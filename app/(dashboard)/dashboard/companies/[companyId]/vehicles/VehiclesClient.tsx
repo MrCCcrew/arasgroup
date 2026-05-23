@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Pencil, PowerOff, X } from "lucide-react";
+import { AlertTriangle, Pencil, PowerOff, X, FolderOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { VehicleRow } from "./page";
 
 interface Branch {
@@ -229,6 +230,13 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                       <td><ExpiryBadge date={v.registrationExpiry} /></td>
                       <td>
                         <div className="flex items-center gap-1">
+                          <Link
+                            href={`/dashboard/companies/${companyId}/vehicles/${v.id}`}
+                            className="rounded p-1.5 hover:bg-blue-50 text-muted-foreground hover:text-blue-600"
+                            title="المستندات والتفاصيل"
+                          >
+                            <FolderOpen size={14} />
+                          </Link>
                           <button
                             onClick={() => openEdit(v)}
                             className="rounded p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground"
