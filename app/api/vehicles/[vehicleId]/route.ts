@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     const companyAccessError = assertCompanyAccess(session, vehicle.companyId);
     if (companyAccessError) return companyAccessError;
-    const permissionError = assertPermission(session, "VEHICLES", "EDIT", { companyId: vehicle.companyId });
+    const permissionError = assertPermission(session, "VEHICLES", "UPDATE", { companyId: vehicle.companyId });
     if (permissionError) return permissionError;
 
     const body = await request.json();
