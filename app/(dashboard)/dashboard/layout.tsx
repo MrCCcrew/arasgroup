@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { SidebarMount } from "@/components/layout/sidebar-mount";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 
 export default async function DashboardRootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -17,11 +18,13 @@ export default async function DashboardRootLayout({ children }: { children: Reac
   });
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <SidebarMount session={session} userName={session.nameAr ?? session.email} companies={companies} />
-      <main className="dashboard-main flex-1 min-h-screen">
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <SidebarMount session={session} userName={session.nameAr ?? session.email} companies={companies} />
+        <main className="dashboard-main min-h-screen">
+          {children}
+        </main>
+      </div>
+    </SidebarProvider>
   );
 }

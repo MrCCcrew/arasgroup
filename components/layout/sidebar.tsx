@@ -27,7 +27,9 @@ import {
   Truck,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
+import { useSidebar } from "./sidebar-context";
 import { cn } from "@/lib/utils";
 import { getVisibleModules, hasPermission, type Module } from "@/lib/auth/permissions";
 import type { SessionUser } from "@/lib/types";
@@ -217,6 +219,7 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
   const { locale, t } = useLocale();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const { isOpen, close } = useSidebar();
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
@@ -258,10 +261,26 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
     : (locale === "en" ? "Access is filtered by company and group" : "الصلاحيات حسب الشركة والمجموعة");
 
   return (
-    <aside className="app-sidebar fixed top-0 z-40 flex h-full w-64 flex-col bg-sidebar shadow-xl">
+    <>
+      {/* Mobile backdrop */}
+      <div
+        className={`fixed inset-0 z-30 bg-black/60 transition-opacity duration-300 md:hidden ${
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={close}
+        aria-hidden="true"
+      />
+      <aside className={`app-sidebar fixed top-0 z-40 flex h-full w-64 flex-col bg-sidebar shadow-xl ${isOpen ? "sidebar-open" : ""}`}>
       {/* Header */}
       <div className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
+          <button
+            onClick={close}
+            className="md:hidden shrink-0 rounded-lg p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            aria-label="إغلاق"
+          >
+            <X size={18} />
+          </button>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
             <span className="text-lg font-bold text-white">ر</span>
           </div>
@@ -307,6 +326,7 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
         </button>
       </div>
     </aside>
+  </>
   );
 }
 

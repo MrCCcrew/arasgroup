@@ -102,10 +102,11 @@
   .app-sidebar {
     right: 0;
     left: auto;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dashboard-main {
-    margin-right: 16rem;
+    margin-right: 0;
     margin-left: 0;
   }
 
@@ -114,9 +115,32 @@
     right: auto;
   }
 
-  html[dir="ltr"] .dashboard-main {
-    margin-left: 16rem;
-    margin-right: 0;
+  /* Desktop: restore sidebar margin */
+  @media (min-width: 768px) {
+    .dashboard-main {
+      margin-right: 16rem;
+      margin-left: 0;
+    }
+    html[dir="ltr"] .dashboard-main {
+      margin-left: 16rem;
+      margin-right: 0;
+    }
+  }
+
+  /* Mobile: sidebar hidden off-screen by default (RTL: push right) */
+  @media (max-width: 767px) {
+    .app-sidebar {
+      transform: translateX(110%);
+    }
+    .app-sidebar.sidebar-open {
+      transform: translateX(0);
+    }
+    html[dir="ltr"] .app-sidebar {
+      transform: translateX(-110%);
+    }
+    html[dir="ltr"] .app-sidebar.sidebar-open {
+      transform: translateX(0);
+    }
   }
 }
 
@@ -181,6 +205,49 @@
 
   .btn-primary {
     @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+
+  /* ── Responsive tables ─────────────────────── */
+  .table-responsive {
+    @apply overflow-x-auto;
+  }
+
+  /* ── Responsive modal overlay ──────────────── */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 md:items-center md:p-4;
+  }
+  .modal-panel {
+    @apply relative w-full overflow-y-auto rounded-t-2xl bg-card shadow-xl md:max-h-[90vh] md:max-w-2xl md:rounded-2xl;
+    max-height: 92vh;
+  }
+  .modal-panel-lg {
+    @apply relative w-full overflow-y-auto rounded-t-2xl bg-card shadow-xl md:max-h-[92vh] md:max-w-4xl md:rounded-2xl;
+    max-height: 92vh;
+  }
+}
+
+/* ── Mobile auto-scroll for tables ─────────────── */
+@media (max-width: 767px) {
+  .ar-table {
+    min-width: 38rem;
+  }
+
+  /* Any direct parent of an ar-table scrolls horizontally */
+  div:has(> .ar-table),
+  div:has(> table) {
+    overflow-x: auto;
+  }
+
+  /* Modals: bottom-sheet style on mobile */
+  [class*="fixed"][class*="inset-0"] > [class*="rounded-2xl"],
+  [class*="fixed"][class*="inset-0"] > [class*="rounded-xl"] {
+    border-radius: 1rem 1rem 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    max-width: 100%;
   }
 }
 
