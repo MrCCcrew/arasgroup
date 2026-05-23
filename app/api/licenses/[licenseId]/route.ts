@@ -91,7 +91,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     const companyError = assertCompanyAccess(session, existing.companyId);
     if (companyError) return companyError;
-    const permError = assertPermission(session, "LICENSES", "EDIT", { companyId: existing.companyId });
+    const permError = assertPermission(session, "LICENSES", "UPDATE", { companyId: existing.companyId });
     if (permError) return permError;
 
     const body = await request.json();
