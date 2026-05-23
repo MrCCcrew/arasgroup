@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTrialBalance, getAccountBalance } from "@/lib/accounting/journal-engine";
-import { getIncomeStatement, getBalanceSheet, getGeneralLedger } from "@/lib/accounting/reports";
+import { getTrialBalance } from "@/lib/accounting/journal-engine";
+import { getIncomeStatement, getBalanceSheet, getAccountLedger } from "@/lib/accounting/reports";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type"); // trial_balance | income_statement | balance_sheet | ledger
+    const type = searchParams.get("type");
     const companyId = searchParams.get("companyId");
-    const fiscalYearId = searchParams.get("fiscalYearId");
+    const fiscalYearId = searchParams.get("fiscalYearId") ?? undefined;
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const accountId = searchParams.get("accountId");
 
-    if (!companyId || !fiscalYearId) {
-      return NextResponse.json({ success: false, error: "companyId و fiscalYearId مطلوبان" }, { status: 400 });
+    if (!companyId) {
+      return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
     }
 
     const start = startDate ? new Date(startDate) : undefined;
@@ -21,14 +21,17 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case "trial_balance": {
+        if (!fiscalYearId) return NextResponse.json({ success: false, error: "fiscalYearId مطلوب" }, { status: 400 });
         const data = await getTrialBalance(companyId, fiscalYearId, start, end);
         return NextResponse.json({ success: true, data });
       }
       case "income_statement": {
+        if (!fiscalYearId) return NextResponse.json({ success: false, error: "fiscalYearId مطلوب" }, { status: 400 });
         const data = await getIncomeStatement(companyId, fiscalYearId, start, end);
         return NextResponse.json({ success: true, data });
       }
       case "balance_sheet": {
+        if (!fiscalYearId) return NextResponse.json({ success: false, error: "fiscalYearId مطلوب" }, { status: 400 });
         const data = await getBalanceSheet(companyId, fiscalYearId, end);
         return NextResponse.json({ success: true, data });
       }
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
         if (!accountId) {
           return NextResponse.json({ success: false, error: "accountId مطلوب" }, { status: 400 });
         }
-        const data = await getGeneralLedger(companyId, accountId, start, end);
+        const data = await getAccountLedger(companyId, accountId, fiscalYearId, start, end);
         return NextResponse.json({ success: true, data });
       }
       default:

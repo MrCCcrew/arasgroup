@@ -88,12 +88,11 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/licenses`, labelKey: "nav.licenses", icon: <FileText size={14} />, iconColor: "amber" },
         { href: `${base}/vehicles`, labelKey: "nav.vehicles", icon: <Car size={14} />,      iconColor: "slate" },
         {
-          href: `${base}/hr`,
+          href: `${base}/hr/employees`,
           labelKey: "nav.employees",
           icon: <Users size={14} />,
           iconColor: "orange",
           children: [
-            { href: `${base}/hr/employees`, labelKey: "nav.employees", icon: <Users size={14} />,    iconColor: "orange" },
             { href: `${base}/hr/positions`, labelKey: "nav.positions", icon: <FileText size={14} />, iconColor: "orange" },
             { href: `${base}/hr/salaries`,  labelKey: "nav.salaries",  icon: <Wallet size={14} />,   iconColor: "orange" },
             { href: `${base}/hr/tickets`,   labelKey: "nav.tickets",   icon: <FileText size={14} />, iconColor: "orange" },
