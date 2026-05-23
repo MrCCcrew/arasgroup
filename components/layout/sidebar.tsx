@@ -85,10 +85,10 @@ function buildCompanyNav(base: string): NavItem[] {
       iconColor: "violet",
       module: "ADMINISTRATIVE_AFFAIRS",
       children: [
-        { href: `${base}/administrative-affairs`, labelKey: "nav.administrativeAffairs", icon: <FileText size={14} />,  iconColor: "violet" },
-        { href: `${base}/licenses`,               labelKey: "nav.licenses",               icon: <FileText size={14} />,  iconColor: "amber"  },
-        { href: `${base}/vehicles`,               labelKey: "nav.vehicles",               icon: <Car size={14} />,       iconColor: "slate"  },
-        { href: `${base}/hr/expiry-alerts`,       labelKey: "nav.expiryAlerts",           icon: <BarChart3 size={14} />, iconColor: "red"    },
+        { href: `${base}/licenses`,         labelKey: "nav.licenses",     icon: <FileText size={14} />,  iconColor: "amber"  },
+        { href: `${base}/vehicles`,         labelKey: "nav.vehicles",     icon: <Car size={14} />,       iconColor: "slate"  },
+        { href: `${base}/hr/employees`,     labelKey: "nav.employees",    icon: <Users size={14} />,     iconColor: "orange" },
+        { href: `${base}/hr/expiry-alerts`, labelKey: "nav.expiryAlerts", icon: <BarChart3 size={14} />, iconColor: "red"    },
       ],
     },
     {
@@ -348,8 +348,7 @@ function NavItemComponent({
   if (hasChildren) {
     return (
       <div className="mb-0.5">
-        <button
-          onClick={onToggle}
+        <div
           className={cn(
             "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
             isActive
@@ -357,10 +356,14 @@ function NavItemComponent({
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
           )}
         >
-          <IconBadge color={item.iconColor}>{item.icon}</IconBadge>
-          <span className="flex-1 text-right">{t(item.labelKey)}</span>
-          {isExpanded ? <ChevronDown size={13} className="opacity-60" /> : <ChevronLeft size={13} className="opacity-60" />}
-        </button>
+          <Link href={item.href} className="flex flex-1 items-center gap-2.5 min-w-0">
+            <IconBadge color={item.iconColor}>{item.icon}</IconBadge>
+            <span className="flex-1 text-right truncate">{t(item.labelKey)}</span>
+          </Link>
+          <button onClick={onToggle} className="shrink-0 p-0.5 rounded hover:bg-sidebar-accent">
+            {isExpanded ? <ChevronDown size={13} className="opacity-60" /> : <ChevronLeft size={13} className="opacity-60" />}
+          </button>
+        </div>
 
         {isExpanded && (
           <div className="mb-1 mr-3 mt-0.5 space-y-0.5 border-r-2 pr-2" style={{ borderColor: `var(--sidebar-border)` }}>
