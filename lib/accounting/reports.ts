@@ -187,7 +187,7 @@ export async function getBalanceSheet(
   };
 }
 
-/** General Ledger for an account */
+/** General Ledger for an account (legacy — used by API route) */
 export async function getGeneralLedger(
   companyId: string,
   accountId: string,
@@ -231,6 +231,149 @@ export async function getGeneralLedger(
       balance: runningBalance,
     };
   });
+}
+
+/** Account Ledger with opening balance — for حساب الأستاذ page */
+export async function getAccountLedger(
+  companyId: string,
+  accountId: string,
+  fiscalYearId?: string,
+  startDate?: Date,
+  endDate?: Date
+) {
+  // Opening balance for the selected fiscal year
+  let openingBalance = 0;
+  if (fiscalYearId) {
+    const ob = await prisma.openingBalance.findFirst({
+      where: { fiscalYearId, accountId },
+    });
+    if (ob) {
+      openingBalance = Number(ob.debit) - Number(ob.credit);
+    }
+  }
+
+  const lines = await prisma.journalEntryLine.findMany({
+    where: {
+      accountId,
+      journalEntry: {
+        companyId,
+        status: "POSTED",
+        isDeleted: false,
+        ...(fiscalYearId ? { fiscalYearId } : {}),
+        ...(startDate || endDate
+          ? { date: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } }
+          : {}),
+      },
+    },
+    include: {
+      journalEntry: {
+        select: { number: true, date: true, descriptionAr: true, type: true },
+      },
+    },
+    orderBy: [{ journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }],
+  });
+
+  let runningBalance = openingBalance;
+  const rows = lines.map((line) => {
+    const debit = Number(line.debit);
+    const credit = Number(line.credit);
+    runningBalance += debit - credit;
+    return {
+      lineId: line.id,
+      journalNumber: line.journalEntry.number,
+      date: line.journalEntry.date,
+      description: line.journalEntry.descriptionAr,
+      type: line.journalEntry.type,
+      debit,
+      credit,
+      balance: runningBalance,
+    };
+  });
+
+  return {
+    openingBalance,
+    rows,
+    totalDebit: rows.reduce((s, r) => s + r.debit, 0),
+    totalCredit: rows.reduce((s, r) => s + r.credit, 0),
+    closingBalance: runningBalance,
+  };
+}
+
+/** Full General Ledger — all accounts with their transactions for دفتر الأستاذ العام */
+export async function getFullGeneralLedger(
+  companyId: string,
+  fiscalYearId?: string,
+  startDate?: Date,
+  endDate?: Date
+) {
+  const lines = await prisma.journalEntryLine.findMany({
+    where: {
+      journalEntry: {
+        companyId,
+        status: "POSTED",
+        isDeleted: false,
+        ...(fiscalYearId ? { fiscalYearId } : {}),
+        ...(startDate || endDate
+          ? { date: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } }
+          : {}),
+      },
+    },
+    include: {
+      account: { select: { id: true, code: true, nameAr: true, type: true } },
+      journalEntry: { select: { number: true, date: true, descriptionAr: true, type: true } },
+    },
+    orderBy: [{ account: { code: "asc" } }, { journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }],
+  });
+
+  type AccountEntry = {
+    account: { id: string; code: string; nameAr: string; type: string };
+    lines: Array<{
+      lineId: string;
+      journalNumber: string;
+      date: Date;
+      description: string | null;
+      type: string;
+      debit: number;
+      credit: number;
+      balance: number;
+    }>;
+    totalDebit: number;
+    totalCredit: number;
+    closingBalance: number;
+  };
+
+  const accountMap = new Map<string, AccountEntry>();
+
+  for (const line of lines) {
+    const key = line.accountId;
+    if (!accountMap.has(key)) {
+      accountMap.set(key, {
+        account: line.account,
+        lines: [],
+        totalDebit: 0,
+        totalCredit: 0,
+        closingBalance: 0,
+      });
+    }
+    const entry = accountMap.get(key)!;
+    const debit = Number(line.debit);
+    const credit = Number(line.credit);
+    entry.closingBalance += debit - credit;
+    entry.totalDebit += debit;
+    entry.totalCredit += credit;
+    entry.lines.push({
+      lineId: line.id,
+      journalNumber: line.journalEntry.number,
+      date: line.journalEntry.date,
+      description: line.journalEntry.descriptionAr,
+      type: line.journalEntry.type,
+      debit,
+      credit,
+      balance: entry.closingBalance,
+    });
+  }
+
+  return Array.from(accountMap.values());
 }
 
 /** Driver wallet statement */
