@@ -32,6 +32,7 @@ model User {
   returnedAssetCustodies AssetCustody[] @relation("AssetCustodyReturnedBy")
   createdJournalEntries  JournalEntry[] @relation("JournalCreatedBy")
   approvedJournalEntries JournalEntry[] @relation("JournalApprovedBy")
+  vehicleIncidents       VehicleIncident[] @relation("VehicleIncidentCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,6 +234,7 @@ model Company {
   driverEvaluations DriverEvaluation[]
   driverViolations  DriverViolation[]
   driverAccidents   DriverAccident[]
+  vehicleIncidents  VehicleIncident[]
   deliveryContracts DeliveryContract[]
   carWashVehicles   CarWashVehicle[]
   carWashWorkers    CarWashWorker[]
@@ -1007,6 +1009,7 @@ model Driver {
   evaluations        DriverEvaluation[]
   violations         DriverViolation[]
   accidents          DriverAccident[]
+  vehicleIncidents   VehicleIncident[]  @relation("DriverVehicleIncidents")
   assetCustodies     AssetCustody[]
   expenses           Expense[]
 
@@ -1060,9 +1063,11 @@ model Vehicle {
   assignedDrivers Driver[]       @relation("DriverAssignedVehicle")
   fuelCardDrivers Driver[]       @relation("DriverFuelCardVehicle")
   driverAssignments DriverVehicleAssignment[]
-  assetCustodies AssetCustody[] @relation("AssetCustodyVehicle")
-  expenses       Expense[]
-  notifications  Notification[]
+  assetCustodies       AssetCustody[]    @relation("AssetCustodyVehicle")
+  expenses             Expense[]
+  notifications        Notification[]
+  incidents            VehicleIncident[] @relation("VehicleIncidents")
+  replacementIncidents VehicleIncident[] @relation("VehicleReplacementIncidents")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2059,6 +2064,72 @@ model DriverAccident {
   @@index([driverId])
   @@index([date])
   @@map("driver_accidents")
+}
+
+// ─── Vehicle Incident & Replacement Tracking ───────────────────────────────
+
+enum IncidentType {
+  ACCIDENT
+  BREAKDOWN
+}
+
+enum ReplacementSource {
+  RENTAL_COMPANY
+  OWN_FLEET
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_REPAIR
+  RESOLVED
+}
+
+model VehicleIncident {
+  id                      String             @id @default(cuid())
+  companyId               String
+  driverId                String
+  vehicleId               String
+
+  incidentDate            DateTime
+  incidentType            IncidentType
+  descriptionAr           String?
+  descriptionEn           String?
+
+  // Replacement vehicle
+  replacementSource       ReplacementSource?
+  replacementVehicleId    String?            // own-fleet replacement (links to Vehicle)
+  replacementVehiclePlate String?            // rental-company replacement plate (free text)
+  replacementStartDate    DateTime?
+  replacementEndDate      DateTime?
+  replacementNotes        String?
+
+  // Repair / garage
+  garageNameAr            String?
+  garagePhone             String?
+  repairStartDate         DateTime?
+  repairEndDate           DateTime?
+  repairCost              Decimal?           @db.Decimal(18, 3)
+
+  status                  IncidentStatus     @default(OPEN)
+  resolvedDate            DateTime?
+  notes                   String?
+  createdById             String?
+
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  driver             Driver    @relation("DriverVehicleIncidents", fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle            Vehicle   @relation("VehicleIncidents", fields: [vehicleId], references: [id], onDelete: Restrict)
+  replacementVehicle Vehicle?  @relation("VehicleReplacementIncidents", fields: [replacementVehicleId], references: [id], onDelete: SetNull)
+  createdBy          User?     @relation("VehicleIncidentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([incidentDate])
+  @@map("vehicle_incidents")
 }
 
 model AccountTransfer {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 
 const branchLinkSchema = z.object({
   branchId: z.string(),
@@ -23,18 +24,33 @@ const createSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
 
+    if (companyId) {
+      const companyAccessError = assertCompanyAccess(session, companyId);
+      if (companyAccessError) return companyAccessError;
+    }
+
+    // ── فلتر الشركة يعتمد على علاقة companies (المنشأة بـ POST عبر connect)
+    // وليس investorBranches، حتى تظهر المستثمرون قبل ربطهم بفروع ──
     const investors = await prisma.investor.findMany({
       where: {
         isActive: true,
         ...(companyId
-          ? { investorBranches: { some: { branch: { companyId }, isActive: true } } }
+          ? { companies: { some: { id: companyId } } }
           : {}),
       },
-      include: { investorBranches: { where: { isActive: true }, include: { branch: { select: { nameAr: true } } } } },
+      include: {
+        investorBranches: {
+          where: { isActive: true },
+          include: { branch: { select: { nameAr: true } } },
+        },
+      },
       orderBy: { nameAr: "asc" },
     });
 
@@ -45,6 +61,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const body = await request.json();
     const parsed = createSchema.safeParse(body);
@@ -53,6 +72,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { companyId, branchLinks, ...investorData } = parsed.data;
+
+    const companyAccessError = assertCompanyAccess(session, companyId);
+    if (companyAccessError) return companyAccessError;
 
     const investor = await prisma.$transaction(async (tx) => {
       const inv = await tx.investor.create({

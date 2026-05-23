@@ -39,9 +39,14 @@ function toDate(v: string | null | undefined): Date | null | undefined {
   return new Date(v);
 }
 
-export async function GET(_req: NextRequest, { params }: Props) {
+export async function GET(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { licenseId } = await params;
+
+    // Fetch first to get companyId for access check
     const license = await prisma.license.findUnique({
       where: { id: licenseId },
       include: {
@@ -72,7 +77,12 @@ export async function GET(_req: NextRequest, { params }: Props) {
         _count: { select: { employees: true, branchLicenses: true } },
       },
     });
+
     if (!license) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
+
+    const companyError = assertCompanyAccess(session, license.companyId);
+    if (companyError) return companyError;
+
     return NextResponse.json({ success: true, data: license });
   } catch {
     return NextResponse.json({ success: false, error: "فشل في جلب الترخيص" }, { status: 500 });

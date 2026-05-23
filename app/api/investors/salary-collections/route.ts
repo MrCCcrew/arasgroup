@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 import { createInvestorSalaryCollectionJE, createInvestorSalaryDisbursementJE } from "@/lib/accounting/auto-entries";
 import { z } from "zod";
 
@@ -17,14 +17,24 @@ const createCollectionSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
     const investorId = searchParams.get("investorId");
 
+    if (!companyId) {
+      return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
+    }
+
+    const companyAccessError = assertCompanyAccess(session, companyId);
+    if (companyAccessError) return companyAccessError;
+
     const collections = await prisma.investorSalaryCollection.findMany({
       where: {
-        ...(companyId ? { companyId } : {}),
+        companyId,
         ...(investorId ? { investorId } : {}),
       },
       include: {
