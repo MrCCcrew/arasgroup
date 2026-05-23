@@ -22,7 +22,7 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { nameAr: true, nameEn: true },
+    select: { nameAr: true, nameEn: true, logoUrl: true },
   });
 
   const asOfDate = sp.asOfDate ? new Date(sp.asOfDate) : undefined;
@@ -40,6 +40,8 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
         body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f5f5f5; font-size: 11pt; }
 .page { max-width: 210mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
         .report-header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .report-header-inner { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+        .company-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb; padding: 4px; background: white; }
         .company-name { font-size: 1.3rem; font-weight: 700; color: #1e3a8a; }
         .report-title { font-size: 1.1rem; font-weight: 600; margin-top: 0.3rem; }
         .report-sub { font-size: 0.85rem; color: #6b7280; margin-top: 0.2rem; }
@@ -76,8 +78,16 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
 
       <div className="page">
         <div className="report-header">
-          <p className="company-name">{company?.nameAr}</p>
-          {company?.nameEn && <p style={{ fontSize: "0.85rem", color: "#374151", direction: "ltr" }}>{company.nameEn}</p>}
+          <div className="report-header-inner">
+            {company?.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logoUrl} alt={company.nameAr} className="company-logo" />
+            )}
+            <div>
+              <p className="company-name">{company?.nameAr}</p>
+              {company?.nameEn && <p style={{ fontSize: "0.85rem", color: "#374151", direction: "ltr" }}>{company.nameEn}</p>}
+            </div>
+          </div>
           <p className="report-title">الميزانية العمومية</p>
           <p className="report-sub">
             {asOfDate

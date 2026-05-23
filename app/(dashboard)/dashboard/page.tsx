@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Header } from "@/components/layout/header";
 import { hasPermission } from "@/lib/auth/permissions";
 import { Building2, Users, TrendingUp, AlertTriangle } from "lucide-react";
@@ -113,8 +114,19 @@ export default async function GroupDashboardPage() {
               >
                 <div className="bg-card border rounded-xl p-5 hover:shadow-md transition-all group-hover:border-primary/30">
                   <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 ${companyTypeColors[company.type] ?? "bg-gray-500"} rounded-lg flex items-center justify-center shrink-0`}>
-                      <span className="text-white font-bold text-sm">{company.nameAr.charAt(0)}</span>
+                    <div className={`w-10 h-10 ${companyTypeColors[company.type] ?? "bg-gray-500"} rounded-lg flex items-center justify-center shrink-0 overflow-hidden`}>
+                      {company.logoUrl ? (
+                        <Image
+                          src={company.logoUrl}
+                          alt={company.nameAr}
+                          width={40}
+                          height={40}
+                          className="h-full w-full object-contain p-0.5"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="text-white font-bold text-sm">{company.nameAr.charAt(0)}</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-foreground truncate">{company.nameAr}</h3>

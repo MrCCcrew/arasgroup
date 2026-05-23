@@ -18,6 +18,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { hasPermission } from "@/lib/auth/permissions";
+import { CompanyLogoUpload } from "@/components/company/CompanyLogoUpload";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 
 interface Props {
@@ -216,6 +217,18 @@ export default async function CompanyDashboardPage({ params }: Props) {
       />
 
       <div className="page-container space-y-6">
+
+        {/* ── شعار الشركة (مشرف عام فقط) ── */}
+        {session.isSuperAdmin && (
+          <div className="section-card">
+            <CompanyLogoUpload
+              companyId={companyId}
+              currentLogoUrl={company.logoUrl ?? null}
+              companyName={companyName}
+              isSuperAdmin={session.isSuperAdmin}
+            />
+          </div>
+        )}
 
         {/* ── الإحصائيات الرئيسية ── */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

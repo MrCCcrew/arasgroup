@@ -20,7 +20,7 @@ interface Entry {
   createdBy: { nameAr: string };
   approvedBy?: { nameAr: string } | null;
 }
-interface Company { nameAr: string; nameEn?: string; address?: string; phone?: string; }
+interface Company { nameAr: string; nameEn?: string; address?: string; phone?: string; logoUrl?: string | null; }
 
 function amountToWords(amount: number): string {
   const whole = Math.floor(amount);
@@ -92,10 +92,16 @@ function VoucherBody({ entry, company, copy }: { entry: Entry; company: Company;
       {/* Header */}
       <div className="voucher-header">
         <div className="company-info">
-          <h1 className="company-name">{company.nameAr}</h1>
-          {company.nameEn && <p className="company-name-en">{company.nameEn}</p>}
-          {company.address && <p className="company-detail">{company.address}</p>}
-          {company.phone && <p className="company-detail" dir="ltr">{company.phone}</p>}
+          {company.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={company.logoUrl} alt={company.nameAr} className="company-logo" />
+          )}
+          <div>
+            <h1 className="company-name">{company.nameAr}</h1>
+            {company.nameEn && <p className="company-name-en">{company.nameEn}</p>}
+            {company.address && <p className="company-detail">{company.address}</p>}
+            {company.phone && <p className="company-detail" dir="ltr">{company.phone}</p>}
+          </div>
         </div>
         <div className="voucher-title-box">
           <h2 className="voucher-title">{title}</h2>
@@ -293,6 +299,8 @@ export default function PrintVoucherPage() {
           padding-bottom: 1rem; margin-bottom: 1rem;
           border-bottom: 2px solid #1e3a8a;
         }
+        .company-info { display: flex; align-items: flex-start; gap: 0.75rem; }
+        .company-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; border: 1px solid #e5e7eb; padding: 3px; background: white; }
         .company-name { font-size: 1.2rem; font-weight: 700; color: #1e3a8a; }
         .company-name-en { font-size: 0.85rem; color: #374151; direction: ltr; text-align: left; margin-top: 0.2rem; }
         .company-detail { font-size: 0.78rem; color: #6b7280; margin-top: 0.15rem; }
