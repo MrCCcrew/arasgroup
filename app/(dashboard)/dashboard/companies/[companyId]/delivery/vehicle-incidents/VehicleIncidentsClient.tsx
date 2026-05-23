@@ -239,8 +239,8 @@ export function VehicleIncidentsClient({
   return (
     <div>
       <Header
-        title={ar ? "حوادث المركبات والتبديل" : "Vehicle Incidents & Replacements"}
-        subtitle={ar ? "متابعة الحوادث والأعطال وسيارات البديلة" : "Track accidents, breakdowns and replacement vehicles"}
+        title={ar ? "حوادث وإصلاح المركبات" : "Vehicle Incidents & Repairs"}
+        subtitle={ar ? "متابعة الحوادث والأعطال والإصلاحات وسيارات البديلة" : "Track accidents, breakdowns, repairs and replacement vehicles"}
         companyId={companyId}
         actions={
           <button
@@ -248,7 +248,7 @@ export function VehicleIncidentsClient({
             className="btn-primary flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
           >
             <Plus size={15} />
-            {ar ? "تسجيل حادثة" : "New incident"}
+            {ar ? "تسجيل حادثة أو إصلاح" : "New incident / repair"}
           </button>
         }
       />
@@ -530,8 +530,8 @@ export function VehicleIncidentsClient({
               <h2 className="flex items-center gap-2 font-semibold">
                 <AlertTriangle size={18} className="text-amber-500" />
                 {modal === "add"
-                  ? (ar ? "تسجيل حادثة جديدة" : "Record new incident")
-                  : (ar ? "تعديل الحادثة" : "Edit incident")}
+                  ? (ar ? "تسجيل حادثة أو إصلاح" : "Record new incident / repair")
+                  : (ar ? "تعديل الحادثة / الإصلاح" : "Edit incident / repair")}
               </h2>
               <button onClick={() => setModal(null)} className="rounded-lg p-1.5 hover:bg-muted">
                 <X size={16} />

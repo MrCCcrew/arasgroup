@@ -85,7 +85,7 @@ export const messages: Record<Locale, MessageTree> = {
       attachments: "النماذج",
       assets: "العهد والأصول",
       notifications: "الإشعارات",
-      vehicleIncidents: "حوادث المركبات",
+      vehicleIncidents: "حوادث وإصلاح المركبات",
     },
     header: {
       unsyncedTransactions: (params?: Record<string, string | number>) =>
@@ -205,7 +205,7 @@ export const messages: Record<Locale, MessageTree> = {
       attachments: "Forms",
       assets: "Assets & Custody",
       notifications: "Notifications",
-      vehicleIncidents: "Vehicle Incidents",
+      vehicleIncidents: "Vehicle Incidents & Repairs",
     },
     header: {
       unsyncedTransactions: (params?: Record<string, string | number>) =>
