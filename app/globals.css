@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 220 20% 96%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 220.9 39.3% 11%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 78%;
+    --input: 220 13% 82%;
+    --ring: 224 71.4% 4.1%;
+    --radius: 0.5rem;
+    --sidebar-background: 224 71.4% 4.1%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 214.3 31.8% 91.4%;
+    --sidebar-primary-foreground: 224 71.4% 4.1%;
+    --sidebar-accent: 216 34% 17%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 216 34% 17%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
+    --secondary: 215 27.9% 16.9%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 215 27.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 216 12.2% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html[dir="rtl"] body {
+    direction: rtl;
+  }
+
+  html[dir="ltr"] body {
+    direction: ltr;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Almarai', system-ui, sans-serif;
+  }
+
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+
+  .number {
+    direction: ltr;
+    display: inline-block;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-muted-foreground/30;
+  }
+
+  .app-sidebar {
+    right: 0;
+    left: auto;
+  }
+
+  .dashboard-main {
+    margin-right: 16rem;
+    margin-left: 0;
+  }
+
+  html[dir="ltr"] .app-sidebar {
+    left: 0;
+    right: auto;
+  }
+
+  html[dir="ltr"] .dashboard-main {
+    margin-left: 16rem;
+    margin-right: 0;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply space-y-6 p-4 md:p-6 lg:p-8;
+  }
+
+  .section-card {
+    @apply rounded-lg border bg-card p-4 shadow-sm md:p-6;
+  }
+
+  .stat-card {
+    @apply flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm;
+  }
+
+  .form-section {
+    @apply space-y-4 rounded-lg bg-muted/30 p-4;
+  }
+
+  .ar-table {
+    @apply w-full text-sm;
+  }
+
+  .ar-table th {
+    @apply bg-muted/50 px-3 py-2 font-bold text-muted-foreground;
+    text-align: start;
+  }
+
+  .ar-table td {
+    @apply border-b border-border px-3 py-2;
+    text-align: start;
+  }
+
+  .status-draft { @apply bg-gray-100 text-gray-700; }
+  .status-pending { @apply bg-yellow-100 text-yellow-700; }
+  .status-approved { @apply bg-blue-100 text-blue-700; }
+  .status-posted { @apply bg-green-100 text-green-700; }
+  .status-rejected { @apply bg-red-100 text-red-700; }
+  .status-cancelled { @apply bg-gray-200 text-gray-500; }
+
+  .form-label {
+    @apply mb-1.5 block text-sm font-medium text-foreground;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-ring focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30;
+  }
+
+  select.input-field {
+    @apply cursor-pointer;
+  }
+
+  textarea.input-field {
+    @apply resize-none;
+  }
+
+  .amount-debit { @apply font-medium text-blue-600; }
+  .amount-credit { @apply font-medium text-green-600; }
+  .amount-balance-positive { @apply font-bold text-emerald-600; }
+  .amount-balance-negative { @apply font-bold text-red-600; }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+}
+
+@media print {
+  .app-sidebar { display: none !important; }
+  .dashboard-main { margin: 0 !important; }
+  .no-print { display: none !important; }
+  .page-container { padding: 0 !important; }
+  .section-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+  body { background: white !important; font-size: 11pt; }
+  @page { size: A4; margin: 1.5cm; }
+}

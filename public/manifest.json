@@ -1,0 +1,15 @@
+{
+  "name": "نظام مجموعة عبد الفتاح راشد",
+  "short_name": "راشد ERP",
+  "description": "نظام إدارة مجموعة عبد الفتاح راشد سليمان",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "orientation": "any",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [],
+  "categories": ["business", "finance", "productivity"],
+  "screenshots": []
+}
