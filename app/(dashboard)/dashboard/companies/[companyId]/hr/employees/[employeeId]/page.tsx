@@ -20,18 +20,22 @@ import { formatDate, formatKWD } from "@/lib/utils";
 
 const DOC_TYPES = {
   ar: [
-    { value: "EMPLOYEE:WORK_PERMIT", label: "إذن العمل" },
-    { value: "EMPLOYEE:PASSPORT", label: "جواز السفر" },
-    { value: "EMPLOYEE:CIVIL_ID", label: "البطاقة المدنية" },
-    { value: "EMPLOYEE:CERTIFICATE", label: "شهادة / مؤهل" },
-    { value: "EMPLOYEE:OTHER", label: "مرفق آخر" },
+    { value: "EMPLOYEE:WORK_PERMIT",      label: "إذن العمل"        },
+    { value: "EMPLOYEE:PASSPORT",          label: "جواز السفر"       },
+    { value: "EMPLOYEE:CIVIL_ID",          label: "البطاقة المدنية"  },
+    { value: "EMPLOYEE:RESIDENCY",         label: "الإقامة"          },
+    { value: "EMPLOYEE:DRIVING_LICENSE",   label: "رخصة القيادة"     },
+    { value: "EMPLOYEE:CERTIFICATE",       label: "شهادة / مؤهل"    },
+    { value: "EMPLOYEE:OTHER",             label: "مرفق آخر"         },
   ],
   en: [
-    { value: "EMPLOYEE:WORK_PERMIT", label: "Work permit" },
-    { value: "EMPLOYEE:PASSPORT", label: "Passport" },
-    { value: "EMPLOYEE:CIVIL_ID", label: "Civil ID" },
-    { value: "EMPLOYEE:CERTIFICATE", label: "Certificate / Qualification" },
-    { value: "EMPLOYEE:OTHER", label: "Other attachment" },
+    { value: "EMPLOYEE:WORK_PERMIT",      label: "Work permit"              },
+    { value: "EMPLOYEE:PASSPORT",          label: "Passport"                 },
+    { value: "EMPLOYEE:CIVIL_ID",          label: "Civil ID"                 },
+    { value: "EMPLOYEE:RESIDENCY",         label: "Residency"                },
+    { value: "EMPLOYEE:DRIVING_LICENSE",   label: "Driving license"          },
+    { value: "EMPLOYEE:CERTIFICATE",       label: "Certificate / Qualification" },
+    { value: "EMPLOYEE:OTHER",             label: "Other attachment"         },
   ],
 } as const;
 
