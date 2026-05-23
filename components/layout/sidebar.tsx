@@ -85,10 +85,21 @@ function buildCompanyNav(base: string): NavItem[] {
       iconColor: "violet",
       module: "ADMINISTRATIVE_AFFAIRS",
       children: [
-        { href: `${base}/licenses`,         labelKey: "nav.licenses",     icon: <FileText size={14} />,  iconColor: "amber"  },
-        { href: `${base}/vehicles`,         labelKey: "nav.vehicles",     icon: <Car size={14} />,       iconColor: "slate"  },
-        { href: `${base}/hr/employees`,     labelKey: "nav.employees",    icon: <Users size={14} />,     iconColor: "orange" },
-        { href: `${base}/hr/expiry-alerts`, labelKey: "nav.expiryAlerts", icon: <BarChart3 size={14} />, iconColor: "red"    },
+        { href: `${base}/licenses`, labelKey: "nav.licenses", icon: <FileText size={14} />, iconColor: "amber" },
+        { href: `${base}/vehicles`, labelKey: "nav.vehicles", icon: <Car size={14} />,      iconColor: "slate" },
+        {
+          href: `${base}/hr`,
+          labelKey: "nav.employees",
+          icon: <Users size={14} />,
+          iconColor: "orange",
+          children: [
+            { href: `${base}/hr/employees`, labelKey: "nav.employees", icon: <Users size={14} />,    iconColor: "orange" },
+            { href: `${base}/hr/positions`, labelKey: "nav.positions", icon: <FileText size={14} />, iconColor: "orange" },
+            { href: `${base}/hr/salaries`,  labelKey: "nav.salaries",  icon: <Wallet size={14} />,   iconColor: "orange" },
+            { href: `${base}/hr/tickets`,   labelKey: "nav.tickets",   icon: <FileText size={14} />, iconColor: "orange" },
+          ],
+        },
+        { href: `${base}/hr/expiry-alerts`, labelKey: "nav.expiryAlerts", icon: <BarChart3 size={14} />, iconColor: "red" },
       ],
     },
     {
@@ -151,19 +162,6 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/investors/claims`,   labelKey: "nav.investorClaims",     icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/statements`,labelKey: "nav.investorStatements",icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/salaries`, labelKey: "nav.investorSalaries",   icon: <Wallet size={14} />,   iconColor: "teal" },
-      ],
-    },
-    {
-      href: `${base}/hr`,
-      labelKey: "nav.employees",
-      icon: <Users size={16} />,
-      iconColor: "orange",
-      module: "HR",
-      children: [
-        { href: `${base}/hr/employees`, labelKey: "nav.employees", icon: <Users size={14} />,    iconColor: "orange" },
-        { href: `${base}/hr/positions`, labelKey: "nav.positions", icon: <FileText size={14} />, iconColor: "orange" },
-        { href: `${base}/hr/salaries`,  labelKey: "nav.salaries",  icon: <Wallet size={14} />,   iconColor: "orange" },
-        { href: `${base}/hr/tickets`,   labelKey: "nav.tickets",   icon: <FileText size={14} />, iconColor: "orange" },
       ],
     },
     { href: `${base}/expenses`,    labelKey: "nav.expenses",    icon: <Receipt size={16} />,   iconColor: "red",    module: "EXPENSES" },
@@ -345,6 +343,26 @@ function NavItemComponent({
   const colorKey = (item.iconColor ?? "slate") as ColorKey;
   const scheme = C[colorKey] ?? C.slate;
 
+  // Local expansion state for nested children (supports 2+ levels deep)
+  const [childExpanded, setChildExpanded] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (item.children) {
+      const toExpand = item.children
+        .filter((c) => c.children?.length && (pathname === c.href || pathname.startsWith(c.href + "/")))
+        .map((c) => c.href);
+      if (toExpand.length) {
+        setChildExpanded((prev) => [...new Set([...prev, ...toExpand])]);
+      }
+    }
+  }, [pathname, item.children]);
+
+  function toggleChild(href: string) {
+    setChildExpanded((prev) =>
+      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href],
+    );
+  }
+
   if (hasChildren) {
     return (
       <div className="mb-0.5">
@@ -372,8 +390,8 @@ function NavItemComponent({
                 key={child.href}
                 item={child}
                 pathname={pathname}
-                isExpanded={false}
-                onToggle={() => undefined}
+                isExpanded={childExpanded.includes(child.href)}
+                onToggle={() => toggleChild(child.href)}
               />
             ))}
           </div>
