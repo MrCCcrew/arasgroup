@@ -5,41 +5,36 @@ import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { hasPermission } from "@/lib/auth/permissions";
 import { Building2, Users, TrendingUp, AlertTriangle } from "lucide-react";
+import { ExpiryAlertsPanel } from "./ExpiryAlertsPanel";
 
 export default async function GroupDashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const companyFilter = session.isSuperAdmin ? {} : { id: { in: session.companyAccess } };
+
   const [companies, totalEmployees, expiringResidencies] = await Promise.all([
     prisma.company.findMany({
-      where: {
-        isActive: true,
-        ...(session.isSuperAdmin ? {} : { id: { in: session.companyAccess } }),
-      },
-      include: {
-        _count: { select: { employees: true, branches: true } },
-      },
+      where: { isActive: true, ...companyFilter },
+      include: { _count: { select: { employees: true, branches: true } } },
       orderBy: { sortOrder: "asc" },
     }),
     prisma.employee.count({
       where: {
-        isActive: true,
-        isDeleted: false,
+        isActive: true, isDeleted: false,
         ...(session.isSuperAdmin ? {} : { companyId: { in: session.companyAccess } }),
       },
     }),
     prisma.employee.count({
       where: {
-        isActive: true,
-        isDeleted: false,
+        isActive: true, isDeleted: false,
         ...(session.isSuperAdmin ? {} : { companyId: { in: session.companyAccess } }),
-        residencyExpiry: {
-          lte: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-          gte: new Date(),
-        },
+        residencyExpiry: { lte: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), gte: new Date() },
       },
     }),
   ]);
+
+  const companyIds = companies.map((c) => c.id);
 
   const companyTypeLabels: Record<string, string> = {
     DELIVERY: "شركة توصيل",
@@ -103,6 +98,9 @@ export default async function GroupDashboardPage() {
             bg="bg-purple-50"
           />
         </div>
+
+        {/* ── تنبيهات الانتهاء ── */}
+        <ExpiryAlertsPanel companyIds={companyIds} />
 
         <div>
           <h2 className="text-lg font-bold mb-4">الشركات</h2>
