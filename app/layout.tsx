@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LocaleProvider } from "@/components/providers/locale-provider";
 import { getLocale, getLocaleDirection } from "@/lib/i18n";
+import { prisma } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: {
@@ -14,9 +15,6 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "نظام مجموعة عبد الفتاح راشد",
-  },
-  icons: {
-    icon: "/favicon.ico",
   },
 };
 
@@ -31,9 +29,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const dir = getLocaleDirection(locale);
 
+  const group = await prisma.group.findFirst({
+    select: { logoUrl: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const faviconUrl = group?.logoUrl ?? "/favicon.svg";
+
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
+        <link rel="icon" href={faviconUrl} />
+        <link rel="apple-touch-icon" href={faviconUrl} />
         <link
           href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap"
           rel="stylesheet"
