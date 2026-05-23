@@ -108,7 +108,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     const permError = assertPermission(session, "VEHICLES", "DELETE", { companyId: existing.companyId });
     if (permError) return permError;
 
-    const opCount = await prisma.carWashOperation.count({ where: { carWashVehicleId: vehicleId } });
+    const opCount = await prisma.carWashDailyOperation.count({ where: { carWashVehicleId: vehicleId } });
     if (opCount > 0) {
       return NextResponse.json(
         { success: false, error: `لا يمكن حذف المركبة — مرتبطة بـ ${opCount} عملية تشغيل` },
