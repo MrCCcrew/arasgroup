@@ -138,6 +138,7 @@ export interface IncomeStatementRow {
   nameAr: string;
   amount: number;
   isHeader: boolean;
+  level?: number;
 }
 
 export interface BalanceSheetRow {

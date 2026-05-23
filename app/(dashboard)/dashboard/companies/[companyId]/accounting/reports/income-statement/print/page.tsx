@@ -108,7 +108,7 @@ export default async function IncomeStatementPrintPage({ params, searchParams }:
                 {report.revenues.map((row, i) => (
                   <tr key={i} className={row.isHeader ? "header-row" : ""}>
                     <td style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "#6b7280", width: "80px" }}>{row.code}</td>
-                    <td style={{ paddingRight: `${row.level * 1 + 0.5}rem` }}>{row.nameAr}</td>
+                    <td style={{ paddingRight: `${(row.level ?? 0) * 1 + 0.5}rem` }}>{row.nameAr}</td>
                     <td className="num" style={{ color: "#059669" }}>{row.isHeader ? "" : row.amount.toFixed(3)}</td>
                   </tr>
                 ))}
@@ -126,7 +126,7 @@ export default async function IncomeStatementPrintPage({ params, searchParams }:
                 {report.expenses.map((row, i) => (
                   <tr key={i} className={row.isHeader ? "header-row" : ""}>
                     <td style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "#6b7280", width: "80px" }}>{row.code}</td>
-                    <td style={{ paddingRight: `${row.level * 1 + 0.5}rem` }}>{row.nameAr}</td>
+                    <td style={{ paddingRight: `${(row.level ?? 0) * 1 + 0.5}rem` }}>{row.nameAr}</td>
                     <td className="num" style={{ color: "#dc2626" }}>{row.isHeader ? "" : row.amount.toFixed(3)}</td>
                   </tr>
                 ))}
