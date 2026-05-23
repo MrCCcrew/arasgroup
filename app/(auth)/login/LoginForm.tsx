@@ -48,18 +48,18 @@ export default function LoginForm({ logoUrl, groupNameAr, groupNameEn }: Props) 
       {/* Logo & Title */}
       <div className="text-center mb-8">
         {logoUrl ? (
-          <div className="relative w-24 h-24 mx-auto mb-4">
+          <div className="relative w-36 h-36 mx-auto mb-5 rounded-2xl overflow-hidden bg-white/10 backdrop-blur-sm border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] p-3">
             <Image
               src={logoUrl}
               alt={groupNameAr}
               fill
-              className="object-contain drop-shadow-lg"
+              className="object-contain p-2"
               unoptimized
             />
           </div>
         ) : (
-          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center">
-            <span className="text-2xl font-bold text-primary-foreground">ر</span>
+          <div className="w-20 h-20 bg-primary rounded-2xl mx-auto mb-5 flex items-center justify-center shadow-lg">
+            <span className="text-3xl font-bold text-primary-foreground">ر</span>
           </div>
         )}
         <h1 className="text-2xl font-bold text-white">{groupNameAr}</h1>
