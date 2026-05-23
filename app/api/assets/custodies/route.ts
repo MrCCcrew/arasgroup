@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { AssetCustodyStatus } from "@prisma/client";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 
 export async function GET(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const custodies = await prisma.assetCustody.findMany({
     where: {
       companyId,
-      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(statusFilter ? { status: statusFilter as AssetCustodyStatus } : {}),
     },
     include: {
       assetItem: {
