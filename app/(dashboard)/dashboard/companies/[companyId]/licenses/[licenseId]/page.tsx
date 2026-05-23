@@ -46,6 +46,15 @@ interface LicenseDetail {
   _count: { employees: number; branchLicenses: number };
 }
 
+const LICENSE_DOC_TYPES = [
+  { value: "LICENSE:COMMERCIAL", label: "الترخيص التجاري" },
+  { value: "LICENSE:FIRE", label: "رخصة الإطفاء" },
+  { value: "LICENSE:HEALTH", label: "الرخصة الصحية" },
+  { value: "LICENSE:ADVERTISING", label: "رخصة الإعلانات" },
+  { value: "LICENSE:LEASE", label: "عقد الإيجار" },
+  { value: "LICENSE:OTHER", label: "مرفق آخر" },
+];
+
 const EMPTY_EDIT = {
   commercialNameAr: "", commercialNameEn: "", licenseNumber: "",
   status: "ACTIVE", branchId: "", investorId: "",
@@ -141,6 +150,7 @@ export default function LicenseDetailPage() {
   const [uploadError, setUploadError] = useState("");
   const [deleteAttId, setDeleteAttId] = useState<string | null>(null);
   const [deletingAtt, setDeletingAtt] = useState(false);
+  const [currentDocType, setCurrentDocType] = useState("LICENSE:COMMERCIAL");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -226,6 +236,7 @@ export default function LicenseDetailPage() {
     for (const file of files) {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("documentCategory", currentDocType);
       const res = await fetch(`/api/licenses/${licenseId}/attachments`, { method: "POST", body: fd });
       const data = await res.json();
       if (!data.success) { setUploadError(data.error ?? "فشل في رفع الملف"); break; }
@@ -502,72 +513,101 @@ export default function LicenseDetailPage() {
 
         {/* Attachments */}
         <div className="section-card space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Paperclip size={16} className="text-primary" />
-              <h3 className="font-semibold">المرفقات ({attachments.length})</h3>
-            </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
-              >
-                <Upload size={14} />
-                {uploading ? "جاري الرفع..." : "رفع ملف"}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <Paperclip size={16} className="text-primary" />
+            <h3 className="font-semibold">المرفقات ({attachments.length})</h3>
           </div>
+
           {uploadError && (
             <div className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{uploadError}</div>
           )}
-          {attachments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-10">
-              <FileText size={32} className="mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">لا توجد مرفقات — اضغط "رفع ملف" لإضافة وثائق</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {attachments.map((att) => {
-                const isImage = att.mimeType?.startsWith("image/");
+
+          {/* hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFileUpload}
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+          />
+
+          {/* زراير أنواع المرفقات */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+            {LICENSE_DOC_TYPES.map((docType) => {
+              const count = attachments.filter((a) => a.documentCategory === docType.value).length;
+              const isUploading = uploading && currentDocType === docType.value;
+              return (
+                <button
+                  key={docType.value}
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => {
+                    setCurrentDocType(docType.value);
+                    setTimeout(() => fileInputRef.current?.click(), 0);
+                  }}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-all
+                    ${isUploading
+                      ? "border-primary/50 bg-primary/5 opacity-70"
+                      : "cursor-pointer border-border bg-muted/20 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                >
+                  {isUploading ? (
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  ) : (
+                    <Upload size={20} className="text-muted-foreground" />
+                  )}
+                  <span className="text-xs leading-tight font-medium">{docType.label}</span>
+                  {count > 0 && (
+                    <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* المرفقات المرفوعة مجمّعة حسب النوع */}
+          {attachments.length > 0 && (
+            <div className="space-y-4 pt-2">
+              {LICENSE_DOC_TYPES.map((docType) => {
+                const items = attachments.filter((a) => a.documentCategory === docType.value || (!a.documentCategory && docType.value === "LICENSE:OTHER"));
+                if (items.length === 0) return null;
                 return (
-                  <div key={att.id} className="group relative overflow-hidden rounded-xl border bg-muted/20">
-                    {isImage ? (
-                      <div className="aspect-video w-full overflow-hidden bg-muted">
-                        <img src={att.filePath} alt={att.originalName} className="h-full w-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className="flex aspect-video items-center justify-center bg-muted/50">
-                        <FileText size={36} className="text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="p-2">
-                      <p className="truncate text-xs font-medium">{att.originalName}</p>
-                      <p className="text-[10px] text-muted-foreground">{formatBytes(att.fileSize)}</p>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <a
-                        href={att.filePath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100"
-                      >
-                        عرض
-                      </a>
-                      <button
-                        onClick={() => setDeleteAttId(att.id)}
-                        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                      >
-                        حذف
-                      </button>
+                  <div key={docType.value}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{docType.label}</p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                      {items.map((att) => {
+                        const isImage = att.mimeType?.startsWith("image/");
+                        return (
+                          <div key={att.id} className="group relative overflow-hidden rounded-xl border bg-muted/20">
+                            {isImage ? (
+                              <div className="aspect-video w-full overflow-hidden bg-muted">
+                                <img src={att.filePath} alt={att.originalName} className="h-full w-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="flex aspect-video items-center justify-center bg-muted/50">
+                                <FileText size={36} className="text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="p-2">
+                              <p className="truncate text-xs font-medium">{att.originalName}</p>
+                              <p className="text-[10px] text-muted-foreground">{formatBytes(att.fileSize)}</p>
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                              <a href={att.filePath} target="_blank" rel="noopener noreferrer"
+                                className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100">
+                                عرض
+                              </a>
+                              <button onClick={() => setDeleteAttId(att.id)}
+                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700">
+                                حذف
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );

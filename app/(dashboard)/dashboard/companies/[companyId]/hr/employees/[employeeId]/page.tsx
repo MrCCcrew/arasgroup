@@ -240,30 +240,52 @@ export default function EmployeeDetailPage() {
             {locale === "en" ? "Documents & Attachments" : "المستندات والمرفقات"}
           </h3>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-3">
-            <select value={docType} onChange={(event) => setDocType(event.target.value)} className="input-field text-sm">
-              {DOC_TYPES[locale].map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <label className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${uploading ? "pointer-events-none opacity-50" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-              <Upload size={15} />
-              {uploading ? (locale === "en" ? "Uploading..." : "جاري الرفع...") : locale === "en" ? "Upload file" : "رفع ملف"}
-              <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleUpload} />
-            </label>
-            <span className="text-xs text-muted-foreground">
-              {locale === "en" ? "Images, PDF, Word, Excel - max 10 MB" : "صور، PDF، Word، Excel - حد أقصى 10 ميجابايت"}
-            </span>
+          {/* زراير أنواع المرفقات */}
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handleUpload}
+          />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+            {DOC_TYPES[locale].map((item) => {
+              const count = attachments.filter((a) => a.refModule === item.value).length;
+              const isUploading = uploading && docType === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => {
+                    setDocType(item.value);
+                    setTimeout(() => fileRef.current?.click(), 0);
+                  }}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center text-sm font-medium transition-all
+                    ${isUploading
+                      ? "border-primary/50 bg-primary/5 opacity-70"
+                      : "border-border bg-muted/20 hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
+                    }`}
+                >
+                  {isUploading ? (
+                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  ) : (
+                    <Upload size={22} className="text-muted-foreground" />
+                  )}
+                  <span className="text-xs leading-tight">{item.label}</span>
+                  {count > 0 && (
+                    <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {attachments.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {locale === "en" ? "No attachments yet" : "لا توجد مرفقات بعد"}
-            </p>
-          ) : (
-            <div className="space-y-4">
+          {/* المرفقات المرفوعة مجمّعة حسب النوع */}
+          {attachments.length > 0 && (
+            <div className="space-y-4 pt-2">
               {grouped.map((group) => (
                 <div key={group.value}>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
