@@ -141,29 +141,29 @@ const companySeeds = [
   },
 ];
 
-const deliveryAssetTypes = [
-  "Mobile phone",
-  "SIM card",
-  "Fuel card",
-  "Delivery bag",
-  "Uniform",
-  "Helmet",
-  "Car key",
-  "Vehicle documents",
+const deliveryAssetTypes: { nameAr: string; nameEn: string; requiresSerial: boolean }[] = [
+  { nameAr: "هاتف محمول",    nameEn: "Mobile phone",       requiresSerial: true  },
+  { nameAr: "شريحة اتصال",  nameEn: "SIM card",           requiresSerial: true  },
+  { nameAr: "بطاقة وقود",   nameEn: "Fuel card",          requiresSerial: true  },
+  { nameAr: "حقيبة توصيل",  nameEn: "Delivery bag",       requiresSerial: false },
+  { nameAr: "زي موحد",      nameEn: "Uniform",            requiresSerial: false },
+  { nameAr: "خوذة",         nameEn: "Helmet",             requiresSerial: false },
+  { nameAr: "مفتاح سيارة",  nameEn: "Car key",            requiresSerial: false },
+  { nameAr: "وثائق المركبة", nameEn: "Vehicle documents",  requiresSerial: false },
 ];
 
-const carWashAssetTypes = [
-  "Mobile phone",
-  "SIM card",
-  "Washing machine",
-  "Vacuum",
-  "Water tank equipment",
-  "Hose",
-  "Cleaning tools",
-  "Chemical sprayer",
-  "Generator",
-  "POS/KNET device",
-  "Uniform",
+const carWashAssetTypes: { nameAr: string; nameEn: string; requiresSerial: boolean }[] = [
+  { nameAr: "هاتف محمول",         nameEn: "Mobile phone",       requiresSerial: true  },
+  { nameAr: "شريحة اتصال",        nameEn: "SIM card",           requiresSerial: true  },
+  { nameAr: "غسالة",              nameEn: "Washing machine",    requiresSerial: false },
+  { nameAr: "مكنسة كهربائية",     nameEn: "Vacuum",             requiresSerial: false },
+  { nameAr: "معدات خزان المياه",   nameEn: "Water tank equipment",requiresSerial: false},
+  { nameAr: "خرطوم مياه",         nameEn: "Hose",               requiresSerial: false },
+  { nameAr: "أدوات النظافة",      nameEn: "Cleaning tools",     requiresSerial: false },
+  { nameAr: "رشاش الكيماويات",    nameEn: "Chemical sprayer",   requiresSerial: false },
+  { nameAr: "مولد كهربائي",       nameEn: "Generator",          requiresSerial: true  },
+  { nameAr: "جهاز نقطة البيع",    nameEn: "POS/KNET device",    requiresSerial: true  },
+  { nameAr: "زي موحد",            nameEn: "Uniform",            requiresSerial: false },
 ];
 
 async function main() {
@@ -414,9 +414,9 @@ async function main() {
   }
 
   for (const company of [itDelivery, eagleDelivery]) {
-    for (const nameAr of deliveryAssetTypes) {
+    for (const type of deliveryAssetTypes) {
       const existing = await prisma.assetItemType.findFirst({
-        where: { companyId: company.id, nameAr },
+        where: { companyId: company.id, nameAr: type.nameAr },
         select: { id: true },
       });
       if (!existing) {
@@ -424,18 +424,24 @@ async function main() {
           data: {
             companyId: company.id,
             companyType: "DELIVERY",
-            nameAr,
-            requiresSerialNumber: ["Mobile phone", "SIM card", "Fuel card"].includes(nameAr),
+            nameAr: type.nameAr,
+            nameEn: type.nameEn,
+            requiresSerialNumber: type.requiresSerial,
             requiresCondition: true,
           },
+        });
+      } else {
+        await prisma.assetItemType.update({
+          where: { id: existing.id },
+          data: { nameEn: type.nameEn },
         });
       }
     }
   }
 
-  for (const nameAr of carWashAssetTypes) {
+  for (const type of carWashAssetTypes) {
     const existing = await prisma.assetItemType.findFirst({
-      where: { companyId: bergenCarWash.id, nameAr },
+      where: { companyId: bergenCarWash.id, nameAr: type.nameAr },
       select: { id: true },
     });
     if (!existing) {
@@ -443,10 +449,16 @@ async function main() {
         data: {
           companyId: bergenCarWash.id,
           companyType: "CAR_WASH",
-          nameAr,
-          requiresSerialNumber: ["Mobile phone", "SIM card", "POS/KNET device", "Generator"].includes(nameAr),
+          nameAr: type.nameAr,
+          nameEn: type.nameEn,
+          requiresSerialNumber: type.requiresSerial,
           requiresCondition: true,
         },
+      });
+    } else {
+      await prisma.assetItemType.update({
+        where: { id: existing.id },
+        data: { nameEn: type.nameEn },
       });
     }
   }

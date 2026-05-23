@@ -199,11 +199,11 @@ export default function CompanyAttachmentsPage() {
   return (
     <div>
       <Header
-        title={locale === "en" ? "Company Attachments" : "مرفقات الشركة"}
+        title={locale === "en" ? "Company Forms" : "نماذج الشركة"}
         subtitle={
           locale === "en"
-            ? "All documents and files for this company"
-            : "جميع المستندات والملفات الخاصة بالشركة"
+            ? "Documents, forms and files for this company"
+            : "النماذج والمستندات والملفات الخاصة بالشركة"
         }
         companyId={companyId}
       />
