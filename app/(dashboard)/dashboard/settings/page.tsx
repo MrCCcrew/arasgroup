@@ -8,7 +8,8 @@ import Link from "next/link";
 const companyTypeLabels: Record<string, string> = {
   DELIVERY: "توصيل",
   CAR_WASH: "غسيل سيارات",
-  TRADING: "تجارة عامة",
+  GENERAL_TRADING: "تجارة عامة",
+  TRADING: "تجارة",
   HOLDING: "قابضة",
   OTHER: "أخرى",
 };
@@ -16,6 +17,7 @@ const companyTypeLabels: Record<string, string> = {
 const companyTypeColors: Record<string, string> = {
   DELIVERY: "bg-blue-100 text-blue-700",
   CAR_WASH: "bg-cyan-100 text-cyan-700",
+  GENERAL_TRADING: "bg-emerald-100 text-emerald-700",
   TRADING: "bg-emerald-100 text-emerald-700",
   HOLDING: "bg-purple-100 text-purple-700",
   OTHER: "bg-gray-100 text-gray-700",
