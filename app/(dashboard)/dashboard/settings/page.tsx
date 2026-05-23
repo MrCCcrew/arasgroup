@@ -2,8 +2,9 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
-import { Building2, Users, Shield, Plus, Link2, Link2Off } from "lucide-react";
+import { Building2, Users, Shield, Plus, Link2 } from "lucide-react";
 import Link from "next/link";
+import { GroupLogoUpload } from "@/components/group/GroupLogoUpload";
 
 const companyTypeLabels: Record<string, string> = {
   DELIVERY: "توصيل",
@@ -106,17 +107,17 @@ export default async function SettingsPage() {
           {groups.map((group) => (
             <div key={group.id} className="section-card">
               {/* Group Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <div className="flex items-start justify-between mb-4 gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
                     <Link2 size={18} className="text-primary" />
                   </div>
-                  <div>
-                    <h3 className="font-bold">{group.nameAr}</h3>
+                  <div className="min-w-0">
+                    <h3 className="font-bold truncate">{group.nameAr}</h3>
                     {group.nameEn && <p className="text-xs text-muted-foreground">{group.nameEn}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <span className="text-xs bg-muted px-3 py-1 rounded-full text-muted-foreground">
                     {group.companies.length} شركة
                   </span>
@@ -127,6 +128,15 @@ export default async function SettingsPage() {
                     تعديل المجموعة
                   </Link>
                 </div>
+              </div>
+
+              {/* Group Logo Upload */}
+              <div className="mb-4 pb-4 border-b border-border/50">
+                <GroupLogoUpload
+                  groupId={group.id}
+                  currentLogoUrl={group.logoUrl ?? null}
+                  groupName={group.nameAr}
+                />
               </div>
 
               {/* Companies in this group */}
