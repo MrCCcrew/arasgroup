@@ -77,10 +77,20 @@ const GROUP_NAV: NavItem[] = [
 
 function buildCompanyNav(base: string): NavItem[] {
   return [
-    { href: base, labelKey: "nav.dashboard", icon: <LayoutDashboard size={16} />, iconColor: "blue",   module: "DASHBOARD" },
-    { href: `${base}/administrative-affairs`, labelKey: "nav.administrativeAffairs", icon: <FileText size={16} />, iconColor: "violet", module: "ADMINISTRATIVE_AFFAIRS" },
-    { href: `${base}/licenses`,  labelKey: "nav.licenses",  icon: <FileText size={16} />,  iconColor: "amber",  module: "LICENSES" },
-    { href: `${base}/vehicles`,  labelKey: "nav.vehicles",  icon: <Car size={16} />,       iconColor: "slate",  module: "VEHICLES" },
+    { href: base, labelKey: "nav.dashboard", icon: <LayoutDashboard size={16} />, iconColor: "blue", module: "DASHBOARD" },
+    {
+      href: `${base}/administrative-affairs`,
+      labelKey: "nav.administrativeAffairs",
+      icon: <FileText size={16} />,
+      iconColor: "violet",
+      module: "ADMINISTRATIVE_AFFAIRS",
+      children: [
+        { href: `${base}/administrative-affairs`, labelKey: "nav.administrativeAffairs", icon: <FileText size={14} />,  iconColor: "violet" },
+        { href: `${base}/licenses`,               labelKey: "nav.licenses",               icon: <FileText size={14} />,  iconColor: "amber"  },
+        { href: `${base}/vehicles`,               labelKey: "nav.vehicles",               icon: <Car size={14} />,       iconColor: "slate"  },
+        { href: `${base}/hr/expiry-alerts`,       labelKey: "nav.expiryAlerts",           icon: <BarChart3 size={14} />, iconColor: "red"    },
+      ],
+    },
     {
       href: `${base}/accounting`,
       labelKey: "nav.accounting",
@@ -150,11 +160,10 @@ function buildCompanyNav(base: string): NavItem[] {
       iconColor: "orange",
       module: "HR",
       children: [
-        { href: `${base}/hr/employees`,     labelKey: "nav.employees",    icon: <Users size={14} />,    iconColor: "orange" },
-        { href: `${base}/hr/positions`,     labelKey: "nav.positions",    icon: <FileText size={14} />, iconColor: "orange" },
-        { href: `${base}/hr/salaries`,      labelKey: "nav.salaries",     icon: <Wallet size={14} />,   iconColor: "orange" },
-        { href: `${base}/hr/tickets`,       labelKey: "nav.tickets",      icon: <FileText size={14} />, iconColor: "orange" },
-        { href: `${base}/hr/expiry-alerts`, labelKey: "nav.expiryAlerts", icon: <BarChart3 size={14} />,iconColor: "orange" },
+        { href: `${base}/hr/employees`, labelKey: "nav.employees", icon: <Users size={14} />,    iconColor: "orange" },
+        { href: `${base}/hr/positions`, labelKey: "nav.positions", icon: <FileText size={14} />, iconColor: "orange" },
+        { href: `${base}/hr/salaries`,  labelKey: "nav.salaries",  icon: <Wallet size={14} />,   iconColor: "orange" },
+        { href: `${base}/hr/tickets`,   labelKey: "nav.tickets",   icon: <FileText size={14} />, iconColor: "orange" },
       ],
     },
     { href: `${base}/expenses`,    labelKey: "nav.expenses",    icon: <Receipt size={16} />,   iconColor: "red",    module: "EXPENSES" },
