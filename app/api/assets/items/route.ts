@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
+import { AssetStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     where: {
       companyId,
       deletedAt: null,
-      ...(status ? { status } : {}),
+      ...(status ? { status: status as AssetStatus } : {}),
     },
     include: {
       assetItemType: { select: { nameAr: true, nameEn: true } },
