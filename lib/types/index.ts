@@ -147,6 +147,7 @@ export interface BalanceSheetRow {
   nameAr: string;
   amount: number;
   isHeader: boolean;
+  level?: number;
 }
 
 export interface JournalEntryLineInput {

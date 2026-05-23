@@ -119,7 +119,7 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
                     {report.assets.map((row, i) => (
                       <tr key={i} className={row.isHeader ? "header-row" : ""}>
                         <td style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#6b7280", width: "60px" }}>{row.code}</td>
-                        <td style={{ paddingRight: `${row.level * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
+                        <td style={{ paddingRight: `${(row.level ?? 0) * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
                         <td className="num" style={{ color: "#1e40af" }}>{row.isHeader ? "" : row.amount.toFixed(3)}</td>
                       </tr>
                     ))}
@@ -139,7 +139,7 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
                     {report.liabilities.map((row, i) => (
                       <tr key={i} className={row.isHeader ? "header-row" : ""}>
                         <td style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#6b7280", width: "60px" }}>{row.code}</td>
-                        <td style={{ paddingRight: `${row.level * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
+                        <td style={{ paddingRight: `${(row.level ?? 0) * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
                         <td className="num" style={{ color: "#9a3412" }}>{row.isHeader ? "" : row.amount.toFixed(3)}</td>
                       </tr>
                     ))}
@@ -156,7 +156,7 @@ export default async function BalanceSheetPrintPage({ params, searchParams }: Pr
                     {report.equity.map((row, i) => (
                       <tr key={i} className={row.isHeader ? "header-row" : ""}>
                         <td style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#6b7280", width: "60px" }}>{row.code}</td>
-                        <td style={{ paddingRight: `${row.level * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
+                        <td style={{ paddingRight: `${(row.level ?? 0) * 0.8 + 0.3}rem` }}>{row.nameAr}</td>
                         <td className="num" style={{ color: "#166534" }}>{row.isHeader ? "" : row.amount.toFixed(3)}</td>
                       </tr>
                     ))}
