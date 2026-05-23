@@ -2,7 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    serverActions: { allowedOrigins: ["localhost:3000"] },
+    serverActions: {
+      allowedOrigins: [
+        "localhost:3000",
+        "arasgroup.app",
+        "www.arasgroup.app",
+      ],
+    },
   },
   images: {
     remotePatterns: [
