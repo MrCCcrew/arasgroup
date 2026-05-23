@@ -197,7 +197,6 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                                 <AlertTriangle
                                   size={12}
                                   className={isExpired || (days !== null && days <= 30) ? "text-red-500" : "text-yellow-500"}
-                                  title={isExpired ? (locale === "en" ? "Residency expired" : "انتهت الإقامة") : undefined}
                                 />
                               )}
                             </div>
