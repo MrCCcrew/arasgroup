@@ -121,9 +121,10 @@ const STATUS_COLORS: Record<string, string> = {
   EXPIRED: "bg-red-100 text-red-700",
   SUSPENDED: "bg-orange-100 text-orange-700",
   INACTIVE: "bg-gray-100 text-gray-600",
+  CANCELLED: "bg-rose-100 text-rose-700",
 };
 const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "نشط", EXPIRED: "منتهي", SUSPENDED: "موقوف", INACTIVE: "غير نشط",
+  ACTIVE: "نشط", EXPIRED: "منتهي", SUSPENDED: "موقوف", INACTIVE: "غير نشط", CANCELLED: "ملغاة",
 };
 
 export default function LicenseDetailPage() {
@@ -645,6 +646,7 @@ export default function LicenseDetailPage() {
                     <option value="INACTIVE">غير نشط</option>
                     <option value="EXPIRED">منتهي</option>
                     <option value="SUSPENDED">موقوف</option>
+                    <option value="CANCELLED">ملغاة</option>
                   </select>
                 </div>
                 <div>

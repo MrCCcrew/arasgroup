@@ -274,11 +274,13 @@ export default function LicensesPage() {
                       </td>
                       <td>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          lic.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
-                          lic.status === "EXPIRED" ? "bg-red-100 text-red-700" :
+                          lic.status === "ACTIVE"    ? "bg-emerald-100 text-emerald-700" :
+                          lic.status === "EXPIRED"   ? "bg-red-100 text-red-700" :
+                          lic.status === "SUSPENDED" ? "bg-orange-100 text-orange-700" :
+                          lic.status === "CANCELLED" ? "bg-rose-100 text-rose-700" :
                           "bg-gray-100 text-gray-600"
                         }`}>
-                          {lic.status === "ACTIVE" ? "نشط" : lic.status === "EXPIRED" ? "منتهي" : lic.status === "SUSPENDED" ? "موقوف" : "غير نشط"}
+                          {lic.status === "ACTIVE" ? "نشط" : lic.status === "EXPIRED" ? "منتهي" : lic.status === "SUSPENDED" ? "موقوف" : lic.status === "CANCELLED" ? "ملغاة" : "غير نشط"}
                         </span>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
@@ -379,6 +381,7 @@ export default function LicensesPage() {
                     <option value="INACTIVE">غير نشط</option>
                     <option value="EXPIRED">منتهي</option>
                     <option value="SUSPENDED">موقوف</option>
+                    <option value="CANCELLED">ملغاة</option>
                   </select>
                 </div>
                 <div>
