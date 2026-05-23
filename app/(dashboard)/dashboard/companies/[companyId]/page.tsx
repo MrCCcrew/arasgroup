@@ -2,9 +2,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   AlertTriangle,
+  BookOpen,
   Building2,
+  Car,
+  FileText,
   Receipt,
+  ShieldCheck,
   TrendingUp,
+  Truck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -12,6 +17,7 @@ import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
+import { hasPermission } from "@/lib/auth/permissions";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 
 interface Props {
@@ -65,6 +71,10 @@ export default async function CompanyDashboardPage({ params }: Props) {
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
 
+  const now = new Date();
+  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const in60Days = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: {
@@ -80,44 +90,122 @@ export default async function CompanyDashboardPage({ params }: Props) {
 
   if (!company) notFound();
 
-  const pendingJEs = await prisma.journalEntry.count({
-    where: { companyId, status: "DRAFT", isDeleted: false },
-  });
-
-  const expiringResidencies = await prisma.employee.findMany({
-    where: {
-      companyId,
-      isActive: true,
-      isDeleted: false,
-      residencyExpiry: {
-        lte: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-        gte: new Date(),
+  const [
+    pendingJEs,
+    mainLicensesCount,
+    subLicensesCount,
+    expiringResidencies,
+    expiringLicenses,
+    recentJEs,
+  ] = await Promise.all([
+    // قيود مسودة
+    prisma.journalEntry.count({
+      where: { companyId, status: "DRAFT", isDeleted: false },
+    }),
+    // عدد التراخيص الرئيسية
+    prisma.license.count({
+      where: { companyId, isMainLicense: true },
+    }),
+    // عدد التراخيص الفرعية
+    prisma.license.count({
+      where: { companyId, isMainLicense: false },
+    }),
+    // إقامات تنتهي خلال 30 يوم
+    prisma.employee.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        isDeleted: false,
+        residencyExpiry: { lte: in30Days, gte: now },
       },
-    },
-    select: { nameAr: true, nameEn: true, residencyExpiry: true },
-    orderBy: { residencyExpiry: "asc" },
-    take: 5,
-  });
+      select: { nameAr: true, nameEn: true, residencyExpiry: true },
+      orderBy: { residencyExpiry: "asc" },
+      take: 5,
+    }),
+    // تراخيص تنتهي خلال 60 يوم
+    prisma.license.count({
+      where: {
+        companyId,
+        licenseExpiryDate: { lte: in60Days, gte: now },
+      },
+    }),
+    // آخر القيود
+    prisma.journalEntry.findMany({
+      where: { companyId, isDeleted: false },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        number: true,
+        date: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        status: true,
+        totalDebit: true,
+      },
+    }),
+  ]);
 
-  const recentJEs = await prisma.journalEntry.findMany({
-    where: { companyId, isDeleted: false },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    select: {
-      id: true,
-      number: true,
-      date: true,
-      descriptionAr: true,
-      descriptionEn: true,
-      status: true,
-      totalDebit: true,
-    },
-  });
+  // عدد الموظفين في التراخيص الرئيسية والفرعية
+  const [empInMainLicenses, empInSubLicenses] = await Promise.all([
+    prisma.employeeLicenseAssignment.count({
+      where: { license: { companyId, isMainLicense: true } },
+    }),
+    prisma.employeeLicenseAssignment.count({
+      where: { license: { companyId, isMainLicense: false } },
+    }),
+  ]);
 
   const isDelivery = company.type === "DELIVERY";
   const isCarWash = company.type === "CAR_WASH";
-  const isTrading = company.type === "TRADING";
+  const isTrading = company.type === "TRADING" || company.type === "GENERAL_TRADING";
   const companyName = locale === "en" ? company.nameEn ?? company.nameAr : company.nameAr;
+
+  // ── الروابط السريعة حسب الصلاحيات ──────────────────────────────
+  type QuickLink = { href: string; label: string; icon: React.ReactNode; color: string };
+  const quickLinks: QuickLink[] = [];
+
+  const canDo = (module: Parameters<typeof hasPermission>[1], action: Parameters<typeof hasPermission>[2]) =>
+    session.isSuperAdmin || hasPermission(session, module, action, { companyId });
+
+  if (canDo("ACCOUNTING", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/accounting/journal-entries/new`, label: locale === "en" ? "New journal entry" : "قيد جديد", color: "blue", icon: <Receipt size={16} /> });
+
+  if (canDo("EXPENSES", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/expenses/new`, label: locale === "en" ? "New expense" : "مصروف جديد", color: "orange", icon: <Receipt size={16} /> });
+
+  if (canDo("HR", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/hr/employees/new`, label: locale === "en" ? "New employee" : "موظف جديد", color: "green", icon: <Users size={16} /> });
+
+  if (canDo("LICENSES", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/licenses`, label: locale === "en" ? "Licenses" : "التراخيص", color: "violet", icon: <ShieldCheck size={16} /> });
+
+  if (canDo("HR", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/hr/employees`, label: locale === "en" ? "Employees" : "الموظفون", color: "teal", icon: <Users size={16} /> });
+
+  if (canDo("ACCOUNTING", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/accounting/journal-entries`, label: locale === "en" ? "Journal entries" : "القيود اليومية", color: "slate", icon: <BookOpen size={16} /> });
+
+  if (isDelivery && canDo("DELIVERY_OPERATIONS", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/delivery/daily-orders/new`, label: locale === "en" ? "Daily orders" : "أوردر يومي", color: "indigo", icon: <TrendingUp size={16} /> });
+
+  if (isDelivery && canDo("DELIVERY_OPERATIONS", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/delivery/wallet`, label: locale === "en" ? "Driver wallets" : "محفظة السائقين", color: "purple", icon: <Wallet size={16} /> });
+
+  if (isDelivery && canDo("DELIVERY_HR", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/delivery/drivers`, label: locale === "en" ? "Drivers" : "السائقون", color: "sky", icon: <Truck size={16} /> });
+
+  if (isCarWash && canDo("CAR_WASH_OPERATIONS", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/car-wash/operations/new`, label: locale === "en" ? "Daily operations" : "عمليات يومية", color: "cyan", icon: <TrendingUp size={16} /> });
+
+  if (isCarWash && canDo("VEHICLES", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/car-wash/vehicles`, label: locale === "en" ? "Vehicles" : "المركبات", color: "rose", icon: <Car size={16} /> });
+
+  if (isTrading && canDo("INVESTOR_CLAIMS", "CREATE"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/investors/claims/new`, label: locale === "en" ? "Investor claim" : "مطالبة مستثمر", color: "emerald", icon: <Users size={16} /> });
+
+  if (canDo("REPORTS", "VIEW"))
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/reports`, label: locale === "en" ? "Reports" : "التقارير", color: "amber", icon: <FileText size={16} /> });
 
   return (
     <div>
@@ -128,18 +216,20 @@ export default async function CompanyDashboardPage({ params }: Props) {
       />
 
       <div className="page-container space-y-6">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+
+        {/* ── الإحصائيات الرئيسية ── */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard
             icon={<Users size={20} className="text-blue-600" />}
             iconBg="bg-blue-50"
             value={String(company._count.employees)}
-            label={locale === "en" ? "Active employees" : "موظف نشط"}
+            label={locale === "en" ? "Total employees" : "إجمالي الموظفين"}
           />
           <StatCard
             icon={<Building2 size={20} className="text-green-600" />}
             iconBg="bg-green-50"
             value={String(company._count.branches)}
-            label={locale === "en" ? "Branches" : "فرع"}
+            label={locale === "en" ? "Branches" : "الفروع"}
           />
           <StatCard
             icon={<Receipt size={20} className="text-yellow-600" />}
@@ -151,23 +241,65 @@ export default async function CompanyDashboardPage({ params }: Props) {
             icon={<AlertTriangle size={20} className="text-red-600" />}
             iconBg="bg-red-50"
             value={String(expiringResidencies.length)}
-            label={locale === "en" ? "Residencies expiring soon" : "إقامة تنتهي قريباً"}
+            label={locale === "en" ? "Residencies expiring (30d)" : "إقامة تنتهي (30 يوم)"}
+            alert={expiringResidencies.length > 0}
           />
         </div>
 
+        {/* ── إحصائيات التراخيص ── */}
         <div>
-          <h2 className="mb-3 text-base font-bold">{locale === "en" ? "Quick actions" : "إجراءات سريعة"}</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <QuickAction href={`/dashboard/companies/${companyId}/accounting/journal-entries/new`} label={locale === "en" ? "New journal entry" : "قيد جديد"} color="blue" icon={<Receipt size={18} />} />
-            {isDelivery && <QuickAction href={`/dashboard/companies/${companyId}/delivery/daily-orders/new`} label={locale === "en" ? "Daily order" : "أوردر يومي"} color="indigo" icon={<TrendingUp size={18} />} />}
-            {isDelivery && <QuickAction href={`/dashboard/companies/${companyId}/delivery/wallet`} label={locale === "en" ? "Driver wallets" : "محفظة السائقين"} color="purple" icon={<Wallet size={18} />} />}
-            {isCarWash && <QuickAction href={`/dashboard/companies/${companyId}/car-wash/operations`} label={locale === "en" ? "Daily operations" : "عمليات يومية"} color="cyan" icon={<TrendingUp size={18} />} />}
-            {isTrading && <QuickAction href={`/dashboard/companies/${companyId}/investors/claims/new`} label={locale === "en" ? "Investor claim" : "مطالبة مستثمر"} color="emerald" icon={<Users size={18} />} />}
-            <QuickAction href={`/dashboard/companies/${companyId}/expenses/new`} label={locale === "en" ? "New expense" : "مصروف جديد"} color="orange" icon={<Receipt size={18} />} />
-            <QuickAction href={`/dashboard/companies/${companyId}/hr/employees/new`} label={locale === "en" ? "New employee" : "موظف جديد"} color="green" icon={<Users size={18} />} />
+          <h2 className="mb-3 text-base font-bold">{locale === "en" ? "Licenses overview" : "نظرة عامة على التراخيص"}</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
+            <StatCard
+              icon={<ShieldCheck size={20} className="text-violet-600" />}
+              iconBg="bg-violet-50"
+              value={String(mainLicensesCount)}
+              label={locale === "en" ? "Main licenses" : "التراخيص الرئيسية"}
+              href={`/dashboard/companies/${companyId}/licenses?type=main`}
+            />
+            <StatCard
+              icon={<ShieldCheck size={20} className="text-indigo-600" />}
+              iconBg="bg-indigo-50"
+              value={String(subLicensesCount)}
+              label={locale === "en" ? "Sub licenses" : "التراخيص الفرعية"}
+              href={`/dashboard/companies/${companyId}/licenses?type=sub`}
+            />
+            <StatCard
+              icon={<Users size={20} className="text-violet-600" />}
+              iconBg="bg-violet-50"
+              value={String(empInMainLicenses)}
+              label={locale === "en" ? "Emp. in main licenses" : "موظفو الرئيسية"}
+            />
+            <StatCard
+              icon={<Users size={20} className="text-indigo-600" />}
+              iconBg="bg-indigo-50"
+              value={String(empInSubLicenses)}
+              label={locale === "en" ? "Emp. in sub licenses" : "موظفو الفرعية"}
+            />
+            <StatCard
+              icon={<AlertTriangle size={20} className="text-amber-600" />}
+              iconBg="bg-amber-50"
+              value={String(expiringLicenses)}
+              label={locale === "en" ? "Licenses expiring (60d)" : "تراخيص تنتهي (60 يوم)"}
+              alert={expiringLicenses > 0}
+              href={`/dashboard/companies/${companyId}/licenses`}
+            />
           </div>
         </div>
 
+        {/* ── الروابط السريعة ── */}
+        {quickLinks.length > 0 && (
+          <div>
+            <h2 className="mb-3 text-base font-bold">{locale === "en" ? "Quick actions" : "إجراءات سريعة"}</h2>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+              {quickLinks.map((link) => (
+                <QuickAction key={link.href} {...link} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── آخر القيود + تنبيهات الإقامات ── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="section-card">
             <div className="mb-4 flex items-center justify-between">
@@ -198,7 +330,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
                     <div className="text-left">
                       <p className="font-bold number text-blue-600">{formatKWD(Number(entry.totalDebit), numberLocale)}</p>
                       <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
-                        {journalStatusLabels[locale][entry.status]}
+                        {journalStatusLabels[locale][entry.status as keyof typeof journalStatusLabels.ar]}
                       </span>
                     </div>
                   </Link>
@@ -209,7 +341,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
 
           <div className="section-card">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-bold">{locale === "en" ? "Residency alerts" : "تنبيهات الإقامات"}</h3>
+              <h3 className="font-bold">{locale === "en" ? "Residency alerts (30 days)" : "تنبيهات الإقامات (30 يوم)"}</h3>
               <Link href={`/dashboard/companies/${companyId}/hr/expiry-alerts`} className="text-xs text-primary hover:underline">
                 {locale === "en" ? "View all" : "عرض الكل"}
               </Link>
@@ -217,7 +349,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
             <div className="space-y-2">
               {expiringResidencies.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                  {locale === "en" ? "No residencies expiring soon" : "لا توجد إقامات منتهية قريباً"}
+                  {locale === "en" ? "No residencies expiring in the next 30 days" : "لا توجد إقامات منتهية خلال 30 يوم"}
                 </p>
               ) : (
                 expiringResidencies.map((employee, index) => {
@@ -231,7 +363,11 @@ export default async function CompanyDashboardPage({ params }: Props) {
                       </div>
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-medium ${
-                          days !== null && days <= 30 ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
+                          days !== null && days <= 7
+                            ? "bg-red-100 text-red-700"
+                            : days !== null && days <= 15
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
                         {days !== null ? `${days} ${locale === "en" ? "day(s)" : "يوم"}` : "-"}
@@ -253,19 +389,24 @@ function StatCard({
   iconBg,
   value,
   label,
+  alert,
+  href,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   value: string;
   label: string;
+  alert?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className="stat-card">
+  const inner = (
+    <div className={`stat-card transition-colors ${href ? "hover:border-primary/30 cursor-pointer" : ""} ${alert ? "border-red-200 bg-red-50/30" : ""}`}>
       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBg}`}>{icon}</div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className={`text-2xl font-bold ${alert ? "text-red-600" : ""}`}>{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
+  return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
 function QuickAction({
@@ -280,19 +421,25 @@ function QuickAction({
   color: string;
 }) {
   const colors: Record<string, string> = {
-    blue: "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100",
-    indigo: "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
-    purple: "border-purple-100 bg-purple-50 text-purple-700 hover:bg-purple-100",
-    cyan: "border-cyan-100 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",
+    blue:    "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    indigo:  "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
+    purple:  "border-purple-100 bg-purple-50 text-purple-700 hover:bg-purple-100",
+    cyan:    "border-cyan-100 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
-    orange: "border-orange-100 bg-orange-50 text-orange-700 hover:bg-orange-100",
-    green: "border-green-100 bg-green-50 text-green-700 hover:bg-green-100",
+    orange:  "border-orange-100 bg-orange-50 text-orange-700 hover:bg-orange-100",
+    green:   "border-green-100 bg-green-50 text-green-700 hover:bg-green-100",
+    violet:  "border-violet-100 bg-violet-50 text-violet-700 hover:bg-violet-100",
+    teal:    "border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100",
+    slate:   "border-slate-100 bg-slate-50 text-slate-700 hover:bg-slate-100",
+    sky:     "border-sky-100 bg-sky-50 text-sky-700 hover:bg-sky-100",
+    rose:    "border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100",
+    amber:   "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100",
   };
 
   return (
-    <Link href={href} className={`flex items-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${colors[color]}`}>
+    <Link href={href} className={`flex items-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${colors[color] ?? colors.slate}`}>
       {icon}
-      {label}
+      <span className="truncate">{label}</span>
     </Link>
   );
 }
