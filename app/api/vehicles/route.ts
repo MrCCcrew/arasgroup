@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { z } from "zod";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
+
+const createVehicleSchema = z.object({
+  companyId: z.string(),
+  branchId: z.string().optional(),
+  investorId: z.string().optional(),
+  plateNumber: z.string().min(1, "رقم اللوحة مطلوب"),
+  vehicleNumber: z.string().optional(),
+  make: z.string().optional(),
+  model: z.string().optional(),
+  year: z.number().int().optional(),
+  color: z.string().optional(),
+  chassisNumber: z.string().optional(),
+  ownershipModel: z.enum(["OWNER_OWNED", "RENTED"]).default("OWNER_OWNED"),
+  trackingDeviceId: z.string().optional(),
+  fuelCardNumber: z.string().optional(),
+  insuranceExpiry: z.string().optional().transform((v) => (v ? new Date(v) : undefined)),
+  registrationExpiry: z.string().optional().transform((v) => (v ? new Date(v) : undefined)),
+  municipalityCardNumber: z.string().optional(),
+  municipalityCardExpiryDate: z.string().optional().transform((v) => (v ? new Date(v) : undefined)),
+  advertisingCardNumber: z.string().optional(),
+  advertisingCardExpiryDate: z.string().optional().transform((v) => (v ? new Date(v) : undefined)),
+  notes: z.string().optional(),
+});
+
+export async function POST(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const body = await request.json();
+    const parsed = createVehicleSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+    }
+
+    const data = parsed.data;
+    const companyAccessError = assertCompanyAccess(session, data.companyId);
+    if (companyAccessError) return companyAccessError;
+    const permissionError = assertPermission(session, "VEHICLES", "CREATE", { companyId: data.companyId });
+    if (permissionError) return permissionError;
+
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        companyId: data.companyId,
+        branchId: data.branchId,
+        investorId: data.investorId,
+        plateNumber: data.plateNumber,
+        vehicleNumber: data.vehicleNumber,
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        color: data.color,
+        chassisNumber: data.chassisNumber,
+        ownershipModel: data.ownershipModel,
+        trackingDeviceId: data.trackingDeviceId,
+        fuelCardNumber: data.fuelCardNumber || null,
+        insuranceExpiry: data.insuranceExpiry,
+        registrationExpiry: data.registrationExpiry,
+        municipalityCardNumber: data.municipalityCardNumber,
+        municipalityCardExpiryDate: data.municipalityCardExpiryDate,
+        advertisingCardNumber: data.advertisingCardNumber,
+        advertisingCardExpiryDate: data.advertisingCardExpiryDate,
+        notes: data.notes,
+        type: "DELIVERY",
+        isActive: true,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: session.id,
+        companyId: data.companyId,
+        action: "CREATE_VEHICLE",
+        module: "vehicles",
+        resourceId: vehicle.id,
+        resourceType: "Vehicle",
+        newValues: { plateNumber: data.plateNumber },
+        ipAddress: request.headers.get("x-forwarded-for") ?? "",
+        userAgent: request.headers.get("user-agent") ?? "",
+      },
+    });
+
+    return NextResponse.json({ success: true, data: vehicle }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "فشل في إضافة المركبة";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
+  }
+}
