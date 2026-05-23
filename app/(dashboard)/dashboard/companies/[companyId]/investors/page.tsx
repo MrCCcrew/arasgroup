@@ -19,18 +19,15 @@ export default async function InvestorsPage({ params }: Props) {
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
 
-  const branches = await prisma.branch.findMany({
-    where: { companyId, isActive: true },
+  // Query investors directly via the company relation (created via POST with companies.connect)
+  // This ensures investors without branch links are also visible in the list.
+  const investors = await prisma.investor.findMany({
+    where: { isActive: true, companies: { some: { id: companyId } } },
     include: {
+      _count: { select: { claims: true } },
       investorBranches: {
         where: { isActive: true },
-        include: {
-          investor: {
-            include: {
-              _count: { select: { claims: true } },
-            },
-          },
-        },
+        include: { branch: { select: { nameAr: true, nameEn: true } } },
       },
     },
     orderBy: { nameAr: "asc" },
@@ -61,15 +58,7 @@ export default async function InvestorsPage({ params }: Props) {
 
   const collectionsMap = new Map(monthlyCollections.map((item) => [item.investorId, Number(item._sum.amount ?? 0)]));
 
-  const investorSet = new Map<string, (typeof branches)[number]["investorBranches"][number]["investor"]>();
-  for (const branch of branches) {
-    for (const relation of branch.investorBranches) {
-      if (!investorSet.has(relation.investor.id)) {
-        investorSet.set(relation.investor.id, relation.investor);
-      }
-    }
-  }
-  const investors = Array.from(investorSet.values());
+  // investors is already a deduplicated, sorted array from the query above
 
   return (
     <div>

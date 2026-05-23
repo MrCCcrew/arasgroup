@@ -147,8 +147,14 @@ export default function EmployeeDetailPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      // Required fields for /api/storage/upload
+      formData.append("companyId", companyId);
+      formData.append("entityType", "EMPLOYEE");
+      formData.append("entityId", employeeId);
+      // Keep refModule = docType so the GET grouping works (e.g. "EMPLOYEE:PASSPORT")
       formData.append("refModule", docType);
       formData.append("refId", employeeId);
+      formData.append("attachmentType", docType);
       const response = await fetch("/api/storage/upload", { method: "POST", body: formData });
       const payload = await response.json();
       if (!payload.success) throw new Error(payload.error);

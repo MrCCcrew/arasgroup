@@ -7,9 +7,21 @@ interface Props {
   params: Promise<{ licenseId: string }>;
 }
 
-export async function GET(_req: NextRequest, { params }: Props) {
+export async function GET(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { licenseId } = await params;
+
+    const license = await prisma.license.findUnique({
+      where: { id: licenseId },
+      select: { companyId: true },
+    });
+    if (!license) {
+      return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
+    }
+
     const attachments = await prisma.attachment.findMany({
       where: { refModule: "LICENSE", refId: licenseId, deletedAt: null },
       orderBy: { createdAt: "desc" },
