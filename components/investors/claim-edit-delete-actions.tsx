@@ -25,7 +25,6 @@ const TYPE_OPTIONS = [
 ] as const;
 
 const EDITABLE_STATUSES = new Set(["PENDING", "SENT_TO_ACCOUNTANT"]);
-const FINAL_STATUSES = new Set(["PAID", "RENEWED", "SETTLED", "CANCELLED"]);
 
 export function ClaimEditDeleteActions({ claimId, status, descriptionAr, type, dueDate, notes }: Props) {
   const router = useRouter();
@@ -104,9 +103,7 @@ export function ClaimEditDeleteActions({ claimId, status, descriptionAr, type, d
   }
 
   const canEdit = EDITABLE_STATUSES.has(status);
-  const canDelete = !FINAL_STATUSES.has(status);
-
-  if (!canEdit && !canDelete) return null;
+  const canDelete = true; // السماح بالحذف في كل الحالات
 
   return (
     <>
