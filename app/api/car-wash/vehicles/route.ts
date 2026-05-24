@@ -34,6 +34,7 @@ const carWashVehicleSchema = z.object({
   fuelCardNumber: z.string().optional(),
   chassisNumber: z.string().optional(),
   notes: z.string().optional(),
+  assignedDriverEmployeeId: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -65,6 +66,11 @@ export async function GET(request: NextRequest) {
         workers: {
           include: {
             employee: { select: { nameAr: true, employmentStatus: true } },
+          },
+        },
+        assignedWorkers: {
+          include: {
+            employee: { select: { id: true, nameAr: true, employmentStatus: true } },
           },
         },
         assetCustodies: {
@@ -157,6 +163,35 @@ export async function POST(request: NextRequest) {
         },
         include: { vehicle: true },
       });
+
+      if (data.assignedDriverEmployeeId) {
+        const assignedDriver = await tx.carWashWorker.findFirst({
+          where: {
+            employeeId: data.assignedDriverEmployeeId,
+            companyId: data.companyId,
+            role: { in: ["DRIVER", "CAR_WASH_DRIVER"] },
+          },
+          select: { id: true },
+        });
+
+        if (!assignedDriver) {
+          throw new Error("السائق المختار غير موجود ضمن سائقي شركة الغسيل");
+        }
+
+        await tx.carWashWorker.updateMany({
+          where: {
+            companyId: data.companyId,
+            assignedCarWashVehicleId: carWashVehicle.id,
+            role: { in: ["DRIVER", "CAR_WASH_DRIVER"] },
+          },
+          data: { assignedCarWashVehicleId: null },
+        });
+
+        await tx.carWashWorker.update({
+          where: { id: assignedDriver.id },
+          data: { assignedCarWashVehicleId: carWashVehicle.id },
+        });
+      }
 
       await tx.auditLog.create({
         data: {

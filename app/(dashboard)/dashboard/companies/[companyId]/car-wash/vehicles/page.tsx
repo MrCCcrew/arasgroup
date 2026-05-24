@@ -9,7 +9,14 @@ import { Header } from "@/components/layout/header";
 interface Worker {
   id: string;
   role: string;
-  employee: { nameAr: string };
+  employee: { id?: string; nameAr: string };
+}
+
+interface DriverOption {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+  employeeNumber?: string | null;
 }
 
 interface Vehicle {
@@ -28,6 +35,7 @@ interface Vehicle {
     insuranceExpiry: string | null;
   };
   workers: Worker[];
+  assignedWorkers: Worker[];
   costCenter: { nameAr: string } | null;
 }
 
@@ -78,12 +86,14 @@ const EMPTY_EDIT = {
   registrationExpiry: "",
   insuranceExpiry: "",
   notes: "",
+  assignedDriverEmployeeId: "",
 };
 
 export default function CarWashVehiclesPage() {
   const { companyId } = useParams<{ companyId: string }>();
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
@@ -97,14 +107,19 @@ export default function CarWashVehiclesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/car-wash/vehicles?companyId=${companyId}`).then((r) => r.json());
-    if (res.success) setVehicles(res.data);
+    const [vehiclesPayload, driversPayload] = await Promise.all([
+      fetch(`/api/car-wash/vehicles?companyId=${companyId}`).then((response) => response.json()),
+      fetch(`/api/hr/employees?companyId=${companyId}&type=CAR_WASH_DRIVER`).then((response) => response.json()),
+    ]);
+    if (vehiclesPayload.success) setVehicles(vehiclesPayload.data);
+    if (driversPayload.success) setDrivers(driversPayload.data);
     setLoading(false);
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
 
   function openEdit(v: Vehicle) {
+    const assignedDriver = v.assignedWorkers.find((worker) => worker.employee?.id);
     setEditVehicle(v);
     setEditForm({
       nameAr: v.nameAr,
@@ -116,6 +131,7 @@ export default function CarWashVehiclesPage() {
       registrationExpiry: v.vehicle.registrationExpiry?.slice(0, 10) ?? "",
       insuranceExpiry: v.vehicle.insuranceExpiry?.slice(0, 10) ?? "",
       notes: "",
+      assignedDriverEmployeeId: assignedDriver?.employee.id ?? "",
     });
     setEditError("");
   }
@@ -141,6 +157,7 @@ export default function CarWashVehiclesPage() {
         color: editForm.color || null,
         registrationExpiry: editForm.registrationExpiry || null,
         insuranceExpiry: editForm.insuranceExpiry || null,
+        assignedDriverEmployeeId: editForm.assignedDriverEmployeeId || null,
       }),
     });
     const data = await res.json();
@@ -148,6 +165,11 @@ export default function CarWashVehiclesPage() {
     if (!data.success) { setEditError(data.error ?? "حدث خطأ"); return; }
     setEditVehicle(null);
     load();
+  }
+
+  function assignedDriverName(vehicle: Vehicle) {
+    const assignedDriver = vehicle.assignedWorkers[0];
+    return assignedDriver?.employee?.nameAr ?? null;
   }
 
   async function confirmDeactivate() {
@@ -231,6 +253,12 @@ export default function CarWashVehiclesPage() {
 
                 {/* Vehicle details */}
                 <div className="space-y-1 text-sm">
+                  {assignedDriverName(v) && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">السائق</span>
+                      <span>{assignedDriverName(v)}</span>
+                    </div>
+                  )}
                   {v.knetDeviceId && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">جهاز KNET</span>
@@ -315,6 +343,22 @@ export default function CarWashVehiclesPage() {
                 <label className="form-label">جهاز KNET</label>
                 <input className="input-field" dir="ltr" value={editForm.knetDeviceId} onChange={ef("knetDeviceId")} />
               </div>
+            </div>
+            <div>
+              <label className="form-label">السائق الحالي</label>
+              <select
+                className="input-field"
+                value={editForm.assignedDriverEmployeeId}
+                onChange={(event) => setEditForm((previous) => ({ ...previous, assignedDriverEmployeeId: event.target.value }))}
+              >
+                <option value="">بدون سائق</option>
+                {drivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.nameAr}
+                    {driver.employeeNumber ? ` - ${driver.employeeNumber}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

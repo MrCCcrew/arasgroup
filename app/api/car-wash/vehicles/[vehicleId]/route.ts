@@ -17,6 +17,7 @@ const updateSchema = z.object({
   nameEn: z.string().optional().nullable(),
   knetDeviceId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  assignedDriverEmployeeId: z.string().optional().nullable(),
   plateNumber: z.string().optional(),
   make: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
@@ -67,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: conflictMessage }, { status: 409 });
     }
 
-    const { nameAr, nameEn, knetDeviceId, isActive, make, model, color, registrationExpiry, insuranceExpiry, notes } = parsed.data;
+    const { assignedDriverEmployeeId, nameAr, nameEn, knetDeviceId, isActive, make, model, color, registrationExpiry, insuranceExpiry, notes } = parsed.data;
 
     const result = await prisma.$transaction(async (tx) => {
       if (
@@ -93,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         });
       }
 
-      return tx.carWashVehicle.update({
+      await tx.carWashVehicle.update({
         where: { id: vehicleId },
         data: {
           ...(nameAr !== undefined ? { nameAr } : {}),
@@ -103,6 +104,49 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         },
         include: {
           vehicle: { select: { plateNumber: true, model: true, make: true, color: true, registrationExpiry: true, insuranceExpiry: true } },
+        },
+      });
+
+      if (assignedDriverEmployeeId !== undefined) {
+        await tx.carWashWorker.updateMany({
+          where: {
+            companyId: existing.companyId,
+            assignedCarWashVehicleId: vehicleId,
+            role: { in: ["DRIVER", "CAR_WASH_DRIVER"] },
+          },
+          data: { assignedCarWashVehicleId: null },
+        });
+
+        if (assignedDriverEmployeeId) {
+          const assignedDriver = await tx.carWashWorker.findFirst({
+            where: {
+              employeeId: assignedDriverEmployeeId,
+              companyId: existing.companyId,
+              role: { in: ["DRIVER", "CAR_WASH_DRIVER"] },
+            },
+            select: { id: true },
+          });
+
+          if (!assignedDriver) {
+            throw new Error("السائق المختار غير موجود ضمن سائقي شركة الغسيل");
+          }
+
+          await tx.carWashWorker.update({
+            where: { id: assignedDriver.id },
+            data: { assignedCarWashVehicleId: vehicleId },
+          });
+        }
+      }
+
+      return tx.carWashVehicle.findUnique({
+        where: { id: vehicleId },
+        include: {
+          vehicle: { select: { plateNumber: true, model: true, make: true, color: true, registrationExpiry: true, insuranceExpiry: true } },
+          assignedWorkers: {
+            include: {
+              employee: { select: { id: true, nameAr: true, employmentStatus: true } },
+            },
+          },
         },
       });
     });

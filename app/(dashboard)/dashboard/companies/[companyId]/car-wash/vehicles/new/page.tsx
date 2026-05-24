@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+
+interface DriverOption {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+  employeeNumber?: string | null;
+}
 
 export default function NewCarWashVehiclePage() {
   const router = useRouter();
@@ -14,6 +21,7 @@ export default function NewCarWashVehiclePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [form, setForm] = useState({
     code: "",
     nameAr: "",
@@ -24,7 +32,17 @@ export default function NewCarWashVehiclePage() {
     year: "",
     color: "",
     knetDeviceId: "",
+    assignedDriverEmployeeId: "",
   });
+
+  useEffect(() => {
+    fetch(`/api/hr/employees?companyId=${companyId}&type=CAR_WASH_DRIVER`)
+      .then((response) => response.json())
+      .then((payload) => {
+        if (payload.success) setDrivers(payload.data);
+      })
+      .catch(() => {});
+  }, [companyId]);
 
   function setField(field: keyof typeof form, value: string) {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -49,6 +67,7 @@ export default function NewCarWashVehiclePage() {
           year: form.year ? Number.parseInt(form.year, 10) : undefined,
           color: form.color || undefined,
           knetDeviceId: form.knetDeviceId || undefined,
+          assignedDriverEmployeeId: form.assignedDriverEmployeeId || undefined,
         }),
       });
       const payload = await response.json();
@@ -93,6 +112,22 @@ export default function NewCarWashVehiclePage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "KNET device ID" : "رقم جهاز KNET"}</label>
                 <input type="text" value={form.knetDeviceId} onChange={(event) => setField("knetDeviceId", event.target.value)} className="input-field w-full" placeholder={locale === "en" ? "Device number" : "رقم الجهاز"} dir="ltr" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Assigned driver" : "السائق الحالي"}</label>
+                <select
+                  value={form.assignedDriverEmployeeId}
+                  onChange={(event) => setField("assignedDriverEmployeeId", event.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="">{locale === "en" ? "Select driver" : "اختر السائق"}</option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {locale === "en" ? driver.nameEn ?? driver.nameAr : driver.nameAr}
+                      {driver.employeeNumber ? ` - ${driver.employeeNumber}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
