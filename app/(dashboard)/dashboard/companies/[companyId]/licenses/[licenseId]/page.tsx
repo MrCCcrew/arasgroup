@@ -338,6 +338,13 @@ export default function LicenseDetailPage() {
 
   async function saveEstContract() {
     const partners = (form.partners as { nameAr: string; sharePercent: string; isDirector: boolean }[] | undefined) ?? [];
+    for (const p of partners) {
+      const sp = Number(p.sharePercent);
+      if (isNaN(sp) || sp < 0 || sp > 100) {
+        setSaveError(`نسبة الشريك "${p.nameAr || "؟"}" يجب أن تكون بين 0 و 100`);
+        return;
+      }
+    }
     await save(`/api/licenses/${licenseId}/establishment-contract`, "POST", {
       contractDate: form.contractDate, notes: form.notes, fileUrl: form.fileUrl, partners,
     });
@@ -365,7 +372,11 @@ export default function LicenseDetailPage() {
   }
 
   async function saveAnnualBalance() {
-    await save(`/api/licenses/${licenseId}/annual-balance`, "POST", form);
+    if (editTarget) {
+      await save(`/api/licenses/${licenseId}/annual-balance/${editTarget}`, "PATCH", form);
+    } else {
+      await save(`/api/licenses/${licenseId}/annual-balance`, "POST", form);
+    }
   }
 
   async function deleteAnnualBalance(balanceId: string) {
@@ -374,12 +385,21 @@ export default function LicenseDetailPage() {
   }
 
   async function saveRentReceipt() {
-    await save(`/api/licenses/${licenseId}/rent-receipts`, "POST", form);
+    if (editTarget) {
+      await save(`/api/licenses/${licenseId}/rent-receipts/${editTarget}`, "PATCH", form);
+    } else {
+      await save(`/api/licenses/${licenseId}/rent-receipts`, "POST", form);
+    }
   }
 
   async function deleteRentReceipt(receiptId: string) {
     if (!confirm("تأكيد حذف الإيصال؟")) return;
     await save(`/api/licenses/${licenseId}/rent-receipts/${receiptId}`, "DELETE", {});
+  }
+
+  async function deleteWorkInjury(year: number, quarter: number) {
+    if (!confirm("تأكيد حذف وثيقة التأمين؟")) return;
+    await save(`/api/licenses/${licenseId}/work-injury?year=${year}&quarter=${quarter}`, "DELETE", {});
   }
 
   // ── Loading / Error ────────────────────────────────────────────────────────
@@ -582,7 +602,8 @@ export default function LicenseDetailPage() {
                           <ExternalLink size={12} />
                         </a>
                       )}
-                      <button onClick={() => deleteRentReceipt(r.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                      <button onClick={() => openModal("rent_receipt", { receiptDate: r.receiptDate?.slice(0, 10) ?? "", amount: r.amount ?? "", fileUrl: r.fileUrl, notes: r.notes ?? "" }, r.id)} className="text-primary hover:text-primary/70" title="تعديل"><Pencil size={12} /></button>
+                      <button onClick={() => deleteRentReceipt(r.id)} className="text-red-400 hover:text-red-600" title="حذف"><Trash2 size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -768,6 +789,8 @@ export default function LicenseDetailPage() {
                           <ExternalLink size={12} />
                         </a>
                       )}
+                      <button onClick={() => openModal("work_injury", { year: w.year, quarter: String(w.quarter), policyNumber: w.policyNumber ?? "", certificateNo: w.certificateNo ?? "", startDate: w.startDate?.slice(0, 10) ?? "", endDate: w.endDate?.slice(0, 10) ?? "", fileUrl: w.fileUrl ?? "" })} className="text-primary hover:text-primary/70" title="تعديل"><Pencil size={12} /></button>
+                      <button onClick={() => deleteWorkInjury(w.year, w.quarter)} className="text-red-400 hover:text-red-600" title="حذف"><Trash2 size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -792,7 +815,8 @@ export default function LicenseDetailPage() {
                           <ExternalLink size={12} />
                         </a>
                       )}
-                      <button onClick={() => deleteAnnualBalance(b.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                      <button onClick={() => openModal("annual_balance", { year: b.year, accountant: b.accountant ?? "", fileUrl: b.fileUrl, notes: b.notes ?? "" }, b.id)} className="text-primary hover:text-primary/70" title="تعديل"><Pencil size={12} /></button>
+                      <button onClick={() => deleteAnnualBalance(b.id)} className="text-red-400 hover:text-red-600" title="حذف"><Trash2 size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -856,7 +880,7 @@ export default function LicenseDetailPage() {
                 <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
                   <input className="input-field col-span-2" placeholder="الاسم" value={p.nameAr} onChange={(e) => setForm((prev) => { const arr = [...(prev.partners as object[])]; (arr[i] as Record<string, unknown>).nameAr = e.target.value; return { ...prev, partners: arr }; })} />
                   <input className="input-field" placeholder="الرقم المدني" value={p.civilId} onChange={(e) => setForm((prev) => { const arr = [...(prev.partners as object[])]; (arr[i] as Record<string, unknown>).civilId = e.target.value; return { ...prev, partners: arr }; })} />
-                  <input type="number" className="input-field" placeholder="%" value={p.sharePercent} onChange={(e) => setForm((prev) => { const arr = [...(prev.partners as object[])]; (arr[i] as Record<string, unknown>).sharePercent = e.target.value; return { ...prev, partners: arr }; })} />
+                  <input type="number" min="0" max="100" step="0.01" className="input-field" placeholder="0-100%" value={p.sharePercent} onChange={(e) => setForm((prev) => { const arr = [...(prev.partners as object[])]; (arr[i] as Record<string, unknown>).sharePercent = e.target.value; return { ...prev, partners: arr }; })} />
                   <div className="flex items-center gap-1">
                     <input type="checkbox" checked={p.isDirector} onChange={(e) => setForm((prev) => { const arr = [...(prev.partners as object[])]; (arr[i] as Record<string, unknown>).isDirector = e.target.checked; return { ...prev, partners: arr }; })} />
                     <span className="text-xs">مدير</span>
@@ -940,11 +964,11 @@ export default function LicenseDetailPage() {
 
       {/* [5] إيصال الإيجار */}
       {modal === "rent_receipt" && (
-        <Modal title="إضافة إيصال إيجار" onClose={() => setModal(null)}>
+        <Modal title={editTarget ? "تعديل إيصال إيجار" : "إضافة إيصال إيجار"} onClose={() => setModal(null)}>
           <div className="space-y-3">
             <div><label className="form-label">تاريخ الإيصال</label><input type="date" className="input-field w-full" value={form.receiptDate as string ?? ""} onChange={f("receiptDate")} /></div>
             <div><label className="form-label">المبلغ (د.ك)</label><input type="number" step="0.001" className="input-field w-full" value={form.amount as string ?? ""} onChange={f("amount")} /></div>
-            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="صورة الإيصال" required />
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="صورة الإيصال" required={!editTarget} />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -1127,11 +1151,11 @@ export default function LicenseDetailPage() {
 
       {/* [14] الميزانية السنوية */}
       {modal === "annual_balance" && (
-        <Modal title="الميزانية السنوية" onClose={() => setModal(null)}>
+        <Modal title={editTarget ? "تعديل الميزانية السنوية" : "إضافة ميزانية سنوية"} onClose={() => setModal(null)}>
           <div className="space-y-3">
             <div><label className="form-label">السنة</label><input type="number" className="input-field w-full" value={form.year as string ?? ""} onChange={f("year")} /></div>
             <div><label className="form-label">اسم المحاسب القانوني</label><input className="input-field w-full" value={form.accountant as string ?? ""} onChange={f("accountant")} /></div>
-            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الميزانية" required />
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الميزانية" required={!editTarget} />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
