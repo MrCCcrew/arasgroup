@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Printer, Search } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
-interface Branch { id: string; nameAr: string }
-interface Investor { id: string; nameAr: string }
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Branch    { id: string; nameAr: string }
+interface Investor  { id: string; nameAr: string }
 interface License {
   id: string;
   commercialNameAr: string;
@@ -45,12 +47,33 @@ const EMPTY = {
   legalEntity: "", capital: "", commercialRegNo: "",
   notes: "",
 };
-
 type Form = typeof EMPTY;
+
+// الحالات التي تُستبعد من الإحصائيات "النشطة"
+const EXCLUDED_STATUSES = new Set(["CANCELLED", "INACTIVE"]);
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "نشط", EXPIRED: "منتهي", SUSPENDED: "موقوف",
+  CANCELLED: "ملغاة", INACTIVE: "غير نشط",
+};
+const STATUS_COLORS: Record<string, string> = {
+  ACTIVE:    "bg-emerald-100 text-emerald-700",
+  EXPIRED:   "bg-red-100 text-red-700",
+  SUSPENDED: "bg-orange-100 text-orange-700",
+  CANCELLED: "bg-rose-100 text-rose-700",
+  INACTIVE:  "bg-gray-100 text-gray-600",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysLeft(d: string | null | undefined): number | null {
   if (!d) return null;
   return Math.floor((new Date(d).getTime() - Date.now()) / 86400000);
+}
+
+function fmtDate(d: string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("ar-KW");
 }
 
 function ExpiryCell({ date }: { date: string | null | undefined }) {
@@ -58,11 +81,13 @@ function ExpiryCell({ date }: { date: string | null | undefined }) {
   const days = daysLeft(date);
   const label = new Date(date).toLocaleDateString("ar-KW");
   if (days === null) return <span>{label}</span>;
-  if (days < 0) return <span className="text-red-700 font-medium">{label}</span>;
-  if (days <= 30) return <span className="text-red-600 font-medium">{label} <span className="text-xs">({days})</span></span>;
+  if (days < 0)   return <span className="text-red-700 font-semibold">{label}</span>;
+  if (days <= 30) return <span className="text-red-600 font-medium">{label} <span className="text-[10px]">({days})</span></span>;
   if (days <= 90) return <span className="text-orange-500 font-medium">{label}</span>;
   return <span>{label}</span>;
 }
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 function Modal({ title, wide, onClose, children }: {
   title: string; wide?: boolean; onClose: () => void; children: React.ReactNode;
@@ -83,22 +108,34 @@ function Modal({ title, wide, onClose, children }: {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function LicensesPage() {
   const { companyId } = useParams<{ companyId: string }>();
   const router = useRouter();
 
-  const [licenses, setLicenses] = useState<License[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [licenses,  setLicenses]  = useState<License[]>([]);
+  const [branches,  setBranches]  = useState<Branch[]>([]);
   const [investors, setInvestors] = useState<Investor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [loading,   setLoading]   = useState(true);
 
+  const [showForm,   setShowForm]   = useState(false);
+  const [form,       setForm]       = useState<Form>(EMPTY);
+  const [saving,     setSaving]     = useState(false);
+  const [formError,  setFormError]  = useState("");
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [deleteError,setDeleteError]= useState("");
+  const [deleting,   setDeleting]   = useState(false);
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  const [search,         setSearch]         = useState("");
+  const [filterStatus,   setFilterStatus]   = useState("");
+  const [filterType,     setFilterType]     = useState("");   // "" | "main" | "branch"
+  const [filterBranch,   setFilterBranch]   = useState("");
+  const [filterInvestor, setFilterInvestor] = useState("");
+  const [filterExpiry,   setFilterExpiry]   = useState("");   // "" | "expired" | "30" | "60" | "90"
+
+  // ── Load ─────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     const [a, b, c] = await Promise.all([
@@ -114,75 +151,109 @@ export default function LicensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Computed stats (active only — exclude CANCELLED / INACTIVE) ───────────
+  const activeLicenses   = licenses.filter((l) => !EXCLUDED_STATUSES.has(l.status));
+  const activeMainCount  = activeLicenses.filter((l) => l.isMainLicense).length;
+  const expiringSoon     = activeLicenses.filter((l) => {
+    const dates = [l.licenseExpiryDate, l.fireLicenseExpiryDate, l.healthLicenseExpiryDate, l.advertisingLicenseExpiryDate];
+    return dates.some((d) => { const n = daysLeft(d); return n !== null && n >= 0 && n <= 90; });
+  }).length;
+
+  // Active branch count per main license (excluding CANCELLED/INACTIVE branches)
+  function activeBranchCount(licId: string) {
+    return activeLicenses.filter((l) => !l.isMainLicense && l.mainLicenseId === licId).length;
+  }
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  const filtered = licenses.filter((l) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!l.commercialNameAr.toLowerCase().includes(q) && !l.licenseNumber.toLowerCase().includes(q)) return false;
+    }
+    if (filterStatus   && l.status    !== filterStatus)  return false;
+    if (filterType === "main"   && !l.isMainLicense)     return false;
+    if (filterType === "branch" &&  l.isMainLicense)     return false;
+    if (filterBranch   && l.branchId   !== filterBranch)   return false;
+    if (filterInvestor && l.investorId !== filterInvestor) return false;
+    if (filterExpiry) {
+      const allDates = [l.licenseExpiryDate, l.fireLicenseExpiryDate, l.healthLicenseExpiryDate, l.advertisingLicenseExpiryDate];
+      if (filterExpiry === "expired") {
+        return allDates.some((d) => { const n = daysLeft(d); return n !== null && n < 0; });
+      }
+      const max = Number(filterExpiry);
+      return allDates.some((d) => { const n = daysLeft(d); return n !== null && n >= 0 && n <= max; });
+    }
+    return true;
+  });
+
+  const mainLicensesForForm = licenses.filter((l) => l.isMainLicense);
+  const hasFilters = !!(search || filterStatus || filterType || filterBranch || filterInvestor || filterExpiry);
+
+  function clearFilters() {
+    setSearch(""); setFilterStatus(""); setFilterType("");
+    setFilterBranch(""); setFilterInvestor(""); setFilterExpiry("");
+  }
+
+  // ── Filter summary for print header ──────────────────────────────────────
+  const filterParts: string[] = [];
+  if (search)         filterParts.push(`بحث: "${search}"`);
+  if (filterStatus)   filterParts.push(`الحالة: ${STATUS_LABELS[filterStatus] ?? filterStatus}`);
+  if (filterType === "main")   filterParts.push("النوع: رئيسية فقط");
+  if (filterType === "branch") filterParts.push("النوع: فرعية فقط");
+  if (filterBranch)   filterParts.push(`الفرع: ${branches.find((b) => b.id === filterBranch)?.nameAr ?? ""}`);
+  if (filterInvestor) filterParts.push(`المستثمر: ${investors.find((i) => i.id === filterInvestor)?.nameAr ?? ""}`);
+  if (filterExpiry === "expired")    filterParts.push("منتهية الصلاحية");
+  else if (filterExpiry)             filterParts.push(`تنتهي خلال ${filterExpiry} يوم`);
+
+  // ── Form helpers ─────────────────────────────────────────────────────────
   function f<K extends keyof Form>(key: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((p) => ({ ...p, [key]: e.target.value }));
   }
-
-  function openAdd() {
-    setForm(EMPTY);
-    setFormError("");
-    setShowForm(true);
-  }
+  function openAdd() { setForm(EMPTY); setFormError(""); setShowForm(true); }
 
   async function save() {
     if (!form.commercialNameAr.trim()) { setFormError("الاسم التجاري مطلوب"); return; }
-    if (!form.licenseNumber.trim()) { setFormError("رقم الترخيص مطلوب"); return; }
-    if (!form.isMainLicense && !form.mainLicenseId) { setFormError("يجب اختيار الترخيص الرئيسي للترخيص الفرعي"); return; }
-    setSaving(true);
-    setFormError("");
+    if (!form.licenseNumber.trim())    { setFormError("رقم الترخيص مطلوب"); return; }
+    if (!form.isMainLicense && !form.mainLicenseId) { setFormError("يجب اختيار الترخيص الرئيسي"); return; }
+    setSaving(true); setFormError("");
     const body = {
-      companyId,
-      ...form,
-      branchId: form.branchId || null,
+      companyId, ...form,
+      branchId:   form.branchId   || null,
       investorId: form.investorId || null,
       mainLicenseId: form.isMainLicense ? null : (form.mainLicenseId || null),
-      issueDate: form.issueDate || null,
-      licenseExpiryDate: form.licenseExpiryDate || null,
-      fireLicenseExpiryDate: form.fireLicenseExpiryDate || null,
-      healthLicenseExpiryDate: form.healthLicenseExpiryDate || null,
+      issueDate:                    form.issueDate                    || null,
+      licenseExpiryDate:            form.licenseExpiryDate            || null,
+      fireLicenseExpiryDate:        form.fireLicenseExpiryDate        || null,
+      healthLicenseExpiryDate:      form.healthLicenseExpiryDate      || null,
       advertisingLicenseExpiryDate: form.advertisingLicenseExpiryDate || null,
-      managerName: form.managerName || null,
-      managerPhone: form.managerPhone || null,
+      managerName: form.managerName || null, managerPhone: form.managerPhone || null,
       unifiedEntityNumber: form.unifiedEntityNumber || null,
-      civilEntityNumber: form.civilEntityNumber || null,
+      civilEntityNumber:   form.civilEntityNumber   || null,
       legalEntity: form.legalEntity || null,
-      capital: form.capital ? Number(form.capital) : null,
+      capital:     form.capital ? Number(form.capital) : null,
       commercialRegNo: form.commercialRegNo || null,
       notes: form.notes || null,
     };
-    const res = await fetch("/api/licenses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res  = await fetch("/api/licenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
     setSaving(false);
     if (!data.success) { setFormError(data.error ?? "حدث خطأ"); return; }
     setShowForm(false);
-    // ← انتقل مباشرة لصفحة تفاصيل الترخيص (الـ 14 كارت)
     router.push(`/dashboard/companies/${companyId}/licenses/${data.data.id}`);
   }
 
   async function confirmDelete() {
     if (!deleteId) return;
-    setDeleting(true);
-    setDeleteError("");
-    const res = await fetch(`/api/licenses/${deleteId}`, { method: "DELETE" });
+    setDeleting(true); setDeleteError("");
+    const res  = await fetch(`/api/licenses/${deleteId}`, { method: "DELETE" });
     const data = await res.json();
     setDeleting(false);
     if (!data.success) { setDeleteError(data.error ?? "فشل الحذف"); return; }
-    setDeleteId(null);
-    load();
+    setDeleteId(null); load();
   }
 
-  const mainLicenses = licenses.filter((l) => l.isMainLicense);
-
-  const expiringSoon = licenses.filter((l) => {
-    const dates = [l.licenseExpiryDate, l.fireLicenseExpiryDate, l.healthLicenseExpiryDate, l.advertisingLicenseExpiryDate];
-    return dates.some((d) => { const days = daysLeft(d); return days !== null && days >= 0 && days <= 90; });
-  }).length;
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
       <Header
@@ -190,29 +261,133 @@ export default function LicensesPage() {
         subtitle="إدارة التراخيص الرئيسية والفرعية"
         companyId={companyId}
         actions={
-          <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
-            + إضافة ترخيص
-          </button>
+          <div className="flex items-center gap-2 no-print">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+            >
+              <Printer size={14} /> طباعة التقرير
+            </button>
+            <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
+              + إضافة ترخيص
+            </button>
+          </div>
         }
       />
 
       <div className="page-container space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="stat-card">
-            <p className="text-xs text-muted-foreground">إجمالي التراخيص</p>
-            <p className="mt-1 text-2xl font-bold text-blue-600">{licenses.length}</p>
-          </div>
-          <div className="stat-card">
-            <p className="text-xs text-muted-foreground">تراخيص رئيسية</p>
-            <p className="mt-1 text-2xl font-bold text-green-600">{mainLicenses.length}</p>
-          </div>
-          <div className="stat-card">
-            <p className="text-xs text-muted-foreground">تنتهي خلال 90 يوم</p>
-            <p className={`mt-1 text-2xl font-bold ${expiringSoon > 0 ? "text-orange-500" : "text-muted-foreground"}`}>{expiringSoon}</p>
+
+        {/* ── Print-only header ────────────────────────────────────────────── */}
+        <div className="print-only border-b border-gray-300 pb-3 mb-2">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-lg font-bold">تقرير التراخيص</h1>
+              {filterParts.length > 0 && (
+                <p className="text-xs text-gray-600 mt-0.5">الفلاتر: {filterParts.join(" · ")}</p>
+              )}
+            </div>
+            <div className="text-left text-xs text-gray-500">
+              <p>تاريخ الطباعة: {new Date().toLocaleDateString("ar-KW")}</p>
+              <p>إجمالي النتائج: {filtered.length} ترخيص</p>
+            </div>
           </div>
         </div>
 
+        {/* ── Stats (screen only) ───────────────────────────────────────────── */}
+        <div className="grid grid-cols-3 gap-4 no-print">
+          <div className="stat-card">
+            <p className="text-xs text-muted-foreground">إجمالي التراخيص النشطة</p>
+            <p className="mt-1 text-2xl font-bold text-blue-600">{activeLicenses.length}</p>
+          </div>
+          <div className="stat-card">
+            <p className="text-xs text-muted-foreground">تراخيص رئيسية نشطة</p>
+            <p className="mt-1 text-2xl font-bold text-green-600">{activeMainCount}</p>
+          </div>
+          <div className="stat-card">
+            <p className="text-xs text-muted-foreground">تنتهي خلال 90 يوم</p>
+            <p className={`mt-1 text-2xl font-bold ${expiringSoon > 0 ? "text-orange-500" : "text-muted-foreground"}`}>
+              {expiringSoon}
+            </p>
+          </div>
+        </div>
+
+        {/* ── Filters bar (screen only) ─────────────────────────────────────── */}
+        <div className="section-card no-print space-y-3">
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Search */}
+            <div className="relative flex-1 min-w-48">
+              <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="بحث بالاسم أو رقم الترخيص..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="input-field w-full pr-8 text-sm"
+              />
+            </div>
+
+            {/* Status */}
+            <select className="input-field text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="">كل الحالات</option>
+              <option value="ACTIVE">نشط</option>
+              <option value="EXPIRED">منتهي</option>
+              <option value="SUSPENDED">موقوف</option>
+              <option value="CANCELLED">ملغاة</option>
+              <option value="INACTIVE">غير نشط</option>
+            </select>
+
+            {/* Type */}
+            <select className="input-field text-sm" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="">كل الأنواع</option>
+              <option value="main">رئيسية فقط</option>
+              <option value="branch">فرعية فقط</option>
+            </select>
+
+            {/* Branch */}
+            {branches.length > 0 && (
+              <select className="input-field text-sm" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+                <option value="">كل الفروع</option>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
+              </select>
+            )}
+
+            {/* Investor */}
+            {investors.length > 0 && (
+              <select className="input-field text-sm" value={filterInvestor} onChange={(e) => setFilterInvestor(e.target.value)}>
+                <option value="">كل المستثمرين</option>
+                {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
+              </select>
+            )}
+
+            {/* Expiry */}
+            <select className="input-field text-sm" value={filterExpiry} onChange={(e) => setFilterExpiry(e.target.value)}>
+              <option value="">كل التواريخ</option>
+              <option value="expired">منتهية الصلاحية</option>
+              <option value="30">تنتهي خلال 30 يوم</option>
+              <option value="60">تنتهي خلال 60 يوم</option>
+              <option value="90">تنتهي خلال 90 يوم</option>
+            </select>
+
+            {/* Clear */}
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg px-2 py-1.5"
+              >
+                <X size={12} /> مسح الفلاتر
+              </button>
+            )}
+          </div>
+
+          {/* Result count */}
+          {hasFilters && (
+            <p className="text-xs text-muted-foreground">
+              يُعرض <span className="font-semibold text-foreground">{filtered.length}</span> من {licenses.length} ترخيص
+            </p>
+          )}
+        </div>
+
+        {/* ── Table ────────────────────────────────────────────────────────── */}
         <div className="section-card overflow-hidden">
           {loading ? (
             <div className="py-16 text-center text-sm text-muted-foreground">جاري التحميل...</div>
@@ -221,6 +396,7 @@ export default function LicensesPage() {
               <table className="ar-table">
                 <thead>
                   <tr>
+                    <th className="no-print">#</th>
                     <th>الاسم التجاري</th>
                     <th>رقم الترخيص</th>
                     <th>الترخيص الرئيسي</th>
@@ -232,25 +408,26 @@ export default function LicensesPage() {
                     <th className="text-center">موظفون</th>
                     <th className="text-center">تراخيص فرعية</th>
                     <th>الحالة</th>
-                    <th></th>
+                    <th className="no-print"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {licenses.length === 0 ? (
+                  {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="py-12 text-center text-muted-foreground">
-                        لا توجد تراخيص — اضغط "إضافة ترخيص" للبدء
+                      <td colSpan={13} className="py-12 text-center text-muted-foreground">
+                        {hasFilters ? "لا توجد نتائج تطابق الفلاتر المحددة" : "لا توجد تراخيص — اضغط \"إضافة ترخيص\" للبدء"}
                       </td>
                     </tr>
-                  ) : licenses.map((lic) => (
+                  ) : filtered.map((lic, idx) => (
                     <tr
                       key={lic.id}
                       className="cursor-pointer hover:bg-muted/30"
                       onClick={() => router.push(`/dashboard/companies/${companyId}/licenses/${lic.id}`)}
                     >
+                      <td className="text-muted-foreground text-xs no-print">{idx + 1}</td>
                       <td className="font-medium">
                         {!lic.isMainLicense && (
-                          <span className="mr-1 inline-block h-3 w-0.5 rounded bg-blue-400"></span>
+                          <span className="mr-1 inline-block h-3 w-0.5 rounded bg-blue-400" />
                         )}
                         {lic.commercialNameAr}
                         {!lic.isMainLicense && (
@@ -261,35 +438,28 @@ export default function LicensesPage() {
                       <td className="text-sm">
                         {lic.mainLicense
                           ? <span className="text-blue-600">{lic.mainLicense.commercialNameAr}</span>
-                          : <span className="text-muted-foreground">—</span>
-                        }
+                          : <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td>{lic.branch?.nameAr ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td>{lic.investor?.nameAr ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td>{lic.branch?.nameAr    ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td>{lic.investor?.nameAr   ?? <span className="text-muted-foreground">—</span>}</td>
                       <td><ExpiryCell date={lic.licenseExpiryDate} /></td>
                       <td><ExpiryCell date={lic.fireLicenseExpiryDate} /></td>
                       <td><ExpiryCell date={lic.healthLicenseExpiryDate} /></td>
                       <td className="text-center">{lic._count.employees}</td>
                       <td className="text-center">
                         {lic.isMainLicense
-                          ? <span className={lic._count.branchLicenses > 0 ? "font-bold text-blue-600" : "text-muted-foreground"}>
-                              {lic._count.branchLicenses}
-                            </span>
-                          : <span className="text-muted-foreground">—</span>
-                        }
+                          ? (() => {
+                              const cnt = activeBranchCount(lic.id);
+                              return <span className={cnt > 0 ? "font-bold text-blue-600" : "text-muted-foreground"}>{cnt}</span>;
+                            })()
+                          : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          lic.status === "ACTIVE"    ? "bg-emerald-100 text-emerald-700" :
-                          lic.status === "EXPIRED"   ? "bg-red-100 text-red-700" :
-                          lic.status === "SUSPENDED" ? "bg-orange-100 text-orange-700" :
-                          lic.status === "CANCELLED" ? "bg-rose-100 text-rose-700" :
-                          "bg-gray-100 text-gray-600"
-                        }`}>
-                          {lic.status === "ACTIVE" ? "نشط" : lic.status === "EXPIRED" ? "منتهي" : lic.status === "SUSPENDED" ? "موقوف" : lic.status === "CANCELLED" ? "ملغاة" : "غير نشط"}
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[lic.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {STATUS_LABELS[lic.status] ?? lic.status}
                         </span>
                       </td>
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td className="no-print" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => { setDeleteId(lic.id); setDeleteError(""); }}
                           className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
@@ -300,157 +470,131 @@ export default function LicensesPage() {
                     </tr>
                   ))}
                 </tbody>
+
+                {/* Print footer summary */}
+                {filtered.length > 0 && (
+                  <tfoot className="print-only">
+                    <tr className="border-t-2 border-gray-400 font-semibold text-sm">
+                      <td colSpan={9} className="py-2 text-right">الإجمالي</td>
+                      <td className="text-center py-2">{filtered.reduce((s, l) => s + l._count.employees, 0)}</td>
+                      <td className="text-center py-2">
+                        {filtered.filter((l) => l.isMainLicense).reduce((s, l) => s + activeBranchCount(l.id), 0)}
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}
         </div>
+
       </div>
 
-      {/* Add Modal */}
+      {/* ── Add Modal ─────────────────────────────────────────────────────── */}
       {showForm && (
         <Modal title="إضافة ترخيص جديد" wide onClose={() => setShowForm(false)}>
           <div className="space-y-5">
 
-            {/* ── النوع ── */}
+            {/* النوع */}
             <div className="flex gap-2 rounded-xl bg-muted/40 p-1">
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => setForm((p) => ({ ...p, isMainLicense: true, mainLicenseId: "" }))}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  form.isMainLicense ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                ترخيص رئيسي
-              </button>
-              <button
-                type="button"
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >ترخيص رئيسي</button>
+              <button type="button"
                 onClick={() => setForm((p) => ({ ...p, isMainLicense: false }))}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  !form.isMainLicense ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                ترخيص فرعي
-              </button>
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground shadow-sm"}`}
+              >ترخيص فرعي</button>
             </div>
 
-            {/* ── الترخيص الرئيسي (للفرعي فقط) ── */}
+            {/* الترخيص الرئيسي */}
             {!form.isMainLicense && (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
                 <label className="form-label text-blue-700">الترخيص الرئيسي *</label>
                 <select className="input-field" value={form.mainLicenseId} onChange={f("mainLicenseId")}>
                   <option value="">— اختر الترخيص الرئيسي —</option>
-                  {mainLicenses.map((l) => (
+                  {mainLicensesForForm.map((l) => (
                     <option key={l.id} value={l.id}>{l.commercialNameAr} ({l.licenseNumber})</option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* ── البيانات الأساسية ── */}
+            {/* البيانات الأساسية */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">البيانات الأساسية</p>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">الاسم التجاري (عربي) *</label>
-                  <input className="input-field" placeholder="مثال: مطعم الراشد" value={form.commercialNameAr} onChange={f("commercialNameAr")} />
-                </div>
-                <div>
-                  <label className="form-label">الاسم التجاري (إنجليزي)</label>
-                  <input className="input-field" dir="ltr" placeholder="Al Rashid Restaurant" value={form.commercialNameEn} onChange={f("commercialNameEn")} />
-                </div>
+                <div><label className="form-label">الاسم التجاري (عربي) *</label>
+                  <input className="input-field" placeholder="مثال: مطعم الراشد" value={form.commercialNameAr} onChange={f("commercialNameAr")} /></div>
+                <div><label className="form-label">الاسم التجاري (إنجليزي)</label>
+                  <input className="input-field" dir="ltr" placeholder="Al Rashid Restaurant" value={form.commercialNameEn} onChange={f("commercialNameEn")} /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="form-label">رقم الترخيص *</label>
-                  <input className="input-field" dir="ltr" placeholder="123456" value={form.licenseNumber} onChange={f("licenseNumber")} />
-                </div>
-                <div>
-                  <label className="form-label">الفرع</label>
+                <div><label className="form-label">رقم الترخيص *</label>
+                  <input className="input-field" dir="ltr" placeholder="123456" value={form.licenseNumber} onChange={f("licenseNumber")} /></div>
+                <div><label className="form-label">الفرع</label>
                   <select className="input-field" value={form.branchId} onChange={f("branchId")}>
                     <option value="">— بدون فرع —</option>
                     {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">المستثمر</label>
+                  </select></div>
+                <div><label className="form-label">المستثمر</label>
                   <select className="input-field" value={form.investorId} onChange={f("investorId")}>
                     <option value="">— بدون مستثمر —</option>
                     {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
-                  </select>
-                </div>
+                  </select></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="form-label">الحالة</label>
+                <div><label className="form-label">الحالة</label>
                   <select className="input-field" value={form.status} onChange={f("status")}>
                     <option value="ACTIVE">نشط</option>
                     <option value="INACTIVE">غير نشط</option>
                     <option value="EXPIRED">منتهي</option>
                     <option value="SUSPENDED">موقوف</option>
                     <option value="CANCELLED">ملغاة</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">تاريخ الإصدار</label>
-                  <input type="date" className="input-field" value={form.issueDate} onChange={f("issueDate")} />
-                </div>
-                <div>
-                  <label className="form-label">انتهاء الترخيص التجاري</label>
-                  <input type="date" className="input-field" value={form.licenseExpiryDate} onChange={f("licenseExpiryDate")} />
-                </div>
+                  </select></div>
+                <div><label className="form-label">تاريخ الإصدار</label>
+                  <input type="date" className="input-field" value={form.issueDate} onChange={f("issueDate")} /></div>
+                <div><label className="form-label">انتهاء الترخيص التجاري</label>
+                  <input type="date" className="input-field" value={form.licenseExpiryDate} onChange={f("licenseExpiryDate")} /></div>
               </div>
             </div>
 
-            {/* ── تواريخ الانتهاء ── */}
+            {/* تواريخ انتهاء الرخص الأخرى */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">تواريخ انتهاء الرخص الأخرى</p>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="form-label">رخصة الإطفاء</label>
-                  <input type="date" className="input-field" value={form.fireLicenseExpiryDate} onChange={f("fireLicenseExpiryDate")} />
-                </div>
-                <div>
-                  <label className="form-label">الترخيص الصحي</label>
-                  <input type="date" className="input-field" value={form.healthLicenseExpiryDate} onChange={f("healthLicenseExpiryDate")} />
-                </div>
-                <div>
-                  <label className="form-label">رخصة الإعلانات</label>
-                  <input type="date" className="input-field" value={form.advertisingLicenseExpiryDate} onChange={f("advertisingLicenseExpiryDate")} />
-                </div>
+                <div><label className="form-label">رخصة الإطفاء</label>
+                  <input type="date" className="input-field" value={form.fireLicenseExpiryDate} onChange={f("fireLicenseExpiryDate")} /></div>
+                <div><label className="form-label">الترخيص الصحي</label>
+                  <input type="date" className="input-field" value={form.healthLicenseExpiryDate} onChange={f("healthLicenseExpiryDate")} /></div>
+                <div><label className="form-label">رخصة الإعلانات</label>
+                  <input type="date" className="input-field" value={form.advertisingLicenseExpiryDate} onChange={f("advertisingLicenseExpiryDate")} /></div>
               </div>
             </div>
 
-            {/* ── المسؤول والكيانات ── */}
+            {/* المسؤول والأرقام الرسمية */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">المسؤول والأرقام الرسمية</p>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">اسم المدير</label>
-                  <input className="input-field" placeholder="اسم المدير المسؤول" value={form.managerName} onChange={f("managerName")} />
-                </div>
-                <div>
-                  <label className="form-label">هاتف المدير</label>
-                  <input className="input-field" dir="ltr" placeholder="965XXXXXXXX+" value={form.managerPhone} onChange={f("managerPhone")} />
-                </div>
+                <div><label className="form-label">اسم المدير</label>
+                  <input className="input-field" placeholder="اسم المدير المسؤول" value={form.managerName} onChange={f("managerName")} /></div>
+                <div><label className="form-label">هاتف المدير</label>
+                  <input className="input-field" dir="ltr" placeholder="+965XXXXXXXX" value={form.managerPhone} onChange={f("managerPhone")} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">رقم الكيان الموحد</label>
-                  <input className="input-field" dir="ltr" placeholder="رقم الكيان الموحد" value={form.unifiedEntityNumber} onChange={f("unifiedEntityNumber")} />
-                </div>
-                <div>
-                  <label className="form-label">رقم الكيان المدني</label>
-                  <input className="input-field" dir="ltr" placeholder="رقم الكيان المدني" value={form.civilEntityNumber} onChange={f("civilEntityNumber")} />
-                </div>
+                <div><label className="form-label">رقم الكيان الموحد</label>
+                  <input className="input-field" dir="ltr" value={form.unifiedEntityNumber} onChange={f("unifiedEntityNumber")} /></div>
+                <div><label className="form-label">رقم الكيان المدني</label>
+                  <input className="input-field" dir="ltr" value={form.civilEntityNumber} onChange={f("civilEntityNumber")} /></div>
               </div>
             </div>
 
-            {/* ── الشكل القانوني ── */}
+            {/* الشكل القانوني */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">الشكل القانوني والمالي</p>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="form-label">الشكل القانوني</label>
+                <div><label className="form-label">الشكل القانوني</label>
                   <select className="input-field w-full" value={form.legalEntity} onChange={f("legalEntity")}>
                     <option value="">— اختر —</option>
                     <option value="LLC">ذات مسئولية محدودة</option>
@@ -458,20 +602,15 @@ export default function LicensesPage() {
                     <option value="JOINT_STOCK">مساهمة</option>
                     <option value="SOLE">مؤسسة فردية</option>
                     <option value="OTHER">أخرى</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">رأس المال (د.ك)</label>
-                  <input type="number" step="0.001" className="input-field" dir="ltr" placeholder="0.000" value={form.capital} onChange={f("capital")} />
-                </div>
-                <div>
-                  <label className="form-label">رقم السجل التجاري</label>
-                  <input className="input-field" dir="ltr" placeholder="رقم السجل" value={form.commercialRegNo} onChange={f("commercialRegNo")} />
-                </div>
+                  </select></div>
+                <div><label className="form-label">رأس المال (د.ك)</label>
+                  <input type="number" step="0.001" className="input-field" dir="ltr" placeholder="0.000" value={form.capital} onChange={f("capital")} /></div>
+                <div><label className="form-label">رقم السجل التجاري</label>
+                  <input className="input-field" dir="ltr" value={form.commercialRegNo} onChange={f("commercialRegNo")} /></div>
               </div>
             </div>
 
-            {/* ── ملاحظات ── */}
+            {/* ملاحظات */}
             <div>
               <label className="form-label">ملاحظات</label>
               <textarea className="input-field" rows={2} placeholder="أي ملاحظات إضافية..." value={form.notes} onChange={f("notes")} />
@@ -480,9 +619,7 @@ export default function LicensesPage() {
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
-                إلغاء
-              </button>
+              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
               <button onClick={save} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
                 {saving ? "جاري الحفظ..." : "إضافة"}
               </button>
@@ -491,18 +628,15 @@ export default function LicensesPage() {
         </Modal>
       )}
 
-      {/* Delete confirm */}
+      {/* ── Delete confirm ────────────────────────────────────────────────── */}
       {deleteId && (
         <Modal title="تأكيد الحذف" onClose={() => setDeleteId(null)}>
           <p className="text-sm text-muted-foreground">هل أنت متأكد من حذف هذا الترخيص؟ لا يمكن التراجع.</p>
           {deleteError && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>}
           <div className="mt-4 flex justify-end gap-2">
             <button onClick={() => setDeleteId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
-            <button
-              onClick={confirmDelete}
-              disabled={deleting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-            >
+            <button onClick={confirmDelete} disabled={deleting}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
               {deleting ? "جاري الحذف..." : "حذف"}
             </button>
           </div>
