@@ -86,6 +86,11 @@
     unicode-bidi: embed;
   }
 
+  /* number cells in RTL tables must stay right-aligned (direction:ltr flips text-align:start to left) */
+  .ar-table td.number {
+    text-align: right;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -252,11 +257,14 @@
 }
 
 @media print {
-  .app-sidebar { display: none !important; }
-  .dashboard-main { margin: 0 !important; }
+  .app-sidebar, header.no-print { display: none !important; }
+  .dashboard-main { margin: 0 !important; padding: 0 !important; }
   .no-print { display: none !important; }
-  .page-container { padding: 0 !important; }
-  .section-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+  .print-only { display: block !important; }
+  .page-container { padding: 0.5cm 0 0 !important; max-width: none !important; }
+  .section-card { box-shadow: none !important; border: 1px solid #ccc !important; padding: 0 !important; }
+  .ar-table th, .ar-table td { padding: 5px 8px !important; font-size: 10pt; }
   body { background: white !important; font-size: 11pt; }
-  @page { size: A4; margin: 1.5cm; }
+  @page { size: A4 landscape; margin: 1.5cm; }
 }
+.print-only { display: none; }
