@@ -18,24 +18,28 @@ export async function POST(request: NextRequest, { params }: Props) {
     const ce = assertCompanyAccess(session, lic.companyId); if (ce) return ce;
 
     const body = await request.json() as Record<string, unknown>;
-    const last = await prisma.leaseContract.findFirst({ where: { licenseId }, orderBy: { version: "desc" }, select: { version: true } });
-    const newVer = (last?.version ?? 0) + 1;
 
-    await prisma.leaseContract.updateMany({ where: { licenseId, isActive: true }, data: { isActive: false } });
-    await prisma.leaseContract.create({
-      data: {
-        licenseId,
-        version:     newVer,
-        isActive:    true,
-        holderType:  body.holderType  as string ?? "INVESTOR",
-        holderNameAr: body.holderNameAr as string | null ?? null,
-        startDate:   toDate(body.startDate),
-        endDate:     toDate(body.endDate),
-        monthlyRent: body.monthlyRent != null ? Number(body.monthlyRent) : null,
-        notes:       body.notes   as string | null ?? null,
-        fileUrl:     body.fileUrl as string | null ?? null,
-      },
+    const newVer = await prisma.$transaction(async (tx) => {
+      const last = await tx.leaseContract.findFirst({ where: { licenseId }, orderBy: { version: "desc" }, select: { version: true } });
+      const ver = (last?.version ?? 0) + 1;
+      await tx.leaseContract.updateMany({ where: { licenseId, isActive: true }, data: { isActive: false } });
+      await tx.leaseContract.create({
+        data: {
+          licenseId,
+          version:      ver,
+          isActive:     true,
+          holderType:   body.holderType  as string ?? "INVESTOR",
+          holderNameAr: body.holderNameAr as string | null ?? null,
+          startDate:    toDate(body.startDate),
+          endDate:      toDate(body.endDate),
+          monthlyRent:  body.monthlyRent != null ? Number(body.monthlyRent) : null,
+          notes:        body.notes   as string | null ?? null,
+          fileUrl:      body.fileUrl as string | null ?? null,
+        },
+      });
+      return ver;
     });
+
     return NextResponse.json({ success: true, data: { version: newVer } });
   } catch (e) {
     return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "خطأ" }, { status: 500 });

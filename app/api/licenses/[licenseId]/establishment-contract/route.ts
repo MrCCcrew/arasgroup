@@ -25,39 +25,58 @@ export async function POST(request: NextRequest, { params }: Props) {
     if (ce) return ce;
 
     const body = await request.json() as Record<string, unknown>;
-    const last = await prisma.establishmentContract.findFirst({
-      where: { licenseId }, orderBy: { version: "desc" }, select: { version: true },
-    });
-    const newVer = (last?.version ?? 0) + 1;
 
-    await prisma.establishmentContract.updateMany({ where: { licenseId, isActive: true }, data: { isActive: false } });
-
-    const contract = await prisma.establishmentContract.create({
-      data: {
-        licenseId,
-        version:      newVer,
-        isActive:     true,
-        contractDate: toDate(body.contractDate),
-        notes:        body.notes   as string | null ?? null,
-        fileUrl:      body.fileUrl as string | null ?? null,
-      },
-    });
-
+    // ── Validate partners sharePercent before touching DB ──────────────────────
     const partners = body.partners as { nameAr: string; nameEn?: string; civilId?: string; sharePercent: number; isDirector?: boolean }[] | undefined;
-    if (Array.isArray(partners) && partners.length > 0) {
-      await prisma.contractPartner.createMany({
-        data: partners.map((p, i) => ({
-          contractId:   contract.id,
-          nameAr:       p.nameAr,
-          nameEn:       p.nameEn  ?? null,
-          civilId:      p.civilId ?? null,
-          sharePercent: p.sharePercent ?? 0,
-          isDirector:   p.isDirector ?? false,
-          sortOrder:    i,
-        })),
-      });
+    if (Array.isArray(partners)) {
+      for (const p of partners) {
+        const sp = Number(p.sharePercent ?? 0);
+        if (isNaN(sp) || sp < 0 || sp > 100) {
+          return NextResponse.json(
+            { success: false, error: `نسبة الشريك "${p.nameAr || "؟"}" يجب أن تكون بين 0 و 100` },
+            { status: 400 }
+          );
+        }
+      }
     }
-    return NextResponse.json({ success: true, data: { id: contract.id, version: newVer } });
+
+    // ── Wrap everything in a transaction so partners failure rolls back ─────────
+    const { id: contractId, version: newVer } = await prisma.$transaction(async (tx) => {
+      const last = await tx.establishmentContract.findFirst({
+        where: { licenseId }, orderBy: { version: "desc" }, select: { version: true },
+      });
+      const ver = (last?.version ?? 0) + 1;
+
+      await tx.establishmentContract.updateMany({ where: { licenseId, isActive: true }, data: { isActive: false } });
+
+      const contract = await tx.establishmentContract.create({
+        data: {
+          licenseId,
+          version:      ver,
+          isActive:     true,
+          contractDate: toDate(body.contractDate),
+          notes:        body.notes   as string | null ?? null,
+          fileUrl:      body.fileUrl as string | null ?? null,
+        },
+      });
+
+      if (Array.isArray(partners) && partners.length > 0) {
+        await tx.contractPartner.createMany({
+          data: partners.map((p, i) => ({
+            contractId:   contract.id,
+            nameAr:       p.nameAr,
+            nameEn:       p.nameEn  ?? null,
+            civilId:      p.civilId ?? null,
+            sharePercent: Number(p.sharePercent ?? 0),
+            isDirector:   p.isDirector ?? false,
+            sortOrder:    i,
+          })),
+        });
+      }
+      return { id: contract.id, version: ver };
+    });
+
+    return NextResponse.json({ success: true, data: { id: contractId, version: newVer } });
   } catch (e) {
     return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "خطأ" }, { status: 500 });
   }
