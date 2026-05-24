@@ -22,7 +22,7 @@ export default async function VehiclesPage({ params }: Props) {
 
   const [vehicles, branches] = await Promise.all([
     prisma.vehicle.findMany({
-      where: { companyId, isActive: true, type: { not: "CAR_WASH" } },
+      where: { companyId, isActive: true },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
