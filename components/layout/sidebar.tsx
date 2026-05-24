@@ -164,7 +164,7 @@ function buildCompanyNav(base: string): NavItem[] {
       iconColor: "teal",
       module: "INVESTORS",
       children: [
-        { href: `${base}/investors`,          labelKey: "nav.investors",          icon: <Users size={14} />,    iconColor: "teal" },
+        { href: `${base}/investors`,          labelKey: "nav.investorsList",      icon: <Users size={14} />,    iconColor: "teal" },
         { href: `${base}/investors/branches`, labelKey: "nav.investorBranches",   icon: <Building2 size={14} />,iconColor: "teal" },
         { href: `${base}/investors/claims`,   labelKey: "nav.investorClaims",     icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/statements`,labelKey: "nav.investorStatements",icon: <FileText size={14} />, iconColor: "teal" },
