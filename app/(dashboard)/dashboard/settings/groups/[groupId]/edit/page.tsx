@@ -5,11 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { ArrowRight, Save, Trash2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { GroupLogoUpload } from "@/components/group/GroupLogoUpload";
 
 interface Company { id: string; nameAr: string; isActive: boolean; }
 interface Group {
   id: string; nameAr: string; nameEn?: string;
   address?: string; phone?: string; email?: string;
+  logoUrl?: string | null;
   companies: Company[];
 }
 
@@ -109,6 +111,16 @@ export default function EditGroupPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
           )}
+
+          {/* Logo Upload */}
+          <div className="section-card">
+            <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wide mb-4">شعار المجموعة</h3>
+            <GroupLogoUpload
+              groupId={groupId}
+              currentLogoUrl={group.logoUrl ?? null}
+              groupName={group.nameAr}
+            />
+          </div>
 
           {/* Edit Form */}
           <form onSubmit={handleSubmit} className="section-card space-y-4">
