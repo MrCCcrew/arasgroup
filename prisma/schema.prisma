@@ -1854,6 +1854,9 @@ model License {
   commercialNameEn           String?
   isMainLicense              Boolean @default(true)
   mainLicenseId              String?
+  legalEntity                String?  // LLC | PARTNERSHIP | JOINT_STOCK | SOLE_PROPRIETORSHIP
+  capital                    Decimal? @db.Decimal(15, 3)
+  commercialRegNo            String?
   ownerOrInvestorNameAr      String?
   ownerOrInvestorNameEn      String?
   ownerOrInvestorPhone       String?
@@ -1869,6 +1872,9 @@ model License {
   fireLicenseExpiryDate      DateTime?
   healthLicenseExpiryDate    DateTime?
   advertisingLicenseExpiryDate DateTime?
+  trafficCertExpiryDate      DateTime?
+  customsCertExpiryDate      DateTime?
+  importLicenseExpiryDate    DateTime?
   status                     String @default("ACTIVE")
   notes                      String?
 
@@ -1883,6 +1889,21 @@ model License {
   branchMainFor          Branch[]        @relation("BranchMainLicense")
   notifications          Notification[]
 
+  // Document sections
+  establishmentContracts EstablishmentContract[]
+  leaseContracts         LeaseContract[]
+  employerSignatureCert  EmployerSignatureCert?
+  rentReceipts           LicenseRentReceipt[]
+  importLicenseDoc       ImportLicenseDoc?
+  advertisingDetails     LicenseAdvertisingDetails?
+  fireSafetyCert         LicenseFireSafetyCert?
+  trafficCert            LicenseTrafficCert?
+  customsCert            LicenseCustomsCert?
+  licenseVehicles        LicenseVehicle[]
+  managerPOA             ManagerPOA?
+  workInjuryInsurances   WorkInjuryInsurance[]
+  annualBalances         LicenseAnnualBalance[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1896,6 +1917,9 @@ model License {
   @@index([fireLicenseExpiryDate])
   @@index([healthLicenseExpiryDate])
   @@index([advertisingLicenseExpiryDate])
+  @@index([trafficCertExpiryDate])
+  @@index([customsCertExpiryDate])
+  @@index([importLicenseExpiryDate])
   @@index([unifiedEntityNumber])
   @@index([status])
   @@map("licenses")
@@ -1936,6 +1960,272 @@ model EmployeeLicenseAssignment {
   @@index([employeeId])
   @@index([licenseId])
   @@map("employee_license_assignments")
+}
+
+// ═══════════════════════════════════════════════════════════
+// LICENSE DOCUMENT SECTIONS (14 sections per license)
+// ═══════════════════════════════════════════════════════════
+
+// [1] عقد التأسيس — versioned, old versions archived
+model EstablishmentContract {
+  id           String    @id @default(cuid())
+  licenseId    String
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  contractDate DateTime?
+  notes        String?
+  fileUrl      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  license  License          @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  partners ContractPartner[]
+
+  @@index([licenseId])
+  @@index([isActive])
+  @@map("establishment_contracts")
+}
+
+model ContractPartner {
+  id           String   @id @default(cuid())
+  contractId   String
+  nameAr       String
+  nameEn       String?
+  civilId      String?
+  sharePercent Decimal  @db.Decimal(5, 2) @default(0)
+  isDirector   Boolean  @default(false)
+  sortOrder    Int      @default(0)
+
+  contract EstablishmentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_partners")
+}
+
+// [2] عقد الإيجار — versioned
+model LeaseContract {
+  id           String   @id @default(cuid())
+  licenseId    String
+  version      Int      @default(1)
+  isActive     Boolean  @default(true)
+  holderType   String   @default("INVESTOR")  // INVESTOR | GROUP_OWNER | OTHER_KUWAITI
+  holderNameAr String?
+  startDate    DateTime?
+  endDate      DateTime?
+  monthlyRent  Decimal? @db.Decimal(10, 3)
+  notes        String?
+  fileUrl      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@index([isActive])
+  @@map("lease_contracts")
+}
+
+// [4] اعتماد توقيع صاحب العمل
+model EmployerSignatureCert {
+  id             String    @id @default(cuid())
+  licenseId      String    @unique
+  fileNumber     String?
+  tradeName      String?
+  companyCivilId String?
+  unifiedNumber  String?
+  governorate    String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  fileUrl        String?
+  updatedAt      DateTime  @updatedAt
+
+  license     License           @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  signatories AuthorizedSigner[]
+
+  @@map("employer_signature_certs")
+}
+
+model AuthorizedSigner {
+  id        String @id @default(cuid())
+  certId    String
+  nameAr    String
+  nameEn    String?
+  sortOrder Int    @default(0)
+
+  cert EmployerSignatureCert @relation(fields: [certId], references: [id], onDelete: Cascade)
+
+  @@index([certId])
+  @@map("authorized_signers")
+}
+
+// [5] إيصالات الإيجار
+model LicenseRentReceipt {
+  id          String    @id @default(cuid())
+  licenseId   String
+  receiptDate DateTime?
+  amount      Decimal?  @db.Decimal(10, 3)
+  fileUrl     String
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@map("license_rent_receipts")
+}
+
+// [6] ترخيص الاستيراد العام
+model ImportLicenseDoc {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  licenseNumber String?
+  startDate     DateTime?
+  endDate       DateTime?
+  fileUrl       String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("import_license_docs")
+}
+
+// [7] ترخيص الإعلان (تفاصيل موسعة)
+model LicenseAdvertisingDetails {
+  id                      String    @id @default(cuid())
+  licenseId               String    @unique
+  adLicenseNumber         String?
+  commercialLicenseNo     String?
+  issueDate               DateTime?
+  expiryDate              DateTime?
+  commercialLicenseExpiry DateTime?
+  municipalityAddress     String?
+  district                String?
+  street                  String?
+  block                   String?
+  fileUrl                 String?
+  updatedAt               DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_advertising_details")
+}
+
+// [8] رخصة الإطفاء (تفاصيل موسعة)
+model LicenseFireSafetyCert {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  licenseNumber String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  fileUrl       String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_fire_safety_certs")
+}
+
+// [9] اعتماد المرور
+model LicenseTrafficCert {
+  id         String    @id @default(cuid())
+  licenseId  String    @unique
+  issueDate  DateTime?
+  expiryDate DateTime?
+  fileUrl    String?
+  updatedAt  DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_traffic_certs")
+}
+
+// [10] اعتماد الجمارك
+model LicenseCustomsCert {
+  id         String    @id @default(cuid())
+  licenseId  String    @unique
+  issueDate  DateTime?
+  expiryDate DateTime?
+  fileUrl    String?
+  updatedAt  DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_customs_certs")
+}
+
+// [11] المركبات المضافة على الترخيص
+model LicenseVehicle {
+  id              String    @id @default(cuid())
+  licenseId       String
+  vehicleType     String
+  plateNumber     String
+  model           String?
+  year            Int?
+  insuranceExpiry DateTime?
+  licenseExpiry   DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@map("license_vehicles")
+}
+
+// [12] وكالة المدير
+model ManagerPOA {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  principalName String?
+  agentName     String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  fileUrl       String?
+  notes         String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("manager_poa")
+}
+
+// [13] وثيقة تأمين إصابات العمل — ربع سنوي
+model WorkInjuryInsurance {
+  id            String   @id @default(cuid())
+  licenseId     String
+  year          Int
+  quarter       Int      // 1 | 2 | 3 | 4
+  policyNumber  String?
+  certificateNo String?
+  startDate     DateTime?
+  endDate       DateTime?
+  fileUrl       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, year, quarter])
+  @@index([licenseId])
+  @@map("work_injury_insurances")
+}
+
+// [14] الميزانية السنوية
+model LicenseAnnualBalance {
+  id        String   @id @default(cuid())
+  licenseId String
+  year      Int
+  accountant String?
+  fileUrl   String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, year])
+  @@index([licenseId])
+  @@map("license_annual_balances")
 }
 
 model DeliveryPlatformProfile {
