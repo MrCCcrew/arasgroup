@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowRight, FileText, Building2, Users, Car, Shield,
   Megaphone, Truck, Globe, UserCheck, FileCheck, BarChart3,
   Receipt, Pencil, Plus, Trash2, X, ChevronDown, ChevronUp,
-  AlertTriangle, CheckCircle, Clock,
+  AlertTriangle, CheckCircle, Clock, Upload, ExternalLink,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
@@ -114,6 +114,16 @@ function fmtDays(d: string | null | undefined) {
   return null;
 }
 
+function FileLink({ url, label = "عرض الملف" }: { url: string | null | undefined; label?: string }) {
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+      <ExternalLink size={11} /> {label}
+    </a>
+  );
+}
+
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
 function SectionCard({
@@ -182,6 +192,77 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
   );
 }
 
+// ─── File Upload Field ─────────────────────────────────────────────────────────
+
+function FileUploadField({
+  value, onChange, licenseId, label = "الملف", required,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  licenseId: string;
+  label?: string;
+  required?: boolean;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadErr(""); setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/licenses/${licenseId}/attachments`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      onChange(json.data.filePath);
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : "فشل الرفع");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div>
+      <label className="form-label">
+        {label}{required && <span className="text-red-500 mr-1">*</span>}
+      </label>
+      <input
+        ref={fileRef} type="file" className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xlsx,.xls"
+        onChange={handleFile}
+      />
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50 shrink-0"
+        >
+          {uploading
+            ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent inline-block" />
+            : <Upload size={13} />
+          }
+          {uploading ? "جاري الرفع..." : value ? "استبدال الملف" : "رفع ملف"}
+        </button>
+        {value && (
+          <a href={value} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-primary hover:underline">
+            <ExternalLink size={12} /> عرض الملف الحالي
+          </a>
+        )}
+      </div>
+      {uploadErr && (
+        <p className="mt-1 text-xs text-red-600 bg-red-50 rounded px-2 py-1">{uploadErr}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LicenseDetailPage() {
@@ -230,6 +311,10 @@ export default function LicenseDetailPage() {
   function f(key: string) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((p) => ({ ...p, [key]: e.target.value }));
+  }
+
+  function setFileUrl(url: string) {
+    setForm((p) => ({ ...p, fileUrl: url }));
   }
 
   async function save(url: string, method: string, body: Record<string, unknown>) {
@@ -406,6 +491,7 @@ export default function LicenseDetailPage() {
                 {s!.establishmentContracts.length > 1 && (
                   <p className="text-xs text-muted-foreground">{s!.establishmentContracts.length - 1} نسخة مؤرشفة</p>
                 )}
+                <FileLink url={activeEstContract.fileUrl} label="عرض العقد" />
               </div>
             )}
           </SectionCard>
@@ -424,11 +510,14 @@ export default function LicenseDetailPage() {
             })} editLabel={activeLeaseContract ? "إضافة تعديل جديد" : "إدخال العقد"}
           >
             {activeLeaseContract && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <span className="text-muted-foreground">الإيجار على</span><span>{HOLDER_LABELS[activeLeaseContract.holderType] ?? activeLeaseContract.holderType}{activeLeaseContract.holderNameAr ? ` — ${activeLeaseContract.holderNameAr}` : ""}</span>
-                {activeLeaseContract.startDate && <><span className="text-muted-foreground">من</span><span>{fmt(activeLeaseContract.startDate)}</span></>}
-                {activeLeaseContract.endDate && <><span className="text-muted-foreground">إلى</span><span>{fmt(activeLeaseContract.endDate)}</span></>}
-                {activeLeaseContract.monthlyRent && <><span className="text-muted-foreground">الإيجار الشهري</span><span dir="ltr">{Number(activeLeaseContract.monthlyRent).toFixed(3)} د.ك</span></>}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">الإيجار على</span><span>{HOLDER_LABELS[activeLeaseContract.holderType] ?? activeLeaseContract.holderType}{activeLeaseContract.holderNameAr ? ` — ${activeLeaseContract.holderNameAr}` : ""}</span>
+                  {activeLeaseContract.startDate && <><span className="text-muted-foreground">من</span><span>{fmt(activeLeaseContract.startDate)}</span></>}
+                  {activeLeaseContract.endDate && <><span className="text-muted-foreground">إلى</span><span>{fmt(activeLeaseContract.endDate)}</span></>}
+                  {activeLeaseContract.monthlyRent && <><span className="text-muted-foreground">الإيجار الشهري</span><span dir="ltr">{Number(activeLeaseContract.monthlyRent).toFixed(3)} د.ك</span></>}
+                </div>
+                <FileLink url={activeLeaseContract.fileUrl} label="عرض العقد" />
               </div>
             )}
           </SectionCard>
@@ -462,13 +551,16 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.employerSignatureCert && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.employerSignatureCert.fileNumber && <><span className="text-muted-foreground">رقم الملف</span><span>{s.employerSignatureCert.fileNumber}</span></>}
-                {s.employerSignatureCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.employerSignatureCert.issueDate)}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.employerSignatureCert.expiryDate)}{fmtDays(s.employerSignatureCert.expiryDate)}</span>
-                {s.employerSignatureCert.signatories.length > 0 && (
-                  <><span className="text-muted-foreground">المفوضون</span><span>{s.employerSignatureCert.signatories.map((sg) => sg.nameAr).join("، ")}</span></>
-                )}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.employerSignatureCert.fileNumber && <><span className="text-muted-foreground">رقم الملف</span><span>{s.employerSignatureCert.fileNumber}</span></>}
+                  {s.employerSignatureCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.employerSignatureCert.issueDate)}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.employerSignatureCert.expiryDate)}{fmtDays(s.employerSignatureCert.expiryDate)}</span>
+                  {s.employerSignatureCert.signatories.length > 0 && (
+                    <><span className="text-muted-foreground">المفوضون</span><span>{s.employerSignatureCert.signatories.map((sg) => sg.nameAr).join("، ")}</span></>
+                  )}
+                </div>
+                <FileLink url={s.employerSignatureCert.fileUrl} label="عرض الشهادة" />
               </div>
             )}
           </SectionCard>
@@ -481,13 +573,20 @@ export default function LicenseDetailPage() {
           >
             {(s?.rentReceipts.length ?? 0) > 0 && (
               <div className="space-y-1">
-                {s!.rentReceipts.slice(0, 3).map((r) => (
+                {s!.rentReceipts.slice(0, 5).map((r) => (
                   <div key={r.id} className="flex items-center justify-between text-xs">
                     <span>{fmt(r.receiptDate)}{r.amount ? ` · ${Number(r.amount).toFixed(3)} د.ك` : ""}</span>
-                    <button onClick={() => deleteRentReceipt(r.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    <div className="flex items-center gap-2">
+                      {r.fileUrl && (
+                        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/70" title="عرض الإيصال">
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                      <button onClick={() => deleteRentReceipt(r.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    </div>
                   </div>
                 ))}
-                {s!.rentReceipts.length > 3 && <p className="text-xs text-muted-foreground">+{s!.rentReceipts.length - 3} أخرى</p>}
+                {s!.rentReceipts.length > 5 && <p className="text-xs text-muted-foreground">+{s!.rentReceipts.length - 5} أخرى</p>}
               </div>
             )}
           </SectionCard>
@@ -503,10 +602,13 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.importLicenseDoc && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.importLicenseDoc.licenseNumber && <><span className="text-muted-foreground">رقم الترخيص</span><span>{s.importLicenseDoc.licenseNumber}</span></>}
-                {s.importLicenseDoc.startDate && <><span className="text-muted-foreground">البداية</span><span>{fmt(s.importLicenseDoc.startDate)}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.importLicenseDoc.endDate)}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.importLicenseDoc.licenseNumber && <><span className="text-muted-foreground">رقم الترخيص</span><span>{s.importLicenseDoc.licenseNumber}</span></>}
+                  {s.importLicenseDoc.startDate && <><span className="text-muted-foreground">البداية</span><span>{fmt(s.importLicenseDoc.startDate)}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.importLicenseDoc.endDate)}</span>
+                </div>
+                <FileLink url={s.importLicenseDoc.fileUrl} label="عرض الترخيص" />
               </div>
             )}
           </SectionCard>
@@ -528,9 +630,12 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.advertisingDetails && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.advertisingDetails.adLicenseNumber && <><span className="text-muted-foreground">رقم الترخيص</span><span>{s.advertisingDetails.adLicenseNumber}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.advertisingDetails.expiryDate)}{fmtDays(s.advertisingDetails.expiryDate)}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.advertisingDetails.adLicenseNumber && <><span className="text-muted-foreground">رقم الترخيص</span><span>{s.advertisingDetails.adLicenseNumber}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.advertisingDetails.expiryDate)}{fmtDays(s.advertisingDetails.expiryDate)}</span>
+                </div>
+                <FileLink url={s.advertisingDetails.fileUrl} label="عرض الترخيص" />
               </div>
             )}
           </SectionCard>
@@ -546,9 +651,12 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.fireSafetyCert && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.fireSafetyCert.licenseNumber && <><span className="text-muted-foreground">رقم الرخصة</span><span>{s.fireSafetyCert.licenseNumber}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.fireSafetyCert.expiryDate)}{fmtDays(s.fireSafetyCert.expiryDate)}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.fireSafetyCert.licenseNumber && <><span className="text-muted-foreground">رقم الرخصة</span><span>{s.fireSafetyCert.licenseNumber}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.fireSafetyCert.expiryDate)}{fmtDays(s.fireSafetyCert.expiryDate)}</span>
+                </div>
+                <FileLink url={s.fireSafetyCert.fileUrl} label="عرض الرخصة" />
               </div>
             )}
           </SectionCard>
@@ -563,9 +671,12 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.trafficCert && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.trafficCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.trafficCert.issueDate)}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.trafficCert.expiryDate)}{fmtDays(s.trafficCert.expiryDate)}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.trafficCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.trafficCert.issueDate)}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.trafficCert.expiryDate)}{fmtDays(s.trafficCert.expiryDate)}</span>
+                </div>
+                <FileLink url={s.trafficCert.fileUrl} label="عرض الاعتماد" />
               </div>
             )}
           </SectionCard>
@@ -580,9 +691,12 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.customsCert && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.customsCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.customsCert.issueDate)}</span></>}
-                <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.customsCert.expiryDate)}{fmtDays(s.customsCert.expiryDate)}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.customsCert.issueDate && <><span className="text-muted-foreground">الإصدار</span><span>{fmt(s.customsCert.issueDate)}</span></>}
+                  <span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.customsCert.expiryDate)}{fmtDays(s.customsCert.expiryDate)}</span>
+                </div>
+                <FileLink url={s.customsCert.fileUrl} label="عرض الاعتماد" />
               </div>
             )}
           </SectionCard>
@@ -625,10 +739,13 @@ export default function LicenseDetailPage() {
             })}
           >
             {s?.managerPOA && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {s.managerPOA.principalName && <><span className="text-muted-foreground">الموكِّل</span><span>{s.managerPOA.principalName}</span></>}
-                {s.managerPOA.agentName && <><span className="text-muted-foreground">الموكَّل إليه</span><span>{s.managerPOA.agentName}</span></>}
-                {s.managerPOA.expiryDate && <><span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.managerPOA.expiryDate)}</span></>}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {s.managerPOA.principalName && <><span className="text-muted-foreground">الموكِّل</span><span>{s.managerPOA.principalName}</span></>}
+                  {s.managerPOA.agentName && <><span className="text-muted-foreground">الموكَّل إليه</span><span>{s.managerPOA.agentName}</span></>}
+                  {s.managerPOA.expiryDate && <><span className="text-muted-foreground">الانتهاء</span><span>{fmt(s.managerPOA.expiryDate)}</span></>}
+                </div>
+                <FileLink url={s.managerPOA.fileUrl} label="عرض الوكالة" />
               </div>
             )}
           </SectionCard>
@@ -644,7 +761,14 @@ export default function LicenseDetailPage() {
                 {s!.workInjuryInsurances.slice(0, 4).map((w) => (
                   <div key={w.id} className="flex items-center justify-between text-xs">
                     <span className="font-medium">{w.year} — {QUARTER_LABELS[w.quarter]}</span>
-                    <span className="text-muted-foreground">{fmt(w.endDate)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{fmt(w.endDate)}</span>
+                      {w.fileUrl && (
+                        <a href={w.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/70" title="عرض الوثيقة">
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -662,7 +786,14 @@ export default function LicenseDetailPage() {
                 {s!.annualBalances.map((b) => (
                   <div key={b.id} className="flex items-center justify-between text-xs">
                     <span className="font-medium">سنة {b.year}{b.accountant ? ` · ${b.accountant}` : ""}</span>
-                    <button onClick={() => deleteAnnualBalance(b.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    <div className="flex items-center gap-2">
+                      {b.fileUrl && (
+                        <a href={b.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/70" title="عرض الميزانية">
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                      <button onClick={() => deleteAnnualBalance(b.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -711,8 +842,8 @@ export default function LicenseDetailPage() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><label className="form-label">تاريخ العقد</label><input type="date" className="input-field w-full" value={form.contractDate as string ?? ""} onChange={f("contractDate")} /></div>
-              <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" placeholder="https://..." value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
             </div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف العقد" />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {/* Partners */}
             <div>
@@ -758,7 +889,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">إلى تاريخ</label><input type="date" className="input-field w-full" value={form.endDate as string ?? ""} onChange={f("endDate")} /></div>
             </div>
             <div><label className="form-label">الإيجار الشهري (د.ك)</label><input type="number" step="0.001" className="input-field w-full" value={form.monthlyRent as string ?? ""} onChange={f("monthlyRent")} /></div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" placeholder="https://..." value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف العقد" />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -783,7 +914,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ الإصدار</label><input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.expiryDate as string ?? ""} onChange={f("expiryDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الشهادة" />
             {/* Signatories */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -813,7 +944,7 @@ export default function LicenseDetailPage() {
           <div className="space-y-3">
             <div><label className="form-label">تاريخ الإيصال</label><input type="date" className="input-field w-full" value={form.receiptDate as string ?? ""} onChange={f("receiptDate")} /></div>
             <div><label className="form-label">المبلغ (د.ك)</label><input type="number" step="0.001" className="input-field w-full" value={form.amount as string ?? ""} onChange={f("amount")} /></div>
-            <div><label className="form-label">رابط الملف *</label><input className="input-field w-full" dir="ltr" placeholder="https://..." value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="صورة الإيصال" required />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -833,7 +964,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ البداية</label><input type="date" className="input-field w-full" value={form.startDate as string ?? ""} onChange={f("startDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.endDate as string ?? ""} onChange={f("endDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الترخيص" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -856,7 +987,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">الشارع</label><input className="input-field w-full" value={form.street as string ?? ""} onChange={f("street")} /></div>
               <div><label className="form-label">القطعة</label><input className="input-field w-full" value={form.block as string ?? ""} onChange={f("block")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الترخيص" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -875,7 +1006,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ الإصدار</label><input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.expiryDate as string ?? ""} onChange={f("expiryDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الرخصة" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -893,7 +1024,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ الإصدار</label><input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.expiryDate as string ?? ""} onChange={f("expiryDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الاعتماد" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -911,7 +1042,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ الإصدار</label><input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.expiryDate as string ?? ""} onChange={f("expiryDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الاعتماد" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -953,7 +1084,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ الإصدار</label><input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.expiryDate as string ?? ""} onChange={f("expiryDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الوكالة" />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -984,7 +1115,7 @@ export default function LicenseDetailPage() {
               <div><label className="form-label">تاريخ البداية</label><input type="date" className="input-field w-full" value={form.startDate as string ?? ""} onChange={f("startDate")} /></div>
               <div><label className="form-label">تاريخ الانتهاء</label><input type="date" className="input-field w-full" value={form.endDate as string ?? ""} onChange={f("endDate")} /></div>
             </div>
-            <div><label className="form-label">رابط الملف</label><input className="input-field w-full" dir="ltr" value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الوثيقة" />
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
@@ -1000,7 +1131,7 @@ export default function LicenseDetailPage() {
           <div className="space-y-3">
             <div><label className="form-label">السنة</label><input type="number" className="input-field w-full" value={form.year as string ?? ""} onChange={f("year")} /></div>
             <div><label className="form-label">اسم المحاسب القانوني</label><input className="input-field w-full" value={form.accountant as string ?? ""} onChange={f("accountant")} /></div>
-            <div><label className="form-label">رابط الملف *</label><input className="input-field w-full" dir="ltr" placeholder="https://..." value={form.fileUrl as string ?? ""} onChange={f("fileUrl")} /></div>
+            <FileUploadField value={form.fileUrl as string ?? ""} onChange={setFileUrl} licenseId={licenseId} label="ملف الميزانية" required />
             <div><label className="form-label">ملاحظات</label><textarea className="input-field w-full" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} /></div>
             {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
