@@ -83,7 +83,7 @@
 
   .number {
     direction: ltr;
-    display: inline-block;
+    unicode-bidi: embed;
   }
 
   ::-webkit-scrollbar {
