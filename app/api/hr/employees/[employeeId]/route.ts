@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import { z } from "zod";
+import { allowsCrossCompanyLicenses, getAllowedEmployeeTypes } from "@/lib/hr/company-employee-rules";
 
 interface Ctx { params: Promise<{ employeeId: string }> }
 
@@ -68,6 +69,35 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+
+    const existingEmployee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, companyId: true, type: true },
+    });
+    if (!existingEmployee) {
+      return NextResponse.json({ success: false, error: "الموظف غير موجود" }, { status: 404 });
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: existingEmployee.companyId },
+      select: { id: true, type: true },
+    });
+    if (!company) {
+      return NextResponse.json({ success: false, error: "الشركة غير موجودة" }, { status: 404 });
+    }
+
+    const nextType = parsed.data.type ?? existingEmployee.type;
+    const allowedTypes = getAllowedEmployeeTypes(company.type);
+    if (!allowedTypes.includes(nextType)) {
+      return NextResponse.json({ success: false, error: "نوع الموظف غير مسموح لهذه الشركة" }, { status: 400 });
+    }
+
+    if (!allowsCrossCompanyLicenses(company.type) && parsed.data.additionalLicenseIds?.length) {
+      return NextResponse.json(
+        { success: false, error: "لا يمكن ربط موظفي شركة الغسيل بتراخيص شركات أخرى" },
+        { status: 400 }
+      );
+    }
 
     const { additionalLicenseIds, ...updateData } = parsed.data;
 

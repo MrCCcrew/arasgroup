@@ -2,15 +2,48 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Save, ChevronDown, X } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { ArrowRight, ChevronDown, Save, X } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { allowsCrossCompanyLicenses, getAllowedEmployeeTypes } from "@/lib/hr/company-employee-rules";
 
-interface SearchableOption { id: string; label: string; sub?: string }
+interface SearchableOption {
+  id: string;
+  label: string;
+  sub?: string;
+}
+
+interface CompanyLookup {
+  type: string;
+}
+
+interface BranchLookup {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+  unifiedEntityNumber?: string | null;
+}
+
+interface PositionLookup {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+}
+
+interface LicenseLookup {
+  id: string;
+  commercialNameAr: string;
+  licenseNumber: string;
+  unifiedEntityNumber?: string | null;
+  company?: { nameAr: string };
+}
 
 function SearchableSelect({
-  options, value, onChange, placeholder,
+  options,
+  value,
+  onChange,
+  placeholder,
 }: {
   options: SearchableOption[];
   value: string;
@@ -21,18 +54,20 @@ function SearchableSelect({
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  const selected = options.find((o) => o.id === value);
+  const selected = options.find((option) => option.id === value);
   const filtered = query
-    ? options.filter((o) =>
-        o.label.toLowerCase().includes(query.toLowerCase()) ||
-        (o.sub ?? "").toLowerCase().includes(query.toLowerCase())
+    ? options.filter(
+        (option) =>
+          option.label.toLowerCase().includes(query.toLowerCase()) ||
+          (option.sub ?? "").toLowerCase().includes(query.toLowerCase()),
       )
     : options;
 
   useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    function onClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
     }
+
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
@@ -41,8 +76,11 @@ function SearchableSelect({
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => { setOpen((p) => !p); setQuery(""); }}
-        className="input-field w-full flex items-center justify-between text-right"
+        onClick={() => {
+          setOpen((previous) => !previous);
+          setQuery("");
+        }}
+        className="input-field flex w-full items-center justify-between text-right"
       >
         <span className={selected ? "text-foreground" : "text-muted-foreground"}>
           {selected ? (
@@ -50,12 +88,17 @@ function SearchableSelect({
               {selected.label}
               {selected.sub && <span className="mr-1 text-xs text-muted-foreground">— {selected.sub}</span>}
             </span>
-          ) : placeholder}
+          ) : (
+            placeholder
+          )}
         </span>
         <span className="flex items-center gap-1">
           {value && (
             <span
-              onClick={(e) => { e.stopPropagation(); onChange(""); }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onChange("");
+              }}
               className="rounded p-0.5 hover:bg-muted"
             >
               <X size={12} />
@@ -64,14 +107,18 @@ function SearchableSelect({
           <ChevronDown size={14} className="text-muted-foreground" />
         </span>
       </button>
+
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border bg-card shadow-lg" style={{ maxHeight: "260px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div
+          className="absolute z-50 mt-1 flex w-full flex-col overflow-hidden rounded-lg border bg-card shadow-lg"
+          style={{ maxHeight: "260px" }}
+        >
           <div className="border-b p-2">
             <input
               autoFocus
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="ابحث بالاسم أو الرقم الموحد..."
               className="w-full rounded-md border px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
               dir="rtl"
@@ -81,23 +128,34 @@ function SearchableSelect({
             <button
               type="button"
               className="w-full px-3 py-2 text-right text-sm text-muted-foreground hover:bg-muted"
-              onClick={() => { onChange(""); setOpen(false); }}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
             >
               — {placeholder} —
             </button>
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">لا توجد نتائج</p>
-            ) : filtered.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                className={`w-full px-3 py-2 text-right text-sm hover:bg-muted ${o.id === value ? "bg-primary/10 font-medium text-primary" : ""}`}
-                onClick={() => { onChange(o.id); setOpen(false); setQuery(""); }}
-              >
-                <span>{o.label}</span>
-                {o.sub && <span className="mr-2 text-xs text-muted-foreground">{o.sub}</span>}
-              </button>
-            ))}
+            ) : (
+              filtered.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`w-full px-3 py-2 text-right text-sm hover:bg-muted ${
+                    option.id === value ? "bg-primary/10 font-medium text-primary" : ""
+                  }`}
+                  onClick={() => {
+                    onChange(option.id);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                >
+                  <span>{option.label}</span>
+                  {option.sub && <span className="mr-2 text-xs text-muted-foreground">{option.sub}</span>}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -134,16 +192,19 @@ const employeeTypes = {
 
 export default function NewEmployeePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ companyId: string }>();
   const { locale } = useLocale();
   const companyId = params.companyId;
+  const requestedType = searchParams.get("type");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [branches, setBranches] = useState<{ id: string; nameAr: string; nameEn?: string | null; unifiedEntityNumber?: string | null }[]>([]);
-  const [positions, setPositions] = useState<{ id: string; nameAr: string; nameEn?: string | null }[]>([]);
-  const [licenses, setLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null }[]>([]);
-  const [groupLicenses, setGroupLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null; company?: { nameAr: string } }[]>([]);
+  const [companyType, setCompanyType] = useState("OTHER");
+  const [branches, setBranches] = useState<BranchLookup[]>([]);
+  const [positions, setPositions] = useState<PositionLookup[]>([]);
+  const [licenses, setLicenses] = useState<LicenseLookup[]>([]);
+  const [groupLicenses, setGroupLicenses] = useState<LicenseLookup[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
   const [form, setForm] = useState({
     employeeNumber: "",
@@ -167,14 +228,22 @@ export default function NewEmployeePage() {
     notes: "",
   });
 
+  const allowedTypes = getAllowedEmployeeTypes(companyType);
+  const availableEmployeeTypes = employeeTypes[locale].filter((type) =>
+    allowedTypes.includes(type.value as (typeof allowedTypes)[number]),
+  );
+  const showAdditionalLicenses = allowsCrossCompanyLicenses(companyType);
+
   useEffect(() => {
     Promise.all([
-      fetch(`/api/companies/${companyId}/branches`).then((r) => r.json()),
-      fetch(`/api/hr/positions?companyId=${companyId}`).then((r) => r.json()),
-      fetch(`/api/licenses?companyId=${companyId}`).then((r) => r.json()),
-      fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`).then((r) => r.json()),
+      fetch(`/api/companies/${companyId}`).then((response) => response.json()),
+      fetch(`/api/companies/${companyId}/branches`).then((response) => response.json()),
+      fetch(`/api/hr/positions?companyId=${companyId}`).then((response) => response.json()),
+      fetch(`/api/licenses?companyId=${companyId}`).then((response) => response.json()),
+      fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`).then((response) => response.json()),
     ])
-      .then(([branchesPayload, positionsPayload, licensesPayload, groupPayload]) => {
+      .then(([companyPayload, branchesPayload, positionsPayload, licensesPayload, groupPayload]) => {
+        if (companyPayload.success) setCompanyType((companyPayload.data as CompanyLookup).type);
         if (branchesPayload.success) setBranches(branchesPayload.data);
         if (positionsPayload.success) setPositions(positionsPayload.data);
         if (licensesPayload.success) setLicenses(licensesPayload.data);
@@ -184,6 +253,17 @@ export default function NewEmployeePage() {
         setError(locale === "en" ? "Failed to load lookup data" : "تعذر تحميل البيانات المساعدة");
       });
   }, [companyId, locale]);
+
+  useEffect(() => {
+    if (requestedType && allowedTypes.includes(requestedType as (typeof allowedTypes)[number])) {
+      setForm((previous) => ({ ...previous, type: requestedType }));
+      return;
+    }
+
+    if (!allowedTypes.includes(form.type as (typeof allowedTypes)[number]) && allowedTypes[0]) {
+      setForm((previous) => ({ ...previous, type: allowedTypes[0] }));
+    }
+  }, [requestedType, allowedTypes, form.type]);
 
   function setField(field: keyof typeof form, value: string) {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -207,7 +287,7 @@ export default function NewEmployeePage() {
           positionId: form.positionId || undefined,
           branchId: form.branchId || undefined,
           licenseId: form.licenseId || undefined,
-          additionalLicenseIds: additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
+          additionalLicenseIds: showAdditionalLicenses && additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
           nationality: form.nationality || undefined,
           civilId: form.civilId || undefined,
           passportNumber: form.passportNumber || undefined,
@@ -224,7 +304,10 @@ export default function NewEmployeePage() {
       });
 
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? (locale === "en" ? "Failed to save employee" : "فشل في حفظ الموظف"));
+      if (!response.ok) {
+        throw new Error(payload.error ?? (locale === "en" ? "Failed to save employee" : "فشل في حفظ الموظف"));
+      }
+
       router.push(`/dashboard/companies/${companyId}/hr/employees`);
       router.refresh();
     } catch (submissionError) {
@@ -260,79 +343,104 @@ export default function NewEmployeePage() {
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">
               {locale === "en" ? "Basic information" : "البيانات الأساسية"}
             </h3>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Employee code" : "رقم الموظف"}</label>
-                <input type="text" value={form.employeeNumber} onChange={(event) => setField("employeeNumber", event.target.value)} className="input-field w-full" placeholder="EMP-001" dir="ltr" />
+                <input
+                  type="text"
+                  value={form.employeeNumber}
+                  onChange={(event) => setField("employeeNumber", event.target.value)}
+                  className="input-field w-full"
+                  placeholder="EMP-001"
+                  dir="ltr"
+                />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Branch" : "الفرع"}</label>
                 <SearchableSelect
                   value={form.branchId}
                   onChange={(id) => setField("branchId", id)}
                   placeholder={locale === "en" ? "Select branch" : "اختر الفرع"}
-                  options={branches.map((b) => ({
-                    id: b.id,
-                    label: locale === "en" ? (b.nameEn ?? b.nameAr) : b.nameAr,
-                    sub: b.unifiedEntityNumber ?? undefined,
+                  options={branches.map((branch) => ({
+                    id: branch.id,
+                    label: locale === "en" ? branch.nameEn ?? branch.nameAr : branch.nameAr,
+                    sub: branch.unifiedEntityNumber ?? undefined,
                   }))}
                 />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "License" : "الترخيص"}</label>
                 <SearchableSelect
                   value={form.licenseId}
                   onChange={(id) => setField("licenseId", id)}
                   placeholder={locale === "en" ? "Select license" : "اختر الترخيص"}
-                  options={licenses.map((l) => ({
-                    id: l.id,
-                    label: `${l.commercialNameAr} (${l.licenseNumber})`,
-                    sub: l.unifiedEntityNumber ?? undefined,
+                  options={licenses.map((license) => ({
+                    id: license.id,
+                    label: `${license.commercialNameAr} (${license.licenseNumber})`,
+                    sub: license.unifiedEntityNumber ?? undefined,
                   }))}
                 />
               </div>
-              {/* التراخيص الإضافية — للإداريين العابرين للشركات */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium">
-                  {locale === "en" ? "Additional licenses (cross-company admin)" : "تراخيص إضافية (إداري عابر للشركات)"}
-                </label>
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {additionalLicenseIds.map((lid) => {
-                      const lic = licenses.find((l) => l.id === lid);
-                      if (!lic) return null;
-                      return (
-                        <span key={lid} className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                          {lic.commercialNameAr} ({lic.licenseNumber})
-                          <button type="button" onClick={() => setAdditionalLicenseIds((p) => p.filter((x) => x !== lid))} className="hover:text-red-500">×</button>
-                        </span>
-                      );
-                    })}
-                    {additionalLicenseIds.length === 0 && (
-                      <p className="text-xs text-muted-foreground">{locale === "en" ? "No additional licenses selected" : "لم يتم اختيار تراخيص إضافية"}</p>
-                    )}
+
+              {showAdditionalLicenses && (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium">
+                    {locale === "en" ? "Additional licenses (cross-company admin)" : "تراخيص إضافية (إداري عابر للشركات)"}
+                  </label>
+                  <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {additionalLicenseIds.map((licenseId) => {
+                        const license = groupLicenses.find((item) => item.id === licenseId);
+                        if (!license) return null;
+
+                        return (
+                          <span key={licenseId} className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                            {license.commercialNameAr} ({license.licenseNumber})
+                            <button
+                              type="button"
+                              onClick={() => setAdditionalLicenseIds((previous) => previous.filter((item) => item !== licenseId))}
+                              className="hover:text-red-500"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+
+                      {additionalLicenseIds.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {locale === "en" ? "No additional licenses selected" : "لم يتم اختيار تراخيص إضافية"}
+                        </p>
+                      )}
+                    </div>
+
+                    <select
+                      className="input-field w-full text-sm"
+                      value=""
+                      onChange={(event) => {
+                        const nextLicenseId = event.target.value;
+                        if (nextLicenseId && !additionalLicenseIds.includes(nextLicenseId)) {
+                          setAdditionalLicenseIds((previous) => [...previous, nextLicenseId]);
+                        }
+                      }}
+                    >
+                      <option value="">{locale === "en" ? "— Add license from another company —" : "— أضف ترخيصاً من شركة أخرى —"}</option>
+                      {groupLicenses
+                        .filter((license) => !additionalLicenseIds.includes(license.id))
+                        .map((license) => (
+                          <option key={license.id} value={license.id}>
+                            {license.company?.nameAr ? `[${license.company.nameAr}] ` : ""}
+                            {license.commercialNameAr} ({license.licenseNumber})
+                            {license.unifiedEntityNumber ? ` — ${license.unifiedEntityNumber}` : ""}
+                          </option>
+                        ))}
+                    </select>
                   </div>
-                  <select
-                    className="input-field w-full text-sm"
-                    value=""
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && !additionalLicenseIds.includes(val)) {
-                        setAdditionalLicenseIds((p) => [...p, val]);
-                      }
-                    }}
-                  >
-                    <option value="">{locale === "en" ? "— Add license from another company —" : "— أضف ترخيصاً من شركة أخرى —"}</option>
-                    {groupLicenses
-                      .filter((l) => !additionalLicenseIds.includes(l.id))
-                      .map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.company?.nameAr ? `[${l.company.nameAr}] ` : ""}{l.commercialNameAr} ({l.licenseNumber}){l.unifiedEntityNumber ? ` — ${l.unifiedEntityNumber}` : ""}
-                        </option>
-                      ))}
-                  </select>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Position" : "المسمى الوظيفي"}</label>
@@ -345,43 +453,86 @@ export default function NewEmployeePage() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
                   {locale === "en" ? "Arabic name" : "الاسم بالعربي"} <span className="text-red-500">*</span>
                 </label>
-                <input type="text" required value={form.nameAr} onChange={(event) => setField("nameAr", event.target.value)} className="input-field w-full" placeholder={locale === "en" ? "Full name" : "الاسم الكامل"} />
+                <input
+                  type="text"
+                  required
+                  value={form.nameAr}
+                  onChange={(event) => setField("nameAr", event.target.value)}
+                  className="input-field w-full"
+                  placeholder={locale === "en" ? "Full name" : "الاسم الكامل"}
+                />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "English name" : "الاسم بالإنجليزي"}</label>
-                <input type="text" value={form.nameEn} onChange={(event) => setField("nameEn", event.target.value)} className="input-field w-full" placeholder="Full name" dir="ltr" />
+                <input
+                  type="text"
+                  value={form.nameEn}
+                  onChange={(event) => setField("nameEn", event.target.value)}
+                  className="input-field w-full"
+                  placeholder="Full name"
+                  dir="ltr"
+                />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
                   {locale === "en" ? "Employee type" : "الوظيفة"} <span className="text-red-500">*</span>
                 </label>
                 <select required value={form.type} onChange={(event) => setField("type", event.target.value)} className="input-field w-full">
-                  {employeeTypes[locale].map((type) => (
+                  {availableEmployeeTypes.map((type) => (
                     <option key={type.value} value={type.value}>
                       {type.label}
                     </option>
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Nationality" : "الجنسية"}</label>
-                <input type="text" value={form.nationality} onChange={(event) => setField("nationality", event.target.value)} className="input-field w-full" placeholder={locale === "en" ? "Example: Egyptian, Indian" : "مثال: مصري، هندي"} />
+                <input
+                  type="text"
+                  value={form.nationality}
+                  onChange={(event) => setField("nationality", event.target.value)}
+                  className="input-field w-full"
+                  placeholder={locale === "en" ? "Example: Egyptian, Indian" : "مثال: مصري، هندي"}
+                />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Phone number" : "رقم الهاتف"}</label>
-                <input type="tel" value={form.phone} onChange={(event) => setField("phone", event.target.value)} className="input-field w-full" placeholder="+965XXXXXXXX" dir="ltr" />
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(event) => setField("phone", event.target.value)}
+                  className="input-field w-full"
+                  placeholder="+965XXXXXXXX"
+                  dir="ltr"
+                />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Joining date" : "تاريخ الالتحاق"}</label>
                 <input type="date" value={form.joinDate} onChange={(event) => setField("joinDate", event.target.value)} className="input-field w-full" />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Base salary (KWD)" : "الراتب الأساسي (د.ك)"}</label>
-                <input type="number" step="0.001" min="0" value={form.baseSalary} onChange={(event) => setField("baseSalary", event.target.value)} className="input-field w-full" placeholder="0.000" dir="ltr" />
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={form.baseSalary}
+                  onChange={(event) => setField("baseSalary", event.target.value)}
+                  className="input-field w-full"
+                  placeholder="0.000"
+                  dir="ltr"
+                />
               </div>
             </div>
           </div>
@@ -390,6 +541,7 @@ export default function NewEmployeePage() {
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">
               {locale === "en" ? "Identity and documents" : "الوثائق والهوية"}
             </h3>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Civil ID" : "رقم البطاقة المدنية"}</label>
@@ -424,13 +576,23 @@ export default function NewEmployeePage() {
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Notes" : "ملاحظات"}</label>
-            <textarea value={form.notes} onChange={(event) => setField("notes", event.target.value)} rows={3} className="input-field w-full resize-none" placeholder={locale === "en" ? "Any additional notes..." : "أي ملاحظات إضافية..."} />
+            <textarea
+              value={form.notes}
+              onChange={(event) => setField("notes", event.target.value)}
+              rows={3}
+              className="input-field w-full resize-none"
+              placeholder={locale === "en" ? "Any additional notes..." : "أي ملاحظات إضافية..."}
+            />
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" disabled={loading} className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
               <Save size={16} />
-              {loading ? (locale === "en" ? "Saving..." : "جاري الحفظ...") : locale === "en" ? "Save employee" : "حفظ الموظف"}
+              {loading ? (locale === "en" ? "Saving..." : "جارٍ الحفظ...") : locale === "en" ? "Save employee" : "حفظ الموظف"}
             </button>
             <Link href={`/dashboard/companies/${companyId}/hr/employees`} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
               {locale === "en" ? "Cancel" : "إلغاء"}

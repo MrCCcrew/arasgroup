@@ -6,8 +6,13 @@ import { ArrowRight, Save, ChevronDown, X } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { allowsCrossCompanyLicenses } from "@/lib/hr/company-employee-rules";
 
 interface SearchableOption { id: string; label: string; sub?: string }
+
+interface CompanyLookup {
+  type: string;
+}
 
 function SearchableSelect({
   options, value, onChange, placeholder,
@@ -165,6 +170,7 @@ export default function EditEmployeePage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
+  const [companyType, setCompanyType] = useState("OTHER");
   const [branches, setBranches] = useState<{ id: string; nameAr: string; nameEn?: string | null; unifiedEntityNumber?: string | null }[]>([]);
   const [licenses, setLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null }[]>([]);
   const [groupLicenses, setGroupLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null; company?: { nameAr: string } }[]>([]);
@@ -190,20 +196,24 @@ export default function EditEmployeePage() {
     notes: "",
     isActive: true,
   });
+  const showAdditionalLicenses = allowsCrossCompanyLicenses(companyType);
 
   const load = useCallback(async () => {
     try {
-      const [employeeRes, branchesRes, licensesRes, groupRes] = await Promise.all([
+      const [employeeRes, companyRes, branchesRes, licensesRes, groupRes] = await Promise.all([
         fetch(`/api/hr/employees/${employeeId}`),
+        fetch(`/api/companies/${companyId}`),
         fetch(`/api/companies/${companyId}/branches`),
         fetch(`/api/licenses?companyId=${companyId}`),
         fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`),
       ]);
       const employeePayload = await employeeRes.json();
+      const companyPayload = await companyRes.json();
       const branchesPayload = await branchesRes.json();
       const licensesPayload = await licensesRes.json();
       const groupPayload = await groupRes.json();
 
+      if (companyPayload.success) setCompanyType((companyPayload.data as CompanyLookup).type);
       if (branchesPayload.success) setBranches(branchesPayload.data);
       if (licensesPayload.success) setLicenses(licensesPayload.data);
       if (groupPayload.success) setGroupLicenses(groupPayload.data);
@@ -268,7 +278,7 @@ export default function EditEmployeePage() {
           nameEn: form.nameEn || undefined,
           branchId: form.branchId || null,
           licenseId: form.licenseId || null,
-          additionalLicenseIds,
+          additionalLicenseIds: showAdditionalLicenses ? additionalLicenseIds : [],
           nationality: form.nationality || undefined,
           civilId: form.civilId || undefined,
           passportNumber: form.passportNumber || undefined,
@@ -377,48 +387,58 @@ export default function EditEmployeePage() {
                   }))}
                 />
               </div>
-              {/* التراخيص الإضافية */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium">
-                  {locale === "en" ? "Additional licenses (cross-company admin)" : "تراخيص إضافية (إداري عابر للشركات)"}
-                </label>
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {additionalLicenseIds.map((lid) => {
-                      const lic = licenses.find((l) => l.id === lid);
-                      if (!lic) return null;
-                      return (
-                        <span key={lid} className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                          {lic.commercialNameAr} ({lic.licenseNumber})
-                          <button type="button" onClick={() => setAdditionalLicenseIds((p) => p.filter((x) => x !== lid))} className="hover:text-red-500">×</button>
-                        </span>
-                      );
-                    })}
-                    {additionalLicenseIds.length === 0 && (
-                      <p className="text-xs text-muted-foreground">{locale === "en" ? "No additional licenses" : "لا توجد تراخيص إضافية"}</p>
-                    )}
+              {showAdditionalLicenses && (
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium">
+                    {locale === "en" ? "Additional licenses (cross-company admin)" : "تراخيص إضافية (إداري عابر للشركات)"}
+                  </label>
+                  <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {additionalLicenseIds.map((licenseId) => {
+                        const license = groupLicenses.find((item) => item.id === licenseId);
+                        if (!license) return null;
+
+                        return (
+                          <span key={licenseId} className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                            {license.commercialNameAr} ({license.licenseNumber})
+                            <button
+                              type="button"
+                              onClick={() => setAdditionalLicenseIds((previous) => previous.filter((item) => item !== licenseId))}
+                              className="hover:text-red-500"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                      {additionalLicenseIds.length === 0 && (
+                        <p className="text-xs text-muted-foreground">{locale === "en" ? "No additional licenses" : "لا توجد تراخيص إضافية"}</p>
+                      )}
+                    </div>
+                    <select
+                      className="input-field w-full text-sm"
+                      value=""
+                      onChange={(event) => {
+                        const nextLicenseId = event.target.value;
+                        if (nextLicenseId && !additionalLicenseIds.includes(nextLicenseId)) {
+                          setAdditionalLicenseIds((previous) => [...previous, nextLicenseId]);
+                        }
+                      }}
+                    >
+                      <option value="">{locale === "en" ? "— Add license from another company —" : "— أضف ترخيصاً من شركة أخرى —"}</option>
+                      {groupLicenses
+                        .filter((license) => !additionalLicenseIds.includes(license.id))
+                        .map((license) => (
+                          <option key={license.id} value={license.id}>
+                            {license.company?.nameAr ? `[${license.company.nameAr}] ` : ""}
+                            {license.commercialNameAr} ({license.licenseNumber})
+                            {license.unifiedEntityNumber ? ` — ${license.unifiedEntityNumber}` : ""}
+                          </option>
+                        ))}
+                    </select>
                   </div>
-                  <select
-                    className="input-field w-full text-sm"
-                    value=""
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && !additionalLicenseIds.includes(val)) {
-                        setAdditionalLicenseIds((p) => [...p, val]);
-                      }
-                    }}
-                  >
-                    <option value="">{locale === "en" ? "— Add license from another company —" : "— أضف ترخيصاً من شركة أخرى —"}</option>
-                    {groupLicenses
-                      .filter((l) => !additionalLicenseIds.includes(l.id))
-                      .map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.company?.nameAr ? `[${l.company.nameAr}] ` : ""}{l.commercialNameAr} ({l.licenseNumber}){l.unifiedEntityNumber ? ` — ${l.unifiedEntityNumber}` : ""}
-                        </option>
-                      ))}
-                  </select>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium">

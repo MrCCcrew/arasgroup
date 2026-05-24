@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { getAccessibleBranchIds } from "@/lib/auth/permissions";
+import { allowsCrossCompanyLicenses, getAllowedEmployeeTypes } from "@/lib/hr/company-employee-rules";
 
 const employeeSchema = z.object({
   companyId: z.string(),
@@ -147,6 +148,29 @@ export async function POST(request: NextRequest) {
       branchId: data.branchId,
     });
     if (permissionError) return permissionError;
+
+    const company = await prisma.company.findUnique({
+      where: { id: data.companyId },
+      select: { id: true, type: true },
+    });
+    if (!company) {
+      return NextResponse.json({ success: false, error: "الشركة غير موجودة" }, { status: 404 });
+    }
+
+    const allowedTypes = getAllowedEmployeeTypes(company.type);
+    if (!allowedTypes.includes(data.type)) {
+      return NextResponse.json(
+        { success: false, error: "نوع الموظف غير مسموح لهذه الشركة" },
+        { status: 400 }
+      );
+    }
+
+    if (!allowsCrossCompanyLicenses(company.type) && data.additionalLicenseIds?.length) {
+      return NextResponse.json(
+        { success: false, error: "لا يمكن ربط موظفي شركة الغسيل بتراخيص شركات أخرى" },
+        { status: 400 }
+      );
+    }
 
     if (data.passportIssueDate && data.passportExpiryDate && data.passportExpiryDate <= data.passportIssueDate) {
       return NextResponse.json(
