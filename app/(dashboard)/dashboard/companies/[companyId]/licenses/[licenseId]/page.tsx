@@ -275,7 +275,7 @@ export default function LicenseDetailPage() {
   const [error, setError] = useState("");
 
   // Active modal
-  type ModalType = "establishment" | "lease" | "employer_cert" | "import_license" |
+  type ModalType = "basic_info" | "establishment" | "lease" | "employer_cert" | "import_license" |
     "advertising" | "fire_safety" | "traffic_cert" | "customs_cert" |
     "vehicle_add" | "vehicle_edit" | "manager_poa" | "work_injury" |
     "annual_balance" | "rent_receipt" | null;
@@ -331,6 +331,26 @@ export default function LicenseDetailPage() {
   }
 
   // ── Section Savers ─────────────────────────────────────────────────────────
+
+  async function saveBasicInfo() {
+    await save(`/api/licenses/${licenseId}`, "PATCH", {
+      commercialNameAr: form.commercialNameAr || undefined,
+      commercialNameEn: form.commercialNameEn || null,
+      licenseNumber:    form.licenseNumber    || undefined,
+      status:           form.status           || undefined,
+      issueDate:        form.issueDate        || null,
+      licenseExpiryDate: form.licenseExpiryDate || null,
+      commercialRegNo:  form.commercialRegNo  || null,
+      unifiedEntityNumber: form.unifiedEntityNumber || null,
+      civilEntityNumber:   form.civilEntityNumber   || null,
+      fileNumber:          form.fileNumber          || null,
+      legalEntity:         form.legalEntity         || null,
+      capital:             form.capital ? Number(form.capital) : null,
+      managerName:         form.managerName         || null,
+      managerPhone:        form.managerPhone        || null,
+      notes:               form.notes               || null,
+    });
+  }
 
   async function saveSection(sectionType: string) {
     await save(`/api/licenses/${licenseId}/section`, "PUT", { sectionType, ...form });
@@ -545,7 +565,22 @@ export default function LicenseDetailPage() {
           {/* [3] الترخيص التجاري — handled via basic license PATCH */}
           <SectionCard icon={FileCheck} title="الترخيص التجاري" status={expiryStatus(license.licenseExpiryDate)}
             subtitle={license.licenseExpiryDate ? `ينتهي ${fmt(license.licenseExpiryDate)}` : "لم يُدخل تاريخ الانتهاء"}
-            onEdit={() => router.push(`/dashboard/companies/${companyId}/licenses?edit=${licenseId}`)}
+            onEdit={() => openModal("basic_info", {
+              commercialNameAr:    license.commercialNameAr,
+              licenseNumber:       license.licenseNumber,
+              status:              license.status,
+              issueDate:           license.issueDate?.slice(0, 10) ?? "",
+              licenseExpiryDate:   license.licenseExpiryDate?.slice(0, 10) ?? "",
+              commercialRegNo:     license.commercialRegNo ?? "",
+              unifiedEntityNumber: license.unifiedEntityNumber ?? "",
+              civilEntityNumber:   license.civilEntityNumber ?? "",
+              fileNumber:          license.fileNumber ?? "",
+              legalEntity:         license.legalEntity ?? "",
+              capital:             license.capital ?? "",
+              managerName:         license.managerName ?? "",
+              managerPhone:        license.managerPhone ?? "",
+              notes:               license.notes ?? "",
+            })}
             editLabel="تعديل البيانات الأساسية"
           >
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -1150,6 +1185,88 @@ export default function LicenseDetailPage() {
       )}
 
       {/* [14] الميزانية السنوية */}
+      {/* ── تعديل البيانات الأساسية ── */}
+      {modal === "basic_info" && (
+        <Modal title="تعديل البيانات الأساسية" onClose={() => setModal(null)}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="form-label">الاسم التجاري العربي *</label>
+                <input className="input-field w-full" value={form.commercialNameAr as string ?? ""} onChange={f("commercialNameAr")} />
+              </div>
+              <div>
+                <label className="form-label">رقم الترخيص *</label>
+                <input className="input-field w-full" dir="ltr" value={form.licenseNumber as string ?? ""} onChange={f("licenseNumber")} />
+              </div>
+              <div>
+                <label className="form-label">حالة الترخيص</label>
+                <select className="input-field w-full" value={form.status as string ?? "ACTIVE"} onChange={f("status")}>
+                  <option value="ACTIVE">فعال</option>
+                  <option value="SUSPENDED">موقوف</option>
+                  <option value="EXPIRED">منتهي</option>
+                  <option value="CANCELLED">ملغاة</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">تاريخ الإصدار</label>
+                <input type="date" className="input-field w-full" value={form.issueDate as string ?? ""} onChange={f("issueDate")} />
+              </div>
+              <div>
+                <label className="form-label">تاريخ الانتهاء</label>
+                <input type="date" className="input-field w-full" value={form.licenseExpiryDate as string ?? ""} onChange={f("licenseExpiryDate")} />
+              </div>
+              <div>
+                <label className="form-label">السجل التجاري</label>
+                <input className="input-field w-full" dir="ltr" value={form.commercialRegNo as string ?? ""} onChange={f("commercialRegNo")} />
+              </div>
+              <div>
+                <label className="form-label">الرقم الموحد</label>
+                <input className="input-field w-full" dir="ltr" value={form.unifiedEntityNumber as string ?? ""} onChange={f("unifiedEntityNumber")} />
+              </div>
+              <div>
+                <label className="form-label">الرقم المدني</label>
+                <input className="input-field w-full" dir="ltr" value={form.civilEntityNumber as string ?? ""} onChange={f("civilEntityNumber")} />
+              </div>
+              <div>
+                <label className="form-label">رقم الملف</label>
+                <input className="input-field w-full" dir="ltr" value={form.fileNumber as string ?? ""} onChange={f("fileNumber")} />
+              </div>
+              <div>
+                <label className="form-label">الشكل القانوني</label>
+                <select className="input-field w-full" value={form.legalEntity as string ?? ""} onChange={f("legalEntity")}>
+                  <option value="">— اختر —</option>
+                  <option value="LLC">ذات مسؤولية محدودة</option>
+                  <option value="PARTNERSHIP">شراكة</option>
+                  <option value="JOINT_STOCK">مساهمة</option>
+                  <option value="SOLE_PROPRIETORSHIP">فردي</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">رأس المال (د.ك)</label>
+                <input type="number" className="input-field w-full" dir="ltr" value={form.capital as string ?? ""} onChange={f("capital")} />
+              </div>
+              <div>
+                <label className="form-label">اسم المدير</label>
+                <input className="input-field w-full" value={form.managerName as string ?? ""} onChange={f("managerName")} />
+              </div>
+              <div>
+                <label className="form-label">هاتف المدير</label>
+                <input className="input-field w-full" dir="ltr" value={form.managerPhone as string ?? ""} onChange={f("managerPhone")} />
+              </div>
+            </div>
+            <div>
+              <label className="form-label">ملاحظات</label>
+              <textarea className="input-field w-full resize-none" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} />
+            </div>
+            {saveError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{saveError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+              <button onClick={saveBasicInfo} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">{saving ? "جاري الحفظ..." : "حفظ"}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {modal === "annual_balance" && (
         <Modal title={editTarget ? "تعديل الميزانية السنوية" : "إضافة ميزانية سنوية"} onClose={() => setModal(null)}>
           <div className="space-y-3">

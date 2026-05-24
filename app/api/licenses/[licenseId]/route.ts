@@ -31,6 +31,9 @@ const updateSchema = z.object({
   advertisingLicenseExpiryDate: z.string().optional().nullable(),
   status: z.string().optional(),
   notes: z.string().optional().nullable(),
+  legalEntity: z.string().optional().nullable(),
+  capital: z.number().optional().nullable(),
+  commercialRegNo: z.string().optional().nullable(),
 });
 
 function toDate(v: string | null | undefined): Date | null | undefined {
@@ -134,6 +137,9 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         ...(d.fireLicenseExpiryDate !== undefined ? { fireLicenseExpiryDate: toDate(d.fireLicenseExpiryDate) } : {}),
         ...(d.healthLicenseExpiryDate !== undefined ? { healthLicenseExpiryDate: toDate(d.healthLicenseExpiryDate) } : {}),
         ...(d.advertisingLicenseExpiryDate !== undefined ? { advertisingLicenseExpiryDate: toDate(d.advertisingLicenseExpiryDate) } : {}),
+        ...(d.legalEntity !== undefined ? { legalEntity: d.legalEntity } : {}),
+        ...(d.capital !== undefined ? { capital: d.capital } : {}),
+        ...(d.commercialRegNo !== undefined ? { commercialRegNo: d.commercialRegNo } : {}),
       },
       include: {
         branch: { select: { nameAr: true } },
