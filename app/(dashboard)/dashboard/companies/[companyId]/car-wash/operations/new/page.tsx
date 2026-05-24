@@ -24,6 +24,8 @@ interface Category {
   id: string;
   nameAr: string;
   nameEn?: string | null;
+  code?: string | null;
+  type?: string;
 }
 
 interface RevenueRow {
@@ -40,6 +42,16 @@ interface ExpenseRow {
   description: string;
 }
 
+const expenseCategoryTypes = [
+  { value: "HR", labelAr: "موارد بشرية", labelEn: "HR" },
+  { value: "VEHICLE", labelAr: "مركبات", labelEn: "Vehicle" },
+  { value: "LEGAL", labelAr: "قانوني / إقامات", labelEn: "Legal / Residency" },
+  { value: "UTILITIES", labelAr: "مرافق واتصالات", labelEn: "Utilities" },
+  { value: "OPERATIONAL", labelAr: "تشغيلي", labelEn: "Operational" },
+  { value: "ADMINISTRATIVE", labelAr: "إداري", labelEn: "Administrative" },
+  { value: "OTHER", labelAr: "أخرى", labelEn: "Other" },
+];
+
 let nextId = 1;
 
 export default function NewCarWashOperationPage() {
@@ -54,6 +66,15 @@ export default function NewCarWashOperationPage() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [addingCategoryForExpenseId, setAddingCategoryForExpenseId] = useState<number | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+  const [newCategory, setNewCategory] = useState({
+    nameAr: "",
+    nameEn: "",
+    code: "",
+    type: "OPERATIONAL",
+  });
 
   const [vehicleId, setVehicleId] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -110,10 +131,64 @@ export default function NewCarWashOperationPage() {
 
   function removeExpense(id: number) {
     setExpenses((previous) => previous.filter((expense) => expense.id !== id));
+    if (addingCategoryForExpenseId === id) {
+      closeAddCategory();
+    }
   }
 
   function setExpField<K extends keyof ExpenseRow>(id: number, key: K, value: ExpenseRow[K]) {
     setExpenses((previous) => previous.map((expense) => (expense.id === id ? { ...expense, [key]: value } : expense)));
+  }
+
+  function openAddCategory(expenseId: number) {
+    setCategoryError("");
+    setAddingCategoryForExpenseId(expenseId);
+    setNewCategory({ nameAr: "", nameEn: "", code: "", type: "OPERATIONAL" });
+  }
+
+  function closeAddCategory() {
+    setAddingCategoryForExpenseId(null);
+    setSavingCategory(false);
+    setCategoryError("");
+    setNewCategory({ nameAr: "", nameEn: "", code: "", type: "OPERATIONAL" });
+  }
+
+  async function handleAddCategory() {
+    if (!addingCategoryForExpenseId) return;
+
+    setCategoryError("");
+    setSavingCategory(true);
+    try {
+      const response = await fetch("/api/expenses/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          nameAr: newCategory.nameAr.trim(),
+          nameEn: newCategory.nameEn.trim() || undefined,
+          code: newCategory.code.trim() || undefined,
+          type: newCategory.type,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+
+      const createdCategory = payload.data as Category;
+      setCategories((previous) =>
+        [...previous, createdCategory].sort((left, right) => left.nameAr.localeCompare(right.nameAr, "ar")),
+      );
+      setExpField(addingCategoryForExpenseId, "categoryId", createdCategory.id);
+      closeAddCategory();
+    } catch (categoryCreationError) {
+      setCategoryError(
+        categoryCreationError instanceof Error
+          ? categoryCreationError.message
+          : ar
+            ? "تعذر إنشاء فئة المصروف"
+            : "Failed to create expense category",
+      );
+      setSavingCategory(false);
+    }
   }
 
   const totalCash = revenues
@@ -341,40 +416,119 @@ export default function NewCarWashOperationPage() {
                   <span className="col-span-1" />
                 </div>
                 {expenses.map((expense) => (
-                  <div key={expense.id} className="grid grid-cols-12 items-center gap-2">
-                    <select
-                      required
-                      value={expense.categoryId}
-                      onChange={(event) => setExpField(expense.id, "categoryId", event.target.value)}
-                      className="input-field col-span-4 text-sm"
-                    >
-                      <option value="">{ar ? "اختر الفئة" : "Select category"}</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {ar ? category.nameAr : category.nameEn ?? category.nameAr}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      required
-                      placeholder={ar ? "وصف المصروف" : "Expense description"}
-                      value={expense.description}
-                      onChange={(event) => setExpField(expense.id, "description", event.target.value)}
-                      className="input-field col-span-4 text-sm"
-                    />
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      placeholder="0.000"
-                      value={expense.amount}
-                      onChange={(event) => setExpField(expense.id, "amount", event.target.value)}
-                      className="input-field col-span-3 text-sm"
-                      dir="ltr"
-                    />
-                    <button type="button" onClick={() => removeExpense(expense.id)} className="col-span-1 flex justify-center rounded-md p-1 text-destructive hover:bg-destructive/10">
-                      <Trash2 size={14} />
-                    </button>
+                  <div key={expense.id} className="space-y-2">
+                    <div className="grid grid-cols-12 items-center gap-2">
+                      <div className="col-span-4 flex items-center gap-2">
+                        <select
+                          required
+                          value={expense.categoryId}
+                          onChange={(event) => setExpField(expense.id, "categoryId", event.target.value)}
+                          className="input-field flex-1 text-sm"
+                        >
+                          <option value="">{ar ? "اختر الفئة" : "Select category"}</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {ar ? category.nameAr : category.nameEn ?? category.nameAr}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => openAddCategory(expense.id)}
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border hover:bg-muted"
+                          title={ar ? "إضافة فئة جديدة" : "Add new category"}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      <input
+                        required
+                        placeholder={ar ? "وصف المصروف" : "Expense description"}
+                        value={expense.description}
+                        onChange={(event) => setExpField(expense.id, "description", event.target.value)}
+                        className="input-field col-span-4 text-sm"
+                      />
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        placeholder="0.000"
+                        value={expense.amount}
+                        onChange={(event) => setExpField(expense.id, "amount", event.target.value)}
+                        className="input-field col-span-3 text-sm"
+                        dir="ltr"
+                      />
+                      <button type="button" onClick={() => removeExpense(expense.id)} className="col-span-1 flex justify-center rounded-md p-1 text-destructive hover:bg-destructive/10">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {addingCategoryForExpenseId === expense.id && (
+                      <div className="rounded-xl border bg-muted/20 p-3">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-sm font-medium">{ar ? "إضافة فئة مصروف جديدة" : "Add new expense category"}</p>
+                          <button type="button" onClick={closeAddCategory} className="text-xs text-muted-foreground hover:text-foreground">
+                            {ar ? "إلغاء" : "Cancel"}
+                          </button>
+                        </div>
+
+                        {categoryError && (
+                          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                            {categoryError}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          <input
+                            required
+                            value={newCategory.nameAr}
+                            onChange={(event) => setNewCategory((previous) => ({ ...previous, nameAr: event.target.value }))}
+                            className="input-field text-sm"
+                            placeholder={ar ? "الاسم بالعربي" : "Arabic name"}
+                            autoFocus
+                          />
+                          <input
+                            value={newCategory.nameEn}
+                            onChange={(event) => setNewCategory((previous) => ({ ...previous, nameEn: event.target.value }))}
+                            className="input-field text-sm"
+                            placeholder={ar ? "الاسم بالإنجليزي اختياري" : "English name optional"}
+                            dir="ltr"
+                          />
+                          <select
+                            value={newCategory.type}
+                            onChange={(event) => setNewCategory((previous) => ({ ...previous, type: event.target.value }))}
+                            className="input-field text-sm"
+                          >
+                            {expenseCategoryTypes.map((typeOption) => (
+                              <option key={typeOption.value} value={typeOption.value}>
+                                {ar ? typeOption.labelAr : typeOption.labelEn}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            value={newCategory.code}
+                            onChange={(event) => setNewCategory((previous) => ({ ...previous, code: event.target.value }))}
+                            className="input-field text-sm"
+                            placeholder={ar ? "الكود اختياري" : "Code optional"}
+                            dir="ltr"
+                          />
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleAddCategory}
+                            disabled={savingCategory}
+                            className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {savingCategory ? (ar ? "جارٍ الحفظ..." : "Saving...") : ar ? "حفظ الفئة" : "Save category"}
+                          </button>
+                          <span className="text-xs text-muted-foreground">
+                            {ar ? "سيتم اختيارها تلقائيًا لهذا السطر بعد الحفظ" : "It will be selected automatically for this row"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

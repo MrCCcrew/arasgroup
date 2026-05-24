@@ -89,11 +89,29 @@ export async function POST(request: NextRequest) {
     const totalExpenses = data.expenses.reduce((s, e) => s + e.amount, 0);
     const netRevenue = totalCash + totalKnet - totalExpenses;
 
-    // Get car wash vehicle to find cost center
+    // Resolve the vehicle and only pass a valid cost center belonging to the same company.
     const cwVehicle = await prisma.carWashVehicle.findUnique({
       where: { id: data.vehicleId },
-      select: { costCenterId: true },
+      select: { id: true, companyId: true, costCenterId: true },
     });
+    if (!cwVehicle || cwVehicle.companyId !== data.companyId) {
+      return NextResponse.json({ success: false, error: "المركبة المختارة غير صالحة لهذه الشركة" }, { status: 400 });
+    }
+
+    let validatedCostCenterId: string | undefined;
+    if (cwVehicle.costCenterId) {
+      const costCenter = await prisma.costCenter.findFirst({
+        where: { id: cwVehicle.costCenterId, companyId: data.companyId },
+        select: { id: true },
+      });
+      if (!costCenter) {
+        return NextResponse.json(
+          { success: false, error: "مركز تكلفة مركبة الغسيل غير صالح. يرجى مراجعة بيانات المركبة أولاً" },
+          { status: 400 },
+        );
+      }
+      validatedCostCenterId = costCenter.id;
+    }
 
     const operation = await prisma.$transaction(async (tx) => {
       const op = await tx.carWashDailyOperation.create({
@@ -138,7 +156,7 @@ export async function POST(request: NextRequest) {
           companyId: data.companyId,
           userId,
           vehicleId: data.vehicleId,
-          costCenterId: cwVehicle?.costCenterId ?? "",
+          costCenterId: validatedCostCenterId,
           cashAmount: totalCash,
           knetAmount: totalKnet,
           date: data.date,
@@ -172,7 +190,7 @@ export async function POST(request: NextRequest) {
             descriptionAr: expense.description,
             paymentMethod: "CASH",
             reference: expenseReference(op.id),
-            costCenterId: cwVehicle?.costCenterId ?? undefined,
+            costCenterId: validatedCostCenterId,
             carWashVehicleId: data.vehicleId,
             status: "POSTED",
           },
@@ -184,7 +202,7 @@ export async function POST(request: NextRequest) {
           expenseAccountCode: resolveExpenseAccountCode(category.type),
           amount: expense.amount,
           isCash: true,
-          costCenterId: cwVehicle?.costCenterId ?? undefined,
+          costCenterId: validatedCostCenterId,
           refId: accountingExpense.id,
           descriptionAr: `مصروف غسيل سيارات - ${expense.description}`,
         });

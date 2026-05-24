@@ -143,7 +143,7 @@ export async function createCarWashDailyJE(params: {
   companyId: string;
   userId: string;
   vehicleId: string;
-  costCenterId: string;
+  costCenterId?: string;
   cashAmount: number;
   knetAmount: number;
   date: Date;
