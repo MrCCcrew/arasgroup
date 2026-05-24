@@ -3,6 +3,11 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { getAccessibleBranchIds } from "@/lib/auth/permissions";
+import {
+  findVehicleIdentityConflict,
+  getVehicleUniqueConstraintMessage,
+  normalizeVehicleString,
+} from "@/lib/vehicle-validation";
 
 const carWashVehicleSchema = z.object({
   companyId: z.string(),
@@ -94,20 +99,36 @@ export async function POST(request: NextRequest) {
     const permissionError = assertPermission(session, "VEHICLES", "CREATE", { companyId: data.companyId, branchId: data.branchId });
     if (permissionError) return permissionError;
 
+    const plateNumber = normalizeVehicleString(data.plateNumber);
+    const fuelCardNumber = normalizeVehicleString(data.fuelCardNumber) ?? undefined;
+
+    if (!plateNumber) {
+      return NextResponse.json({ success: false, error: "رقم اللوحة مطلوب" }, { status: 400 });
+    }
+
+    const conflictMessage = await findVehicleIdentityConflict({
+      companyId: data.companyId,
+      plateNumber,
+      fuelCardNumber,
+    });
+    if (conflictMessage) {
+      return NextResponse.json({ success: false, error: conflictMessage }, { status: 409 });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const vehicle = await tx.vehicle.create({
         data: {
           companyId: data.companyId,
           branchId: data.branchId,
           clientGeneratedId: data.clientGeneratedId,
-          plateNumber: data.plateNumber,
+          plateNumber,
           make: data.make,
           model: data.model,
           year: data.year,
           color: data.color,
           type: "CAR_WASH",
           isActive: true,
-          fuelCardNumber: data.fuelCardNumber,
+          fuelCardNumber,
           registrationBookNumber: data.registrationBookNumber,
           registrationExpiry: data.registrationExpiry,
           insuranceExpiry: data.insuranceExpiry,
@@ -146,7 +167,7 @@ export async function POST(request: NextRequest) {
           module: "vehicles",
           resourceId: carWashVehicle.id,
           resourceType: "CarWashVehicle",
-          newValues: { code: data.code, plateNumber: data.plateNumber },
+          newValues: { code: data.code, plateNumber },
           ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
           userAgent: request.headers.get("user-agent") ?? "",
         },
@@ -157,6 +178,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: result }, { status: 201 });
   } catch (error) {
+    const uniqueMessage = getVehicleUniqueConstraintMessage(error);
+    if (uniqueMessage) {
+      return NextResponse.json({ success: false, error: uniqueMessage }, { status: 409 });
+    }
+
     const message = error instanceof Error ? error.message : "فشل في إضافة مركبة الغسيل";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
+import {
+  findVehicleIdentityConflict,
+  getVehicleUniqueConstraintMessage,
+  normalizeVehicleString,
+} from "@/lib/vehicle-validation";
 
 const createVehicleSchema = z.object({
   companyId: z.string(),
@@ -43,12 +48,28 @@ export async function POST(request: NextRequest) {
     const permissionError = assertPermission(session, "VEHICLES", "CREATE", { companyId: data.companyId });
     if (permissionError) return permissionError;
 
+    const plateNumber = normalizeVehicleString(data.plateNumber);
+    const fuelCardNumber = normalizeVehicleString(data.fuelCardNumber) ?? undefined;
+
+    if (!plateNumber) {
+      return NextResponse.json({ success: false, error: "رقم اللوحة مطلوب" }, { status: 400 });
+    }
+
+    const conflictMessage = await findVehicleIdentityConflict({
+      companyId: data.companyId,
+      plateNumber,
+      fuelCardNumber,
+    });
+    if (conflictMessage) {
+      return NextResponse.json({ success: false, error: conflictMessage }, { status: 409 });
+    }
+
     const vehicle = await prisma.vehicle.create({
       data: {
         companyId: data.companyId,
         branchId: data.branchId,
         investorId: data.investorId,
-        plateNumber: data.plateNumber,
+        plateNumber,
         vehicleNumber: data.vehicleNumber,
         make: data.make,
         model: data.model,
@@ -57,7 +78,7 @@ export async function POST(request: NextRequest) {
         chassisNumber: data.chassisNumber,
         ownershipModel: data.ownershipModel,
         trackingDeviceId: data.trackingDeviceId,
-        fuelCardNumber: data.fuelCardNumber || null,
+        fuelCardNumber: fuelCardNumber ?? null,
         insuranceExpiry: data.insuranceExpiry,
         registrationExpiry: data.registrationExpiry,
         municipalityCardNumber: data.municipalityCardNumber,
@@ -78,7 +99,7 @@ export async function POST(request: NextRequest) {
         module: "vehicles",
         resourceId: vehicle.id,
         resourceType: "Vehicle",
-        newValues: { plateNumber: data.plateNumber },
+        newValues: { plateNumber },
         ipAddress: request.headers.get("x-forwarded-for") ?? "",
         userAgent: request.headers.get("user-agent") ?? "",
       },
@@ -86,6 +107,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: vehicle }, { status: 201 });
   } catch (error) {
+    const uniqueMessage = getVehicleUniqueConstraintMessage(error);
+    if (uniqueMessage) {
+      return NextResponse.json({ success: false, error: uniqueMessage }, { status: 409 });
+    }
+
     const message = error instanceof Error ? error.message : "فشل في إضافة المركبة";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }

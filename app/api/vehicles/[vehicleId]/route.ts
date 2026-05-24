@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
+import {
+  findVehicleIdentityConflict,
+  getVehicleUniqueConstraintMessage,
+  normalizeVehicleString,
+} from "@/lib/vehicle-validation";
 
 interface Props {
   params: Promise<{ vehicleId: string }>;
@@ -49,13 +54,38 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    const normalizedData = {
+      ...parsed.data,
+      plateNumber: normalizeVehicleString(parsed.data.plateNumber) ?? undefined,
+      fuelCardNumber: normalizeVehicleString(parsed.data.fuelCardNumber),
+    };
+
+    if (parsed.data.plateNumber !== undefined && !normalizedData.plateNumber) {
+      return NextResponse.json({ success: false, error: "رقم اللوحة مطلوب" }, { status: 400 });
+    }
+
+    const conflictMessage = await findVehicleIdentityConflict({
+      companyId: vehicle.companyId,
+      plateNumber: normalizedData.plateNumber,
+      fuelCardNumber: normalizedData.fuelCardNumber,
+      excludeVehicleId: vehicleId,
+    });
+    if (conflictMessage) {
+      return NextResponse.json({ success: false, error: conflictMessage }, { status: 409 });
+    }
+
     const updated = await prisma.vehicle.update({
       where: { id: vehicleId },
-      data: parsed.data,
+      data: normalizedData,
     });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
+    const uniqueMessage = getVehicleUniqueConstraintMessage(error);
+    if (uniqueMessage) {
+      return NextResponse.json({ success: false, error: uniqueMessage }, { status: 409 });
+    }
+
     const message = error instanceof Error ? error.message : "فشل في تعديل المركبة";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
