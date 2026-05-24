@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { ExpenseRowActions } from "@/components/expenses/expense-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -35,7 +36,7 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
     ...(sp.categoryId ? { categoryId: sp.categoryId } : {}),
   };
 
-  const [total, expenses] = await Promise.all([
+  const [total, expenses, categories, bankAccounts] = await Promise.all([
     prisma.expense.count({ where }),
     prisma.expense.findMany({
       where,
@@ -43,6 +44,16 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
       orderBy: { date: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
+    }),
+    prisma.expenseCategory.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, nameAr: true },
+      orderBy: { nameAr: "asc" },
+    }),
+    prisma.bankAccount.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, nameAr: true, bankName: true },
+      orderBy: { nameAr: "asc" },
     }),
   ]);
 
@@ -136,9 +147,23 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
                         </span>
                       </td>
                       <td>
-                        <Link href={`/dashboard/companies/${companyId}/expenses/${expense.id}`} className="text-xs text-primary hover:underline">
-                          {locale === "en" ? "View" : "عرض"}
-                        </Link>
+                        <div className="flex items-center gap-1">
+                          <Link href={`/dashboard/companies/${companyId}/expenses/${expense.id}`} className="rounded p-1.5 text-xs text-primary hover:underline">
+                            {locale === "en" ? "View" : "عرض"}
+                          </Link>
+                          <ExpenseRowActions
+                            expenseId={expense.id}
+                            date={expense.date.toISOString()}
+                            amount={expense.amount.toString()}
+                            descriptionAr={expense.descriptionAr}
+                            categoryId={expense.categoryId}
+                            paymentMethod={expense.paymentMethod}
+                            bankAccountId={expense.bankAccountId}
+                            reference={expense.reference}
+                            categories={categories}
+                            bankAccounts={bankAccounts}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))

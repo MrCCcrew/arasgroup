@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { KnetSettlementRowActions } from "@/components/car-wash/knet-settlement-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -32,7 +33,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
   const monthStart = new Date(year, month - 1, 1);
   const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-  const [settlements, unsettledTotal] = await Promise.all([
+  const [settlements, unsettledTotal, bankAccounts] = await Promise.all([
     prisma.knetSettlement.findMany({
       where: {
         companyId,
@@ -51,6 +52,11 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
       },
       _sum: { amount: true },
       _count: { id: true },
+    }),
+    prisma.bankAccount.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, nameAr: true, bankName: true },
+      orderBy: { nameAr: "asc" },
     }),
   ]);
 
@@ -149,12 +155,13 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
                   <th>{locale === "en" ? "Net transfer" : "صافي المحول"}</th>
                   <th>{locale === "en" ? "Notes" : "ملاحظات"}</th>
                   <th>{locale === "en" ? "Journal entry" : "القيد"}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {settlements.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <td colSpan={9} className="py-12 text-center text-muted-foreground">
                       {locale === "en"
                         ? `No settlements found for ${MONTHS.en[month - 1]} ${year}`
                         : `لا توجد تسويات في ${MONTHS.ar[month - 1]} ${year}`}
@@ -179,6 +186,18 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
                           <span className="text-xs text-muted-foreground">{locale === "en" ? "None" : "لا يوجد"}</span>
                         )}
                       </td>
+                      <td>
+                        <KnetSettlementRowActions
+                          settlementId={settlement.id}
+                          settlementDate={settlement.settlementDate.toISOString()}
+                          grossAmount={settlement.grossAmount.toString()}
+                          commission={settlement.commission.toString()}
+                          netAmount={settlement.netAmount.toString()}
+                          bankAccountId={settlement.bankAccountId}
+                          notes={settlement.notes}
+                          bankAccounts={bankAccounts}
+                        />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -190,7 +209,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
                     <td className="number">{formatKWD(totalGross, numberLocale)}</td>
                     <td className="number text-red-600">{formatKWD(totalCommission, numberLocale)}</td>
                     <td className="number text-green-600">{formatKWD(totalNet, numberLocale)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               )}
