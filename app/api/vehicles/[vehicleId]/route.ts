@@ -23,6 +23,7 @@ const updateSchema = z.object({
   color: z.string().optional().nullable(),
   chassisNumber: z.string().optional().nullable(),
   ownershipModel: z.enum(["OWNER_OWNED", "RENTED"]).optional(),
+  isActive: z.boolean().optional(),
   trackingDeviceId: z.string().optional().nullable(),
   fuelCardNumber: z.string().optional().nullable(),
   insuranceExpiry: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
@@ -105,14 +106,48 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     const permissionError = assertPermission(session, "VEHICLES", "DELETE", { companyId: vehicle.companyId });
     if (permissionError) return permissionError;
 
-    await prisma.vehicle.update({
+    const [
+      assignedDriversCount,
+      fuelCardDriversCount,
+      assignmentsCount,
+      expensesCount,
+      incidentsCount,
+      assetCustodiesCount,
+      carWashVehicleCount,
+    ] = await Promise.all([
+      prisma.driver.count({ where: { assignedVehicleId: vehicleId } }),
+      prisma.driver.count({ where: { fuelCardLinkedVehicleId: vehicleId } }),
+      prisma.driverVehicleAssignment.count({ where: { vehicleId } }),
+      prisma.expense.count({ where: { vehicleId, isDeleted: false } }),
+      prisma.vehicleIncident.count({ where: { OR: [{ vehicleId }, { replacementVehicleId: vehicleId }] } }),
+      prisma.assetCustody.count({ where: { vehicleId } }),
+      prisma.carWashVehicle.count({ where: { vehicleId } }),
+    ]);
+
+    const blockers = [
+      assignedDriversCount ? `سائق حالي (${assignedDriversCount})` : null,
+      fuelCardDriversCount ? `ربط بطاقة وقود مع سائق (${fuelCardDriversCount})` : null,
+      assignmentsCount ? `سجل تعيين مركبة (${assignmentsCount})` : null,
+      expensesCount ? `مصروف (${expensesCount})` : null,
+      incidentsCount ? `حادث أو مركبة بديلة (${incidentsCount})` : null,
+      assetCustodiesCount ? `عهدة أصل (${assetCustodiesCount})` : null,
+      carWashVehicleCount ? `سجل غسيل سيارات (${carWashVehicleCount})` : null,
+    ].filter(Boolean);
+
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        { success: false, error: `لا يمكن حذف المركبة - مرتبطة بـ ${blockers.join("، ")}` },
+        { status: 409 }
+      );
+    }
+
+    await prisma.vehicle.delete({
       where: { id: vehicleId },
-      data: { isActive: false },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في إيقاف المركبة";
+    const message = error instanceof Error ? error.message : "فشل في حذف المركبة";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

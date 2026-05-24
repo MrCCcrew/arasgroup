@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Pencil, PowerOff, X, FolderOpen } from "lucide-react";
+import { AlertTriangle, FolderOpen, Pencil, PowerOff, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { VehicleRow } from "./page";
@@ -30,7 +30,7 @@ function formatDate(d: Date | null | undefined, locale: string) {
 }
 
 function ExpiryBadge({ date }: { date: Date | null | undefined }) {
-  if (!date) return <span className="text-muted-foreground text-sm">—</span>;
+  if (!date) return <span className="text-sm text-muted-foreground">—</span>;
   const days = daysLeft(date);
   const formatted = formatDate(date, "ar");
   const color =
@@ -52,8 +52,8 @@ function ExpiryBadge({ date }: { date: Date | null | undefined }) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-card shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b px-5 py-4 sticky top-0 bg-card">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between border-b bg-card px-5 py-4">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X size={16} /></button>
         </div>
@@ -85,13 +85,16 @@ const EMPTY_EDIT = {
 
 export function VehiclesClient({ initialVehicles, branches, companyId, locale }: Props) {
   const router = useRouter();
-  const [vehicles, setVehicles] = useState<VehicleRow[]>(initialVehicles);
+  const [vehicles] = useState<VehicleRow[]>(initialVehicles);
   const [editVehicle, setEditVehicle] = useState<VehicleRow | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
   const [deactivating, setDeactivating] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   function openEdit(v: VehicleRow) {
     setEditVehicle(v);
@@ -125,7 +128,8 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
 
   async function saveEdit() {
     if (!editVehicle) return;
-    setSaving(true); setEditError("");
+    setSaving(true);
+    setEditError("");
     try {
       const res = await fetch(`/api/vehicles/${editVehicle.id}`, {
         method: "PATCH",
@@ -165,13 +169,34 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
     if (!deactivateId) return;
     setDeactivating(true);
     try {
-      const res = await fetch(`/api/vehicles/${deactivateId}`, { method: "DELETE" });
+      const res = await fetch(`/api/vehicles/${deactivateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: false }),
+      });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setDeactivateId(null);
       router.refresh();
     } finally {
       setDeactivating(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteId) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/vehicles/${deleteId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error ?? "تعذر حذف المركبة");
+      setDeleteId(null);
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "تعذر حذف المركبة");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -213,12 +238,10 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                     : "—";
 
                   return (
-                    <tr key={v.id} className={`hover:bg-muted/20 transition-colors ${expiringSoon ? "bg-yellow-50/30" : ""}`}>
+                    <tr key={v.id} className={`transition-colors hover:bg-muted/20 ${expiringSoon ? "bg-yellow-50/30" : ""}`}>
                       <td className="number font-medium">{v.plateNumber}</td>
                       <td className="number text-sm">{v.vehicleNumber ?? "—"}</td>
-                      <td className="text-sm">
-                        {[v.make, v.model].filter(Boolean).join(" ") || "—"}
-                      </td>
+                      <td className="text-sm">{[v.make, v.model].filter(Boolean).join(" ") || "—"}</td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs ${v.ownershipModel === "RENTED" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
                           {v.ownershipModel === "RENTED" ? (locale === "en" ? "Rented" : "مؤجرة") : (locale === "en" ? "Owned" : "مملوكة")}
@@ -232,24 +255,34 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                         <div className="flex items-center gap-1">
                           <Link
                             href={`/dashboard/companies/${companyId}/vehicles/${v.id}`}
-                            className="rounded p-1.5 hover:bg-blue-50 text-muted-foreground hover:text-blue-600"
-                            title="المستندات والتفاصيل"
+                            className="rounded p-1.5 text-muted-foreground hover:bg-blue-50 hover:text-blue-600"
+                            title={locale === "en" ? "Documents and details" : "المستندات والتفاصيل"}
                           >
                             <FolderOpen size={14} />
                           </Link>
                           <button
                             onClick={() => openEdit(v)}
-                            className="rounded p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground"
-                            title="تعديل"
+                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title={locale === "en" ? "Edit" : "تعديل"}
                           >
                             <Pencil size={14} />
                           </button>
                           <button
                             onClick={() => setDeactivateId(v.id)}
-                            className="rounded p-1.5 hover:bg-red-50 text-muted-foreground hover:text-red-600"
-                            title="إيقاف"
+                            className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                            title={locale === "en" ? "Deactivate" : "إيقاف"}
                           >
                             <PowerOff size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDeleteId(v.id);
+                              setDeleteError("");
+                            }}
+                            className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-700"
+                            title={locale === "en" ? "Delete" : "حذف"}
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -262,9 +295,8 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
         </div>
       </div>
 
-      {/* Edit Modal */}
       {editVehicle && (
-        <Modal title={`تعديل: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
+        <Modal title={`${locale === "en" ? "Edit" : "تعديل"}: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -315,7 +347,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                 <input type="date" className="input-field w-full" value={editForm.municipalityCardExpiryDate} onChange={ef("municipalityCardExpiryDate")} />
               </div>
               <div>
-                <label className="form-label">انتهاء بطاقة الدعاية</label>
+                <label className="form-label">انتهاء بطاقة الإعلان</label>
                 <input type="date" className="input-field w-full" value={editForm.advertisingCardExpiryDate} onChange={ef("advertisingCardExpiryDate")} />
               </div>
             </div>
@@ -325,23 +357,53 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
             </div>
             {editError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{editError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditVehicle(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+              <button onClick={() => setEditVehicle(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                {locale === "en" ? "Cancel" : "إلغاء"}
+              </button>
               <button onClick={saveEdit} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
-                {saving ? "جاري الحفظ..." : "حفظ"}
+                {saving ? (locale === "en" ? "Saving..." : "جارٍ الحفظ...") : locale === "en" ? "Save" : "حفظ"}
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Deactivate confirm */}
       {deactivateId && (
-        <Modal title="تأكيد الإيقاف" onClose={() => setDeactivateId(null)}>
-          <p className="text-sm text-muted-foreground">هل تريد إيقاف هذه المركبة؟ ستبقى البيانات محفوظة.</p>
+        <Modal title={locale === "en" ? "Confirm deactivation" : "تأكيد الإيقاف"} onClose={() => setDeactivateId(null)}>
+          <p className="text-sm text-muted-foreground">
+            {locale === "en"
+              ? "This vehicle will be deactivated and hidden from the active list, while keeping its history."
+              : "سيتم إيقاف هذه المركبة وإخفاؤها من القائمة النشطة مع الاحتفاظ بسجلها."}
+          </p>
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setDeactivateId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+            <button onClick={() => setDeactivateId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+              {locale === "en" ? "Cancel" : "إلغاء"}
+            </button>
             <button onClick={confirmDeactivate} disabled={deactivating} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-              {deactivating ? "جاري الإيقاف..." : "إيقاف"}
+              {deactivating ? (locale === "en" ? "Deactivating..." : "جارٍ الإيقاف...") : locale === "en" ? "Deactivate" : "إيقاف"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteId && (
+        <Modal title={locale === "en" ? "Confirm delete" : "تأكيد الحذف"} onClose={() => setDeleteId(null)}>
+          <p className="text-sm text-muted-foreground">
+            {locale === "en"
+              ? "This will permanently delete the vehicle if it has no linked records."
+              : "سيتم حذف المركبة نهائياً فقط إذا لم تكن مرتبطة بأي سجلات أخرى."}
+          </p>
+          {deleteError && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setDeleteId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+              {locale === "en" ? "Cancel" : "إلغاء"}
+            </button>
+            <button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+            >
+              {deleting ? (locale === "en" ? "Deleting..." : "جارٍ الحذف...") : locale === "en" ? "Delete" : "حذف"}
             </button>
           </div>
         </Modal>
