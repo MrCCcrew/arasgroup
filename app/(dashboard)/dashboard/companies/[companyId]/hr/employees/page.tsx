@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
+import { DeleteButton } from "@/components/ui/delete-button";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -206,9 +207,24 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         </td>
                         <td className="text-sm">{branchName}</td>
                         <td>
-                          <Link href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}`} className="text-xs text-primary hover:underline">
-                            {locale === "en" ? "View" : "عرض"}
-                          </Link>
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}`}
+                              className="rounded p-1.5 text-xs text-primary hover:underline"
+                            >
+                              {locale === "en" ? "View" : "عرض"}
+                            </Link>
+                            <Link
+                              href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`}
+                              className="rounded p-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                            >
+                              {locale === "en" ? "Edit" : "تعديل"}
+                            </Link>
+                            <DeleteButton
+                              apiUrl={`/api/hr/employees/${employee.id}`}
+                              label={locale === "en" ? "Delete" : "حذف"}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
