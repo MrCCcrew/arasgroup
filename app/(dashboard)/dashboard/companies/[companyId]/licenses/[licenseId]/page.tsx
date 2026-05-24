@@ -441,8 +441,8 @@ export default function LicenseDetailPage() {
 
   const HOLDER_LABELS: Record<string, string> = { INVESTOR: "المستثمر", GROUP_OWNER: "صاحب المجموعة", OTHER_KUWAITI: "كويتي آخر" };
   const QUARTER_LABELS = ["", "الأول (يناير–مارس)", "الثاني (أبريل–يونيو)", "الثالث (يوليو–سبتمبر)", "الرابع (أكتوبر–ديسمبر)"];
-  const STATUS_COLORS: Record<string, string> = { ACTIVE: "bg-emerald-100 text-emerald-700", EXPIRED: "bg-red-100 text-red-700", SUSPENDED: "bg-orange-100 text-orange-700", INACTIVE: "bg-gray-100 text-gray-600", CANCELLED: "bg-rose-100 text-rose-700" };
-  const STATUS_LABELS: Record<string, string> = { ACTIVE: "نشط", EXPIRED: "منتهي", SUSPENDED: "موقوف", INACTIVE: "غير نشط", CANCELLED: "ملغاة" };
+  const STATUS_COLORS: Record<string, string> = { ACTIVE: "bg-emerald-100 text-emerald-700", EXPIRED: "bg-red-100 text-red-700", SUSPENDED: "bg-orange-100 text-orange-700", CANCELLED: "bg-rose-100 text-rose-700" };
+  const STATUS_LABELS: Record<string, string> = { ACTIVE: "فعال", EXPIRED: "منتهي", SUSPENDED: "موقوف", CANCELLED: "ملغاة" };
 
   return (
     <div>

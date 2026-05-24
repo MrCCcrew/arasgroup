@@ -103,13 +103,13 @@ export default async function CompanyDashboardPage({ params }: Props) {
     prisma.journalEntry.count({
       where: { companyId, status: "DRAFT", isDeleted: false },
     }),
-    // عدد التراخيص الرئيسية
+    // عدد التراخيص الرئيسية (بدون الملغاة)
     prisma.license.count({
-      where: { companyId, isMainLicense: true },
+      where: { companyId, isMainLicense: true, status: { not: "CANCELLED" } },
     }),
-    // عدد التراخيص الفرعية
+    // عدد التراخيص الفرعية (بدون الملغاة)
     prisma.license.count({
-      where: { companyId, isMainLicense: false },
+      where: { companyId, isMainLicense: false, status: { not: "CANCELLED" } },
     }),
     // إقامات تنتهي خلال 30 يوم
     prisma.employee.findMany({
@@ -123,10 +123,11 @@ export default async function CompanyDashboardPage({ params }: Props) {
       orderBy: { residencyExpiry: "asc" },
       take: 5,
     }),
-    // تراخيص تنتهي خلال 60 يوم
+    // تراخيص تنتهي خلال 60 يوم (بدون الملغاة)
     prisma.license.count({
       where: {
         companyId,
+        status: { not: "CANCELLED" },
         licenseExpiryDate: { lte: in60Days, gte: now },
       },
     }),
@@ -150,10 +151,10 @@ export default async function CompanyDashboardPage({ params }: Props) {
   // عدد الموظفين في التراخيص الرئيسية والفرعية
   const [empInMainLicenses, empInSubLicenses] = await Promise.all([
     prisma.employeeLicenseAssignment.count({
-      where: { license: { companyId, isMainLicense: true } },
+      where: { license: { companyId, isMainLicense: true, status: { not: "CANCELLED" } } },
     }),
     prisma.employeeLicenseAssignment.count({
-      where: { license: { companyId, isMainLicense: false } },
+      where: { license: { companyId, isMainLicense: false, status: { not: "CANCELLED" } } },
     }),
   ]);
 

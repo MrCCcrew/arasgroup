@@ -29,10 +29,11 @@ export default async function AdministrativeAffairsPage({ params }: Props) {
     activeEmployees,
     expiringEmployees60,
   ] = await Promise.all([
-    prisma.license.count({ where: { companyId } }),
+    prisma.license.count({ where: { companyId, status: { not: "CANCELLED" } } }),
     prisma.license.count({
       where: {
         companyId,
+        status: { not: "CANCELLED" },
         licenseExpiryDate: { gte: now, lte: in30Days },
       },
     }),

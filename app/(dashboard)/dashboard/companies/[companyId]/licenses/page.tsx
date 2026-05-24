@@ -49,19 +49,20 @@ const EMPTY = {
 };
 type Form = typeof EMPTY;
 
-// الحالات التي تُستبعد من الإحصائيات "النشطة"
-const EXCLUDED_STATUSES = new Set(["CANCELLED", "INACTIVE"]);
+// الحالات المُستبعدة من الإحصائيات (ملغاة لا تُحسب إطلاقاً)
+const EXCLUDED_STATUSES = new Set(["CANCELLED"]);
 
 const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "نشط", EXPIRED: "منتهي", SUSPENDED: "موقوف",
-  CANCELLED: "ملغاة", INACTIVE: "غير نشط",
+  ACTIVE:    "فعال",
+  EXPIRED:   "منتهي",
+  SUSPENDED: "موقوف",
+  CANCELLED: "ملغاة",
 };
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE:    "bg-emerald-100 text-emerald-700",
   EXPIRED:   "bg-red-100 text-red-700",
   SUSPENDED: "bg-orange-100 text-orange-700",
   CANCELLED: "bg-rose-100 text-rose-700",
-  INACTIVE:  "bg-gray-100 text-gray-600",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ export default function LicensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Computed stats (active only — exclude CANCELLED / INACTIVE) ───────────
+  // ── Computed stats (exclude CANCELLED) ──────────────────────────────────────
   const activeLicenses   = licenses.filter((l) => !EXCLUDED_STATUSES.has(l.status));
   const activeMainCount  = activeLicenses.filter((l) => l.isMainLicense).length;
   const expiringSoon     = activeLicenses.filter((l) => {
@@ -159,7 +160,7 @@ export default function LicensesPage() {
     return dates.some((d) => { const n = daysLeft(d); return n !== null && n >= 0 && n <= 90; });
   }).length;
 
-  // Active branch count per main license (excluding CANCELLED/INACTIVE branches)
+  // Active branch count per main license (excluding CANCELLED branches)
   function activeBranchCount(licId: string) {
     return activeLicenses.filter((l) => !l.isMainLicense && l.mainLicenseId === licId).length;
   }
@@ -296,11 +297,11 @@ export default function LicensesPage() {
         {/* ── Stats (screen only) ───────────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-4 no-print">
           <div className="stat-card">
-            <p className="text-xs text-muted-foreground">إجمالي التراخيص النشطة</p>
+            <p className="text-xs text-muted-foreground">إجمالي التراخيص الفعالة</p>
             <p className="mt-1 text-2xl font-bold text-blue-600">{activeLicenses.length}</p>
           </div>
           <div className="stat-card">
-            <p className="text-xs text-muted-foreground">تراخيص رئيسية نشطة</p>
+            <p className="text-xs text-muted-foreground">تراخيص رئيسية فعالة</p>
             <p className="mt-1 text-2xl font-bold text-green-600">{activeMainCount}</p>
           </div>
           <div className="stat-card">
@@ -329,11 +330,10 @@ export default function LicensesPage() {
             {/* Status */}
             <select className="input-field text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="">كل الحالات</option>
-              <option value="ACTIVE">نشط</option>
+              <option value="ACTIVE">فعال</option>
               <option value="EXPIRED">منتهي</option>
               <option value="SUSPENDED">موقوف</option>
               <option value="CANCELLED">ملغاة</option>
-              <option value="INACTIVE">غير نشط</option>
             </select>
 
             {/* Type */}
@@ -547,8 +547,7 @@ export default function LicensesPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div><label className="form-label">الحالة</label>
                   <select className="input-field" value={form.status} onChange={f("status")}>
-                    <option value="ACTIVE">نشط</option>
-                    <option value="INACTIVE">غير نشط</option>
+                    <option value="ACTIVE">فعال</option>
                     <option value="EXPIRED">منتهي</option>
                     <option value="SUSPENDED">موقوف</option>
                     <option value="CANCELLED">ملغاة</option>

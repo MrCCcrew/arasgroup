@@ -35,7 +35,7 @@ export default async function VehiclesPage({ params }: Props) {
       orderBy: { nameAr: "asc" },
     }),
     prisma.license.findMany({
-      where: { companyId, status: { notIn: ["CANCELLED", "INACTIVE"] } },
+      where: { companyId, status: { not: "CANCELLED" } },
       select: { id: true, commercialNameAr: true, licenseNumber: true },
       orderBy: { commercialNameAr: "asc" },
     }),

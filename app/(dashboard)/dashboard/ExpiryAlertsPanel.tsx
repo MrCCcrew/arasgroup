@@ -43,7 +43,7 @@ export async function ExpiryAlertsPanel({ companyIds }: Props) {
   const licenses = await prisma.license.findMany({
     where: {
       companyId: { in: companyIds },
-      status: { notIn: ["EXPIRED", "CANCELLED", "INACTIVE"] },
+      status: { not: "CANCELLED" },
       OR: [
         { licenseExpiryDate:          { lte: in90, gte: now } },
         { fireLicenseExpiryDate:      { lte: in90, gte: now } },

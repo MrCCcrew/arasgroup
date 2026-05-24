@@ -133,7 +133,7 @@ export async function regenerateNotifications() {
     }),
     prisma.license.findMany({
       where: {
-        status: "ACTIVE",
+        status: { not: "CANCELLED" },
         OR: [
           { licenseExpiryDate: { gte: now, lte: in30Days } },
           { fireLicenseExpiryDate: { gte: now, lte: in30Days } },
