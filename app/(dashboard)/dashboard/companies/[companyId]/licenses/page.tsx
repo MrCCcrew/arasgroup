@@ -41,7 +41,9 @@ const EMPTY = {
   fireLicenseExpiryDate: "", healthLicenseExpiryDate: "", advertisingLicenseExpiryDate: "",
   branchId: "", investorId: "",
   managerName: "", managerPhone: "",
-  unifiedEntityNumber: "", civilEntityNumber: "", notes: "",
+  unifiedEntityNumber: "", civilEntityNumber: "",
+  legalEntity: "", capital: "", commercialRegNo: "",
+  notes: "",
 };
 
 type Form = typeof EMPTY;
@@ -144,6 +146,9 @@ export default function LicensesPage() {
       managerPhone: form.managerPhone || null,
       unifiedEntityNumber: form.unifiedEntityNumber || null,
       civilEntityNumber: form.civilEntityNumber || null,
+      legalEntity: form.legalEntity || null,
+      capital: form.capital ? Number(form.capital) : null,
+      commercialRegNo: form.commercialRegNo || null,
       notes: form.notes || null,
     };
     const res = await fetch("/api/licenses", {
@@ -436,6 +441,32 @@ export default function LicensesPage() {
                 <div>
                   <label className="form-label">رقم الكيان المدني</label>
                   <input className="input-field" dir="ltr" placeholder="رقم الكيان المدني" value={form.civilEntityNumber} onChange={f("civilEntityNumber")} />
+                </div>
+              </div>
+            </div>
+
+            {/* ── الشكل القانوني ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">الشكل القانوني والمالي</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="form-label">الشكل القانوني</label>
+                  <select className="input-field w-full" value={form.legalEntity} onChange={f("legalEntity")}>
+                    <option value="">— اختر —</option>
+                    <option value="LLC">ذات مسئولية محدودة</option>
+                    <option value="PARTNERSHIP">تضامنية</option>
+                    <option value="JOINT_STOCK">مساهمة</option>
+                    <option value="SOLE">مؤسسة فردية</option>
+                    <option value="OTHER">أخرى</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">رأس المال (د.ك)</label>
+                  <input type="number" step="0.001" className="input-field" dir="ltr" placeholder="0.000" value={form.capital} onChange={f("capital")} />
+                </div>
+                <div>
+                  <label className="form-label">رقم السجل التجاري</label>
+                  <input className="input-field" dir="ltr" placeholder="رقم السجل" value={form.commercialRegNo} onChange={f("commercialRegNo")} />
                 </div>
               </div>
             </div>
