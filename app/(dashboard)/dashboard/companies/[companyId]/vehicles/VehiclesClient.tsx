@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, FolderOpen, Pencil, PowerOff, Trash2, X } from "lucide-react";
+import { useState, useMemo } from "react";
+import { AlertTriangle, Pencil, PowerOff, X, FolderOpen, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { VehicleRow } from "./page";
@@ -12,9 +12,16 @@ interface Branch {
   nameEn: string | null;
 }
 
+interface LicenseOption {
+  id: string;
+  commercialNameAr: string;
+  licenseNumber: string;
+}
+
 interface Props {
   initialVehicles: VehicleRow[];
   branches: Branch[];
+  licenses: LicenseOption[];
   companyId: string;
   locale: string;
 }
@@ -30,7 +37,7 @@ function formatDate(d: Date | null | undefined, locale: string) {
 }
 
 function ExpiryBadge({ date }: { date: Date | null | undefined }) {
-  if (!date) return <span className="text-sm text-muted-foreground">—</span>;
+  if (!date) return <span className="text-muted-foreground text-sm">—</span>;
   const days = daysLeft(date);
   const formatted = formatDate(date, "ar");
   const color =
@@ -52,8 +59,8 @@ function ExpiryBadge({ date }: { date: Date | null | undefined }) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between border-b bg-card px-5 py-4">
+      <div className="w-full max-w-lg rounded-xl bg-card shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b px-5 py-4 sticky top-0 bg-card">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X size={16} /></button>
         </div>
@@ -80,21 +87,44 @@ const EMPTY_EDIT = {
   municipalityCardExpiryDate: "",
   advertisingCardNumber: "",
   advertisingCardExpiryDate: "",
+  licenseId: "",
   notes: "",
 };
 
-export function VehiclesClient({ initialVehicles, branches, companyId, locale }: Props) {
+export function VehiclesClient({ initialVehicles, branches, licenses, companyId, locale }: Props) {
   const router = useRouter();
-  const [vehicles] = useState<VehicleRow[]>(initialVehicles);
+  const [vehicles, setVehicles] = useState<VehicleRow[]>(initialVehicles);
   const [editVehicle, setEditVehicle] = useState<VehicleRow | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
   const [deactivating, setDeactivating] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+
+  // Filters
+  const [searchQ, setSearchQ] = useState("");
+  const [filterLicenseId, setFilterLicenseId] = useState("");
+
+  const filtered = useMemo(() => {
+    let list = vehicles;
+    if (searchQ.trim()) {
+      const q = searchQ.trim().toLowerCase();
+      list = list.filter(v =>
+        v.plateNumber.toLowerCase().includes(q) ||
+        (v.vehicleNumber ?? "").toLowerCase().includes(q) ||
+        (v.make ?? "").toLowerCase().includes(q) ||
+        (v.model ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterLicenseId) {
+      if (filterLicenseId === "__none__") {
+        list = list.filter(v => !v.licenseId);
+      } else {
+        list = list.filter(v => v.licenseId === filterLicenseId);
+      }
+    }
+    return list;
+  }, [vehicles, searchQ, filterLicenseId]);
 
   function openEdit(v: VehicleRow) {
     setEditVehicle(v);
@@ -116,6 +146,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
       municipalityCardExpiryDate: eff(v.municipalityCardExpiryDate),
       advertisingCardNumber: v.advertisingCardNumber ?? "",
       advertisingCardExpiryDate: eff(v.advertisingCardExpiryDate),
+      licenseId: v.licenseId ?? "",
       notes: v.notes ?? "",
     });
     setEditError("");
@@ -128,8 +159,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
 
   async function saveEdit() {
     if (!editVehicle) return;
-    setSaving(true);
-    setEditError("");
+    setSaving(true); setEditError("");
     try {
       const res = await fetch(`/api/vehicles/${editVehicle.id}`, {
         method: "PATCH",
@@ -151,6 +181,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
           municipalityCardExpiryDate: editForm.municipalityCardExpiryDate || null,
           advertisingCardNumber: editForm.advertisingCardNumber || null,
           advertisingCardExpiryDate: editForm.advertisingCardExpiryDate || null,
+          licenseId: editForm.licenseId || null,
           notes: editForm.notes || null,
         }),
       });
@@ -169,11 +200,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
     if (!deactivateId) return;
     setDeactivating(true);
     try {
-      const res = await fetch(`/api/vehicles/${deactivateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: false }),
-      });
+      const res = await fetch(`/api/vehicles/${deactivateId}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setDeactivateId(null);
@@ -183,25 +210,45 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteId) return;
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      const res = await fetch(`/api/vehicles/${deleteId}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error ?? "تعذر حذف المركبة");
-      setDeleteId(null);
-      router.refresh();
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "تعذر حذف المركبة");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   return (
-    <div className="page-container">
+    <div className="page-container space-y-4">
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input
+            className="input-field w-full pr-8 text-sm"
+            placeholder="بحث باللوحة أو الماركة..."
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+          />
+        </div>
+        <select
+          className="input-field text-sm min-w-[200px]"
+          value={filterLicenseId}
+          onChange={(e) => setFilterLicenseId(e.target.value)}
+        >
+          <option value="">كل التراخيص</option>
+          <option value="__none__">بدون ترخيص</option>
+          {licenses.map(l => (
+            <option key={l.id} value={l.id}>
+              {l.commercialNameAr} — {l.licenseNumber}
+            </option>
+          ))}
+        </select>
+        {(searchQ || filterLicenseId) && (
+          <button
+            onClick={() => { setSearchQ(""); setFilterLicenseId(""); }}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            مسح الفلاتر
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground mr-auto">
+          {filtered.length} من {vehicles.length} مركبة
+        </span>
+      </div>
+
       <div className="overflow-hidden rounded-xl border bg-card">
         <div className="overflow-x-auto">
           <table className="ar-table">
@@ -212,6 +259,7 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                 <th>{locale === "en" ? "Make / Model" : "الماركة / الموديل"}</th>
                 <th>{locale === "en" ? "Ownership" : "الملكية"}</th>
                 <th>{locale === "en" ? "Branch" : "الفرع"}</th>
+                <th>{locale === "en" ? "License" : "الترخيص"}</th>
                 <th>{locale === "en" ? "Driver" : "السائق"}</th>
                 <th>{locale === "en" ? "Insurance" : "التأمين"}</th>
                 <th>{locale === "en" ? "Registration" : "التسجيل"}</th>
@@ -219,14 +267,14 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
               </tr>
             </thead>
             <tbody>
-              {vehicles.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-10 text-center text-muted-foreground">
                     {locale === "en" ? "No vehicles found" : "لا توجد مركبات"}
                   </td>
                 </tr>
               ) : (
-                vehicles.map((v) => {
+                filtered.map((v) => {
                   const insuranceDate = v.insuranceExpiry ?? v.insuranceExpiryDate;
                   const days = daysLeft(insuranceDate);
                   const expiringSoon = days !== null && days <= 30;
@@ -238,16 +286,27 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                     : "—";
 
                   return (
-                    <tr key={v.id} className={`transition-colors hover:bg-muted/20 ${expiringSoon ? "bg-yellow-50/30" : ""}`}>
+                    <tr key={v.id} className={`hover:bg-muted/20 transition-colors ${expiringSoon ? "bg-yellow-50/30" : ""}`}>
                       <td className="number font-medium">{v.plateNumber}</td>
                       <td className="number text-sm">{v.vehicleNumber ?? "—"}</td>
-                      <td className="text-sm">{[v.make, v.model].filter(Boolean).join(" ") || "—"}</td>
+                      <td className="text-sm">
+                        {[v.make, v.model].filter(Boolean).join(" ") || "—"}
+                      </td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs ${v.ownershipModel === "RENTED" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
                           {v.ownershipModel === "RENTED" ? (locale === "en" ? "Rented" : "مؤجرة") : (locale === "en" ? "Owned" : "مملوكة")}
                         </span>
                       </td>
                       <td className="text-sm">{branchName}</td>
+                      <td className="text-sm">
+                        {v.license ? (
+                          <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2 py-0.5">
+                            {v.license.commercialNameAr}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="text-sm">{driverName}</td>
                       <td><ExpiryBadge date={insuranceDate} /></td>
                       <td><ExpiryBadge date={v.registrationExpiry} /></td>
@@ -255,34 +314,24 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                         <div className="flex items-center gap-1">
                           <Link
                             href={`/dashboard/companies/${companyId}/vehicles/${v.id}`}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-blue-50 hover:text-blue-600"
-                            title={locale === "en" ? "Documents and details" : "المستندات والتفاصيل"}
+                            className="rounded p-1.5 hover:bg-blue-50 text-muted-foreground hover:text-blue-600"
+                            title="المستندات والتفاصيل"
                           >
                             <FolderOpen size={14} />
                           </Link>
                           <button
                             onClick={() => openEdit(v)}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            title={locale === "en" ? "Edit" : "تعديل"}
+                            className="rounded p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground"
+                            title="تعديل"
                           >
                             <Pencil size={14} />
                           </button>
                           <button
                             onClick={() => setDeactivateId(v.id)}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                            title={locale === "en" ? "Deactivate" : "إيقاف"}
+                            className="rounded p-1.5 hover:bg-red-50 text-muted-foreground hover:text-red-600"
+                            title="إيقاف"
                           >
                             <PowerOff size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteId(v.id);
-                              setDeleteError("");
-                            }}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-700"
-                            title={locale === "en" ? "Delete" : "حذف"}
-                          >
-                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -295,8 +344,9 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
         </div>
       </div>
 
+      {/* Edit Modal */}
       {editVehicle && (
-        <Modal title={`${locale === "en" ? "Edit" : "تعديل"}: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
+        <Modal title={`تعديل: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -351,59 +401,41 @@ export function VehiclesClient({ initialVehicles, branches, companyId, locale }:
                 <input type="date" className="input-field w-full" value={editForm.advertisingCardExpiryDate} onChange={ef("advertisingCardExpiryDate")} />
               </div>
             </div>
+            {/* License association */}
+            <div>
+              <label className="form-label">الترخيص المرتبط</label>
+              <select className="input-field w-full" value={editForm.licenseId} onChange={ef("licenseId")}>
+                <option value="">— بدون ترخيص —</option>
+                {licenses.map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.commercialNameAr} — {l.licenseNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="form-label">ملاحظات</label>
               <textarea className="input-field w-full resize-none" rows={2} value={editForm.notes} onChange={ef("notes")} />
             </div>
             {editError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{editError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditVehicle(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
-                {locale === "en" ? "Cancel" : "إلغاء"}
-              </button>
+              <button onClick={() => setEditVehicle(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
               <button onClick={saveEdit} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
-                {saving ? (locale === "en" ? "Saving..." : "جارٍ الحفظ...") : locale === "en" ? "Save" : "حفظ"}
+                {saving ? "جاري الحفظ..." : "حفظ"}
               </button>
             </div>
           </div>
         </Modal>
       )}
 
+      {/* Deactivate confirm */}
       {deactivateId && (
-        <Modal title={locale === "en" ? "Confirm deactivation" : "تأكيد الإيقاف"} onClose={() => setDeactivateId(null)}>
-          <p className="text-sm text-muted-foreground">
-            {locale === "en"
-              ? "This vehicle will be deactivated and hidden from the active list, while keeping its history."
-              : "سيتم إيقاف هذه المركبة وإخفاؤها من القائمة النشطة مع الاحتفاظ بسجلها."}
-          </p>
+        <Modal title="تأكيد الإيقاف" onClose={() => setDeactivateId(null)}>
+          <p className="text-sm text-muted-foreground">هل تريد إيقاف هذه المركبة؟ ستبقى البيانات محفوظة.</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setDeactivateId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
-              {locale === "en" ? "Cancel" : "إلغاء"}
-            </button>
+            <button onClick={() => setDeactivateId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
             <button onClick={confirmDeactivate} disabled={deactivating} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-              {deactivating ? (locale === "en" ? "Deactivating..." : "جارٍ الإيقاف...") : locale === "en" ? "Deactivate" : "إيقاف"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {deleteId && (
-        <Modal title={locale === "en" ? "Confirm delete" : "تأكيد الحذف"} onClose={() => setDeleteId(null)}>
-          <p className="text-sm text-muted-foreground">
-            {locale === "en"
-              ? "This will permanently delete the vehicle if it has no linked records."
-              : "سيتم حذف المركبة نهائياً فقط إذا لم تكن مرتبطة بأي سجلات أخرى."}
-          </p>
-          {deleteError && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>}
-          <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setDeleteId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
-              {locale === "en" ? "Cancel" : "إلغاء"}
-            </button>
-            <button
-              onClick={confirmDelete}
-              disabled={deleting}
-              className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
-            >
-              {deleting ? (locale === "en" ? "Deleting..." : "جارٍ الحذف...") : locale === "en" ? "Delete" : "حذف"}
+              {deactivating ? "جاري الإيقاف..." : "إيقاف"}
             </button>
           </div>
         </Modal>

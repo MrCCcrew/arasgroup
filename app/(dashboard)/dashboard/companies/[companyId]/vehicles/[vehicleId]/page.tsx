@@ -63,6 +63,7 @@ export default async function VehicleDetailPage({ params }: Props) {
       branch: { select: { nameAr: true } },
       investor: { select: { nameAr: true } },
       assignedEmployee: { select: { nameAr: true } },
+      license: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
     },
   });
 
@@ -112,6 +113,12 @@ export default async function VehicleDetailPage({ params }: Props) {
             <Field label="الفرع" value={vehicle.branch?.nameAr} />
             <Field label="المستثمر" value={vehicle.investor?.nameAr} />
             <Field label="السائق" value={vehicle.assignedEmployee?.nameAr} />
+            {vehicle.license && (
+              <Field
+                label="الترخيص"
+                value={`${vehicle.license.commercialNameAr} — ${vehicle.license.licenseNumber}`}
+              />
+            )}
             <Field label="رقم جهاز التتبع" value={vehicle.trackingDeviceId} />
             <Field label="رقم بطاقة الوقود" value={vehicle.fuelCardNumber} />
           </div>
@@ -122,14 +129,14 @@ export default async function VehicleDetailPage({ params }: Props) {
             <DateField label="التأمين" value={vehicle.insuranceExpiry ?? vehicle.insuranceExpiryDate} />
             <DateField label="التسجيل" value={vehicle.registrationExpiry} />
             <DateField label="بطاقة البلدية" value={vehicle.municipalityCardExpiryDate} />
-            <DateField label="بطاقة الدعاية" value={vehicle.advertisingCardExpiryDate} />
+            <DateField label="بطاقة الإعلان" value={vehicle.advertisingCardExpiryDate} />
             <DateField label="رخصة الأغذية" value={vehicle.foodLicenseExpiryDate} />
 
             {vehicle.municipalityCardNumber && (
               <Field label="رقم بطاقة البلدية" value={vehicle.municipalityCardNumber} />
             )}
             {vehicle.advertisingCardNumber && (
-              <Field label="رقم بطاقة الدعاية" value={vehicle.advertisingCardNumber} />
+              <Field label="رقم بطاقة الإعلان" value={vehicle.advertisingCardNumber} />
             )}
             {vehicle.foodLicenseNumber && (
               <Field label="رقم رخصة الأغذية" value={vehicle.foodLicenseNumber} />

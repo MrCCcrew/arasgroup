@@ -1028,6 +1028,7 @@ model Vehicle {
   companyId           String
   branchId            String?
   investorId          String?
+  licenseId           String?
   assignedEmployeeId  String?
   clientGeneratedId   String?
   plateNumber         String
@@ -1058,6 +1059,7 @@ model Vehicle {
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   branch         Branch?         @relation(fields: [branchId], references: [id], onDelete: Restrict)
   investor       Investor?       @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  license        License?        @relation("LicenseVehicles", fields: [licenseId], references: [id], onDelete: SetNull)
   assignedEmployee Employee?     @relation("VehicleAssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   carWashVehicle CarWashVehicle?
   assignedDrivers Driver[]       @relation("DriverAssignedVehicle")
@@ -1078,6 +1080,7 @@ model Vehicle {
   @@index([companyId])
   @@index([branchId])
   @@index([investorId])
+  @@index([licenseId])
   @@index([assignedEmployeeId])
   @@index([type])
   @@index([vehicleStatus])
@@ -1900,6 +1903,7 @@ model License {
   trafficCert            LicenseTrafficCert?
   customsCert            LicenseCustomsCert?
   licenseVehicles        LicenseVehicle[]
+  vehicles               Vehicle[]       @relation("LicenseVehicles")
   managerPOA             ManagerPOA?
   workInjuryInsurances   WorkInjuryInsurance[]
   annualBalances         LicenseAnnualBalance[]

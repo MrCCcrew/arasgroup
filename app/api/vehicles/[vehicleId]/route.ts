@@ -15,6 +15,7 @@ interface Props {
 const updateSchema = z.object({
   branchId: z.string().optional().nullable(),
   investorId: z.string().optional().nullable(),
+  licenseId: z.string().optional().nullable(),
   plateNumber: z.string().min(1).optional(),
   vehicleNumber: z.string().optional().nullable(),
   make: z.string().optional().nullable(),

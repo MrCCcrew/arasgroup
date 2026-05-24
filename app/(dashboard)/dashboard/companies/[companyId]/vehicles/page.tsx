@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { AlertTriangle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n";
-import { formatDate } from "@/lib/utils";
-import { daysUntilExpiry } from "@/lib/utils";
 import { VehiclesClient } from "./VehiclesClient";
 
 interface Props {
@@ -20,13 +18,14 @@ export default async function VehiclesPage({ params }: Props) {
   const { companyId } = await params;
   const locale = await getLocale();
 
-  const [vehicles, branches] = await Promise.all([
+  const [vehicles, branches, licenses] = await Promise.all([
     prisma.vehicle.findMany({
-      where: { companyId, isActive: true },
+      where: { companyId, isActive: true, type: { not: "CAR_WASH" } },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
         assignedEmployee: { select: { nameAr: true, nameEn: true } },
+        license: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
       },
       orderBy: { plateNumber: "asc" },
     }),
@@ -34,6 +33,11 @@ export default async function VehiclesPage({ params }: Props) {
       where: { companyId, isActive: true },
       select: { id: true, nameAr: true, nameEn: true },
       orderBy: { nameAr: "asc" },
+    }),
+    prisma.license.findMany({
+      where: { companyId, status: { notIn: ["CANCELLED", "INACTIVE"] } },
+      select: { id: true, commercialNameAr: true, licenseNumber: true },
+      orderBy: { commercialNameAr: "asc" },
     }),
   ]);
 
@@ -60,6 +64,7 @@ export default async function VehiclesPage({ params }: Props) {
       <VehiclesClient
         initialVehicles={vehicles as VehicleRow[]}
         branches={branches}
+        licenses={licenses}
         companyId={companyId}
         locale={locale}
       />
@@ -89,7 +94,9 @@ export type VehicleRow = {
   advertisingCardNumber: string | null;
   advertisingCardExpiryDate: Date | null;
   notes: string | null;
+  licenseId: string | null;
   branch: { nameAr: string; nameEn: string | null } | null;
   investor: { nameAr: string; nameEn: string | null } | null;
   assignedEmployee: { nameAr: string; nameEn: string | null } | null;
+  license: { id: string; commercialNameAr: string; licenseNumber: string } | null;
 };

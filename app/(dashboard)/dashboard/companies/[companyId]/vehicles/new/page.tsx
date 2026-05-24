@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
+
+interface LicenseOption {
+  id: string;
+  commercialNameAr: string;
+  licenseNumber: string;
+}
 
 export default function NewDeliveryVehiclePage() {
   const router = useRouter();
@@ -12,6 +18,7 @@ export default function NewDeliveryVehiclePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [licenses, setLicenses] = useState<LicenseOption[]>([]);
   const [form, setForm] = useState({
     plateNumber: "",
     vehicleNumber: "",
@@ -29,8 +36,29 @@ export default function NewDeliveryVehiclePage() {
     municipalityCardExpiryDate: "",
     advertisingCardNumber: "",
     advertisingCardExpiryDate: "",
+    licenseId: "",
     notes: "",
   });
+
+  useEffect(() => {
+    fetch(`/api/licenses?companyId=${companyId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.data)) {
+          const EXCLUDED = new Set(["CANCELLED", "INACTIVE"]);
+          setLicenses(
+            d.data
+              .filter((l: { status?: string }) => !EXCLUDED.has(l.status ?? ""))
+              .map((l: { id: string; commercialNameAr: string; licenseNumber: string }) => ({
+                id: l.id,
+                commercialNameAr: l.commercialNameAr,
+                licenseNumber: l.licenseNumber,
+              }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [companyId]);
 
   function setField(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -62,6 +90,7 @@ export default function NewDeliveryVehiclePage() {
           municipalityCardExpiryDate: form.municipalityCardExpiryDate || undefined,
           advertisingCardNumber: form.advertisingCardNumber || undefined,
           advertisingCardExpiryDate: form.advertisingCardExpiryDate || undefined,
+          licenseId: form.licenseId || undefined,
           notes: form.notes || undefined,
         }),
       });
@@ -77,7 +106,7 @@ export default function NewDeliveryVehiclePage() {
 
   return (
     <div>
-      <Header title="إضافة مركبة توصيل" subtitle="تسجيل مركبة جديدة" companyId={companyId} />
+      <Header title="إضافة مركبة" subtitle="تسجيل مركبة جديدة" companyId={companyId} />
       <div className="page-container max-w-2xl">
         <div className="mb-2">
           <Link
@@ -184,6 +213,26 @@ export default function NewDeliveryVehiclePage() {
             </div>
           </div>
 
+          {/* الترخيص المرتبط */}
+          <div>
+            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">الترخيص</h3>
+            <div>
+              <label className="form-label">الترخيص المرتبط بالمركبة</label>
+              <select
+                value={form.licenseId}
+                onChange={(e) => setField("licenseId", e.target.value)}
+                className="input-field w-full"
+              >
+                <option value="">— بدون ترخيص —</option>
+                {licenses.map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.commercialNameAr} — {l.licenseNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* بيانات تتبع ووقود */}
           <div>
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">التتبع والوقود</h3>
@@ -250,7 +299,7 @@ export default function NewDeliveryVehiclePage() {
                 />
               </div>
               <div>
-                <label className="form-label">رقم بطاقة الدعاية</label>
+                <label className="form-label">رقم بطاقة الإعلان</label>
                 <input
                   type="text" dir="ltr"
                   value={form.advertisingCardNumber}
@@ -259,7 +308,7 @@ export default function NewDeliveryVehiclePage() {
                 />
               </div>
               <div>
-                <label className="form-label">انتهاء بطاقة الدعاية</label>
+                <label className="form-label">انتهاء بطاقة الإعلان</label>
                 <input
                   type="date"
                   value={form.advertisingCardExpiryDate}
