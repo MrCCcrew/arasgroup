@@ -101,3 +101,88 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
   return NextResponse.json({ success: true, data: updated });
 }
+
+// Full edit (description, amount lines, type, dueDate)
+const claimTypeValues = ["LICENSE_RENEWAL", "RESIDENCY_RENEWAL", "RENT", "SALARY_FUNDING", "ADMIN_FEE", "FINE", "OTHER"] as const;
+const editSchema = z.object({
+  descriptionAr: z.string().min(1).optional(),
+  type: z.enum(claimTypeValues).optional(),
+  dueDate: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
+  notes: z.string().optional().nullable(),
+});
+
+export async function PUT(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { claimId } = await params;
+    const claim = await prisma.investorClaim.findUnique({ where: { id: claimId } });
+    if (!claim) return NextResponse.json({ success: false, error: "المطالبة غير موجودة" }, { status: 404 });
+
+    const permissionError = assertPermission(session, "INVESTOR_CLAIMS", "UPDATE", {
+      companyId: claim.companyId,
+      branchId: claim.branchId ?? undefined,
+    });
+    if (permissionError) return permissionError;
+
+    // Only allow editing PENDING or SENT_TO_ACCOUNTANT claims
+    if (!["PENDING", "SENT_TO_ACCOUNTANT"].includes(claim.status)) {
+      return NextResponse.json(
+        { success: false, error: "لا يمكن تعديل مطالبة تم تحصيلها أو إلغاؤها" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const parsed = editSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+    }
+
+    const updated = await prisma.investorClaim.update({
+      where: { id: claimId },
+      data: parsed.data,
+    });
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في التعديل";
+    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { claimId } = await params;
+    const claim = await prisma.investorClaim.findUnique({
+      where: { id: claimId },
+      include: { payments: true },
+    });
+    if (!claim) return NextResponse.json({ success: false, error: "المطالبة غير موجودة" }, { status: 404 });
+
+    if (!session.isSuperAdmin) {
+      return NextResponse.json({ success: false, error: "يلزم صلاحية المشرف العام للحذف" }, { status: 403 });
+    }
+
+    if (claim.payments.length > 0) {
+      return NextResponse.json(
+        { success: false, error: "لا يمكن حذف مطالبة لها مدفوعات مسجلة — استخدم الإلغاء بدلاً من ذلك" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.investorClaimLine.deleteMany({ where: { claimId } });
+      await tx.investorClaim.delete({ where: { id: claimId } });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في الحذف";
+    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+  }
+}

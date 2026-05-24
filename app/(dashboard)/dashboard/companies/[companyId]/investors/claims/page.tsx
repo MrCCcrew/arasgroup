@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { ClaimStatusActions } from "@/components/investors/claim-status-actions";
+import { ClaimEditDeleteActions } from "@/components/investors/claim-edit-delete-actions";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
@@ -177,7 +178,17 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                           </span>
                         </td>
                         <td>
-                          <ClaimStatusActions claimId={claim.id} status={claim.status} />
+                          <div className="flex flex-col gap-1.5">
+                            <ClaimStatusActions claimId={claim.id} status={claim.status} />
+                            <ClaimEditDeleteActions
+                              claimId={claim.id}
+                              status={claim.status}
+                              descriptionAr={claim.descriptionAr}
+                              type={claim.type}
+                              dueDate={claim.dueDate ? claim.dueDate.toISOString() : null}
+                              notes={claim.notes ?? null}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
