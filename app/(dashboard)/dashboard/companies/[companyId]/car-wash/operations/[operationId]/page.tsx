@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { DeleteOperationButton } from "../DeleteOperationButton";
 
 interface Props {
   params: Promise<{ companyId: string; operationId: string }>;
@@ -35,52 +36,65 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
         title={`عملية ${new Date(operation.date).toLocaleDateString("ar-KW")}`}
         subtitle={`${operation.vehicle.nameAr} - ${operation.location.nameAr}`}
         companyId={companyId}
+        actions={
+          session.isSuperAdmin ? (
+            <DeleteOperationButton
+              operationId={operation.id}
+              locale="ar"
+              redirectTo={`/dashboard/companies/${companyId}/car-wash/operations`}
+            />
+          ) : undefined
+        }
       />
 
       <div className="page-container max-w-4xl space-y-6">
         <Link
           href={`/dashboard/companies/${companyId}/car-wash/operations`}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+          className="flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowRight size={14} />
           العودة للعمليات
         </Link>
 
         <div className="section-card">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">التاريخ</p>
+              <p className="mb-1 text-xs text-muted-foreground">التاريخ</p>
               <p className="font-medium">{new Date(operation.date).toLocaleDateString("ar-KW")}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">السيارة</p>
-              <p className="font-medium">{operation.vehicle.code} - {operation.vehicle.nameAr}</p>
+              <p className="mb-1 text-xs text-muted-foreground">السيارة</p>
+              <p className="font-medium">
+                {operation.vehicle.code} - {operation.vehicle.nameAr}
+              </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">الموقع</p>
+              <p className="mb-1 text-xs text-muted-foreground">الموقع</p>
               <p className="font-medium">{operation.location.nameAr}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">الحالة</p>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                operation.status === "CLOSED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-              }`}>
+              <p className="mb-1 text-xs text-muted-foreground">الحالة</p>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  operation.status === "CLOSED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
                 {operation.status === "CLOSED" ? "مغلقة" : "مفتوحة"}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             { label: "إجمالي الكاش", value: Number(operation.totalCash), color: "text-blue-600" },
             { label: "إجمالي KNET", value: Number(operation.totalKnet), color: "text-purple-600" },
             { label: "إجمالي المصروفات", value: Number(operation.totalExpenses), color: "text-red-600" },
             { label: "صافي الإيراد", value: Number(operation.netRevenue), color: "text-green-600" },
           ].map((item) => (
-            <div key={item.label} className="bg-card border rounded-xl p-4">
-              <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-              <p className={`text-xl font-bold number ${item.color}`}>{item.value.toFixed(3)}</p>
+            <div key={item.label} className="rounded-xl border bg-card p-4">
+              <p className="mb-1 text-xs text-muted-foreground">{item.label}</p>
+              <p className={`number text-xl font-bold ${item.color}`}>{item.value.toFixed(3)}</p>
               <p className="text-xs text-muted-foreground">د.ك</p>
             </div>
           ))}
@@ -88,8 +102,8 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
 
         {operation.revenues.length > 0 && (
           <div>
-            <h3 className="font-bold mb-3">الإيرادات</h3>
-            <div className="bg-card border rounded-xl overflow-hidden">
+            <h3 className="mb-3 font-bold">الإيرادات</h3>
+            <div className="overflow-hidden rounded-xl border bg-card">
               <table className="ar-table">
                 <thead>
                   <tr>
@@ -102,13 +116,15 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                   {operation.revenues.map((revenue) => (
                     <tr key={revenue.id}>
                       <td>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          revenue.type === "CASH" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                        }`}>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            revenue.type === "CASH" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                          }`}
+                        >
                           {revenue.type === "CASH" ? "كاش" : "KNET"}
                         </span>
                       </td>
-                      <td className="text-sm text-muted-foreground">{revenue.description ?? "—"}</td>
+                      <td className="text-sm text-muted-foreground">{revenue.description ?? "-"}</td>
                       <td className="number font-bold">{Number(revenue.amount).toFixed(3)}</td>
                     </tr>
                   ))}
@@ -120,8 +136,8 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
 
         {operation.expenses.length > 0 && (
           <div>
-            <h3 className="font-bold mb-3">المصروفات</h3>
-            <div className="bg-card border rounded-xl overflow-hidden">
+            <h3 className="mb-3 font-bold">المصروفات</h3>
+            <div className="overflow-hidden rounded-xl border bg-card">
               <table className="ar-table">
                 <thead>
                   <tr>
@@ -144,8 +160,8 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
 
         {operation.knetTransactions.length > 0 && (
           <div>
-            <h3 className="font-bold mb-3">معاملات KNET</h3>
-            <div className="bg-card border rounded-xl overflow-hidden">
+            <h3 className="mb-3 font-bold">معاملات KNET</h3>
+            <div className="overflow-hidden rounded-xl border bg-card">
               <table className="ar-table">
                 <thead>
                   <tr>
@@ -157,10 +173,8 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                 <tbody>
                   {operation.knetTransactions.map((transaction) => (
                     <tr key={transaction.id}>
-                      <td className="number text-xs text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString("ar-KW")}
-                      </td>
-                      <td className="number text-sm">{transaction.transactionRef ?? "—"}</td>
+                      <td className="number text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString("ar-KW")}</td>
+                      <td className="number text-sm">{transaction.transactionRef ?? "-"}</td>
                       <td className="number font-bold text-purple-600">{Number(transaction.amount).toFixed(3)}</td>
                     </tr>
                   ))}
@@ -172,7 +186,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
 
         {operation.notes && (
           <div className="section-card">
-            <p className="text-xs text-muted-foreground mb-1">ملاحظات</p>
+            <p className="mb-1 text-xs text-muted-foreground">ملاحظات</p>
             <p className="text-sm">{operation.notes}</p>
           </div>
         )}

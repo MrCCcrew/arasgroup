@@ -7,9 +7,10 @@ import { useRouter } from "next/navigation";
 interface Props {
   operationId: string;
   locale: string;
+  redirectTo?: string;
 }
 
-export function DeleteOperationButton({ operationId, locale }: Props) {
+export function DeleteOperationButton({ operationId, locale, redirectTo }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +31,12 @@ export function DeleteOperationButton({ operationId, locale }: Props) {
       if (!response.ok || !payload.success) {
         throw new Error(payload.error ?? (locale === "en" ? "Delete failed" : "فشل في حذف العملية"));
       }
-      router.refresh();
+
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : locale === "en" ? "Delete failed" : "فشل في حذف العملية");
     } finally {
