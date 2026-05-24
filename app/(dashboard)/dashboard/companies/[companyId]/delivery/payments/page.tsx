@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { PaymentRowActions } from "@/components/delivery/payment-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -49,14 +50,21 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
     ...(sp.platform ? { platform: sp.platform as "TALABAT" | "RO_POPS" } : {}),
   };
 
-  const payments = await prisma.companyPayment.findMany({
-    where,
-    include: {
-      contract: { select: { nameAr: true, nameEn: true, platform: true } },
-      bankAccount: { select: { nameAr: true, nameEn: true } },
-    },
-    orderBy: { receivedDate: "desc" },
-  });
+  const [payments, bankAccounts] = await Promise.all([
+    prisma.companyPayment.findMany({
+      where,
+      include: {
+        contract: { select: { nameAr: true, nameEn: true, platform: true } },
+        bankAccount: { select: { nameAr: true, nameEn: true } },
+      },
+      orderBy: { receivedDate: "desc" },
+    }),
+    prisma.bankAccount.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, nameAr: true, bankName: true },
+      orderBy: { nameAr: "asc" },
+    }),
+  ]);
 
   const totalGross = payments.reduce((sum, payment) => sum + Number(payment.grossAmount), 0);
   const totalWallet = payments.reduce((sum, payment) => sum + Number(payment.walletDeductions), 0);
@@ -158,12 +166,13 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
                   <th>{locale === "en" ? "Wallet deduction" : "خصم المحفظة"}</th>
                   <th>{locale === "en" ? "Net received" : "صافي المستلم"}</th>
                   <th>{locale === "en" ? "Status" : "الحالة"}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {payments.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                    <td colSpan={10} className="py-12 text-center text-muted-foreground">
                       {locale === "en" ? "No payments found in this period" : "لا توجد مدفوعات في هذه الفترة"}
                     </td>
                   </tr>
@@ -197,6 +206,21 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
                           {payment.status === "RECEIVED" ? (locale === "en" ? "Received" : "مستلم") : payment.status}
                         </span>
                       </td>
+                      <td>
+                        <PaymentRowActions
+                          paymentId={payment.id}
+                          platform={payment.platform}
+                          month={payment.month}
+                          year={payment.year}
+                          grossAmount={payment.grossAmount.toString()}
+                          walletDeductions={payment.walletDeductions.toString()}
+                          netReceived={payment.netReceived.toString()}
+                          receivedDate={payment.receivedDate.toISOString()}
+                          bankAccountId={payment.bankAccountId}
+                          notes={payment.notes}
+                          bankAccounts={bankAccounts}
+                        />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -210,7 +234,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
                     <td className="number">{formatKWD(totalGross, numberLocale)}</td>
                     <td className="number text-orange-600">{formatKWD(totalWallet, numberLocale)}</td>
                     <td className="number text-green-600">{formatKWD(totalNet, numberLocale)}</td>
-                    <td></td>
+                    <td colSpan={2}></td>
                   </tr>
                 </tfoot>
               )}

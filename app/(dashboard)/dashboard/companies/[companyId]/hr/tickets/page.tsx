@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { TicketRowActions } from "@/components/hr/ticket-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -48,13 +49,20 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
     ...(sp.type ? { type: sp.type as keyof typeof TICKET_TYPE_LABELS.ar } : {}),
   };
 
-  const tickets = await prisma.employeeTicket.findMany({
-    where: ticketWhere,
-    include: {
-      employee: { select: { nameAr: true, nameEn: true, type: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [tickets, investors] = await Promise.all([
+    prisma.employeeTicket.findMany({
+      where: ticketWhere,
+      include: {
+        employee: { select: { nameAr: true, nameEn: true, type: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.investor.findMany({
+      where: { isActive: true, companies: { some: { id: companyId } } },
+      select: { id: true, nameAr: true },
+      orderBy: { nameAr: "asc" },
+    }),
+  ]);
 
   const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
   const companyCost = tickets.filter((ticket) => ticket.paidBy === "COMPANY").reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
@@ -135,12 +143,13 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Cost (KWD)" : "التكلفة (د.ك)"}</th>
                   <th>{locale === "en" ? "Paid by" : "يدفعها"}</th>
                   <th>{locale === "en" ? "Notes" : "ملاحظات"}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {tickets.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center text-muted-foreground">
+                    <td colSpan={9} className="py-16 text-center text-muted-foreground">
                       <Plane size={32} className="mx-auto mb-2 opacity-40" />
                       {locale === "en" ? `No tickets found in ${year}` : `لا توجد تذاكر في ${year}`}
                     </td>
@@ -172,6 +181,20 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                         {!ticket.paidBy && <span className="text-xs text-muted-foreground">-</span>}
                       </td>
                       <td className="text-sm text-muted-foreground">{ticket.notes ?? "-"}</td>
+                      <td>
+                        <TicketRowActions
+                          ticketId={ticket.id}
+                          type={ticket.type}
+                          destination={ticket.destination}
+                          travelDate={ticket.travelDate?.toISOString() ?? null}
+                          returnDate={ticket.returnDate?.toISOString() ?? null}
+                          cost={ticket.cost?.toString() ?? null}
+                          paidBy={ticket.paidBy}
+                          investorId={ticket.investorId}
+                          notes={ticket.notes}
+                          investors={investors}
+                        />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -181,7 +204,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                   <tr>
                     <td colSpan={5} className="py-2 text-center">{locale === "en" ? "Total" : "الإجمالي"}</td>
                     <td className="number">{formatKWD(totalCost, numberLocale)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               )}

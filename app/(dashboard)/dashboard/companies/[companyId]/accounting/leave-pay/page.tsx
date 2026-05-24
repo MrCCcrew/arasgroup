@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
+import { CalcRowActions } from "@/components/hr/calc-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -105,12 +106,13 @@ export default async function LeavePayPage({ params }: Props) {
                   <th>{locale === "en" ? "Total amount" : "الإجمالي"}</th>
                   <th>{locale === "en" ? "Status" : "الحالة"}</th>
                   <th>{locale === "en" ? "Journal entry" : "القيد"}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                    <td colSpan={10} className="py-10 text-center text-muted-foreground">
                       {locale === "en" ? "No leave pay records yet" : "لا توجد سجلات بدل إجازة بعد"}
                     </td>
                   </tr>
@@ -156,6 +158,15 @@ export default async function LeavePayPage({ params }: Props) {
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
+                        </td>
+                        <td>
+                          <CalcRowActions
+                            calcId={record.id}
+                            calcType="leave-pay"
+                            status={record.status as "CALCULATED" | "ACCRUED" | "PAID"}
+                            notes={record.notes}
+                            paidDate={record.paidDate?.toISOString() ?? null}
+                          />
                         </td>
                       </tr>
                     );
