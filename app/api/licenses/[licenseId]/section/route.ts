@@ -36,6 +36,8 @@ export async function PUT(request: NextRequest, { params }: Props) {
 
     switch (sectionType) {
 
+      // ── [4] اعتماد توقيع صاحب العمل ─────────────────────────────────────────
+      // CRITICAL: upsert cert + delete-then-replace signatories must be atomic
       case "employer_cert": {
         const { signatories, ...certFields } = fields as Record<string, unknown>;
         const data = {
@@ -48,29 +50,31 @@ export async function PUT(request: NextRequest, { params }: Props) {
           expiryDate:     toDate(certFields.expiryDate),
           fileUrl:        certFields.fileUrl        as string | null ?? null,
         };
-        // upsert cert
-        const cert = await prisma.employerSignatureCert.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
-        });
-        // replace signatories
-        if (Array.isArray(signatories)) {
-          await prisma.authorizedSigner.deleteMany({ where: { certId: cert.id } });
-          if (signatories.length > 0) {
-            await prisma.authorizedSigner.createMany({
-              data: (signatories as { nameAr: string; nameEn?: string }[]).map((s, i) => ({
-                certId:    cert.id,
-                nameAr:    s.nameAr,
-                nameEn:    s.nameEn ?? null,
-                sortOrder: i,
-              })),
-            });
+        await prisma.$transaction(async (tx) => {
+          const cert = await tx.employerSignatureCert.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (Array.isArray(signatories)) {
+            await tx.authorizedSigner.deleteMany({ where: { certId: cert.id } });
+            if (signatories.length > 0) {
+              await tx.authorizedSigner.createMany({
+                data: (signatories as { nameAr: string; nameEn?: string }[]).map((s, i) => ({
+                  certId:    cert.id,
+                  nameAr:    s.nameAr,
+                  nameEn:    s.nameEn ?? null,
+                  sortOrder: i,
+                })),
+              });
+            }
           }
-        }
+        });
         return NextResponse.json({ success: true });
       }
 
+      // ── [6] ترخيص الاستيراد ──────────────────────────────────────────────────
+      // upsert doc + sync expiry on license record — must be atomic
       case "import_license": {
         const data = {
           licenseNumber: fields.licenseNumber as string | null ?? null,
@@ -78,18 +82,20 @@ export async function PUT(request: NextRequest, { params }: Props) {
           endDate:       toDate(fields.endDate),
           fileUrl:       fields.fileUrl       as string | null ?? null,
         };
-        await prisma.importLicenseDoc.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
+        await prisma.$transaction(async (tx) => {
+          await tx.importLicenseDoc.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (data.endDate !== undefined) {
+            await tx.license.update({ where: { id: licenseId }, data: { importLicenseExpiryDate: data.endDate } });
+          }
         });
-        // keep top-level expiry in sync
-        if (data.endDate !== undefined) {
-          await prisma.license.update({ where: { id: licenseId }, data: { importLicenseExpiryDate: data.endDate } });
-        }
         return NextResponse.json({ success: true });
       }
 
+      // ── [7] ترخيص الإعلان ────────────────────────────────────────────────────
       case "advertising": {
         const data = {
           adLicenseNumber:         fields.adLicenseNumber         as string | null ?? null,
@@ -103,17 +109,20 @@ export async function PUT(request: NextRequest, { params }: Props) {
           block:                   fields.block                   as string | null ?? null,
           fileUrl:                 fields.fileUrl                 as string | null ?? null,
         };
-        await prisma.licenseAdvertisingDetails.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
+        await prisma.$transaction(async (tx) => {
+          await tx.licenseAdvertisingDetails.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (data.expiryDate !== undefined) {
+            await tx.license.update({ where: { id: licenseId }, data: { advertisingLicenseExpiryDate: data.expiryDate } });
+          }
         });
-        if (data.expiryDate !== undefined) {
-          await prisma.license.update({ where: { id: licenseId }, data: { advertisingLicenseExpiryDate: data.expiryDate } });
-        }
         return NextResponse.json({ success: true });
       }
 
+      // ── [8] رخصة الإطفاء ─────────────────────────────────────────────────────
       case "fire_safety": {
         const data = {
           licenseNumber: fields.licenseNumber as string | null ?? null,
@@ -121,51 +130,60 @@ export async function PUT(request: NextRequest, { params }: Props) {
           expiryDate:    toDate(fields.expiryDate),
           fileUrl:       fields.fileUrl       as string | null ?? null,
         };
-        await prisma.licenseFireSafetyCert.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
+        await prisma.$transaction(async (tx) => {
+          await tx.licenseFireSafetyCert.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (data.expiryDate !== undefined) {
+            await tx.license.update({ where: { id: licenseId }, data: { fireLicenseExpiryDate: data.expiryDate } });
+          }
         });
-        if (data.expiryDate !== undefined) {
-          await prisma.license.update({ where: { id: licenseId }, data: { fireLicenseExpiryDate: data.expiryDate } });
-        }
         return NextResponse.json({ success: true });
       }
 
+      // ── [9] اعتماد المرور ────────────────────────────────────────────────────
       case "traffic_cert": {
         const data = {
           issueDate:  toDate(fields.issueDate),
           expiryDate: toDate(fields.expiryDate),
           fileUrl:    fields.fileUrl as string | null ?? null,
         };
-        await prisma.licenseTrafficCert.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
+        await prisma.$transaction(async (tx) => {
+          await tx.licenseTrafficCert.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (data.expiryDate !== undefined) {
+            await tx.license.update({ where: { id: licenseId }, data: { trafficCertExpiryDate: data.expiryDate } });
+          }
         });
-        if (data.expiryDate !== undefined) {
-          await prisma.license.update({ where: { id: licenseId }, data: { trafficCertExpiryDate: data.expiryDate } });
-        }
         return NextResponse.json({ success: true });
       }
 
+      // ── [10] اعتماد الجمارك ──────────────────────────────────────────────────
       case "customs_cert": {
         const data = {
           issueDate:  toDate(fields.issueDate),
           expiryDate: toDate(fields.expiryDate),
           fileUrl:    fields.fileUrl as string | null ?? null,
         };
-        await prisma.licenseCustomsCert.upsert({
-          where:  { licenseId },
-          create: { licenseId, ...data },
-          update: data,
+        await prisma.$transaction(async (tx) => {
+          await tx.licenseCustomsCert.upsert({
+            where:  { licenseId },
+            create: { licenseId, ...data },
+            update: data,
+          });
+          if (data.expiryDate !== undefined) {
+            await tx.license.update({ where: { id: licenseId }, data: { customsCertExpiryDate: data.expiryDate } });
+          }
         });
-        if (data.expiryDate !== undefined) {
-          await prisma.license.update({ where: { id: licenseId }, data: { customsCertExpiryDate: data.expiryDate } });
-        }
         return NextResponse.json({ success: true });
       }
 
+      // ── [12] وكالة المدير — single upsert, no secondary ops needed ───────────
       case "manager_poa": {
         const data = {
           principalName: fields.principalName as string | null ?? null,
