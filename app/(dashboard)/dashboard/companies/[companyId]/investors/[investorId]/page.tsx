@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { CreditCard, FileText, Mail, MapPin, Phone, Plus } from "lucide-react";
+import { CreditCard, FileText, Mail, MapPin, Phone, Plus, Pencil } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { InvestorDeleteButton } from "./InvestorDeleteButton";
 
 interface Props {
   params: Promise<{ companyId: string; investorId: string }>;
@@ -114,13 +115,29 @@ export default async function InvestorDetailPage({ params }: Props) {
         subtitle={locale === "en" ? "Investor profile" : "ملف المستثمر"}
         companyId={companyId}
         actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/investors/claims/new?investorId=${investorId}`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus size={16} />
-            {locale === "en" ? "New claim" : "مطالبة جديدة"}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/companies/${companyId}/investors/${investorId}/edit`}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <Pencil size={15} />
+              {locale === "en" ? "Edit" : "تعديل"}
+            </Link>
+            {session.isSuperAdmin && (
+              <InvestorDeleteButton
+                investorId={investorId}
+                companyId={companyId}
+                investorName={investorName}
+              />
+            )}
+            <Link
+              href={`/dashboard/companies/${companyId}/investors/claims/new?investorId=${investorId}`}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              {locale === "en" ? "New claim" : "مطالبة جديدة"}
+            </Link>
+          </div>
         }
       />
 
