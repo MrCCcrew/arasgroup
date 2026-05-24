@@ -241,9 +241,27 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
 
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
+  // مفتاح التخزين — منفصل لكل شركة / للمجموعة
+  const storageKey = `sidebar-exp:${resolvedCompanyId ?? "group"}`;
+
+  // عند تغيّر الشركة أو أول تحميل: اقرأ من localStorage أو افتح القسم النشط فقط
   useEffect(() => {
-    setExpandedItems(navItems.filter((item) => item.children?.length).map((item) => item.href));
-  }, [navItems]);
+    if (!mounted) return;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved !== null) {
+        setExpandedItems(JSON.parse(saved) as string[]);
+        return;
+      }
+    } catch { /* ignore */ }
+    // زيارة أولى: افتح فقط القسم الذي يحتوي الصفحة الحالية
+    setExpandedItems(
+      navItems
+        .filter((item) => item.children?.length && pathname.startsWith(item.href + "/"))
+        .map((item) => item.href),
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, navItems, storageKey]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -251,9 +269,13 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
   }
 
   function toggleExpand(href: string) {
-    setExpandedItems((prev) =>
-      prev.includes(href) ? prev.filter((entry) => entry !== href) : [...prev, href],
-    );
+    setExpandedItems((prev) => {
+      const next = prev.includes(href)
+        ? prev.filter((h) => h !== href)
+        : [...prev, href];
+      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   }
 
   const companySubtitle = mounted && currentCompany
