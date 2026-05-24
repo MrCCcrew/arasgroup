@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { DeleteOperationButton } from "./DeleteOperationButton";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -64,7 +65,10 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
         subtitle={`${MONTHS[locale][month - 1]} ${year}`}
         companyId={companyId}
         actions={
-          <Link href={`/dashboard/companies/${companyId}/car-wash/operations/new`} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link
+            href={`/dashboard/companies/${companyId}/car-wash/operations/new`}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
             <Plus size={16} />
             {locale === "en" ? "New operation" : "عملية جديدة"}
           </Link>
@@ -87,7 +91,10 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link href={`/dashboard/companies/${companyId}/car-wash/operations?month=${month}&year=${year}`} className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!sp.vehicleId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+          <Link
+            href={`/dashboard/companies/${companyId}/car-wash/operations?month=${month}&year=${year}`}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!sp.vehicleId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+          >
             {locale === "en" ? "All" : "الكل"}
           </Link>
           {vehicles.map((vehicle) => (
@@ -137,14 +144,34 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                       <td className="number text-red-600">{formatKWD(Number(operation.totalExpenses), numberLocale)}</td>
                       <td className="number font-bold text-green-600">{formatKWD(Number(operation.netRevenue), numberLocale)}</td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${operation.status === "POSTED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                          {operation.status === "POSTED" ? (locale === "en" ? "Posted" : "مرحل") : operation.status === "CLOSED" ? (locale === "en" ? "Closed" : "مغلق") : locale === "en" ? "Open" : "مفتوح"}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            operation.status === "POSTED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {operation.status === "POSTED"
+                            ? locale === "en"
+                              ? "Posted"
+                              : "مرحل"
+                            : operation.status === "CLOSED"
+                              ? locale === "en"
+                                ? "Closed"
+                                : "مغلق"
+                              : locale === "en"
+                                ? "Open"
+                                : "مفتوح"}
                         </span>
                       </td>
                       <td>
-                        <Link href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}`} className="text-xs text-primary hover:underline">
-                          {locale === "en" ? "View" : "عرض"}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}`}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            {locale === "en" ? "View" : "عرض"}
+                          </Link>
+                          {session.isSuperAdmin && <DeleteOperationButton operationId={operation.id} locale={locale} />}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -153,7 +180,9 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
               {operations.length > 0 && (
                 <tfoot className="border-t-2 bg-muted/20 font-bold">
                   <tr>
-                    <td colSpan={3} className="text-center">{locale === "en" ? "Total" : "الإجمالي"}</td>
+                    <td colSpan={3} className="text-center">
+                      {locale === "en" ? "Total" : "الإجمالي"}
+                    </td>
                     <td className="number text-blue-600">{formatKWD(totalCash, numberLocale)}</td>
                     <td className="number text-purple-600">{formatKWD(totalKnet, numberLocale)}</td>
                     <td className="number text-red-600">{formatKWD(totalExpenses, numberLocale)}</td>

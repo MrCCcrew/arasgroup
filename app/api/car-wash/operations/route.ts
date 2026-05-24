@@ -5,6 +5,10 @@ import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
 import { requireRequestSession } from "@/lib/auth/access";
 import { z } from "zod";
 
+function expenseReference(operationId: string) {
+  return `CWOP:${operationId}`;
+}
+
 const revenueSchema = z.object({
   type: z.enum(["CASH", "KNET"]),
   amount: z.number().min(0),
@@ -167,6 +171,7 @@ export async function POST(request: NextRequest) {
             amount: expense.amount,
             descriptionAr: expense.description,
             paymentMethod: "CASH",
+            reference: expenseReference(op.id),
             costCenterId: cwVehicle?.costCenterId ?? undefined,
             carWashVehicleId: data.vehicleId,
             status: "POSTED",
