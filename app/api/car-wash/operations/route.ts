@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createCarWashDailyJE } from "@/lib/accounting/auto-entries";
+import { createCarWashDailyJE, createExpenseJE } from "@/lib/accounting/auto-entries";
+import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
 import { requireRequestSession } from "@/lib/auth/access";
 import { z } from "zod";
 
@@ -125,7 +126,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Auto journal entry
+      let primaryJournalEntryId: string | undefined;
+
+      // Auto revenue journal entry
       if (totalCash > 0 || totalKnet > 0) {
         const je = await createCarWashDailyJE({
           companyId: data.companyId,
@@ -138,9 +141,61 @@ export async function POST(request: NextRequest) {
           refId: op.id,
         });
 
+        primaryJournalEntryId = je.id;
+      }
+
+      for (const [index, expense] of data.expenses.entries()) {
+        if (expense.amount <= 0) continue;
+
+        if (!expense.categoryId) {
+          throw new Error(`فئة المصروف مطلوبة في السطر رقم ${index + 1}`);
+        }
+
+        const category = await tx.expenseCategory.findUnique({
+          where: { id: expense.categoryId },
+          select: { id: true, companyId: true, type: true },
+        });
+        if (!category || category.companyId !== data.companyId) {
+          throw new Error(`فئة المصروف في السطر رقم ${index + 1} غير صالحة لهذه الشركة`);
+        }
+
+        const accountingExpense = await tx.expense.create({
+          data: {
+            companyId: data.companyId,
+            categoryId: expense.categoryId,
+            date: data.date,
+            amount: expense.amount,
+            descriptionAr: expense.description,
+            paymentMethod: "CASH",
+            costCenterId: cwVehicle?.costCenterId ?? undefined,
+            carWashVehicleId: data.vehicleId,
+            status: "POSTED",
+          },
+        });
+
+        const expenseJournalEntry = await createExpenseJE({
+          companyId: data.companyId,
+          userId,
+          expenseAccountCode: resolveExpenseAccountCode(category.type),
+          amount: expense.amount,
+          isCash: true,
+          costCenterId: cwVehicle?.costCenterId ?? undefined,
+          refId: accountingExpense.id,
+          descriptionAr: `مصروف غسيل سيارات - ${expense.description}`,
+        });
+
+        await tx.expense.update({
+          where: { id: accountingExpense.id },
+          data: { journalEntryId: expenseJournalEntry.id },
+        });
+
+        primaryJournalEntryId ??= expenseJournalEntry.id;
+      }
+
+      if (primaryJournalEntryId) {
         await tx.carWashDailyOperation.update({
           where: { id: op.id },
-          data: { journalEntryId: je.id, status: "CLOSED" },
+          data: { journalEntryId: primaryJournalEntryId, status: "CLOSED" },
         });
       }
 

@@ -2,27 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import { createExpenseJE } from "@/lib/accounting/auto-entries";
+import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
 import { z } from "zod";
-
-// Expense category code mapping
-const EXPENSE_ACCOUNT_MAP: Record<string, string> = {
-  SALARY: "5010",
-  RENT: "5020",
-  CAR_RENTAL: "5021",
-  FUEL: "5030",
-  VEHICLE_MAINTENANCE: "5031",
-  CAR_INSTALLMENT: "5032",
-  TRACKING: "5033",
-  TELEPHONE: "5040",
-  LABOR_INSURANCE: "5050",
-  RESIDENCY_RENEWAL: "5060",
-  LICENSE_RENEWAL: "5061",
-  TRAVEL_TICKETS: "5070",
-  TRAFFIC_VIOLATIONS: "5080",
-  SERVER_SUBSCRIPTIONS: "5090",
-  GARAGE_RENT: "5091",
-  GENERAL: "5099",
-};
 
 const createExpenseSchema = z.object({
   companyId: z.string(),
@@ -112,9 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Get category to determine accounting code
     const category = await prisma.expenseCategory.findUnique({ where: { id: data.categoryId } });
-    const accountCode = data.expenseAccountCode ??
-      (category?.type ? EXPENSE_ACCOUNT_MAP[category.type] : null) ??
-      "5099";
+    const accountCode = resolveExpenseAccountCode(category?.type, data.expenseAccountCode);
 
     const expense = await prisma.$transaction(async (tx) => {
       const expense = await tx.expense.create({
