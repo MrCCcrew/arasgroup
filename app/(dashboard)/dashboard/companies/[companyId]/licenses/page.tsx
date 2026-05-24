@@ -155,7 +155,8 @@ export default function LicensesPage() {
     setSaving(false);
     if (!data.success) { setFormError(data.error ?? "حدث خطأ"); return; }
     setShowForm(false);
-    load();
+    // ← انتقل مباشرة لصفحة تفاصيل الترخيص (الـ 14 كارت)
+    router.push(`/dashboard/companies/${companyId}/licenses/${data.data.id}`);
   }
 
   async function confirmDelete() {
