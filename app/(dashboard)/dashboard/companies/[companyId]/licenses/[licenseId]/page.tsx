@@ -14,7 +14,8 @@ import { Header } from "@/components/layout/header";
 
 interface LicenseBase {
   id: string; commercialNameAr: string; licenseNumber: string;
-  isMainLicense: boolean; status: string; investorId: string | null;
+  isMainLicense: boolean; status: string;
+  branchId: string | null; investorId: string | null;
   legalEntity: string | null; capital: string | null; commercialRegNo: string | null;
   licenseExpiryDate: string | null; fireLicenseExpiryDate: string | null;
   advertisingLicenseExpiryDate: string | null; trafficCertExpiryDate: string | null;
@@ -273,6 +274,8 @@ export default function LicenseDetailPage() {
   const [sections, setSections] = useState<Sections | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [branches,  setBranches]  = useState<{ id: string; nameAr: string }[]>([]);
+  const [investors, setInvestors] = useState<{ id: string; nameAr: string }[]>([]);
 
   // Active modal
   type ModalType = "basic_info" | "establishment" | "lease" | "employer_cert" | "import_license" |
@@ -298,6 +301,18 @@ export default function LicenseDetailPage() {
     if (secRes?.success) setSections(secRes.data);
     setLoading(false);
   }, [licenseId]);
+
+  // جلب الفروع والمستثمرين مرة واحدة
+  useEffect(() => {
+    if (!companyId) return;
+    Promise.all([
+      fetch(`/api/companies/${companyId}/branches`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
+    ]).then(([b, i]) => {
+      if (b?.success) setBranches(b.data);
+      if (i?.success) setInvestors(i.data);
+    });
+  }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -334,6 +349,8 @@ export default function LicenseDetailPage() {
 
   async function saveBasicInfo() {
     await save(`/api/licenses/${licenseId}`, "PATCH", {
+      branchId:         form.branchId   || null,
+      investorId:       form.investorId || null,
       commercialNameAr: form.commercialNameAr || undefined,
       commercialNameEn: form.commercialNameEn || null,
       licenseNumber:    form.licenseNumber    || undefined,
@@ -566,6 +583,8 @@ export default function LicenseDetailPage() {
           <SectionCard icon={FileCheck} title="الترخيص التجاري" status={expiryStatus(license.licenseExpiryDate)}
             subtitle={license.licenseExpiryDate ? `ينتهي ${fmt(license.licenseExpiryDate)}` : "لم يُدخل تاريخ الانتهاء"}
             onEdit={() => openModal("basic_info", {
+              branchId:            license.branchId   ?? "",
+              investorId:          license.investorId ?? "",
               commercialNameAr:    license.commercialNameAr,
               licenseNumber:       license.licenseNumber,
               status:              license.status,
@@ -1187,7 +1206,7 @@ export default function LicenseDetailPage() {
       {/* [14] الميزانية السنوية */}
       {/* ── تعديل البيانات الأساسية ── */}
       {modal === "basic_info" && (
-        <Modal title="تعديل البيانات الأساسية" onClose={() => setModal(null)}>
+        <Modal title="تعديل البيانات الأساسية" wide onClose={() => setModal(null)}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -1205,6 +1224,20 @@ export default function LicenseDetailPage() {
                   <option value="SUSPENDED">موقوف</option>
                   <option value="EXPIRED">منتهي</option>
                   <option value="CANCELLED">ملغاة</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">الفرع</label>
+                <select className="input-field w-full" value={form.branchId as string ?? ""} onChange={f("branchId")}>
+                  <option value="">— بدون فرع —</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">المستثمر</label>
+                <select className="input-field w-full" value={form.investorId as string ?? ""} onChange={f("investorId")}>
+                  <option value="">— بدون مستثمر —</option>
+                  {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
                 </select>
               </div>
               <div>
