@@ -84,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       uniqueKey: `claim:${claim.id}:sent`,
       titleAr: "تم إرسال المطالبة إلى المحاسب",
       titleEn: "Financial claim sent to accountant",
-      messageAr: `تم إرسال مطالبة المستثمر ${claim.investor.nameAr} إلى المحاسب`,
+      messageAr: `تم إرسال مطالبة المسئول ${claim.investor.nameAr} إلى المحاسب`,
       messageEn: `Financial claim for ${claim.investor.nameEn ?? claim.investor.nameAr} was sent to the accountant`,
       companyId: claim.companyId,
       branchId: claim.branchId ?? undefined,

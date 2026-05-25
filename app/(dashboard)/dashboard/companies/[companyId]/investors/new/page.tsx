@@ -97,7 +97,7 @@ export default function NewInvestorPage() {
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? (locale === "en" ? "Failed to save investor" : "فشل في حفظ المستثمر"));
+      if (!response.ok) throw new Error(payload.error ?? (locale === "en" ? "Failed to save investor" : "فشل في حفظ البيانات"));
       router.push(`/dashboard/companies/${companyId}/investors`);
       router.refresh();
     } catch (submissionError) {
@@ -110,8 +110,8 @@ export default function NewInvestorPage() {
   return (
     <div>
       <Header
-        title={locale === "en" ? "New Investor" : "مستثمر جديد"}
-        subtitle={locale === "en" ? "Add a new investor to this company" : "إضافة مستثمر جديد إلى هذه الشركة"}
+        title={locale === "en" ? "New Investor" : "مسئول جديد"}
+        subtitle={locale === "en" ? "Add a new investor to this company" : "إضافة مسئول جديد إلى هذه الشركة"}
         companyId={companyId}
       />
 
@@ -121,7 +121,7 @@ export default function NewInvestorPage() {
           className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowRight size={14} />
-          {locale === "en" ? "Back to investors" : "العودة للمستثمرين"}
+          {locale === "en" ? "Back to investors" : "العودة للمسئولين"}
         </Link>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -129,7 +129,7 @@ export default function NewInvestorPage() {
 
           <div className="section-card space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              {locale === "en" ? "Investor information" : "بيانات المستثمر"}
+              {locale === "en" ? "Investor information" : "بيانات المسئول"}
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
@@ -142,7 +142,7 @@ export default function NewInvestorPage() {
                   value={form.nameAr}
                   onChange={(event) => setField("nameAr", event.target.value)}
                   className="input-field w-full"
-                  placeholder={locale === "en" ? "Investor name" : "اسم المستثمر"}
+                  placeholder={locale === "en" ? "Investor name" : "اسم المسئول"}
                 />
               </div>
               <div className="col-span-2">
@@ -207,7 +207,7 @@ export default function NewInvestorPage() {
               </p>
             ) : branchLinks.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {locale === "en" ? "Use “Add branch” to link this investor to company branches." : "استخدم \"إضافة فرع\" لربط المستثمر بفروع الشركة."}
+                {locale === “en” ? “Use “Add branch” to link this investor to company branches.” : “استخدم \”إضافة فرع\” لربط المسئول بفروع الشركة.”}
               </p>
             ) : (
               <div className="space-y-3">
@@ -245,7 +245,7 @@ export default function NewInvestorPage() {
           <div className="flex items-center gap-3">
             <button type="submit" disabled={loading} className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               <Save size={16} />
-              {loading ? (locale === "en" ? "Saving..." : "جاري الحفظ...") : locale === "en" ? "Add investor" : "إضافة المستثمر"}
+              {loading ? (locale === "en" ? "Saving..." : "جاري الحفظ...") : locale === "en" ? "Add investor" : "إضافة المسئول"}
             </button>
             <Link href={`/dashboard/companies/${companyId}/investors`} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium hover:bg-muted">
               {locale === "en" ? "Cancel" : "إلغاء"}

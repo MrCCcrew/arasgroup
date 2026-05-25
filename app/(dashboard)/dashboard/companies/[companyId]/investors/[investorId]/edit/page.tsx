@@ -91,7 +91,7 @@ export default function EditInvestorPage() {
 
   return (
     <div>
-      <Header title="تعديل بيانات المستثمر" subtitle={form.nameAr} companyId={companyId} />
+      <Header title="تعديل بيانات المسئول" subtitle={form.nameAr} companyId={companyId} />
       <div className="page-container max-w-xl">
         <div className="mb-4">
           <Link
@@ -99,7 +99,7 @@ export default function EditInvestorPage() {
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowRight size={14} />
-            العودة لملف المستثمر
+            العودة لملف المسئول
           </Link>
         </div>
 

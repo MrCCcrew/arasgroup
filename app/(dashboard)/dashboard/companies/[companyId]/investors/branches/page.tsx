@@ -35,8 +35,8 @@ export default async function InvestorBranchesPage({ params }: Props) {
   return (
     <div>
       <Header
-        title={locale === "en" ? "Branches & Investors" : "الفروع والمستثمرون"}
-        subtitle={locale === "en" ? "Branch ownership distribution across investors" : "توزيع ملكية الفروع على المستثمرين"}
+        title={locale === "en" ? "Branches & Investors" : "الفروع والمسئولون والمديرون"}
+        subtitle={locale === "en" ? "Branch ownership distribution across investors" : "توزيع ملكية الفروع على المسئولين والمديرين"}
         companyId={companyId}
         actions={
           <Link
@@ -64,20 +64,20 @@ export default async function InvestorBranchesPage({ params }: Props) {
                     {branch.address && <p className="mt-0.5 text-xs text-muted-foreground">{branch.address}</p>}
                   </div>
                   <span className="rounded-full bg-green-50 px-2 py-1 text-xs text-green-700">
-                    {branch.investorBranches.length} {locale === "en" ? "investor(s)" : "مستثمر"}
+                    {branch.investorBranches.length} {locale === "en" ? "investor(s)" : "مسئول"}
                   </span>
                 </div>
 
                 {branch.investorBranches.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    {locale === "en" ? "No investors are linked to this branch" : "لا يوجد مستثمرون مرتبطون بهذا الفرع"}
+                    {locale === "en" ? "No investors are linked to this branch" : "لا يوجد مسئولون ومديرون مرتبطون بهذا الفرع"}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="ar-table">
                       <thead>
                         <tr>
-                          <th>{locale === "en" ? "Investor" : "المستثمر"}</th>
+                          <th>{locale === "en" ? "Investor" : "المسئول والمدير"}</th>
                           <th>{locale === "en" ? "Ownership %" : "نسبة الملكية"}</th>
                           <th>{locale === "en" ? "Start date" : "تاريخ البداية"}</th>
                           <th>{locale === "en" ? "Phone" : "الهاتف"}</th>

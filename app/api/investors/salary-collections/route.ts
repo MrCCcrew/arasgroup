@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         investorId: data.investorId,
         amount: data.collectedAmount,
         refId: collection.id,
-        descriptionAr: `تحصيل رواتب من مستثمر: ${investor?.nameAr} — شهر ${data.month}/${data.year}`,
+        descriptionAr: `تحصيل رواتب من مسئول: ${investor?.nameAr} — شهر ${data.month}/${data.year}`,
       });
 
       await tx.investorSalaryCollection.update({

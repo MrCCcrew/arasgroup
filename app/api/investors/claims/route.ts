@@ -143,9 +143,9 @@ export async function POST(request: NextRequest) {
       await upsertNotification({
         type: "INVESTOR_CLAIM_DUE",
         uniqueKey: `claim:${claim.id}:due:${claim.dueDate.toISOString().slice(0, 10)}`,
-        titleAr: "استحقاق مطالبة مستثمر",
+        titleAr: "استحقاق مطالبة مسئول",
         titleEn: "Investor claim due",
-        messageAr: `مطالبة المستثمر ${claim.investor.nameAr} مستحقة قريباً`,
+        messageAr: `مطالبة المسئول ${claim.investor.nameAr} مستحقة قريباً`,
         messageEn: `Investor claim for ${claim.investor.nameEn ?? claim.investor.nameAr} is due soon`,
         companyId: claim.companyId,
         branchId: claim.branchId ?? undefined,

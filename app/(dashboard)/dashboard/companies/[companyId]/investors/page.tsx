@@ -63,8 +63,8 @@ export default async function InvestorsPage({ params }: Props) {
   return (
     <div>
       <Header
-        title={locale === "en" ? "Investors" : "المستثمرون"}
-        subtitle={`${investors.length} ${locale === "en" ? "active investor(s)" : "مستثمر نشط"}`}
+        title={locale === "en" ? "Investors" : "المسئولون والمديرون"}
+        subtitle={`${investors.length} ${locale === "en" ? "active investor(s)" : "مسئول نشط"}`}
         companyId={companyId}
         actions={
           <div className="flex gap-2">
@@ -73,7 +73,7 @@ export default async function InvestorsPage({ params }: Props) {
               className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
             >
               <Plus size={16} />
-              {locale === "en" ? "New investor" : "مستثمر جديد"}
+              {locale === "en" ? "New investor" : "مسئول جديد"}
             </Link>
             <Link
               href={`/dashboard/companies/${companyId}/investors/claims/new`}
@@ -89,8 +89,8 @@ export default async function InvestorsPage({ params }: Props) {
       <div className="page-container space-y-8">
         {investors.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
-            <p>{locale === "en" ? "No investors are linked to this company yet" : "لا يوجد مستثمرون مرتبطون بهذه الشركة بعد"}</p>
-            <p className="mt-2 text-sm">{locale === "en" ? "Create branches and link them to investors first" : "أنشئ الفروع واربطها بالمستثمرين أولاً"}</p>
+            <p>{locale === "en" ? "No investors are linked to this company yet" : "لا يوجد مسئولون ومديرون مرتبطون بهذه الشركة بعد"}</p>
+            <p className="mt-2 text-sm">{locale === "en" ? "Create branches and link them to investors first" : "أنشئ الفروع واربطها بالمسئولين أولاً"}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -231,7 +231,7 @@ async function RecentClaims({
       <table className="ar-table">
         <thead>
           <tr>
-            <th>{locale === "en" ? "Investor" : "المستثمر"}</th>
+            <th>{locale === "en" ? "Investor" : "المسئول والمدير"}</th>
             <th>{locale === "en" ? "Type" : "النوع"}</th>
             <th>{locale === "en" ? "Description" : "البيان"}</th>
             <th>{locale === "en" ? "Collected" : "المبلغ المجمّع"}</th>

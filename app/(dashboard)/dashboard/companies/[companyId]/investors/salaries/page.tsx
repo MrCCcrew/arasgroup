@@ -97,7 +97,7 @@ export default function InvestorSalariesPage() {
   }
 
   async function save() {
-    if (!form.investorId) { setFormError("اختر المستثمر"); return; }
+    if (!form.investorId) { setFormError("اختر المسئول"); return; }
     if (!form.collectedAmount || Number(form.collectedAmount) <= 0) { setFormError("أدخل مبلغاً صحيحاً"); return; }
     setSaving(true); setFormError("");
     const res = await fetch("/api/investors/salary-collections", {
@@ -173,8 +173,8 @@ export default function InvestorSalariesPage() {
   return (
     <div>
       <Header
-        title="رواتب المستثمرين"
-        subtitle="دورات تحصيل رواتب موظفي المستثمرين"
+        title="رواتب المسئولين والمديرين"
+        subtitle="دورات تحصيل رواتب موظفي المسئولين والمديرين"
         companyId={companyId}
         actions={
           <button
@@ -210,7 +210,7 @@ export default function InvestorSalariesPage() {
               <table className="ar-table">
                 <thead>
                   <tr>
-                    <th>المستثمر</th>
+                    <th>المسئول والمدير</th>
                     <th>الفترة</th>
                     <th>المبلغ المحصل</th>
                     <th>تاريخ التحصيل</th>
@@ -267,12 +267,12 @@ export default function InvestorSalariesPage() {
 
       {/* Add Modal */}
       {showForm && (
-        <Modal title="تسجيل تحصيل رواتب مستثمر" onClose={() => setShowForm(false)}>
+        <Modal title="تسجيل تحصيل رواتب مسئول" onClose={() => setShowForm(false)}>
           <div className="space-y-3">
             <div>
-              <label className="form-label">المستثمر *</label>
+              <label className="form-label">المسئول والمدير *</label>
               <select className="input-field w-full" value={form.investorId} onChange={f("investorId")}>
-                <option value="">— اختر المستثمر —</option>
+                <option value="">— اختر المسئول —</option>
                 {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
               </select>
             </div>

@@ -88,7 +88,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
   return (
     <div>
       <Header
-        title={locale === "en" ? "Investor Claims" : "مطالبات المستثمرين"}
+        title={locale === "en" ? "Investor Claims" : "مطالبات المسئولين والمديرين"}
         subtitle={locale === "en" ? "Claims, collections, and renewal workflow" : "سجل المطالبات والتحصيلات والتجديد"}
         companyId={companyId}
         actions={
@@ -127,7 +127,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
             <table className="ar-table">
               <thead>
                 <tr>
-                  <th>{locale === "en" ? "Investor" : "المستثمر"}</th>
+                  <th>{locale === "en" ? "Investor" : "المسئول والمدير"}</th>
                   <th>{locale === "en" ? "Type" : "النوع"}</th>
                   <th>{locale === "en" ? "Branch" : "الفرع"}</th>
                   <th>{locale === "en" ? "Claim date" : "تاريخ المطالبة"}</th>
@@ -141,7 +141,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                 {claims.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                      {locale === "en" ? "No investor claims found" : "لا توجد مطالبات مستثمرين"}
+                      {locale === "en" ? "No investor claims found" : "لا توجد مطالبات مسئولين"}
                     </td>
                   </tr>
                 ) : (

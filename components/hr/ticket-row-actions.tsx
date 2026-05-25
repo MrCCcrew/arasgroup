@@ -171,16 +171,16 @@ export function TicketRowActions({ ticketId, type, destination, travelDate, retu
                     onChange={(e) => setEditForm((p) => ({ ...p, paidBy: e.target.value }))}>
                     <option value="">— غير محدد —</option>
                     <option value="COMPANY">الشركة</option>
-                    <option value="INVESTOR">المستثمر</option>
+                    <option value="INVESTOR">المسئول والمدير</option>
                   </select>
                 </div>
               </div>
               {editForm.paidBy === "INVESTOR" && investors.length > 0 && (
                 <div>
-                  <label className="form-label">المستثمر</label>
+                  <label className="form-label">المسئول والمدير</label>
                   <select className="input-field w-full" value={editForm.investorId}
                     onChange={(e) => setEditForm((p) => ({ ...p, investorId: e.target.value }))}>
-                    <option value="">— اختر المستثمر —</option>
+                    <option value="">— اختر المسئول —</option>
                     {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
                   </select>
                 </div>

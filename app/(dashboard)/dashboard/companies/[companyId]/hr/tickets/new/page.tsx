@@ -206,7 +206,7 @@ export default function NewTicketPage() {
               >
                 <option value="">{locale === "en" ? "Not specified" : "غير محدد"}</option>
                 <option value="COMPANY">{locale === "en" ? "Company" : "الشركة"}</option>
-                <option value="INVESTOR">{locale === "en" ? "Investor" : "المستثمر"}</option>
+                <option value="INVESTOR">{locale === "en" ? "Investor" : "المسئول والمدير"}</option>
               </select>
             </div>
 

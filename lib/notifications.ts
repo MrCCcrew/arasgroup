@@ -284,9 +284,9 @@ export async function regenerateNotifications() {
   await Promise.all(investorClaims.map((claim) => upsertNotification({
     type: "INVESTOR_CLAIM_DUE",
     uniqueKey: `claim:${claim.id}:due:${claim.dueDate?.toISOString().slice(0, 10) ?? "na"}`,
-    titleAr: "مطالبة مستثمر مستحقة",
+    titleAr: "مطالبة مسئول مستحقة",
     titleEn: "Investor claim due",
-    messageAr: `مطالبة المستثمر ${claim.investor.nameAr} مستحقة`,
+    messageAr: `مطالبة المسئول ${claim.investor.nameAr} مستحقة`,
     messageEn: `Investor claim for ${claim.investor.nameEn ?? claim.investor.nameAr} is due`,
     companyId: claim.companyId,
     branchId: claim.branchId ?? undefined,
@@ -306,9 +306,9 @@ export async function regenerateNotifications() {
     return upsertNotification({
       type: "INVESTOR_SALARY_COLLECTION_DUE",
       uniqueKey: `salary-collection:${collection.id}:${collection.month}-${collection.year}`,
-      titleAr: "تحصيل رواتب المستثمرين مستحق",
+      titleAr: "تحصيل رواتب المسئولين والمديرين مستحق",
       titleEn: "Investor salary collection due",
-      messageAr: `تحصيل رواتب المستثمر ${collection.investor.nameAr} مستحق`,
+      messageAr: `تحصيل رواتب المسئول ${collection.investor.nameAr} مستحق`,
       messageEn: `Salary collection for investor ${collection.investor.nameEn ?? collection.investor.nameAr} is due`,
       companyId: collection.companyId,
       branchId: collection.branchId ?? undefined,

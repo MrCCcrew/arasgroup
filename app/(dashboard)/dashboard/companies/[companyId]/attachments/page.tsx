@@ -35,7 +35,7 @@ interface Attachment {
 const ENTITY_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
   EMPLOYEE: { ar: "موظف", en: "Employee" },
   COMPANY: { ar: "شركة", en: "Company" },
-  INVESTOR: { ar: "مستثمر", en: "Investor" },
+  INVESTOR: { ar: "مسئول", en: "Investor" },
   BRANCH: { ar: "فرع", en: "Branch" },
   JOURNAL_ENTRY: { ar: "قيد محاسبي", en: "Journal Entry" },
   DRIVER: { ar: "سائق", en: "Driver" },

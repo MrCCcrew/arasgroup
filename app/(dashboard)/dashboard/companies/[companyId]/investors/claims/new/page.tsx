@@ -131,7 +131,7 @@ export default function NewClaimPage() {
     setError("");
 
     if (!form.investorId) {
-      setError(locale === "en" ? "Please select an investor" : "يرجى اختيار المستثمر");
+      setError(locale === "en" ? "Please select an investor" : "يرجى اختيار المسئول");
       return;
     }
 
@@ -182,7 +182,7 @@ export default function NewClaimPage() {
     <div>
       <Header
         title={locale === "en" ? "New Investor Claim" : "مطالبة جديدة"}
-        subtitle={locale === "en" ? "Register a financial claim for an investor" : "تسجيل مطالبة مالية على مستثمر"}
+        subtitle={locale === "en" ? "Register a financial claim for an investor" : "تسجيل مطالبة مالية على مسئول"}
         companyId={companyId}
       />
 
@@ -207,10 +207,10 @@ export default function NewClaimPage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
-                  {locale === "en" ? "Investor" : "المستثمر"} <span className="text-red-500">*</span>
+                  {locale === "en" ? "Investor" : "المسئول والمدير"} <span className="text-red-500">*</span>
                 </label>
                 <select value={form.investorId} onChange={(event) => setField("investorId", event.target.value)} className="input-field w-full" required>
-                  <option value="">{locale === "en" ? "Select investor" : "اختر المستثمر"}</option>
+                  <option value="">{locale === "en" ? "Select investor" : "اختر المسئول"}</option>
                   {investors.map((investor) => (
                     <option key={investor.id} value={investor.id}>
                       {locale === "en" ? investor.nameEn ?? investor.nameAr : investor.nameAr}

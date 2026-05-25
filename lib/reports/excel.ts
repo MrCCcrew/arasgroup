@@ -146,7 +146,7 @@ export function exportInvestorStatementToExcel(
   const wb = XLSX.utils.book_new();
 
   const ws = XLSX.utils.aoa_to_sheet([
-    [`كشف حساب المستثمر: ${investorName}`],
+    [`كشف حساب المسئول: ${investorName}`],
     [],
     ["النوع", "البيان", "التاريخ", "الحالة", "المجمّع", "الفعلي", "هامش الربح", "الرصيد"],
     ...claims.map((c) => [
@@ -162,6 +162,6 @@ export function exportInvestorStatementToExcel(
   ]);
 
   ws["!dir"] = "RTL";
-  XLSX.utils.book_append_sheet(wb, ws, "كشف المستثمر");
+  XLSX.utils.book_append_sheet(wb, ws, "كشف المسئول");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 }

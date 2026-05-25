@@ -202,7 +202,7 @@ export default function LicensesPage() {
   if (filterType === "main")   filterParts.push("النوع: رئيسية فقط");
   if (filterType === "branch") filterParts.push("النوع: فرعية فقط");
   if (filterBranch)   filterParts.push(`الفرع: ${branches.find((b) => b.id === filterBranch)?.nameAr ?? ""}`);
-  if (filterInvestor) filterParts.push(`المستثمر: ${investors.find((i) => i.id === filterInvestor)?.nameAr ?? ""}`);
+  if (filterInvestor) filterParts.push(`المسئول: ${investors.find((i) => i.id === filterInvestor)?.nameAr ?? ""}`);
   if (filterExpiry === "expired")    filterParts.push("منتهية الصلاحية");
   else if (filterExpiry)             filterParts.push(`تنتهي خلال ${filterExpiry} يوم`);
 
@@ -354,7 +354,7 @@ export default function LicensesPage() {
             {/* Investor */}
             {investors.length > 0 && (
               <select className="input-field text-sm" value={filterInvestor} onChange={(e) => setFilterInvestor(e.target.value)}>
-                <option value="">كل المستثمرين</option>
+                <option value="">كل المسئولين</option>
                 {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
               </select>
             )}
@@ -401,7 +401,7 @@ export default function LicensesPage() {
                     <th>رقم الترخيص</th>
                     <th>الترخيص الرئيسي</th>
                     <th>الفرع</th>
-                    <th>المستثمر</th>
+                    <th>المسئول والمدير</th>
                     <th>انتهاء الترخيص</th>
                     <th>انتهاء الإطفاء</th>
                     <th>انتهاء الصحة</th>
@@ -538,9 +538,9 @@ export default function LicensesPage() {
                     <option value="">— بدون فرع —</option>
                     {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
                   </select></div>
-                <div><label className="form-label">المستثمر</label>
+                <div><label className="form-label">المسئول والمدير</label>
                   <select className="input-field" value={form.investorId} onChange={f("investorId")}>
-                    <option value="">— بدون مستثمر —</option>
+                    <option value="">— بدون مسئول —</option>
                     {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
                   </select></div>
               </div>

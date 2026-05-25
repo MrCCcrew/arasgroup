@@ -476,7 +476,7 @@ export default function LicenseDetailPage() {
     annual_balance:(s?.annualBalances.length ?? 0) > 0 ? "ok" : "empty",
   };
 
-  const HOLDER_LABELS: Record<string, string> = { INVESTOR: "المستثمر", GROUP_OWNER: "صاحب المجموعة", OTHER_KUWAITI: "كويتي آخر" };
+  const HOLDER_LABELS: Record<string, string> = { INVESTOR: "المسئول والمدير", GROUP_OWNER: "صاحب المجموعة", OTHER_KUWAITI: "كويتي آخر" };
   const QUARTER_LABELS = ["", "الأول (يناير–مارس)", "الثاني (أبريل–يونيو)", "الثالث (يوليو–سبتمبر)", "الرابع (أكتوبر–ديسمبر)"];
   const STATUS_COLORS: Record<string, string> = { ACTIVE: "bg-emerald-100 text-emerald-700", EXPIRED: "bg-red-100 text-red-700", SUSPENDED: "bg-orange-100 text-orange-700", CANCELLED: "bg-rose-100 text-rose-700" };
   const STATUS_LABELS: Record<string, string> = { ACTIVE: "فعال", EXPIRED: "منتهي", SUSPENDED: "موقوف", CANCELLED: "ملغاة" };
@@ -516,7 +516,7 @@ export default function LicenseDetailPage() {
 
         {/* Basic info */}
         <div className="section-card grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
-          {license.investor && <><span className="text-muted-foreground">المستثمر</span><span className="font-medium">{license.investor.nameAr}</span></>}
+          {license.investor && <><span className="text-muted-foreground">المسئول والمدير</span><span className="font-medium">{license.investor.nameAr}</span></>}
           {license.licenseExpiryDate && <><span className="text-muted-foreground">انتهاء الترخيص</span><span className={`font-medium ${expiryStatus(license.licenseExpiryDate) === "danger" ? "text-red-600" : expiryStatus(license.licenseExpiryDate) === "warning" ? "text-yellow-600" : ""}`}>{fmt(license.licenseExpiryDate)}</span></>}
           {license.unifiedEntityNumber && <><span className="text-muted-foreground">الكيان الموحد</span><span dir="ltr" className="font-mono text-xs">{license.unifiedEntityNumber}</span></>}
           {license.civilEntityNumber && <><span className="text-muted-foreground">الكيان المدني</span><span dir="ltr" className="font-mono text-xs">{license.civilEntityNumber}</span></>}
@@ -958,7 +958,7 @@ export default function LicenseDetailPage() {
           <div className="space-y-3">
             <div><label className="form-label">الإيجار على</label>
               <select className="input-field w-full" value={form.holderType as string} onChange={f("holderType")}>
-                <option value="INVESTOR">المستثمر</option><option value="GROUP_OWNER">صاحب المجموعة</option><option value="OTHER_KUWAITI">كويتي آخر</option>
+                <option value="INVESTOR">المسئول والمدير</option><option value="GROUP_OWNER">صاحب المجموعة</option><option value="OTHER_KUWAITI">كويتي آخر</option>
               </select>
             </div>
             {form.holderType === "OTHER_KUWAITI" && <div><label className="form-label">اسم الكويتي</label><input className="input-field w-full" value={form.holderNameAr as string ?? ""} onChange={f("holderNameAr")} /></div>}
@@ -1234,9 +1234,9 @@ export default function LicenseDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="form-label">المستثمر</label>
+                <label className="form-label">المسئول والمدير</label>
                 <select className="input-field w-full" value={form.investorId as string ?? ""} onChange={f("investorId")}>
-                  <option value="">— بدون مستثمر —</option>
+                  <option value="">— بدون مسئول —</option>
                   {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
                 </select>
               </div>

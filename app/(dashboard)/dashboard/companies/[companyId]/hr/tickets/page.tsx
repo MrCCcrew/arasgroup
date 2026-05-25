@@ -125,7 +125,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
             <span className="number text-2xl font-bold text-red-600">{formatKWD(companyCost, numberLocale)}</span>
           </div>
           <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Investor cost" : "تكلفة المستثمر"}</span>
+            <span className="text-sm text-muted-foreground">{locale === "en" ? "Investor cost" : "تكلفة المسئول"}</span>
             <span className="number text-2xl font-bold text-orange-600">{formatKWD(investorCost, numberLocale)}</span>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                         )}
                         {ticket.paidBy === "INVESTOR" && (
                           <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
-                            {locale === "en" ? "Investor" : "المستثمر"}
+                            {locale === "en" ? "Investor" : "المسئول والمدير"}
                           </span>
                         )}
                         {!ticket.paidBy && <span className="text-xs text-muted-foreground">-</span>}

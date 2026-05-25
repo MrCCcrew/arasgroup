@@ -112,7 +112,7 @@ export default async function InvestorDetailPage({ params }: Props) {
     <div>
       <Header
         title={investorName}
-        subtitle={locale === "en" ? "Investor profile" : "ملف المستثمر"}
+        subtitle={locale === "en" ? "Investor profile" : "ملف المسئول"}
         companyId={companyId}
         actions={
           <div className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export default async function InvestorDetailPage({ params }: Props) {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-3 rounded-xl border bg-card p-5">
             <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              {locale === "en" ? "Investor information" : "بيانات المستثمر"}
+              {locale === "en" ? "Investor information" : "بيانات المسئول"}
             </h2>
 
             {investor.phone && (
@@ -230,7 +230,7 @@ export default async function InvestorDetailPage({ params }: Props) {
                 {claims.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-10 text-center text-muted-foreground">
-                      {locale === "en" ? "No claims found for this investor" : "لا توجد مطالبات لهذا المستثمر"}
+                      {locale === "en" ? "No claims found for this investor" : "لا توجد مطالبات لهذا المسئول"}
                     </td>
                   </tr>
                 ) : (

@@ -64,11 +64,11 @@ export function InvestorDeleteButton({ investorId, companyId, investorName }: Pr
             </div>
             <div className="p-5 space-y-4">
               <p className="text-sm text-muted-foreground">
-                هل تريد إيقاف المستثمر{" "}
+                هل تريد إيقاف المسئول{" "}
                 <span className="font-bold text-foreground">"{investorName}"</span>؟
               </p>
               <p className="text-xs text-muted-foreground bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-                ⚠️ سيتم إيقاف المستثمر وإخفاؤه من القوائم. البيانات والمطالبات ستبقى محفوظة.
+                ⚠️ سيتم إيقاف المسئول وإخفاؤه من القوائم. البيانات والمطالبات ستبقى محفوظة.
               </p>
 
               {error && (

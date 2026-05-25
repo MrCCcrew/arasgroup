@@ -78,7 +78,7 @@ export default async function InvestorStatementsPage({ params }: Props) {
   return (
     <div>
       <Header
-        title={col ? "Investor Statements" : "كشوف المستثمرين"}
+        title={col ? "Investor Statements" : "كشوف المسئولين والمديرين"}
         subtitle={col ? "Summary of claims, collections, and payments" : "ملخص المطالبات والتحصيل والمدفوعات"}
         companyId={companyId}
         actions={<StatementsPrintBar />}
@@ -86,7 +86,7 @@ export default async function InvestorStatementsPage({ params }: Props) {
 
       {/* Print-only heading */}
       <div className="print-only px-6 py-4 border-b">
-        <h1 className="text-xl font-bold">{col ? "Investor Statements" : "كشوف المستثمرين"}</h1>
+        <h1 className="text-xl font-bold">{col ? "Investor Statements" : "كشوف المسئولين والمديرين"}</h1>
         <p className="text-sm text-gray-500 mt-1">
           {col ? "Printed on" : "تاريخ الطباعة"}: {new Date().toLocaleDateString(numberLocale)}
         </p>
@@ -98,7 +98,7 @@ export default async function InvestorStatementsPage({ params }: Props) {
             <table className="ar-table">
               <thead>
                 <tr>
-                  <th>{col ? "Investor" : "المستثمر"}</th>
+                  <th>{col ? "Investor" : "المسئول والمدير"}</th>
                   {/* ← fix 2: number headers right-aligned to match data cells */}
                   <th className="text-right">{col ? "Claims" : "عدد المطالبات"}</th>
                   <th className="text-right">{col ? "Collected total" : "إجمالي التحصيل"}</th>
@@ -111,7 +111,7 @@ export default async function InvestorStatementsPage({ params }: Props) {
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-10 text-center text-muted-foreground">
-                      {col ? "No investor data found" : "لا توجد بيانات مستثمرين"}
+                      {col ? "No investor data found" : "لا توجد بيانات مسئولين ومديرين"}
                     </td>
                   </tr>
                 ) : (

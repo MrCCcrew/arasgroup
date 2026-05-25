@@ -401,6 +401,6 @@ export const SYSTEM_ROLES = [
   { name: "DELIVERY_OPERATIONS", nameAr: "مشرف / موظف عمليات" },
   { name: "CAR_WASH_SUPERVISOR", nameAr: "مشرف غسيل السيارات" },
   { name: "HR_MANDOB", nameAr: "موظف المعاملات / مندوب" },
-  { name: "INVESTOR_VIEWER", nameAr: "مستخدم متابعة المستثمرين" },
+  { name: "INVESTOR_VIEWER", nameAr: "مستخدم متابعة المسئولين والمديرين" },
   { name: "READ_ONLY", nameAr: "قراءة فقط" },
 ];

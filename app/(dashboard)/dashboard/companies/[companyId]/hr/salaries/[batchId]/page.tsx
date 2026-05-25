@@ -15,7 +15,7 @@ const CYCLE_LABELS = {
     ADMINISTRATIVE_26_DAY: "إداريون (26 يوم)",
     DELIVERY_28_DAY: "توصيل (28 يوم)",
     CAR_WASH_28_DAY: "غسيل سيارات (28 يوم)",
-    INVESTOR_FIXED: "موظفو المستثمر",
+    INVESTOR_FIXED: "موظفو المسئول",
   },
   en: {
     OWNER_STANDARD: "Owner standard",

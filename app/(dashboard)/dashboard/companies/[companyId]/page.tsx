@@ -204,7 +204,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
     quickLinks.push({ href: `/dashboard/companies/${companyId}/car-wash/vehicles`, label: locale === "en" ? "Vehicles" : "المركبات", color: "rose", icon: <Car size={16} /> });
 
   if (isTrading && canDo("INVESTOR_CLAIMS", "CREATE"))
-    quickLinks.push({ href: `/dashboard/companies/${companyId}/investors/claims/new`, label: locale === "en" ? "Investor claim" : "مطالبة مستثمر", color: "emerald", icon: <Users size={16} /> });
+    quickLinks.push({ href: `/dashboard/companies/${companyId}/investors/claims/new`, label: locale === "en" ? "Investor claim" : "مطالبة مسئول", color: "emerald", icon: <Users size={16} /> });
 
   if (canDo("REPORTS", "VIEW"))
     quickLinks.push({ href: `/dashboard/companies/${companyId}/reports`, label: locale === "en" ? "Reports" : "التقارير", color: "amber", icon: <FileText size={16} /> });

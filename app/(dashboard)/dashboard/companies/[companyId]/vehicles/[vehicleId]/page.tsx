@@ -111,7 +111,7 @@ export default async function VehicleDetailPage({ params }: Props) {
               value={vehicle.ownershipModel === "RENTED" ? "مؤجرة" : "مملوكة"}
             />
             <Field label="الفرع" value={vehicle.branch?.nameAr} />
-            <Field label="المستثمر" value={vehicle.investor?.nameAr} />
+            <Field label="المسئول والمدير" value={vehicle.investor?.nameAr} />
             <Field label="السائق" value={vehicle.assignedEmployee?.nameAr} />
             {vehicle.license && (
               <Field
