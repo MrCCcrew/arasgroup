@@ -207,7 +207,7 @@ export default function NewInvestorPage() {
               </p>
             ) : branchLinks.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {locale === “en” ? “Use “Add branch” to link this investor to company branches.” : “استخدم \”إضافة فرع\” لربط المسئول بفروع الشركة.”}
+                {locale === “en” ? 'Use “Add branch” to link this person to company branches.' : 'استخدم “إضافة فرع” لربط المسئول بفروع الشركة.'}
               </p>
             ) : (
               <div className="space-y-3">
