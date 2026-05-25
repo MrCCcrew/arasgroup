@@ -159,9 +159,10 @@ export default function LicensesPage() {
   useEffect(() => { load(); }, [load]);
 
   // ── Computed stats (exclude CANCELLED) ──────────────────────────────────────
-  const activeLicenses   = licenses.filter((l) => !EXCLUDED_STATUSES.has(l.status));
-  const activeMainCount  = activeLicenses.filter((l) => l.isMainLicense).length;
-  const expiringSoon     = activeLicenses.filter((l) => {
+  const activeLicenses    = licenses.filter((l) => !EXCLUDED_STATUSES.has(l.status));
+  const activeMainCount   = activeLicenses.filter((l) =>  l.isMainLicense).length;
+  const activeSubCount    = activeLicenses.filter((l) => !l.isMainLicense).length;
+  const expiringSoon      = activeLicenses.filter((l) => {
     const dates = [l.licenseExpiryDate, l.fireLicenseExpiryDate, l.healthLicenseExpiryDate, l.advertisingLicenseExpiryDate];
     return dates.some((d) => { const n = daysLeft(d); return n !== null && n >= 0 && n <= 90; });
   }).length;
@@ -316,7 +317,7 @@ export default function LicensesPage() {
         </div>
 
         {/* ── Stats (screen only) ───────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 no-print">
+        <div className="grid grid-cols-4 gap-4 no-print">
           <div className="stat-card">
             <p className="text-xs text-muted-foreground">إجمالي التراخيص الفعالة</p>
             <p className="mt-1 text-2xl font-bold text-blue-600">{activeLicenses.length}</p>
@@ -324,6 +325,10 @@ export default function LicensesPage() {
           <div className="stat-card">
             <p className="text-xs text-muted-foreground">تراخيص رئيسية فعالة</p>
             <p className="mt-1 text-2xl font-bold text-green-600">{activeMainCount}</p>
+          </div>
+          <div className="stat-card">
+            <p className="text-xs text-muted-foreground">تراخيص فرعية فعالة</p>
+            <p className="mt-1 text-2xl font-bold text-violet-600">{activeSubCount}</p>
           </div>
           <div className="stat-card">
             <p className="text-xs text-muted-foreground">تنتهي خلال 90 يوم</p>
