@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { X, Printer, Search } from "lucide-react";
+import { X, Printer, Search, ChevronDown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -128,6 +128,12 @@ export default function LicensesPage() {
   const [deleteError,setDeleteError]= useState("");
   const [deleting,   setDeleting]   = useState(false);
 
+  // ── Status change ─────────────────────────────────────────────────────────
+  const [statusModal,   setStatusModal]   = useState<{ id: string; current: string; name: string } | null>(null);
+  const [newStatus,     setNewStatus]     = useState("");
+  const [statusSaving,  setStatusSaving]  = useState(false);
+  const [statusError,   setStatusError]   = useState("");
+
   // ── Filters ──────────────────────────────────────────────────────────────
   const [search,         setSearch]         = useState("");
   const [filterStatus,   setFilterStatus]   = useState("");
@@ -252,6 +258,21 @@ export default function LicensesPage() {
     setDeleting(false);
     if (!data.success) { setDeleteError(data.error ?? "فشل الحذف"); return; }
     setDeleteId(null); load();
+  }
+
+  async function confirmStatusChange() {
+    if (!statusModal || !newStatus || newStatus === statusModal.current) return;
+    setStatusSaving(true); setStatusError("");
+    const res = await fetch(`/api/licenses/${statusModal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    const data = await res.json();
+    setStatusSaving(false);
+    if (!data.success) { setStatusError(data.error ?? "فشل تغيير الحالة"); return; }
+    setStatusModal(null);
+    load();
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -460,12 +481,25 @@ export default function LicensesPage() {
                         </span>
                       </td>
                       <td className="no-print" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => { setDeleteId(lic.id); setDeleteError(""); }}
-                          className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
-                        >
-                          حذف
-                        </button>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => {
+                              setStatusModal({ id: lic.id, current: lic.status, name: lic.commercialNameAr });
+                              setNewStatus(lic.status);
+                              setStatusError("");
+                            }}
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
+                          >
+                            <ChevronDown size={11} />
+                            الحالة
+                          </button>
+                          <button
+                            onClick={() => { setDeleteId(lic.id); setDeleteError(""); }}
+                            className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                          >
+                            حذف
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -638,6 +672,94 @@ export default function LicensesPage() {
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
               {deleting ? "جاري الحذف..." : "حذف"}
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Status change modal ───────────────────────────────────────────── */}
+      {statusModal && (
+        <Modal title="تغيير حالة الترخيص" onClose={() => setStatusModal(null)}>
+          <div className="space-y-4">
+
+            {/* اسم الترخيص */}
+            <div className="rounded-lg bg-muted/40 px-4 py-2.5">
+              <p className="text-xs text-muted-foreground">الترخيص</p>
+              <p className="font-medium text-sm mt-0.5">{statusModal.name}</p>
+            </div>
+
+            {/* الحالة الحالية */}
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">الحالة الحالية:</span>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[statusModal.current] ?? "bg-gray-100 text-gray-600"}`}>
+                {STATUS_LABELS[statusModal.current] ?? statusModal.current}
+              </span>
+            </div>
+
+            {/* خيارات الحالة */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">اختر الحالة الجديدة</p>
+              {([
+                { value: "ACTIVE",    label: "فعال",    desc: "الترخيص ساري ومعتمد",            warn: false },
+                { value: "EXPIRED",   label: "منتهي",   desc: "انتهت مدة الترخيص",             warn: false },
+                { value: "SUSPENDED", label: "موقوف",   desc: "الترخيص موقوف مؤقتاً",          warn: false },
+                { value: "CANCELLED", label: "ملغاة",   desc: "الترخيص ملغى نهائياً ← تحقق من الموظفين أولاً", warn: true },
+              ] as const).map((opt) => {
+                const isCurrent  = opt.value === statusModal.current;
+                const isSelected = opt.value === newStatus;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={isCurrent}
+                    onClick={() => setNewStatus(opt.value)}
+                    className={[
+                      "flex w-full items-center gap-3 rounded-xl border-2 p-3 text-right transition-all",
+                      isCurrent  ? "opacity-35 cursor-not-allowed border-border bg-muted/30" :
+                      isSelected ? "border-primary bg-primary/5 shadow-sm" :
+                                   "border-border hover:border-muted-foreground/40 hover:bg-muted/40",
+                    ].join(" ")}
+                  >
+                    <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[opt.value] ?? "bg-gray-100 text-gray-600"}`}>
+                      {opt.label}
+                    </span>
+                    <span className={`flex-1 text-xs ${opt.warn ? "text-orange-600" : "text-muted-foreground"}`}>
+                      {opt.desc}
+                    </span>
+                    {isCurrent && <span className="text-[10px] text-muted-foreground">الحالية</span>}
+                    {isSelected && !isCurrent && (
+                      <span className="text-[10px] font-medium text-primary">✓ محدد</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* تحذير الإلغاء */}
+            {newStatus === "CANCELLED" && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-xs text-orange-700">
+                ⚠️ تأكد من إنهاء أو نقل جميع الموظفين المرتبطين بهذا الترخيص قبل الإلغاء.
+              </div>
+            )}
+
+            {statusError && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{statusError}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setStatusModal(null)}
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                disabled={statusSaving || !newStatus || newStatus === statusModal.current}
+                className="btn-primary rounded-lg px-5 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                {statusSaving ? "جاري الحفظ..." : "تطبيق التغيير"}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
