@@ -44,6 +44,11 @@ export async function POST(request: NextRequest) {
         groupAccess: true,
         companyAccess: true,
         branchAccess: true,
+        directPermissions: {
+          include: {
+            permission: true,
+          },
+        },
       },
     });
 
@@ -108,11 +113,24 @@ export async function POST(request: NextRequest) {
       })),
       permissions: user.roles.flatMap((ur) =>
         ur.role.permissions.map((permissionLink) => ({
+          permissionId: permissionLink.permission.id,
           module: permissionLink.permission.module,
           action: permissionLink.permission.action,
           scope: permissionLink.permission.scope,
           companyId: ur.companyId,
+          allowed: true,
         }))
+      ).concat(
+        user.directPermissions.map((entry) => ({
+          permissionId: entry.permissionId,
+          module: entry.permission.module,
+          action: entry.permission.action,
+          scope: entry.permission.scope,
+          companyId: entry.companyId,
+          branchId: entry.branchId,
+          scopeKey: entry.scopeKey,
+          allowed: entry.isAllowed,
+        })),
       ),
     };
 

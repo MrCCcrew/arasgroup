@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CheckCircle, Shield, Users, XCircle } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { CheckCircle, KeyRound, Shield, SlidersHorizontal, Users, XCircle } from "lucide-react";
+import { useLocale } from "@/components/providers/locale-provider";
 
 interface RoleOption {
   id: string;
   name: string;
   nameAr: string;
+}
+
+interface PermissionOption {
+  id: string;
+  module: string;
+  action: string;
+  scope: string;
 }
 
 interface BranchOption {
@@ -53,12 +61,27 @@ interface ExistingUser {
     canApprove: boolean;
     branch: { nameAr: string };
   }>;
+  directPermissions?: Array<{
+    permissionId: string;
+    companyId?: string | null;
+    branchId?: string | null;
+    scopeKey: string;
+    isAllowed: boolean;
+    permission: {
+      id: string;
+      module: string;
+      action: string;
+      scope: string;
+    };
+  }>;
 }
 
 interface Props {
   users: ExistingUser[];
   roles: RoleOption[];
   companies: CompanyOption[];
+  permissions: PermissionOption[];
+  canManagePasswords?: boolean;
 }
 
 type AccessFlags = {
@@ -69,6 +92,14 @@ type AccessFlags = {
   canApprove: boolean;
 };
 
+type DirectPermissionDraft = {
+  permissionId: string;
+  companyId: string | null;
+  branchId: string | null;
+  scopeKey: string;
+  isAllowed: boolean;
+};
+
 const defaultFlags: AccessFlags = {
   canView: true,
   canCreate: false,
@@ -77,10 +108,39 @@ const defaultFlags: AccessFlags = {
   canApprove: false,
 };
 
-export function UserManagement({ users, roles, companies }: Props) {
+const scopeLabelMap: Record<string, { ar: string; en: string }> = {
+  GROUP: { ar: "على مستوى المجموعة", en: "Group scope" },
+  COMPANY: { ar: "على مستوى الشركة", en: "Company scope" },
+  BRANCH: { ar: "على مستوى الفرع", en: "Branch scope" },
+  OWN: { ar: "على مستوى المستخدم نفسه", en: "Own scope" },
+};
+
+function permissionLabel(permission: PermissionOption, locale: "ar" | "en") {
+  const scopeLabel = scopeLabelMap[permission.scope]?.[locale] ?? permission.scope;
+  return `${permission.module} / ${permission.action} / ${scopeLabel}`;
+}
+
+export function UserManagement({
+  users,
+  roles,
+  companies,
+  permissions,
+  canManagePasswords = false,
+}: Props) {
+  const { locale, t } = useLocale();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [activePasswordUserId, setActivePasswordUserId] = useState<string | null>(null);
+  const [activePermissionsUserId, setActivePermissionsUserId] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ password: "", confirmPassword: "" });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [permissionLoading, setPermissionLoading] = useState(false);
+  const [selectedPermissionId, setSelectedPermissionId] = useState("");
+  const [selectedPermissionCompanyId, setSelectedPermissionCompanyId] = useState("");
+  const [selectedPermissionBranchId, setSelectedPermissionBranchId] = useState("");
+  const [selectedPermissionAllowed, setSelectedPermissionAllowed] = useState(true);
+  const [editingPermissions, setEditingPermissions] = useState<DirectPermissionDraft[]>([]);
   const [form, setForm] = useState({
     nameAr: "",
     nameEn: "",
@@ -95,15 +155,19 @@ export function UserManagement({ users, roles, companies }: Props) {
   const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>({});
 
   const selectedCompanyIds = useMemo(() => Object.keys(selectedCompanies), [selectedCompanies]);
+  const permissionBranchOptions = useMemo(() => {
+    if (!selectedPermissionCompanyId) return [];
+    return companies.find((company) => company.id === selectedPermissionCompanyId)?.branches ?? [];
+  }, [companies, selectedPermissionCompanyId]);
+
+  const text = (ar: string, en: string) => (locale === "en" ? en : ar);
 
   function updateField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function toggleRole(roleId: string) {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
-    );
+    setSelectedRoles((prev) => (prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]));
   }
 
   function toggleCompany(companyId: string) {
@@ -111,12 +175,9 @@ export function UserManagement({ users, roles, companies }: Props) {
       if (prev[companyId]) {
         const next = { ...prev };
         delete next[companyId];
-        setSelectedBranches((branchPrev) => {
-          const filtered = Object.fromEntries(
-            Object.entries(branchPrev).filter(([, value]) => value.companyId !== companyId)
-          );
-          return filtered;
-        });
+        setSelectedBranches((branchPrev) =>
+          Object.fromEntries(Object.entries(branchPrev).filter(([, value]) => value.companyId !== companyId)),
+        );
         return next;
       }
       return { ...prev, [companyId]: { ...defaultFlags } };
@@ -148,6 +209,71 @@ export function UserManagement({ users, roles, companies }: Props) {
     }));
   }
 
+  function buildScopeKey(permission: PermissionOption, companyId?: string, branchId?: string) {
+    if (permission.scope === "GROUP") return "GROUP";
+    if (permission.scope === "COMPANY") return `COMPANY:${companyId ?? "ALL"}`;
+    if (permission.scope === "BRANCH") return `BRANCH:${branchId ?? "ALL"}`;
+    return "OWN";
+  }
+
+  function resetPermissionPicker() {
+    setSelectedPermissionId("");
+    setSelectedPermissionCompanyId("");
+    setSelectedPermissionBranchId("");
+    setSelectedPermissionAllowed(true);
+  }
+
+  function openPermissionEditor(user: ExistingUser) {
+    setActivePermissionsUserId(user.id);
+    setEditingPermissions(
+      (user.directPermissions ?? []).map((entry) => ({
+        permissionId: entry.permissionId,
+        companyId: entry.companyId ?? null,
+        branchId: entry.branchId ?? null,
+        scopeKey: entry.scopeKey,
+        isAllowed: entry.isAllowed,
+      })),
+    );
+    resetPermissionPicker();
+    setError("");
+    setSuccess("");
+  }
+
+  function addDirectPermission() {
+    const permission = permissions.find((entry) => entry.id === selectedPermissionId);
+    if (!permission) {
+      setError(text("اختر الصلاحية أولاً", "Select a permission first"));
+      return;
+    }
+    if (permission.scope === "COMPANY" && !selectedPermissionCompanyId) {
+      setError(text("حدد الشركة لهذه الصلاحية", "Select a company for this permission"));
+      return;
+    }
+    if (permission.scope === "BRANCH" && (!selectedPermissionCompanyId || !selectedPermissionBranchId)) {
+      setError(text("حدد الشركة والفرع لهذه الصلاحية", "Select both company and branch for this permission"));
+      return;
+    }
+
+    const draft: DirectPermissionDraft = {
+      permissionId: permission.id,
+      companyId: permission.scope === "COMPANY" || permission.scope === "BRANCH" ? selectedPermissionCompanyId || null : null,
+      branchId: permission.scope === "BRANCH" ? selectedPermissionBranchId || null : null,
+      scopeKey: buildScopeKey(permission, selectedPermissionCompanyId, selectedPermissionBranchId),
+      isAllowed: selectedPermissionAllowed,
+    };
+
+    setEditingPermissions((prev) => {
+      const filtered = prev.filter((entry) => !(entry.permissionId === draft.permissionId && entry.scopeKey === draft.scopeKey));
+      return [...filtered, draft];
+    });
+    resetPermissionPicker();
+    setError("");
+  }
+
+  function removeDirectPermission(permissionId: string, scopeKey: string) {
+    setEditingPermissions((prev) => prev.filter((entry) => !(entry.permissionId === permissionId && entry.scopeKey === scopeKey)));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -172,6 +298,7 @@ export function UserManagement({ users, roles, companies }: Props) {
           canDelete: value.canDelete,
           canApprove: value.canApprove,
         })),
+        directPermissions: [],
       };
 
       const response = await fetch("/api/users", {
@@ -180,12 +307,11 @@ export function UserManagement({ users, roles, companies }: Props) {
         body: JSON.stringify(payload),
       });
       const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error ?? "فشل في إنشاء المستخدم");
+        throw new Error(result.error ?? text("فشل في إنشاء المستخدم", "Failed to create user"));
       }
 
-      setSuccess("تم إنشاء المستخدم بنجاح. حدّث الصفحة لمراجعة الصلاحيات الفعلية.");
+      setSuccess(text("تم إنشاء المستخدم بنجاح. حدّث الصفحة لمراجعة القائمة.", "User created successfully. Refresh the page to review the list."));
       setForm({
         nameAr: "",
         nameEn: "",
@@ -199,78 +325,125 @@ export function UserManagement({ users, roles, companies }: Props) {
       setSelectedCompanies({});
       setSelectedBranches({});
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "فشل في إنشاء المستخدم");
+      setError(submitError instanceof Error ? submitError.message : text("فشل في إنشاء المستخدم", "Failed to create user"));
     } finally {
       setLoading(false);
     }
   }
 
+  async function handlePasswordReset(userId: string) {
+    if (passwordForm.password.length < 8) {
+      setError(t("usersManagement.passwordMin"));
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      setError(t("usersManagement.passwordMismatch"));
+      return;
+    }
+
+    setPasswordLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/users/${userId}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordForm.password }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? t("usersManagement.passwordRestricted"));
+
+      setSuccess(t("usersManagement.passwordUpdated"));
+      setActivePasswordUserId(null);
+      setPasswordForm({ password: "", confirmPassword: "" });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t("usersManagement.passwordRestricted"));
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
+  async function handleDirectPermissionsSave(userId: string) {
+    setPermissionLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/users/${userId}/permissions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions: editingPermissions }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? text("تعذر تحديث الصلاحيات", "Failed to update permissions"));
+      }
+
+      setSuccess(text("تم تحديث الصلاحيات المباشرة بنجاح. حدّث الصفحة لمراجعة البيانات المحدثة.", "Direct permissions updated successfully. Refresh the page to review updated data."));
+      setActivePermissionsUserId(null);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : text("تعذر تحديث الصلاحيات", "Failed to update permissions"));
+    } finally {
+      setPermissionLoading(false);
+    }
+  }
+
+  function describeDirectPermission(entry: DirectPermissionDraft) {
+    const permission = permissions.find((item) => item.id === entry.permissionId);
+    const company = companies.find((item) => item.id === entry.companyId);
+    const branch = company?.branches.find((item) => item.id === entry.branchId);
+    if (!permission) return entry.scopeKey;
+
+    const parts = [permissionLabel(permission, locale)];
+    if (company) parts.push(company.nameAr);
+    if (branch) parts.push(branch.nameAr);
+    parts.push(entry.isAllowed ? text("سماح", "Allow") : text("منع", "Deny"));
+    return parts.join(" • ");
+  }
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="stat-card">
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Users size={20} className="text-blue-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{users.length}</p>
-            <p className="text-xs text-muted-foreground">إجمالي المستخدمين</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-            <CheckCircle size={20} className="text-green-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{users.filter((user) => user.isActive).length}</p>
-            <p className="text-xs text-muted-foreground">مستخدم نشط</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-            <Shield size={20} className="text-purple-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{users.filter((user) => user.isSuperAdmin).length}</p>
-            <p className="text-xs text-muted-foreground">مدير نظام</p>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard icon={<Users size={20} className="text-blue-600" />} iconBg="bg-blue-50" value={users.length} label={text("إجمالي المستخدمين", "Total users")} />
+        <StatCard icon={<CheckCircle size={20} className="text-green-600" />} iconBg="bg-green-50" value={users.filter((user) => user.isActive).length} label={text("مستخدم نشط", "Active users")} />
+        <StatCard icon={<Shield size={20} className="text-purple-600" />} iconBg="bg-purple-50" value={users.filter((user) => user.isSuperAdmin).length} label={text("مدير نظام", "System admins")} />
       </div>
 
       <form onSubmit={handleSubmit} className="section-card space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-bold text-base">إنشاء مستخدم جديد</h2>
-            <p className="text-sm text-muted-foreground">تقييد الوصول بالشركة والفروع والوحدات يبدأ من الدور ثم نطاق الوصول.</p>
+            <h2 className="text-base font-bold">{text("إنشاء مستخدم جديد", "Create New User")}</h2>
+            <p className="text-sm text-muted-foreground">{text("حدد الدور وصلاحيات الشركات والفروع لهذا المستخدم.", "Assign roles and company/branch access for this user.")}</p>
           </div>
           <div className="text-xs text-muted-foreground">
-            {selectedRoles.length} دور • {selectedCompanyIds.length} شركة • {Object.keys(selectedBranches).length} فرع
+            {selectedRoles.length} {text("دور", "role")} • {selectedCompanyIds.length} {text("شركة", "company")} • {Object.keys(selectedBranches).length} {text("فرع", "branch")}
           </div>
         </div>
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>}
-        {success && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm">{success}</div>}
+        {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+        {success ? <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{success}</div> : null}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="الاسم العربي" required>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label={text("الاسم بالعربية", "Arabic Name")} required>
             <input className="input-field w-full" value={form.nameAr} onChange={(event) => updateField("nameAr", event.target.value)} required />
           </Field>
-          <Field label="الاسم الإنجليزي">
+          <Field label={text("الاسم بالإنجليزية", "English Name")}>
             <input className="input-field w-full" value={form.nameEn} onChange={(event) => updateField("nameEn", event.target.value)} dir="ltr" />
           </Field>
-          <Field label="البريد الإلكتروني" required>
+          <Field label={text("البريد الإلكتروني", "Email")} required>
             <input type="email" className="input-field w-full" value={form.email} onChange={(event) => updateField("email", event.target.value)} dir="ltr" required />
           </Field>
-          <Field label="الهاتف">
+          <Field label={text("الهاتف", "Phone")}>
             <input className="input-field w-full" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} dir="ltr" />
           </Field>
-          <Field label="كلمة المرور" required>
+          <Field label={text("كلمة المرور", "Password")} required>
             <input type="password" className="input-field w-full" value={form.password} onChange={(event) => updateField("password", event.target.value)} required />
           </Field>
           <div className="flex items-end gap-5">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} />
-              <span>نشط</span>
+              <span>{text("نشط", "Active")}</span>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.isSuperAdmin} onChange={(event) => updateField("isSuperAdmin", event.target.checked)} />
@@ -280,13 +453,13 @@ export function UserManagement({ users, roles, companies }: Props) {
         </div>
 
         <div>
-          <h3 className="font-medium mb-3">الأدوار</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <h3 className="mb-3 font-medium">{text("الأدوار", "Roles")}</h3>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {roles.map((role) => (
-              <label key={role.id} className="border rounded-lg px-3 py-3 flex items-center gap-3 hover:bg-muted/30">
+              <label key={role.id} className="flex items-center gap-3 rounded-lg border px-3 py-3 hover:bg-muted/30">
                 <input type="checkbox" checked={selectedRoles.includes(role.id)} onChange={() => toggleRole(role.id)} />
                 <div>
-                  <p className="font-medium text-sm">{role.nameAr}</p>
+                  <p className="text-sm font-medium">{role.nameAr}</p>
                   <p className="text-xs text-muted-foreground">{role.name}</p>
                 </div>
               </label>
@@ -295,13 +468,13 @@ export function UserManagement({ users, roles, companies }: Props) {
         </div>
 
         <div>
-          <h3 className="font-medium mb-3">صلاحيات الشركات والفروع</h3>
+          <h3 className="mb-3 font-medium">{text("صلاحيات الشركات والفروع", "Companies and Branches Access")}</h3>
           <div className="space-y-4">
             {companies.map((company) => {
               const isSelected = Boolean(selectedCompanies[company.id]);
               return (
-                <div key={company.id} className="border rounded-xl p-4 space-y-4">
-                  <div className="flex items-center justify-between gap-3">
+                <div key={company.id} className="space-y-4 rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <label className="flex items-center gap-3">
                       <input type="checkbox" checked={isSelected} onChange={() => toggleCompany(company.id)} />
                       <div>
@@ -309,135 +482,281 @@ export function UserManagement({ users, roles, companies }: Props) {
                         <p className="text-xs text-muted-foreground">{company.type}</p>
                       </div>
                     </label>
-                    {isSelected && (
-                      <AccessFlagEditor
-                        value={selectedCompanies[company.id]}
-                        onChange={(field, checked) => updateCompanyFlag(company.id, field, checked)}
-                      />
-                    )}
+                    {isSelected ? <AccessFlagEditor value={selectedCompanies[company.id]} onChange={(field, checked) => updateCompanyFlag(company.id, field, checked)} /> : null}
                   </div>
 
-                  {isSelected && company.branches.length > 0 && (
+                  {isSelected && company.branches.length > 0 ? (
                     <div className="border-t pt-4">
-                      <p className="text-sm font-medium mb-2">الفروع المسموح بها</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <p className="mb-2 text-sm font-medium">{text("الفروع المسموح بها", "Allowed Branches")}</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {company.branches.map((branch) => {
                           const branchEntry = selectedBranches[branch.id];
                           return (
-                            <div key={branch.id} className="border rounded-lg p-3 space-y-3">
+                            <div key={branch.id} className="space-y-3 rounded-lg border p-3">
                               <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(branchEntry)}
-                                  onChange={() => toggleBranch(branch.id, company.id)}
-                                />
+                                <input type="checkbox" checked={Boolean(branchEntry)} onChange={() => toggleBranch(branch.id, company.id)} />
                                 <span>{branch.nameAr}</span>
                               </label>
-                              {branchEntry && (
-                                <AccessFlagEditor
-                                  value={branchEntry}
-                                  onChange={(field, checked) => updateBranchFlag(branch.id, field, checked)}
-                                />
-                              )}
+                              {branchEntry ? <AccessFlagEditor value={branchEntry} onChange={(field, checked) => updateBranchFlag(branch.id, field, checked)} /> : null}
                             </div>
                           );
                         })}
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-          >
-            {loading ? "جارٍ الإنشاء..." : "إنشاء المستخدم"}
-          </button>
-        </div>
+        <button type="submit" disabled={loading} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {loading ? text("جارٍ الإنشاء...", "Creating...") : text("إنشاء المستخدم", "Create User")}
+        </button>
       </form>
 
       <div className="section-card overflow-hidden">
-        <h2 className="font-bold text-base mb-4">المستخدمون الحاليون</h2>
+        <h2 className="mb-4 text-base font-bold">{text("المستخدمون الحاليون", "Current Users")}</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">الاسم</th>
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">البريد</th>
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">الأدوار</th>
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">الشركات</th>
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">الفروع</th>
-                <th className="text-right py-3 px-4 font-medium text-muted-foreground">الحالة</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الاسم", "Name")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("البريد", "Email")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الأدوار", "Roles")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الشركات", "Companies")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الفروع", "Branches")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الحالة", "Status")}</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الصلاحيات المباشرة", "Direct Permissions")}</th>
+                {canManagePasswords ? <th className="px-4 py-3 text-right font-medium text-muted-foreground">{text("الإجراءات", "Actions")}</th> : null}
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors align-top">
-                  <td className="py-3 px-4">
-                    <div>
-                      <p className="font-medium">{user.nameAr}</p>
-                      {user.isSuperAdmin && <p className="text-xs text-purple-600">Super Admin</p>}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground" dir="ltr">{user.email}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map((entry) => (
-                        <span key={entry.roleId + (entry.companyId ?? "")} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                          {entry.role.nameAr}
-                          {entry.company ? ` - ${entry.company.nameAr}` : ""}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {user.isSuperAdmin ? (
-                        <span className="text-xs text-muted-foreground">جميع الشركات</span>
-                      ) : (
-                        user.companyAccess.map((entry) => (
-                          <span key={entry.companyId} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                            {entry.company.nameAr}
+              {users.map((user) => {
+                const isPasswordOpen = activePasswordUserId === user.id;
+                const isPermissionsOpen = activePermissionsUserId === user.id;
+                return (
+                  <Fragment key={user.id}>
+                    <tr className="align-top transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium">{user.nameAr}</p>
+                          {user.isSuperAdmin ? <p className="text-xs text-purple-600">Super Admin</p> : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground" dir="ltr">{user.email}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {user.roles.map((entry) => (
+                            <span key={entry.roleId + (entry.companyId ?? "")} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                              {entry.role.nameAr}
+                              {entry.company ? ` - ${entry.company.nameAr}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {user.isSuperAdmin ? (
+                            <span className="text-xs text-muted-foreground">{text("جميع الشركات", "All companies")}</span>
+                          ) : (
+                            user.companyAccess.map((entry) => (
+                              <span key={entry.companyId} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                                {entry.company.nameAr}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {user.branchAccess.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">{text("كل الفروع ضمن الشركات المصرح بها", "All branches within allowed companies")}</span>
+                          ) : (
+                            user.branchAccess.map((entry) => (
+                              <span key={entry.branchId} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                                {entry.branch.nameAr}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.isActive ? (
+                          <span className="flex items-center gap-1 text-xs text-green-600">
+                            <CheckCircle size={12} /> {text("نشط", "Active")}
                           </span>
-                        ))
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {user.branchAccess.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">كل الفروع ضمن الشركة المصرح بها</span>
-                      ) : (
-                        user.branchAccess.map((entry) => (
-                          <span key={entry.branchId} className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                            {entry.branch.nameAr}
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-red-500">
+                            <XCircle size={12} /> {text("موقوف", "Inactive")}
                           </span>
-                        ))
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    {user.isActive ? (
-                      <span className="flex items-center gap-1 text-xs text-green-600">
-                        <CheckCircle size={12} /> نشط
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-red-500">
-                        <XCircle size={12} /> موقوف
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            {(user.directPermissions?.length ?? 0) > 0
+                              ? text(`${user.directPermissions?.length ?? 0} صلاحية مباشرة`, `${user.directPermissions?.length ?? 0} direct permission(s)`)
+                              : text("لا توجد صلاحيات مباشرة", "No direct permissions")}
+                          </p>
+                          <button type="button" onClick={() => openPermissionEditor(user)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
+                            <SlidersHorizontal size={14} />
+                            {text("إدارة الصلاحيات", "Manage permissions")}
+                          </button>
+                        </div>
+                      </td>
+                      {canManagePasswords ? (
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActivePasswordUserId(isPasswordOpen ? null : user.id);
+                              setPasswordForm({ password: "", confirmPassword: "" });
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                          >
+                            <KeyRound size={14} />
+                            {t("usersManagement.resetPassword")}
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+
+                    {isPermissionsOpen ? (
+                      <tr className="border-b border-border/50 bg-muted/20">
+                        <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="font-medium">{text("محرر الصلاحيات الدقيقة", "Granular Permissions Editor")}</h3>
+                              <p className="text-sm text-muted-foreground">{text("أضف صلاحيات مباشرة تسمح أو تمنع إجراءات محددة لهذا المستخدم فوق صلاحيات الدور.", "Add direct allow or deny permissions for this user on top of role permissions.")}</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                              <Field label={text("الصلاحية", "Permission")}>
+                                <select className="input-field w-full" value={selectedPermissionId} onChange={(event) => setSelectedPermissionId(event.target.value)}>
+                                  <option value="">{text("اختر الصلاحية", "Select permission")}</option>
+                                  {permissions.map((permission) => (
+                                    <option key={permission.id} value={permission.id}>
+                                      {permissionLabel(permission, locale)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={text("الشركة", "Company")}>
+                                <select
+                                  className="input-field w-full"
+                                  value={selectedPermissionCompanyId}
+                                  onChange={(event) => {
+                                    setSelectedPermissionCompanyId(event.target.value);
+                                    setSelectedPermissionBranchId("");
+                                  }}
+                                >
+                                  <option value="">{text("غير محدد", "Not specified")}</option>
+                                  {companies.map((company) => (
+                                    <option key={company.id} value={company.id}>{company.nameAr}</option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={text("الفرع", "Branch")}>
+                                <select className="input-field w-full" value={selectedPermissionBranchId} onChange={(event) => setSelectedPermissionBranchId(event.target.value)}>
+                                  <option value="">{text("غير محدد", "Not specified")}</option>
+                                  {permissionBranchOptions.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>{branch.nameAr}</option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={text("نوع القرار", "Rule")}>
+                                <select className="input-field w-full" value={selectedPermissionAllowed ? "ALLOW" : "DENY"} onChange={(event) => setSelectedPermissionAllowed(event.target.value === "ALLOW")}>
+                                  <option value="ALLOW">{text("سماح", "Allow")}</option>
+                                  <option value="DENY">{text("منع", "Deny")}</option>
+                                </select>
+                              </Field>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={addDirectPermission} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                                {text("إضافة الصلاحية", "Add permission")}
+                              </button>
+                              <button type="button" onClick={() => handleDirectPermissionsSave(user.id)} disabled={permissionLoading} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                {permissionLoading ? text("جارٍ الحفظ...", "Saving...") : text("حفظ الصلاحيات", "Save permissions")}
+                              </button>
+                              <button type="button" onClick={() => setActivePermissionsUserId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                                {text("إغلاق", "Close")}
+                              </button>
+                            </div>
+
+                            <div className="rounded-lg border">
+                              <div className="border-b px-4 py-3 text-sm font-medium">{text("الصلاحيات المباشرة الحالية", "Current direct permissions")}</div>
+                              <div className="space-y-2 px-4 py-3">
+                                {editingPermissions.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">{text("لا توجد صلاحيات مباشرة حتى الآن", "No direct permissions yet")}</p>
+                                ) : (
+                                  editingPermissions.map((entry) => (
+                                    <div key={`${entry.permissionId}-${entry.scopeKey}`} className="flex flex-col gap-2 rounded-lg border px-3 py-3 md:flex-row md:items-center md:justify-between">
+                                      <span className="text-sm">{describeDirectPermission(entry)}</span>
+                                      <button type="button" onClick={() => removeDirectPermission(entry.permissionId, entry.scopeKey)} className="self-start rounded-lg border px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 md:self-auto">
+                                        {text("إزالة", "Remove")}
+                                      </button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {isPasswordOpen ? (
+                      <tr className="border-b border-border/50 bg-muted/20">
+                        <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <Field label={t("usersManagement.newPassword")} required>
+                              <input type="password" className="input-field w-full" value={passwordForm.password} onChange={(event) => setPasswordForm((prev) => ({ ...prev, password: event.target.value }))} />
+                            </Field>
+                            <Field label={t("usersManagement.confirmPassword")} required>
+                              <input type="password" className="input-field w-full" value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))} />
+                            </Field>
+                            <div className="flex items-end gap-2">
+                              <button type="button" onClick={() => handlePasswordReset(user.id)} disabled={passwordLoading} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                {passwordLoading ? text("جارٍ الحفظ...", "Saving...") : t("usersManagement.savePassword")}
+                              </button>
+                              <button type="button" onClick={() => setActivePasswordUserId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                                {text("إلغاء", "Cancel")}
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  iconBg,
+  value,
+  label,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="stat-card">
+      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBg}`}>{icon}</div>
+      <div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
       </div>
     </div>
   );
@@ -454,7 +773,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1.5">
+      <label className="mb-1.5 block text-sm font-medium">
         {label} {required ? <span className="text-red-500">*</span> : null}
       </label>
       {children}
@@ -481,11 +800,7 @@ function AccessFlagEditor({
     <div className="flex flex-wrap gap-3">
       {labels.map((item) => (
         <label key={item.key} className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={value[item.key]}
-            onChange={(event) => onChange(item.key, event.target.checked)}
-          />
+          <input type="checkbox" checked={value[item.key]} onChange={(event) => onChange(item.key, event.target.checked)} />
           <span>{item.label}</span>
         </label>
       ))}

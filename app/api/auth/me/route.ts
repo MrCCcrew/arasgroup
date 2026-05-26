@@ -49,6 +49,18 @@ export async function GET() {
             branch: { select: { id: true, nameAr: true } },
           },
         },
+        directPermissions: {
+          include: {
+            permission: {
+              select: {
+                id: true,
+                module: true,
+                action: true,
+                scope: true,
+              },
+            },
+          },
+        },
       },
     });
 

@@ -34,6 +34,7 @@ export type Module =
   | "EXPENSES"
   | "REPORTS"
   | "NOTIFICATIONS"
+  | "TASKS"
   | "SETTINGS"
   | "USERS"
   | "AUDIT_LOGS";
@@ -102,6 +103,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     EXPENSES: ["VIEW", "CREATE", "UPDATE", "DELETE", "EXPORT"],
     REPORTS: ["VIEW", "EXPORT", "PRINT"],
     NOTIFICATIONS: ["VIEW", "UPDATE", "RESOLVE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "DELETE", "PRINT"],
     SETTINGS: ["VIEW", "CREATE", "UPDATE", "DELETE"],
     USERS: ["VIEW", "CREATE", "UPDATE", "DELETE"],
     AUDIT_LOGS: ["VIEW", "EXPORT"],
@@ -134,7 +136,8 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     EXPENSES: ["VIEW", "CREATE", "UPDATE", "EXPORT"],
     REPORTS: ["VIEW", "EXPORT", "PRINT"],
     NOTIFICATIONS: ["VIEW", "UPDATE", "RESOLVE"],
-    USERS: ["VIEW"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
+    USERS: ["VIEW", "CREATE", "UPDATE"],
     AUDIT_LOGS: ["VIEW"],
   },
   ACCOUNTANT: {
@@ -152,6 +155,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     CAR_WASH_REPORTS: ["VIEW", "EXPORT", "PRINT"],
     ATTACHMENTS: ["VIEW", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW", "UPDATE", "RESOLVE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   ADMINISTRATIVE_AFFAIRS: {
     DASHBOARD: ["VIEW"],
@@ -164,6 +168,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     ATTACHMENTS: ["VIEW", "UPLOAD", "DOWNLOAD"],
     REPORTS: ["VIEW"],
     NOTIFICATIONS: ["VIEW", "UPDATE", "RESOLVE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   DELIVERY_HR: {
     DASHBOARD: ["VIEW"],
@@ -174,6 +179,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     ATTACHMENTS: ["VIEW", "UPLOAD", "DOWNLOAD"],
     REPORTS: ["VIEW"],
     NOTIFICATIONS: ["VIEW", "UPDATE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   DELIVERY_OPERATIONS: {
     DASHBOARD: ["VIEW"],
@@ -182,6 +188,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     VEHICLES: ["VIEW"],
     ATTACHMENTS: ["VIEW", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW", "UPDATE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   CAR_WASH_SUPERVISOR: {
     DASHBOARD: ["VIEW"],
@@ -193,6 +200,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     ASSETS_CUSTODY: ["VIEW", "CREATE", "UPDATE", "EXPORT", "PRINT", "ASSIGN", "RETURN"],
     ATTACHMENTS: ["VIEW", "UPLOAD", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW", "UPDATE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   HR_MANDOB: {
     DASHBOARD: ["VIEW"],
@@ -203,6 +211,7 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     INVESTOR_CLAIMS: ["VIEW", "CREATE", "UPDATE"],
     ATTACHMENTS: ["VIEW", "UPLOAD", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW", "UPDATE"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   INVESTOR_VIEWER: {
     DASHBOARD: ["VIEW"],
@@ -210,12 +219,14 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     INVESTOR_STATEMENTS: ["VIEW"],
     REPORTS: ["VIEW"],
     NOTIFICATIONS: ["VIEW"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
   READ_ONLY: {
     DASHBOARD: ["VIEW"],
     REPORTS: ["VIEW"],
     ATTACHMENTS: ["VIEW", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW"],
+    TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
   },
 };
 
@@ -252,7 +263,16 @@ export function hasPermission(
   if (options?.companyId && !canAccessCompany(user, options.companyId)) return false;
   if (options?.branchId && !canAccessBranch(user, options.branchId)) return false;
 
+  const explicitDeny = user.permissions.some((permission) =>
+    permission.allowed === false &&
+    permission.module === module &&
+    permission.action === action &&
+    matchesScope(permission, options),
+  );
+  if (explicitDeny) return false;
+
   const explicit = user.permissions.some((permission) =>
+    permission.allowed !== false &&
     permission.module === module &&
     permission.action === action &&
     matchesScope(permission, options),
@@ -281,7 +301,7 @@ function matchesScope(
     case "COMPANY":
       return !options?.companyId || permission.companyId === options.companyId || !permission.companyId;
     case "BRANCH":
-      return Boolean(options?.branchId);
+      return !options?.branchId || permission.branchId === options.branchId || !permission.branchId;
     case "OWN":
       return true;
     default:
@@ -348,6 +368,7 @@ export function companyTypeAllowsModule(companyType: string | undefined, module:
     "ASSETS_CUSTODY",
     "VEHICLES",
     "NOTIFICATIONS",
+    "TASKS",
     "INVESTOR_CLAIMS",
     "INVESTOR_STATEMENTS",
     "SALARIES",

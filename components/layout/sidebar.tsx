@@ -14,6 +14,7 @@ import {
   Car,
   ChevronDown,
   ChevronLeft,
+  ClipboardCheck,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -75,6 +76,7 @@ const GROUP_NAV: NavItem[] = [
   { href: "/dashboard",              labelKey: "nav.groupDashboard",  icon: <LayoutDashboard size={16} />, iconColor: "blue"    },
   { href: "/dashboard/companies",    labelKey: "nav.companies",       icon: <Building2 size={16} />,       iconColor: "teal"    },
   { href: "/dashboard/users",        labelKey: "nav.users",           icon: <Users size={16} />,           iconColor: "violet", module: "USERS" },
+  { href: "/dashboard/completed-tasks", labelKey: "nav.completedTasks", icon: <ClipboardCheck size={16} />, iconColor: "green", module: "TASKS" },
   { href: "/dashboard/settings",     labelKey: "nav.settings",        icon: <Settings size={16} />,        iconColor: "slate",  module: "SETTINGS" },
   { href: "/dashboard/notifications",labelKey: "nav.notifications",   icon: <Bell size={16} />,            iconColor: "rose",   module: "NOTIFICATIONS" },
 ];
@@ -174,6 +176,7 @@ function buildCompanyNav(base: string): NavItem[] {
     { href: `${base}/reports`,     labelKey: "nav.reports",     icon: <BarChart3 size={16} />, iconColor: "purple", module: "REPORTS" },
     { href: `${base}/attachments`, labelKey: "nav.attachments", icon: <Paperclip size={16} />, iconColor: "sky",    module: "ATTACHMENTS" },
     { href: `${base}/assets`,      labelKey: "nav.assets",      icon: <Package size={16} />,   iconColor: "green",  module: "ASSETS_CUSTODY" },
+    { href: "/dashboard/completed-tasks", labelKey: "nav.completedTasks", icon: <ClipboardCheck size={16} />, iconColor: "green", module: "TASKS" },
   ];
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
+import { isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
 
 const companyAccessSchema = z.object({
   companyId: z.string(),
@@ -24,6 +24,14 @@ const branchAccessSchema = z.object({
   canApprove: z.boolean().default(false),
 });
 
+const directPermissionSchema = z.object({
+  permissionId: z.string(),
+  companyId: z.string().nullable().optional(),
+  branchId: z.string().nullable().optional(),
+  scopeKey: z.string(),
+  isAllowed: z.boolean().default(true),
+});
+
 const createUserSchema = z.object({
   email: z.string().email("البريد الإلكتروني غير صالح"),
   nameAr: z.string().min(2, "الاسم العربي مطلوب"),
@@ -36,12 +44,14 @@ const createUserSchema = z.object({
   groupIds: z.array(z.string()).default([]),
   companyAccess: z.array(companyAccessSchema).default([]),
   branchAccess: z.array(branchAccessSchema).default([]),
+  directPermissions: z.array(directPermissionSchema).default([]),
 });
 
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
-  if (!session.isSuperAdmin) {
+
+  if (!isOwnerOrAdminSession(session)) {
     return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 403 });
   }
 
@@ -62,6 +72,7 @@ export async function GET(request: NextRequest) {
       groupAccess: { include: { group: true } },
       companyAccess: { include: { company: true, role: true } },
       branchAccess: { include: { branch: true } },
+      directPermissions: { include: { permission: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -72,7 +83,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
-  if (!session.isSuperAdmin) {
+
+  if (!isOwnerOrAdminSession(session)) {
     return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 403 });
   }
 
@@ -147,6 +159,20 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      for (const entry of data.directPermissions) {
+        await tx.userPermission.create({
+          data: {
+            userId: user.id,
+            permissionId: entry.permissionId,
+            companyId: entry.companyId || null,
+            branchId: entry.branchId || null,
+            scopeKey: entry.scopeKey,
+            isAllowed: entry.isAllowed,
+            grantedById: session.id,
+          },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           userId: session.id,
@@ -159,6 +185,7 @@ export async function POST(request: NextRequest) {
             groupIds: data.groupIds,
             companyAccess: data.companyAccess,
             branchAccess: data.branchAccess,
+            directPermissions: data.directPermissions,
           },
           ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
           userAgent: request.headers.get("user-agent") ?? "",

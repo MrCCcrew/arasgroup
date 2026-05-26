@@ -4,16 +4,13 @@ import type { JwtPayload, SessionUser } from "@/lib/types";
 import { getLocale } from "@/lib/i18n";
 
 const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "fallback-secret-change-in-production-32ch"
+  process.env.JWT_SECRET ?? "fallback-secret-change-in-production-32ch",
 );
 const COOKIE_NAME = "rashid_erp_session";
-const EXPIRES_IN = 7 * 24 * 60 * 60; // 7 days in seconds
+const EXPIRES_IN = 7 * 24 * 60 * 60;
 
 export async function createSession(user: SessionUser): Promise<string> {
   const locale = user.locale ?? await getLocale();
-
-  // Super admin bypasses all permission/company/branch checks, so strip heavy arrays from token.
-  // Regular users: drop the permissions array entirely — hasPermission() uses ROLE_PERMISSION_MATRIX.
   const isSuperAdmin = user.isSuperAdmin;
 
   const token = await new SignJWT({
@@ -28,7 +25,7 @@ export async function createSession(user: SessionUser): Promise<string> {
     companyAccess: user.companyAccess,
     companyAccessEntries: isSuperAdmin ? [] : user.companyAccessEntries,
     branchAccess: isSuperAdmin ? [] : user.branchAccess,
-    // permissions intentionally omitted — derived from ROLE_PERMISSION_MATRIX at runtime
+    permissions: isSuperAdmin ? [] : user.permissions,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()

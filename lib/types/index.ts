@@ -2,7 +2,7 @@ import type {
   User, Role, Company, Branch, BankAccount, FiscalYear,
   ChartOfAccount, JournalEntry, JournalEntryLine, CostCenter,
   Employee, Driver, Vehicle, DeliveryContract, DeliveryMonthlyReport,
-  CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification,
+  CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification, CompletedTask, UserPermission,
   CompanyType, AccountType, JournalEntryType, JournalStatus,
   EmployeeType, DeliveryPlatform, ClaimType, ClaimStatus, NormalBalance,
 } from "@prisma/client";
@@ -11,7 +11,7 @@ export type {
   User, Role, Company, Branch, BankAccount, FiscalYear,
   ChartOfAccount, JournalEntry, JournalEntryLine, CostCenter,
   Employee, Driver, Vehicle, DeliveryContract, DeliveryMonthlyReport,
-  CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification,
+  CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification, CompletedTask, UserPermission,
   CompanyType, AccountType, JournalEntryType, JournalStatus,
   EmployeeType, DeliveryPlatform, ClaimType, ClaimStatus, NormalBalance,
 };
@@ -67,10 +67,14 @@ export interface SessionBranchAccess {
 }
 
 export interface SessionPermission {
+  permissionId?: string;
   module: string;
   action: string;
   scope: string;
+  branchId?: string | null;
   companyId?: string | null;
+  scopeKey?: string | null;
+  allowed?: boolean;
 }
 
 export interface JwtPayload {

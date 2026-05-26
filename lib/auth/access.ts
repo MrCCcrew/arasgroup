@@ -4,6 +4,10 @@ import { getTokenFromRequest, verifySession } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/types";
 import { canAccessBranch, canAccessCompany, hasPermission, type Action, type Module } from "@/lib/auth/permissions";
 
+export function isOwnerOrAdminSession(session: SessionUser): boolean {
+  return session.isSuperAdmin || session.roles.some((role) => role.name === "GROUP_OWNER");
+}
+
 export function getRequestSession(request: NextRequest): SessionUser | null {
   const userId = request.headers.get("x-user-id");
   const email = request.headers.get("x-user-email");
