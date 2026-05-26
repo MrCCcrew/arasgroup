@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getTokenFromRequest, verifySession } from "@/lib/auth/session";
+import { getSession, getTokenFromRequest, verifySession } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/types";
 import { canAccessBranch, canAccessCompany, hasPermission, type Action, type Module } from "@/lib/auth/permissions";
 
@@ -42,20 +42,12 @@ export async function requireRequestSession(request: NextRequest): Promise<Sessi
     return NextResponse.json({ success: false, error: "انتهت صلاحية الجلسة" }, { status: 401 });
   }
 
-  return {
-    id: payload.sub,
-    email: payload.email,
-    nameAr: payload.nameAr,
-    nameEn: payload.nameEn,
-    isSuperAdmin: payload.isSuperAdmin,
-    roles: payload.roles,
-    groupAccess: payload.groupAccess ?? [],
-    companyAccess: payload.companyAccess ?? (payload.companyAccessEntries ?? []).map((entry) => entry.companyId),
-    companyAccessEntries: payload.companyAccessEntries ?? [],
-    branchAccess: payload.branchAccess ?? [],
-    permissions: payload.permissions ?? [],
-    locale: payload.locale,
-  };
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ success: false, error: "انتهت صلاحية الجلسة" }, { status: 401 });
+  }
+
+  return session;
 }
 
 export function assertCompanyAccess(session: SessionUser, companyId: string): NextResponse | null {

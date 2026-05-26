@@ -83,8 +83,15 @@ export async function POST(request: NextRequest) {
 
     if (!user.isActive) {
       return NextResponse.json(
-        { success: false, error: "الحساب غير مفعّل. يرجى التواصل مع المسؤول" },
+        { success: false, error: "الحساب غير مفعل. يرجى التواصل مع المسؤول" },
         { status: 401 },
+      );
+    }
+
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        { success: false, error: "هذا الحساب لا يحتوي على كلمة مرور صالحة بعد" },
+        { status: 400 },
       );
     }
 
@@ -160,16 +167,20 @@ export async function POST(request: NextRequest) {
 
     const token = await createSession(sessionUser);
 
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "LOGIN",
-        module: "auth",
-        resourceId: user.id,
-        resourceType: "User",
-        ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
-      },
-    });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "LOGIN",
+          module: "auth",
+          resourceId: user.id,
+          resourceType: "User",
+          ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
+        },
+      });
+    } catch (error) {
+      console.error("Login audit log error:", error);
+    }
 
     const response = NextResponse.json({
       success: true,
