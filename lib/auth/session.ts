@@ -10,6 +10,34 @@ const SECRET = new TextEncoder().encode(
 const COOKIE_NAME = "rashid_erp_session";
 const EXPIRES_IN = 7 * 24 * 60 * 60;
 
+// ── كاش الجلسة في الذاكرة — يمنع query ثقيل عند كل request ─────
+// TTL دقيقتان: سريع + يضمن انعكاس تغييرات الصلاحيات في وقت معقول
+const SESSION_CACHE_TTL = 2 * 60 * 1000; // 2 min in ms
+const sessionCache = new Map<string, { data: SessionUser; expiresAt: number }>();
+
+function getCached(userId: string, locale?: string): SessionUser | null {
+  const key = `${userId}:${locale ?? "ar"}`;
+  const entry = sessionCache.get(key);
+  if (!entry || entry.expiresAt < Date.now()) {
+    sessionCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(userId: string, locale: string | undefined, data: SessionUser) {
+  sessionCache.set(`${userId}:${locale ?? "ar"}`, {
+    data,
+    expiresAt: Date.now() + SESSION_CACHE_TTL,
+  });
+}
+
+export function invalidateSessionCache(userId: string) {
+  for (const key of sessionCache.keys()) {
+    if (key.startsWith(`${userId}:`)) sessionCache.delete(key);
+  }
+}
+
 export async function createSession(user: SessionUser): Promise<string> {
   const locale = user.locale ?? await getLocale();
 
@@ -39,6 +67,10 @@ export async function verifySession(token: string): Promise<JwtPayload | null> {
 }
 
 async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<SessionUser | null> {
+  // ── تحقق من الكاش أولاً ───────────────────────────────────────
+  const cached = getCached(userId, locale);
+  if (cached) return cached;
+
   let user: any = null;
 
   try {
@@ -93,7 +125,7 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
     return null;
   }
 
-  return {
+  const sessionUser: SessionUser = {
     id: user.id,
     email: user.email,
     nameAr: user.nameAr,
@@ -155,6 +187,9 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
         })),
       ),
   };
+
+  setCache(userId, locale, sessionUser);
+  return sessionUser;
 }
 
 export async function getSession(): Promise<SessionUser | null> {

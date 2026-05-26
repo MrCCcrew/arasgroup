@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clearSessionCookie, getSession } from "@/lib/auth/session";
+import { clearSessionCookie, getSession, invalidateSessionCache } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
 export async function POST() {
@@ -7,6 +7,7 @@ export async function POST() {
     const session = await getSession();
 
     if (session) {
+      invalidateSessionCache(session.id); // امسح الكاش فوراً عند الخروج
       await prisma.auditLog.create({
         data: {
           userId: session.id,
