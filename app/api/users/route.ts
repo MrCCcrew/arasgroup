@@ -58,26 +58,47 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search");
 
-  const users = await prisma.user.findMany({
-    where: search
-      ? {
-          OR: [
-            { nameAr: { contains: search } },
-            { email: { contains: search } },
-          ],
-        }
-      : undefined,
-    include: {
-      roles: { include: { role: true, company: true } },
-      groupAccess: { include: { group: true } },
-      companyAccess: { include: { company: true, role: true } },
-      branchAccess: { include: { branch: true } },
-      directPermissions: { include: { permission: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  try {
+    const users = await prisma.user.findMany({
+      where: search
+        ? {
+            OR: [{ nameAr: { contains: search } }, { email: { contains: search } }],
+          }
+        : undefined,
+      include: {
+        roles: { include: { role: true, company: true } },
+        groupAccess: { include: { group: true } },
+        companyAccess: { include: { company: true, role: true } },
+        branchAccess: { include: { branch: true } },
+        directPermissions: { include: { permission: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-  return NextResponse.json({ success: true, data: users });
+    return NextResponse.json({ success: true, data: users });
+  } catch (error) {
+    console.error("Users API fallback query:", error);
+
+    const users = await prisma.user.findMany({
+      where: search
+        ? {
+            OR: [{ nameAr: { contains: search } }, { email: { contains: search } }],
+          }
+        : undefined,
+      include: {
+        roles: { include: { role: true, company: true } },
+        groupAccess: { include: { group: true } },
+        companyAccess: { include: { company: true, role: true } },
+        branchAccess: { include: { branch: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: users.map((user) => ({ ...user, directPermissions: [] })),
+    });
+  }
 }
 
 export async function POST(request: NextRequest) {

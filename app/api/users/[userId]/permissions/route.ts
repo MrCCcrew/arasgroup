@@ -29,7 +29,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json();
     const parsed = updatePermissionsSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ success: false, error: parsed.error.errors[0]?.message ?? "بيانات الصلاحيات غير صالحة" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: parsed.error.errors[0]?.message ?? "بيانات الصلاحيات غير صالحة" },
+        { status: 400 },
+      );
     }
 
     const existingUser = await prisma.user.findUnique({

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/types";
-import { z } from "zod";
 
 const COOKIE_NAME = "rashid_erp_session";
 const EXPIRES_IN = 7 * 24 * 60 * 60;
@@ -19,50 +19,72 @@ export async function POST(request: NextRequest) {
     const parsed = loginSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.errors[0].message },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
     const { email, password } = parsed.data;
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        roles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: { permission: true },
+    let user: any = null;
+
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          roles: {
+            include: {
+              role: {
+                include: {
+                  permissions: {
+                    include: { permission: true },
+                  },
                 },
               },
             },
           },
-        },
-        groupAccess: true,
-        companyAccess: true,
-        branchAccess: true,
-        directPermissions: {
-          include: {
-            permission: true,
+          groupAccess: true,
+          companyAccess: true,
+          branchAccess: true,
+          directPermissions: {
+            include: {
+              permission: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      console.error("Login query fallback:", error);
+      user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          roles: {
+            include: {
+              role: {
+                include: {
+                  permissions: {
+                    include: { permission: true },
+                  },
+                },
+              },
+            },
+          },
+          groupAccess: true,
+          companyAccess: true,
+          branchAccess: true,
+        },
+      });
+    }
 
     if (!user) {
       return NextResponse.json(
         { success: false, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     if (!user.isActive) {
       return NextResponse.json(
         { success: false, error: "الحساب غير مفعّل. يرجى التواصل مع المسؤول" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -70,7 +92,7 @@ export async function POST(request: NextRequest) {
     if (!passwordValid) {
       return NextResponse.json(
         { success: false, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -80,11 +102,11 @@ export async function POST(request: NextRequest) {
       nameAr: user.nameAr,
       nameEn: user.nameEn,
       isSuperAdmin: user.isSuperAdmin,
-      roles: user.roles.map((ur) => ({
+      roles: user.roles.map((ur: any) => ({
         name: ur.role.name,
         companyId: ur.companyId,
       })),
-      groupAccess: user.groupAccess.map((entry) => ({
+      groupAccess: user.groupAccess.map((entry: any) => ({
         groupId: entry.groupId,
         canView: entry.canView,
         canCreate: entry.canCreate,
@@ -92,8 +114,8 @@ export async function POST(request: NextRequest) {
         canDelete: entry.canDelete,
         canApprove: entry.canApprove,
       })),
-      companyAccess: user.companyAccess.map((ca) => ca.companyId),
-      companyAccessEntries: user.companyAccess.map((ca) => ({
+      companyAccess: user.companyAccess.map((ca: any) => ca.companyId),
+      companyAccessEntries: user.companyAccess.map((ca: any) => ({
         companyId: ca.companyId,
         roleId: ca.roleId,
         canView: ca.canView,
@@ -102,7 +124,7 @@ export async function POST(request: NextRequest) {
         canDelete: ca.canDelete,
         canApprove: ca.canApprove,
       })),
-      branchAccess: user.branchAccess.map((ba) => ({
+      branchAccess: user.branchAccess.map((ba: any) => ({
         branchId: ba.branchId,
         companyId: ba.companyId,
         canView: ba.canView,
@@ -111,32 +133,33 @@ export async function POST(request: NextRequest) {
         canDelete: ba.canDelete,
         canApprove: ba.canApprove,
       })),
-      permissions: user.roles.flatMap((ur) =>
-        ur.role.permissions.map((permissionLink) => ({
-          permissionId: permissionLink.permission.id,
-          module: permissionLink.permission.module,
-          action: permissionLink.permission.action,
-          scope: permissionLink.permission.scope,
-          companyId: ur.companyId,
-          allowed: true,
-        }))
-      ).concat(
-        user.directPermissions.map((entry) => ({
-          permissionId: entry.permissionId,
-          module: entry.permission.module,
-          action: entry.permission.action,
-          scope: entry.permission.scope,
-          companyId: entry.companyId,
-          branchId: entry.branchId,
-          scopeKey: entry.scopeKey,
-          allowed: entry.isAllowed,
-        })),
-      ),
+      permissions: user.roles
+        .flatMap((ur: any) =>
+          ur.role.permissions.map((permissionLink: any) => ({
+            permissionId: permissionLink.permission.id,
+            module: permissionLink.permission.module,
+            action: permissionLink.permission.action,
+            scope: permissionLink.permission.scope,
+            companyId: ur.companyId,
+            allowed: true,
+          })),
+        )
+        .concat(
+          (user.directPermissions ?? []).map((entry: any) => ({
+            permissionId: entry.permissionId,
+            module: entry.permission.module,
+            action: entry.permission.action,
+            scope: entry.permission.scope,
+            companyId: entry.companyId,
+            branchId: entry.branchId,
+            scopeKey: entry.scopeKey,
+            allowed: entry.isAllowed,
+          })),
+        ),
     };
 
     const token = await createSession(sessionUser);
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         userId: user.id,
@@ -172,9 +195,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { success: false, error: "حدث خطأ أثناء تسجيل الدخول" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "حدث خطأ أثناء تسجيل الدخول" }, { status: 500 });
   }
 }
