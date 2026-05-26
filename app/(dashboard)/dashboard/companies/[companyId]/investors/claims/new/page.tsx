@@ -309,7 +309,7 @@ export default function NewClaimPage() {
                 </thead>
                 <tbody>
                   {lines.map((line, index) => (
-                    <tr key={`${line.descriptionAr}-${index}`} className="border-b border-border">
+                    <tr key={index} className="border-b border-border">
                       <td className="px-3 py-2">
                         <input
                           type="text"

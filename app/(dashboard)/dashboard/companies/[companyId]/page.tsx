@@ -91,6 +91,8 @@ export default async function CompanyDashboardPage({ params }: Props) {
 
   if (!company) notFound();
 
+  const canViewAccountingForQuery = session.isSuperAdmin || hasPermission(session, "ACCOUNTING", "VIEW", { companyId });
+
   const [
     pendingJEs,
     mainLicensesCount,
@@ -99,10 +101,10 @@ export default async function CompanyDashboardPage({ params }: Props) {
     expiringLicenses,
     recentJEs,
   ] = await Promise.all([
-    // قيود مسودة
-    prisma.journalEntry.count({
-      where: { companyId, status: "DRAFT", isDeleted: false },
-    }),
+    // قيود مسودة (فقط لمن يملك صلاحية المحاسبة)
+    canViewAccountingForQuery
+      ? prisma.journalEntry.count({ where: { companyId, status: "DRAFT", isDeleted: false } })
+      : Promise.resolve(0),
     // عدد التراخيص الرئيسية (بدون الملغاة)
     prisma.license.count({
       where: { companyId, isMainLicense: true, status: { not: "CANCELLED" } },
@@ -131,21 +133,23 @@ export default async function CompanyDashboardPage({ params }: Props) {
         licenseExpiryDate: { lte: in60Days, gte: now },
       },
     }),
-    // آخر القيود
-    prisma.journalEntry.findMany({
-      where: { companyId, isDeleted: false },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        number: true,
-        date: true,
-        descriptionAr: true,
-        descriptionEn: true,
-        status: true,
-        totalDebit: true,
-      },
-    }),
+    // آخر القيود (فقط لمن يملك صلاحية المحاسبة)
+    canViewAccountingForQuery
+      ? prisma.journalEntry.findMany({
+          where: { companyId, isDeleted: false },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            number: true,
+            date: true,
+            descriptionAr: true,
+            descriptionEn: true,
+            status: true,
+            totalDebit: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   // عدد الموظفين في التراخيص الرئيسية والفرعية
@@ -162,6 +166,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
   const isCarWash = company.type === "CAR_WASH";
   const isTrading = company.type === "TRADING" || company.type === "GENERAL_TRADING";
   const companyName = locale === "en" ? company.nameEn ?? company.nameAr : company.nameAr;
+  const canViewAccounting = session.isSuperAdmin || hasPermission(session, "ACCOUNTING", "VIEW", { companyId });
 
   // ── الروابط السريعة حسب الصلاحيات ──────────────────────────────
   type QuickLink = { href: string; label: string; icon: React.ReactNode; color: string };
@@ -232,7 +237,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
         )}
 
         {/* ── الإحصائيات الرئيسية ── */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className={`grid grid-cols-2 gap-3 ${canViewAccounting ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
           <StatCard
             icon={<Users size={20} className="text-blue-600" />}
             iconBg="bg-blue-50"
@@ -245,12 +250,14 @@ export default async function CompanyDashboardPage({ params }: Props) {
             value={String(company._count.branches)}
             label={locale === "en" ? "Branches" : "الفروع"}
           />
-          <StatCard
-            icon={<Receipt size={20} className="text-yellow-600" />}
-            iconBg="bg-yellow-50"
-            value={String(pendingJEs)}
-            label={locale === "en" ? "Draft entries" : "قيد مسودة"}
-          />
+          {canViewAccounting && (
+            <StatCard
+              icon={<Receipt size={20} className="text-yellow-600" />}
+              iconBg="bg-yellow-50"
+              value={String(pendingJEs)}
+              label={locale === "en" ? "Draft entries" : "قيد مسودة"}
+            />
+          )}
           <StatCard
             icon={<AlertTriangle size={20} className="text-red-600" />}
             iconBg="bg-red-50"
@@ -314,44 +321,46 @@ export default async function CompanyDashboardPage({ params }: Props) {
         )}
 
         {/* ── آخر القيود + تنبيهات الإقامات ── */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="section-card">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-bold">{locale === "en" ? "Recent journal entries" : "آخر القيود"}</h3>
-              <Link href={`/dashboard/companies/${companyId}/accounting/journal-entries`} className="text-xs text-primary hover:underline">
-                {locale === "en" ? "View all" : "عرض الكل"}
-              </Link>
+        <div className={`grid grid-cols-1 gap-6 ${canViewAccounting ? "lg:grid-cols-2" : ""}`}>
+          {canViewAccounting && (
+            <div className="section-card">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-bold">{locale === "en" ? "Recent journal entries" : "آخر القيود"}</h3>
+                <Link href={`/dashboard/companies/${companyId}/accounting/journal-entries`} className="text-xs text-primary hover:underline">
+                  {locale === "en" ? "View all" : "عرض الكل"}
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {recentJEs.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    {locale === "en" ? "No journal entries yet" : "لا توجد قيود"}
+                  </p>
+                ) : (
+                  recentJEs.map((entry) => (
+                    <Link
+                      key={entry.id}
+                      href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}`}
+                      className="flex items-center justify-between rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{entry.number}</p>
+                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                          {locale === "en" ? entry.descriptionEn ?? entry.descriptionAr : entry.descriptionAr}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{formatDate(entry.date, dateLocale)}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold number text-blue-600">{formatKWD(Number(entry.totalDebit), numberLocale)}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
+                          {journalStatusLabels[locale][entry.status as keyof typeof journalStatusLabels.ar]}
+                        </span>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              {recentJEs.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  {locale === "en" ? "No journal entries yet" : "لا توجد قيود"}
-                </p>
-              ) : (
-                recentJEs.map((entry) => (
-                  <Link
-                    key={entry.id}
-                    href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}`}
-                    className="flex items-center justify-between rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{entry.number}</p>
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
-                        {locale === "en" ? entry.descriptionEn ?? entry.descriptionAr : entry.descriptionAr}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{formatDate(entry.date, dateLocale)}</p>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold number text-blue-600">{formatKWD(Number(entry.totalDebit), numberLocale)}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
-                        {journalStatusLabels[locale][entry.status as keyof typeof journalStatusLabels.ar]}
-                      </span>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
+          )}
 
           <div className="section-card">
             <div className="mb-4 flex items-center justify-between">

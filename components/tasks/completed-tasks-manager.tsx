@@ -234,8 +234,47 @@ export function CompletedTasksManager({
     deferred: visibleTasks.filter((task) => task.status === "DEFERRED").length,
   };
 
+  // ── ملخص الفلاتر للطباعة ──────────────────────────────────
+  const periodLabelForPrint =
+    filters.period === "all" ? text("كل الفترات", "All periods") :
+    filters.period === "day" ? text("يومي", "Daily") :
+    filters.period === "week" ? text("أسبوعي", "Weekly") :
+    filters.period === "month" ? text("شهري", "Monthly") :
+    text("سنوي", "Yearly");
+
+  const statusLabelForPrint =
+    filters.status === "ALL" ? text("كل الحالات", "All statuses") :
+    filters.status === "COMPLETED" ? t("tasks.completed") :
+    filters.status === "NOT_COMPLETED" ? t("tasks.notCompleted") :
+    t("tasks.deferred");
+
+  const selectedUserName = filters.userId
+    ? (users.find((u) => u.id === filters.userId)?.nameAr ?? filters.userId)
+    : text("الكل", "All");
+
+  const printDate = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ar-KW", {
+    year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  }).format(new Date());
+
   return (
     <div className="space-y-6">
+      {/* ── رأس الطباعة (يظهر فقط عند الطباعة) ── */}
+      <div className="print-only">
+        <div className="border-b pb-4 mb-4 text-center">
+          <h1 className="text-2xl font-bold">{text("تقرير المهام المنجزة", "Completed Tasks Report")}</h1>
+          <p className="text-sm text-muted-foreground">{text("نظام مجموعة عبد الفتاح راشد سليمان", "Abdul Fattah Rashid Group System")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{text("تاريخ الطباعة:", "Print date:")} {printDate}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm mb-4 border rounded-lg p-4 bg-muted/30">
+          <div className="flex gap-2"><span className="font-medium">{text("الفترة:", "Period:")}</span> <span>{periodLabelForPrint}</span></div>
+          <div className="flex gap-2"><span className="font-medium">{text("التاريخ:", "Date:")}</span> <span>{filters.date}</span></div>
+          <div className="flex gap-2"><span className="font-medium">{text("الحالة:", "Status:")}</span> <span>{statusLabelForPrint}</span></div>
+          {canViewAll && <div className="flex gap-2"><span className="font-medium">{text("الموظف:", "Employee:")}</span> <span>{selectedUserName}</span></div>}
+          <div className="flex gap-2"><span className="font-medium">{text("إجمالي النتائج:", "Total results:")}</span> <span>{visibleTasks.length}</span></div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <SummaryCard icon={<ClipboardCheck size={18} className="text-emerald-600" />} title={text("إجمالي المهام", "Total tasks")} value={visibleTasks.length} />
         <SummaryCard icon={<ClipboardCheck size={18} className="text-green-600" />} title={t("tasks.completed")} value={statusSummary.completed} />
@@ -426,8 +465,7 @@ export function CompletedTasksManager({
 
       <div className="section-card">
         <div className="print-only mb-4 border-b pb-3">
-          <h1 className="text-xl font-bold">{t("tasks.pageTitle")}</h1>
-          <p className="text-sm text-muted-foreground">{t("tasks.filtersSummary")}: {t(`tasks.${filters.period === "all" ? "allPeriods" : filters.period === "day" ? "daily" : filters.period === "week" ? "weekly" : filters.period === "month" ? "monthly" : "yearly"}`)}</p>
+          <h2 className="font-bold text-base">{t("tasks.pageTitle")}</h2>
         </div>
 
         <div className="overflow-x-auto">

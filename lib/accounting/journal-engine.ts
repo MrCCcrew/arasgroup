@@ -42,12 +42,13 @@ const TYPE_PREFIX: Record<string, string> = {
 /** Get next journal entry number for a company, unique per type */
 async function getNextJournalNumber(companyId: string, year: number, type?: string): Promise<string> {
   const prefix = TYPE_PREFIX[type ?? "GENERAL"] ?? "QY";
+  // نعد الكل بما فيهم المحذوفين (soft-delete) لتجنب إعادة استخدام الأرقام
   const count = await prisma.journalEntry.count({
     where: {
       companyId,
       fiscalYear: { year },
       type: (type as never) ?? "GENERAL",
-      isDeleted: false,
+      // لا نفلتر isDeleted هنا — المحذوف يظل "يحجز" رقمه
     },
   });
   return generateNumber(prefix, year, count + 1);
@@ -87,49 +88,83 @@ export async function createJournalEntry(
 
   const fy = await prisma.fiscalYear.findUnique({ where: { id: fiscalYearId } });
   const year = fy?.year ?? new Date().getFullYear();
-  const number = await getNextJournalNumber(input.companyId, year, input.type);
+  const prefix = TYPE_PREFIX[input.type ?? "GENERAL"] ?? "QY";
 
   const totalDebit = input.lines.reduce((s, l) => s + l.debit, 0);
   const totalCredit = input.lines.reduce((s, l) => s + l.credit, 0);
 
-  const entry = await prisma.journalEntry.create({
-    data: {
-      companyId: input.companyId,
-      fiscalYearId,
-      number,
-      date: input.date,
-      descriptionAr: input.descriptionAr,
-      descriptionEn: input.descriptionEn,
-      type: input.type,
-      status: "DRAFT",
-      reference: input.reference,
-      refModule: input.refModule,
-      refId: input.refId,
-      isAutomatic: input.isAutomatic ?? false,
-      costCenterId: input.costCenterId,
-      totalDebit,
-      totalCredit,
-      createdById: input.createdById,
-      lines: {
-        create: input.lines.map((line, idx) => ({
-          accountId: line.accountId,
-          descriptionAr: line.descriptionAr,
-          debit: line.debit,
-          credit: line.credit,
-          sortOrder: idx,
-          costCenterId: line.costCenterId,
-          driverId: line.driverId,
-          employeeId: line.employeeId,
-          investorId: line.investorId,
-          branchId: line.branchId,
-          carWashVehicleId: line.carWashVehicleId,
-        })),
-      },
+  const buildData = (number: string) => ({
+    companyId: input.companyId,
+    fiscalYearId,
+    number,
+    date: input.date,
+    descriptionAr: input.descriptionAr,
+    descriptionEn: input.descriptionEn,
+    type: input.type,
+    status: "DRAFT" as const,
+    reference: input.reference,
+    refModule: input.refModule,
+    refId: input.refId,
+    isAutomatic: input.isAutomatic ?? false,
+    costCenterId: input.costCenterId,
+    totalDebit,
+    totalCredit,
+    createdById: input.createdById,
+    lines: {
+      create: input.lines.map((line, idx) => ({
+        accountId: line.accountId,
+        descriptionAr: line.descriptionAr,
+        debit: line.debit,
+        credit: line.credit,
+        sortOrder: idx,
+        costCenterId: line.costCenterId,
+        driverId: line.driverId,
+        employeeId: line.employeeId,
+        investorId: line.investorId,
+        branchId: line.branchId,
+        carWashVehicleId: line.carWashVehicleId,
+      })),
     },
-    include: { lines: true },
   });
 
-  return entry;
+  // محاولة الإنشاء مع إعادة المحاولة عند تعارض الأرقام (race condition أو soft-delete)
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const number = await getNextJournalNumber(input.companyId, year, input.type);
+
+    try {
+      return await prisma.journalEntry.create({
+        data: buildData(number),
+        include: { lines: true },
+      });
+    } catch (err: unknown) {
+      const isUniqueViolation =
+        typeof err === "object" &&
+        err !== null &&
+        "code" in err &&
+        (err as { code: string }).code === "P2002";
+
+      if (isUniqueViolation && attempt < MAX_RETRIES - 1) {
+        // الرقم مستخدم بالفعل، نجرب مرة أخرى بعد إعادة حساب الرقم التالي
+        console.warn(`Journal number ${number} conflict (attempt ${attempt + 1}), retrying...`);
+        // إضافة القيد المحجوز مؤقتاً بنفس الرقم لتجنب التكرار في المحاولة القادمة
+        // (الكاونت سيزيد بسبب قيد جديد قُبل للتو في مكان آخر)
+        continue;
+      }
+
+      // أي خطأ آخر أو استنفاد المحاولات
+      const typeHint = generateNumber(prefix, year, 0); // للوضوح في رسالة الخطأ
+      const message =
+        isUniqueViolation
+          ? `تعارض في رقم القيد (${typeHint.replace("-0000", "")}-xxxx) — يرجى المحاولة مجدداً`
+          : err instanceof Error
+          ? err.message
+          : "فشل في إنشاء القيد";
+      throw new Error(message);
+    }
+  }
+
+  throw new Error("تعذر إنشاء القيد بعد عدة محاولات، يرجى المحاولة مجدداً");
 }
 
 /** Post a journal entry (change status to POSTED) */
