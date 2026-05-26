@@ -7,6 +7,9 @@ const updatePermissionsSchema = z.object({
   permissions: z.array(
     z.object({
       permissionId: z.string(),
+      module: z.string().optional(),
+      action: z.string().optional(),
+      scope: z.string().optional(),
       companyId: z.string().nullable().optional(),
       branchId: z.string().nullable().optional(),
       scopeKey: z.string(),
@@ -48,17 +51,61 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await tx.userPermission.deleteMany({ where: { userId } });
 
       if (parsed.data.permissions.length > 0) {
-        await tx.userPermission.createMany({
-          data: parsed.data.permissions.map((entry) => ({
-            userId,
-            permissionId: entry.permissionId,
-            companyId: entry.companyId || null,
-            branchId: entry.branchId || null,
-            scopeKey: entry.scopeKey,
-            isAllowed: entry.isAllowed,
-            grantedById: session.id,
-          })),
-        });
+        const createdPermissions = await Promise.all(
+          parsed.data.permissions.map(async (entry) => {
+            const byId =
+              !entry.permissionId.includes(":") &&
+              (await tx.permission.findUnique({
+                where: { id: entry.permissionId },
+                select: { id: true },
+              }));
+
+            if (byId) {
+              return {
+                userId,
+                permissionId: byId.id,
+                companyId: entry.companyId || null,
+                branchId: entry.branchId || null,
+                scopeKey: entry.scopeKey,
+                isAllowed: entry.isAllowed,
+                grantedById: session.id,
+              };
+            }
+
+            if (!entry.module || !entry.action || !entry.scope) {
+              throw new Error("بيانات الصلاحية غير مكتملة");
+            }
+
+            const permission = await tx.permission.upsert({
+              where: {
+                module_action_scope: {
+                  module: entry.module,
+                  action: entry.action,
+                  scope: entry.scope as any,
+                },
+              },
+              update: {},
+              create: {
+                module: entry.module,
+                action: entry.action,
+                scope: entry.scope as any,
+              },
+              select: { id: true },
+            });
+
+            return {
+              userId,
+              permissionId: permission.id,
+              companyId: entry.companyId || null,
+              branchId: entry.branchId || null,
+              scopeKey: entry.scopeKey,
+              isAllowed: entry.isAllowed,
+              grantedById: session.id,
+            };
+          }),
+        );
+
+        await tx.userPermission.createMany({ data: createdPermissions });
       }
 
       await tx.auditLog.create({

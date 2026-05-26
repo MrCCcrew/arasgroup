@@ -5,6 +5,7 @@ import { UserManagement } from "@/components/users/user-management";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { isOwnerOrAdminSession } from "@/lib/auth/access";
+import { PERMISSION_DEFINITIONS } from "@/lib/auth/permissions";
 
 type UserManagementProps = ComponentProps<typeof UserManagement>;
 type UsersPageData = [
@@ -15,8 +16,15 @@ type UsersPageData = [
 ];
 
 async function loadUsersPageData(): Promise<UsersPageData> {
+  const fallbackPermissions = PERMISSION_DEFINITIONS.map((permission) => ({
+    id: `${permission.module}:${permission.action}:${permission.scope}`,
+    module: permission.module,
+    action: permission.action,
+    scope: permission.scope,
+  }));
+
   try {
-    return await Promise.all([
+    const [users, roles, companies, permissions] = await Promise.all([
       prisma.user.findMany({
         include: {
           roles: {
@@ -69,6 +77,21 @@ async function loadUsersPageData(): Promise<UsersPageData> {
         select: { id: true, module: true, action: true, scope: true },
       }),
     ]);
+
+    const mergedPermissions = [
+      ...permissions,
+      ...fallbackPermissions.filter(
+        (fallback) =>
+          !permissions.some(
+            (entry) =>
+              entry.module === fallback.module &&
+              entry.action === fallback.action &&
+              entry.scope === fallback.scope,
+          ),
+      ),
+    ];
+
+    return [users, roles, companies, mergedPermissions];
   } catch (error) {
     console.error("Users page fallback query:", error);
 
@@ -126,7 +149,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
       }> })),
       roles,
       companies,
-      [] as Array<{ id: string; module: string; action: string; scope: string }>,
+      fallbackPermissions,
     ];
   }
 }

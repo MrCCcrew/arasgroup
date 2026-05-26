@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { CheckCircle, KeyRound, Shield, SlidersHorizontal, Users, XCircle } from "lucide-react";
+import { CheckCircle, KeyRound, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, XCircle } from "lucide-react";
 import { useLocale } from "@/components/providers/locale-provider";
 
 interface RoleOption {
@@ -94,6 +94,9 @@ type AccessFlags = {
 
 type DirectPermissionDraft = {
   permissionId: string;
+  module: string;
+  action: string;
+  scope: string;
   companyId: string | null;
   branchId: string | null;
   scopeKey: string;
@@ -128,6 +131,7 @@ export function UserManagement({
   canManagePasswords = false,
 }: Props) {
   const { locale, t } = useLocale();
+  const [usersState, setUsersState] = useState<ExistingUser[]>(users);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -228,6 +232,9 @@ export function UserManagement({
     setEditingPermissions(
       (user.directPermissions ?? []).map((entry) => ({
         permissionId: entry.permissionId,
+        module: entry.permission.module,
+        action: entry.permission.action,
+        scope: entry.permission.scope,
         companyId: entry.companyId ?? null,
         branchId: entry.branchId ?? null,
         scopeKey: entry.scopeKey,
@@ -256,6 +263,9 @@ export function UserManagement({
 
     const draft: DirectPermissionDraft = {
       permissionId: permission.id,
+      module: permission.module,
+      action: permission.action,
+      scope: permission.scope,
       companyId: permission.scope === "COMPANY" || permission.scope === "BRANCH" ? selectedPermissionCompanyId || null : null,
       branchId: permission.scope === "BRANCH" ? selectedPermissionBranchId || null : null,
       scopeKey: buildScopeKey(permission, selectedPermissionCompanyId, selectedPermissionBranchId),
@@ -389,8 +399,84 @@ export function UserManagement({
     }
   }
 
+  async function handleToggleUserStatus(userId: string, nextIsActive: boolean) {
+    const confirmationMessage = nextIsActive
+      ? text("هل تريد إعادة تفعيل هذا المستخدم؟", "Do you want to reactivate this user?")
+      : text("هل تريد تعطيل هذا المستخدم؟", "Do you want to disable this user?");
+    if (!window.confirm(confirmationMessage)) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: nextIsActive }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? text("تعذر تحديث حالة المستخدم", "Failed to update user status"));
+      }
+
+      setUsersState((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, isActive: nextIsActive } : user)),
+      );
+      setSuccess(
+        nextIsActive
+          ? text("تمت إعادة تفعيل المستخدم بنجاح", "User reactivated successfully")
+          : text("تم تعطيل المستخدم بنجاح", "User disabled successfully"),
+      );
+    } catch (statusError) {
+      setError(
+        statusError instanceof Error
+          ? statusError.message
+          : text("تعذر تحديث حالة المستخدم", "Failed to update user status"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteUser(userId: string) {
+    if (!window.confirm(text("هل تريد حذف هذا المستخدم نهائيًا؟", "Do you want to permanently delete this user?"))) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? text("تعذر حذف المستخدم", "Failed to delete user"));
+      }
+
+      setUsersState((prev) => prev.filter((user) => user.id !== userId));
+      setSuccess(text("تم حذف المستخدم بنجاح", "User deleted successfully"));
+      if (activePasswordUserId === userId) setActivePasswordUserId(null);
+      if (activePermissionsUserId === userId) setActivePermissionsUserId(null);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error ? deleteError.message : text("تعذر حذف المستخدم", "Failed to delete user"),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function describeDirectPermission(entry: DirectPermissionDraft) {
-    const permission = permissions.find((item) => item.id === entry.permissionId);
+    const permission =
+      permissions.find((item) => item.id === entry.permissionId) ??
+      permissions.find(
+        (item) =>
+          item.module === entry.module &&
+          item.action === entry.action &&
+          item.scope === entry.scope,
+      );
     const company = companies.find((item) => item.id === entry.companyId);
     const branch = company?.branches.find((item) => item.id === entry.branchId);
     if (!permission) return entry.scopeKey;
@@ -405,9 +491,9 @@ export function UserManagement({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard icon={<Users size={20} className="text-blue-600" />} iconBg="bg-blue-50" value={users.length} label={text("إجمالي المستخدمين", "Total users")} />
-        <StatCard icon={<CheckCircle size={20} className="text-green-600" />} iconBg="bg-green-50" value={users.filter((user) => user.isActive).length} label={text("مستخدم نشط", "Active users")} />
-        <StatCard icon={<Shield size={20} className="text-purple-600" />} iconBg="bg-purple-50" value={users.filter((user) => user.isSuperAdmin).length} label={text("مدير نظام", "System admins")} />
+        <StatCard icon={<Users size={20} className="text-blue-600" />} iconBg="bg-blue-50" value={usersState.length} label={text("إجمالي المستخدمين", "Total users")} />
+        <StatCard icon={<CheckCircle size={20} className="text-green-600" />} iconBg="bg-green-50" value={usersState.filter((user) => user.isActive).length} label={text("مستخدم نشط", "Active users")} />
+        <StatCard icon={<Shield size={20} className="text-purple-600" />} iconBg="bg-purple-50" value={usersState.filter((user) => user.isSuperAdmin).length} label={text("مدير نظام", "System admins")} />
       </div>
 
       <form onSubmit={handleSubmit} className="section-card space-y-6">
@@ -532,7 +618,7 @@ export function UserManagement({
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => {
+              {usersState.map((user) => {
                 const isPasswordOpen = activePasswordUserId === user.id;
                 const isPermissionsOpen = activePermissionsUserId === user.id;
                 return (
@@ -607,17 +693,37 @@ export function UserManagement({
                       </td>
                       {canManagePasswords ? (
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActivePasswordUserId(isPasswordOpen ? null : user.id);
-                              setPasswordForm({ password: "", confirmPassword: "" });
-                            }}
-                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
-                          >
-                            <KeyRound size={14} />
-                            {t("usersManagement.resetPassword")}
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePasswordUserId(isPasswordOpen ? null : user.id);
+                                setPasswordForm({ password: "", confirmPassword: "" });
+                              }}
+                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                            >
+                              <KeyRound size={14} />
+                              {t("usersManagement.resetPassword")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserStatus(user.id, !user.isActive)}
+                              disabled={loading}
+                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50"
+                            >
+                              {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                              {user.isActive ? text("تعطيل", "Disable") : text("تفعيل", "Activate")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(user.id)}
+                              disabled={loading}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <Trash2 size={14} />
+                              {text("حذف", "Delete")}
+                            </button>
+                          </div>
                         </td>
                       ) : null}
                     </tr>

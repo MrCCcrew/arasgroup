@@ -26,6 +26,9 @@ const branchAccessSchema = z.object({
 
 const directPermissionSchema = z.object({
   permissionId: z.string(),
+  module: z.string().optional(),
+  action: z.string().optional(),
+  scope: z.string().optional(),
   companyId: z.string().nullable().optional(),
   branchId: z.string().nullable().optional(),
   scopeKey: z.string(),
@@ -181,10 +184,44 @@ export async function POST(request: NextRequest) {
       }
 
       for (const entry of data.directPermissions) {
+        const byId =
+          !entry.permissionId.includes(":") &&
+          (await tx.permission.findUnique({
+            where: { id: entry.permissionId },
+            select: { id: true },
+          }));
+
+        const resolvedPermissionId = byId
+          ? byId.id
+          : entry.module && entry.action && entry.scope
+            ? (
+                await tx.permission.upsert({
+                  where: {
+                    module_action_scope: {
+                      module: entry.module,
+                      action: entry.action,
+                      scope: entry.scope as any,
+                    },
+                  },
+                  update: {},
+                  create: {
+                    module: entry.module,
+                    action: entry.action,
+                    scope: entry.scope as any,
+                  },
+                  select: { id: true },
+                })
+              ).id
+            : null;
+
+        if (!resolvedPermissionId) {
+          throw new Error("بيانات الصلاحية غير مكتملة");
+        }
+
         await tx.userPermission.create({
           data: {
             userId: user.id,
-            permissionId: entry.permissionId,
+            permissionId: resolvedPermissionId,
             companyId: entry.companyId || null,
             branchId: entry.branchId || null,
             scopeKey: entry.scopeKey,
