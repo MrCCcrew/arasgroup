@@ -36,9 +36,11 @@ const claimTypeLabels = {
 const statusLabels = {
   ar: {
     PENDING: "معلق",
-    SENT_TO_ACCOUNTANT: "مرسل للمحاسب",
+    SENT_TO_ACCOUNTANT: "أُرسل للمحاسب",
+    SENT_TO_INVESTOR: "أُرسل للمسئول",
     PARTIALLY_COLLECTED: "محصل جزئياً",
-    COLLECTED: "محصل",
+    COLLECTED: "تم التحصيل",
+    COMPLETED: "تم التنفيذ",
     PAID: "مدفوع",
     RENEWED: "تم التجديد",
     OVERDUE: "متأخر",
@@ -48,8 +50,10 @@ const statusLabels = {
   en: {
     PENDING: "Pending",
     SENT_TO_ACCOUNTANT: "Sent to accountant",
+    SENT_TO_INVESTOR: "Sent to investor",
     PARTIALLY_COLLECTED: "Partially collected",
     COLLECTED: "Collected",
+    COMPLETED: "Completed",
     PAID: "Paid",
     RENEWED: "Renewed",
     OVERDUE: "Overdue",

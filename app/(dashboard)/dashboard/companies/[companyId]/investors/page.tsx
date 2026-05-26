@@ -37,7 +37,7 @@ export default async function InvestorsPage({ params }: Props) {
     by: ["investorId"],
     where: {
       companyId,
-      status: { in: ["PENDING", "SENT_TO_ACCOUNTANT", "PARTIALLY_COLLECTED", "OVERDUE"] },
+      status: { in: ["PENDING", "SENT_TO_ACCOUNTANT", "SENT_TO_INVESTOR", "PARTIALLY_COLLECTED", "OVERDUE"] },
     },
     _count: { id: true },
   });
@@ -183,9 +183,11 @@ async function RecentClaims({
   const statusLabels = {
     ar: {
       PENDING: "معلق",
-      SENT_TO_ACCOUNTANT: "مرسل للمحاسب",
+      SENT_TO_ACCOUNTANT: "أُرسل للمحاسب",
+      SENT_TO_INVESTOR: "أُرسل للمسئول",
       PARTIALLY_COLLECTED: "محصل جزئياً",
-      COLLECTED: "محصل",
+      COLLECTED: "تم التحصيل",
+      COMPLETED: "تم التنفيذ",
       PAID: "مدفوع",
       RENEWED: "تم التجديد",
       OVERDUE: "متأخر",
@@ -195,8 +197,10 @@ async function RecentClaims({
     en: {
       PENDING: "Pending",
       SENT_TO_ACCOUNTANT: "Sent to accountant",
+      SENT_TO_INVESTOR: "Sent to investor",
       PARTIALLY_COLLECTED: "Partially collected",
       COLLECTED: "Collected",
+      COMPLETED: "Completed",
       PAID: "Paid",
       RENEWED: "Renewed",
       OVERDUE: "Overdue",
