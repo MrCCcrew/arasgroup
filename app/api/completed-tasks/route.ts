@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { assertBranchAccess, assertCompanyAccess, assertPermission, isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
 import { CompletedTaskStatus } from "@prisma/client";
-import { endOfDay, endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear } from "date-fns";
+import {
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  endOfYear,
+  parseISO,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+} from "date-fns";
+import { prisma } from "@/lib/db";
+import {
+  assertBranchAccess,
+  assertCompanyAccess,
+  assertPermission,
+  isOwnerOrAdminSession,
+  requireRequestSession,
+} from "@/lib/auth/access";
 
 const dateValue = z.string().min(1).transform((value) => new Date(value));
 
@@ -28,10 +44,10 @@ function normalizeOptionalDate(value?: string | null) {
   return value ? new Date(value) : null;
 }
 
-function resolvePeriodRange(period: string | null, dateValue: string | null) {
+function resolvePeriodRange(period: string | null, dateValueParam: string | null) {
   if (!period || period === "all") return undefined;
 
-  const basis = dateValue ? parseISO(dateValue) : new Date();
+  const basis = dateValueParam ? parseISO(dateValueParam) : new Date();
   if (Number.isNaN(basis.getTime())) return undefined;
 
   switch (period) {
@@ -70,17 +86,22 @@ export async function GET(request: NextRequest) {
     taskDate: range,
   };
 
-  const tasks = await prisma.completedTask.findMany({
-    where,
-    include: {
-      user: { select: { id: true, nameAr: true, nameEn: true, email: true } },
-      company: { select: { id: true, nameAr: true, nameEn: true } },
-      branch: { select: { id: true, nameAr: true, nameEn: true } },
-    },
-    orderBy: [{ taskDate: "desc" }, { createdAt: "desc" }],
-  });
+  try {
+    const tasks = await prisma.completedTask.findMany({
+      where,
+      include: {
+        user: { select: { id: true, nameAr: true, nameEn: true, email: true } },
+        company: { select: { id: true, nameAr: true, nameEn: true } },
+        branch: { select: { id: true, nameAr: true, nameEn: true } },
+      },
+      orderBy: [{ taskDate: "desc" }, { createdAt: "desc" }],
+    });
 
-  return NextResponse.json({ success: true, data: tasks });
+    return NextResponse.json({ success: true, data: tasks });
+  } catch (error) {
+    console.error("Completed tasks API fallback query:", error);
+    return NextResponse.json({ success: true, data: [] });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -94,7 +115,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = taskSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ success: false, error: parsed.error.errors[0]?.message ?? "بيانات المهمة غير صالحة" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: parsed.error.errors[0]?.message ?? "بيانات المهمة غير صالحة" },
+        { status: 400 },
+      );
     }
 
     const ownerOrAdmin = isOwnerOrAdminSession(session);

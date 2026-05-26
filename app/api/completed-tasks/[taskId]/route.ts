@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { assertBranchAccess, assertCompanyAccess, assertPermission, isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
 import { CompletedTaskStatus } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import {
+  assertBranchAccess,
+  assertCompanyAccess,
+  assertPermission,
+  isOwnerOrAdminSession,
+  requireRequestSession,
+} from "@/lib/auth/access";
 
 const taskUpdateSchema = z.object({
   companyId: z.string().optional().nullable(),
@@ -46,7 +52,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json();
     const parsed = taskUpdateSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ success: false, error: parsed.error.errors[0]?.message ?? "بيانات المهمة غير صالحة" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: parsed.error.errors[0]?.message ?? "بيانات المهمة غير صالحة" },
+        { status: 400 },
+      );
     }
 
     if (parsed.data.companyId) {
