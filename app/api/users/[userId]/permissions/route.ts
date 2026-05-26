@@ -18,6 +18,10 @@ const updatePermissionsSchema = z.object({
   ),
 });
 
+function isMissingUserPermissionsTableError(error: unknown) {
+  return error instanceof Error && error.message.includes("user_permissions");
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -127,7 +131,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "تعذر تحديث الصلاحيات";
+    const message = isMissingUserPermissionsTableError(error)
+      ? "ميزة الصلاحيات الدقيقة تحتاج تحديث قاعدة البيانات على الخادم أولاً."
+      : error instanceof Error
+        ? error.message
+        : "تعذر تحديث الصلاحيات";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

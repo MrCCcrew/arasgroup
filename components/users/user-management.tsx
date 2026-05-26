@@ -118,9 +118,63 @@ const scopeLabelMap: Record<string, { ar: string; en: string }> = {
   OWN: { ar: "على مستوى المستخدم نفسه", en: "Own scope" },
 };
 
+const moduleLabelMap: Record<string, { ar: string; en: string }> = {
+  DASHBOARD: { ar: "لوحة التحكم", en: "Dashboard" },
+  COMPANIES: { ar: "الشركات", en: "Companies" },
+  BRANCHES: { ar: "الفروع", en: "Branches" },
+  ADMINISTRATIVE_AFFAIRS: { ar: "الشؤون الإدارية", en: "Administrative Affairs" },
+  LICENSES: { ar: "التراخيص", en: "Licenses" },
+  ACCOUNTING: { ar: "المحاسبة", en: "Accounting" },
+  OWNER_ACCOUNTING: { ar: "محاسبة شركات المالك", en: "Owner Accounting" },
+  INVESTOR_ACCOUNTING: { ar: "محاسبة المستثمرين", en: "Investor Accounting" },
+  BANKS: { ar: "الحسابات البنكية", en: "Bank Accounts" },
+  HR: { ar: "الموظفون", en: "HR" },
+  SALARIES: { ar: "الرواتب", en: "Salaries" },
+  DELIVERY_HR: { ar: "موارد التوصيل", en: "Delivery HR" },
+  DELIVERY_OPERATIONS: { ar: "عمليات التوصيل", en: "Delivery Operations" },
+  DELIVERY_REPORTS: { ar: "تقارير التوصيل", en: "Delivery Reports" },
+  DELIVERY_EXPENSES: { ar: "مصروفات التوصيل", en: "Delivery Expenses" },
+  CAR_WASH_HR: { ar: "موارد غسيل السيارات", en: "Car Wash HR" },
+  CAR_WASH_OPERATIONS: { ar: "عمليات غسيل السيارات", en: "Car Wash Operations" },
+  CAR_WASH_REPORTS: { ar: "تقارير غسيل السيارات", en: "Car Wash Reports" },
+  CAR_WASH_EXPENSES: { ar: "مصروفات غسيل السيارات", en: "Car Wash Expenses" },
+  VEHICLES: { ar: "المركبات", en: "Vehicles" },
+  ASSETS_CUSTODY: { ar: "العهد والأصول", en: "Assets Custody" },
+  ATTACHMENTS: { ar: "المرفقات", en: "Attachments" },
+  INVESTORS: { ar: "المستثمرون", en: "Investors" },
+  INVESTOR_CLAIMS: { ar: "مطالبات المستثمرين", en: "Investor Claims" },
+  INVESTOR_STATEMENTS: { ar: "كشوف المستثمرين", en: "Investor Statements" },
+  EXPENSES: { ar: "المصروفات", en: "Expenses" },
+  REPORTS: { ar: "التقارير", en: "Reports" },
+  NOTIFICATIONS: { ar: "الإشعارات", en: "Notifications" },
+  TASKS: { ar: "المهام المنجزة", en: "Completed Tasks" },
+  SETTINGS: { ar: "الإعدادات", en: "Settings" },
+  USERS: { ar: "المستخدمون", en: "Users" },
+  AUDIT_LOGS: { ar: "سجل العمليات", en: "Audit Logs" },
+};
+
+const actionLabelMap: Record<string, { ar: string; en: string }> = {
+  VIEW: { ar: "عرض", en: "View" },
+  CREATE: { ar: "إنشاء", en: "Create" },
+  UPDATE: { ar: "تعديل", en: "Update" },
+  DELETE: { ar: "حذف", en: "Delete" },
+  APPROVE: { ar: "اعتماد", en: "Approve" },
+  EXPORT: { ar: "تصدير", en: "Export" },
+  PRINT: { ar: "طباعة", en: "Print" },
+  UPLOAD: { ar: "رفع", en: "Upload" },
+  DOWNLOAD: { ar: "تنزيل", en: "Download" },
+  ASSIGN: { ar: "تسليم", en: "Assign" },
+  RETURN: { ar: "استرجاع", en: "Return" },
+  COLLECT: { ar: "تحصيل", en: "Collect" },
+  PAY: { ar: "دفع", en: "Pay" },
+  RESOLVE: { ar: "معالجة", en: "Resolve" },
+};
+
 function permissionLabel(permission: PermissionOption, locale: "ar" | "en") {
   const scopeLabel = scopeLabelMap[permission.scope]?.[locale] ?? permission.scope;
-  return `${permission.module} / ${permission.action} / ${scopeLabel}`;
+  const moduleLabel = moduleLabelMap[permission.module]?.[locale] ?? permission.module;
+  const actionLabel = actionLabelMap[permission.action]?.[locale] ?? permission.action;
+  return `${moduleLabel} - ${actionLabel} - ${scopeLabel}`;
 }
 
 export function UserManagement({
@@ -159,6 +213,10 @@ export function UserManagement({
   const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>({});
 
   const selectedCompanyIds = useMemo(() => Object.keys(selectedCompanies), [selectedCompanies]);
+  const selectedPermission = useMemo(
+    () => permissions.find((entry) => entry.id === selectedPermissionId) ?? null,
+    [permissions, selectedPermissionId],
+  );
   const permissionBranchOptions = useMemo(() => {
     if (!selectedPermissionCompanyId) return [];
     return companies.find((company) => company.id === selectedPermissionCompanyId)?.branches ?? [];
@@ -247,7 +305,7 @@ export function UserManagement({
   }
 
   function addDirectPermission() {
-    const permission = permissions.find((entry) => entry.id === selectedPermissionId);
+    const permission = selectedPermission;
     if (!permission) {
       setError(text("اختر الصلاحية أولاً", "Select a permission first"));
       return;
@@ -739,7 +797,15 @@ export function UserManagement({
 
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                               <Field label={text("الصلاحية", "Permission")}>
-                                <select className="input-field w-full" value={selectedPermissionId} onChange={(event) => setSelectedPermissionId(event.target.value)}>
+                                <select
+                                  className="input-field w-full"
+                                  value={selectedPermissionId}
+                                  onChange={(event) => {
+                                    setSelectedPermissionId(event.target.value);
+                                    setSelectedPermissionCompanyId("");
+                                    setSelectedPermissionBranchId("");
+                                  }}
+                                >
                                   <option value="">{text("اختر الصلاحية", "Select permission")}</option>
                                   {permissions.map((permission) => (
                                     <option key={permission.id} value={permission.id}>
@@ -752,6 +818,7 @@ export function UserManagement({
                                 <select
                                   className="input-field w-full"
                                   value={selectedPermissionCompanyId}
+                                  disabled={!selectedPermission || (selectedPermission.scope !== "COMPANY" && selectedPermission.scope !== "BRANCH")}
                                   onChange={(event) => {
                                     setSelectedPermissionCompanyId(event.target.value);
                                     setSelectedPermissionBranchId("");
@@ -764,7 +831,12 @@ export function UserManagement({
                                 </select>
                               </Field>
                               <Field label={text("الفرع", "Branch")}>
-                                <select className="input-field w-full" value={selectedPermissionBranchId} onChange={(event) => setSelectedPermissionBranchId(event.target.value)}>
+                                <select
+                                  className="input-field w-full"
+                                  value={selectedPermissionBranchId}
+                                  disabled={!selectedPermission || selectedPermission.scope !== "BRANCH" || !selectedPermissionCompanyId}
+                                  onChange={(event) => setSelectedPermissionBranchId(event.target.value)}
+                                >
                                   <option value="">{text("غير محدد", "Not specified")}</option>
                                   {permissionBranchOptions.map((branch) => (
                                     <option key={branch.id} value={branch.id}>{branch.nameAr}</option>
@@ -777,6 +849,18 @@ export function UserManagement({
                                   <option value="DENY">{text("منع", "Deny")}</option>
                                 </select>
                               </Field>
+                            </div>
+
+                            <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                              {!selectedPermission
+                                ? text("اختر الصلاحية أولاً لمعرفة هل تحتاج شركة أو فرع.", "Select a permission first to see whether it needs a company or branch.")
+                                : selectedPermission.scope === "GROUP"
+                                  ? text("هذه الصلاحية على مستوى المجموعة ولا تحتاج شركة أو فرع.", "This permission is at group level and does not require a company or branch.")
+                                  : selectedPermission.scope === "COMPANY"
+                                    ? text("هذه الصلاحية على مستوى الشركة. اختر الشركة فقط.", "This permission is company-scoped. Select a company only.")
+                                    : selectedPermission.scope === "BRANCH"
+                                      ? text("هذه الصلاحية على مستوى الفرع. اختر الشركة أولاً ثم الفرع.", "This permission is branch-scoped. Select a company first, then a branch.")
+                                      : text("هذه الصلاحية على مستوى المستخدم نفسه.", "This permission is user-scoped.")}
                             </div>
 
                             <div className="flex flex-wrap gap-2">
