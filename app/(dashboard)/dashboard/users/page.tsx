@@ -13,6 +13,7 @@ type UsersPageData = [
   UserManagementProps["roles"],
   UserManagementProps["companies"],
   UserManagementProps["permissions"],
+  boolean,
 ];
 
 async function loadUsersPageData(): Promise<UsersPageData> {
@@ -91,7 +92,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
       ),
     ];
 
-    return [users, roles, companies, mergedPermissions];
+    return [users, roles, companies, mergedPermissions, true];
   } catch (error) {
     console.error("Users page fallback query:", error);
 
@@ -150,6 +151,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
       roles,
       companies,
       fallbackPermissions,
+      false,
     ];
   }
 }
@@ -159,7 +161,7 @@ export default async function UsersPage() {
   if (!session) redirect("/login");
   if (!isOwnerOrAdminSession(session)) redirect("/dashboard");
 
-  const [users, roles, companies, permissions] = await loadUsersPageData();
+  const [users, roles, companies, permissions, granularPermissionsEnabled] = await loadUsersPageData();
 
   return (
     <div>
@@ -174,6 +176,7 @@ export default async function UsersPage() {
           companies={companies}
           permissions={permissions}
           canManagePasswords
+          granularPermissionsEnabled={granularPermissionsEnabled}
         />
       </div>
     </div>

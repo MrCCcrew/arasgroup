@@ -82,6 +82,7 @@ interface Props {
   companies: CompanyOption[];
   permissions: PermissionOption[];
   canManagePasswords?: boolean;
+  granularPermissionsEnabled?: boolean;
 }
 
 type AccessFlags = {
@@ -183,6 +184,7 @@ export function UserManagement({
   companies,
   permissions,
   canManagePasswords = false,
+  granularPermissionsEnabled = true,
 }: Props) {
   const { locale, t } = useLocale();
   const [usersState, setUsersState] = useState<ExistingUser[]>(users);
@@ -743,10 +745,16 @@ export function UserManagement({
                               ? text(`${user.directPermissions?.length ?? 0} صلاحية مباشرة`, `${user.directPermissions?.length ?? 0} direct permission(s)`)
                               : text("لا توجد صلاحيات مباشرة", "No direct permissions")}
                           </p>
-                          <button type="button" onClick={() => openPermissionEditor(user)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
-                            <SlidersHorizontal size={14} />
-                            {text("إدارة الصلاحيات", "Manage permissions")}
-                          </button>
+                          {granularPermissionsEnabled ? (
+                            <button type="button" onClick={() => openPermissionEditor(user)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
+                              <SlidersHorizontal size={14} />
+                              {text("إدارة الصلاحيات", "Manage permissions")}
+                            </button>
+                          ) : (
+                            <span className="inline-flex rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                              {text("الصلاحيات الدقيقة غير مفعلة على الخادم بعد", "Granular permissions are not enabled on the server yet")}
+                            </span>
+                          )}
                         </div>
                       </td>
                       {canManagePasswords ? (
@@ -786,7 +794,7 @@ export function UserManagement({
                       ) : null}
                     </tr>
 
-                    {isPermissionsOpen ? (
+                    {granularPermissionsEnabled && isPermissionsOpen ? (
                       <tr className="border-b border-border/50 bg-muted/20">
                         <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
                           <div className="space-y-4">
