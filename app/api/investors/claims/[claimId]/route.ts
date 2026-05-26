@@ -4,14 +4,27 @@ import { prisma } from "@/lib/db";
 import { assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { kuwaitNow } from "@/lib/utils";
 import { resolveNotification, upsertNotification } from "@/lib/notifications";
+import { createInvestorClaimCollectionJE } from "@/lib/accounting/auto-entries";
 
 interface Props {
   params: Promise<{ claimId: string }>;
 }
 
 const patchSchema = z.object({
-  action: z.enum(["SEND_TO_ACCOUNTANT", "COLLECT", "PAY", "RENEW", "CANCEL"]),
+  action: z.enum([
+    "SEND_TO_ACCOUNTANT",
+    "SEND_TO_INVESTOR",
+    "COLLECT",
+    "CONFIRM_EXECUTION",
+    "PAY",
+    "RENEW",
+    "CANCEL",
+  ]),
   note: z.string().optional(),
+  // للتحصيل: المبالغ المحصلة لكل بند
+  collectedLines: z
+    .array(z.object({ lineId: z.string(), collectedAmount: z.number().min(0) }))
+    .optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: Props) {
@@ -36,11 +49,13 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
   const action = parsed.data.action;
   const permissionMap = {
-    SEND_TO_ACCOUNTANT: ["INVESTOR_CLAIMS", "UPDATE"] as const,
-    COLLECT: ["INVESTOR_CLAIMS", "COLLECT"] as const,
-    PAY: ["INVESTOR_CLAIMS", "PAY"] as const,
-    RENEW: ["INVESTOR_CLAIMS", "PAY"] as const,
-    CANCEL: ["INVESTOR_CLAIMS", "DELETE"] as const,
+    SEND_TO_ACCOUNTANT:  ["INVESTOR_CLAIMS", "UPDATE"]  as const,
+    SEND_TO_INVESTOR:    ["INVESTOR_CLAIMS", "COLLECT"] as const,
+    COLLECT:             ["INVESTOR_CLAIMS", "COLLECT"] as const,
+    CONFIRM_EXECUTION:   ["INVESTOR_CLAIMS", "UPDATE"]  as const,
+    PAY:                 ["INVESTOR_CLAIMS", "PAY"]     as const,
+    RENEW:               ["INVESTOR_CLAIMS", "PAY"]     as const,
+    CANCEL:              ["INVESTOR_CLAIMS", "DELETE"]  as const,
   };
   const [module, permissionAction] = permissionMap[action];
 
@@ -54,9 +69,65 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   let updateData: Record<string, unknown> = {};
 
   if (action === "SEND_TO_ACCOUNTANT") {
+    if (claim.status !== "PENDING" && claim.status !== "OVERDUE") {
+      return NextResponse.json({ success: false, error: "المطالبة ليست في حالة تسمح بالإرسال للمحاسب" }, { status: 400 });
+    }
     updateData = { status: "SENT_TO_ACCOUNTANT", sentToAccountantAt: now };
+
+  } else if (action === "SEND_TO_INVESTOR") {
+    if (claim.status !== "SENT_TO_ACCOUNTANT") {
+      return NextResponse.json({ success: false, error: "يجب إرسال المطالبة للمحاسب أولاً" }, { status: 400 });
+    }
+    updateData = { status: "SENT_TO_INVESTOR", sentToInvestorAt: now };
+
   } else if (action === "COLLECT") {
-    updateData = { status: "COLLECTED", collectedAt: now };
+    if (!["SENT_TO_ACCOUNTANT", "SENT_TO_INVESTOR", "PARTIALLY_COLLECTED"].includes(claim.status)) {
+      return NextResponse.json({ success: false, error: "المطالبة ليست في حالة تسمح بتسجيل التحصيل" }, { status: 400 });
+    }
+
+    const { collectedLines } = parsed.data;
+    if (!collectedLines || collectedLines.length === 0) {
+      return NextResponse.json({ success: false, error: "يرجى إدخال المبالغ المحصلة" }, { status: 400 });
+    }
+
+    // تحديث المبالغ المحصلة لكل بند
+    await prisma.$transaction(async (tx) => {
+      for (const cl of collectedLines) {
+        await tx.investorClaimLine.update({
+          where: { id: cl.lineId },
+          data: { collectedAmount: cl.collectedAmount },
+        });
+      }
+    });
+
+    const totalCollected = collectedLines.reduce((s, l) => s + l.collectedAmount, 0);
+    const totalActual = claim.lines.reduce((s, l) => s + Number(l.actualAmount), 0);
+    const totalIncome = claim.lines.reduce((s, l) => s + Number(l.groupIncome), 0);
+
+    // إنشاء قيد محاسبي
+    if (totalCollected > 0) {
+      const entry = await createInvestorClaimCollectionJE({
+        companyId: claim.companyId,
+        userId: session.id,
+        investorId: claim.investorId,
+        claimType: claim.type,
+        collectedAmount: totalCollected,
+        actualAmount: totalActual,
+        groupIncome: totalIncome,
+        refId: claim.id,
+        descriptionAr: claim.descriptionAr,
+      });
+      updateData.journalEntryId = entry.id;
+    }
+
+    updateData = { ...updateData, status: "COLLECTED", collectedAt: now };
+
+  } else if (action === "CONFIRM_EXECUTION") {
+    if (claim.status !== "COLLECTED") {
+      return NextResponse.json({ success: false, error: "يجب تسجيل التحصيل أولاً قبل تأكيد التنفيذ" }, { status: 400 });
+    }
+    updateData = { status: "COMPLETED", completedAt: now };
+
   } else if (action === "PAY") {
     updateData = { status: "PAID", paidAt: now };
   } else if (action === "RENEW") {
@@ -74,7 +145,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   });
 
   const dueKey = `claim:${claim.id}:due:${claim.dueDate?.toISOString().slice(0, 10) ?? "na"}`;
-  if (action === "COLLECT" || action === "PAY" || action === "RENEW" || action === "CANCEL") {
+  if (["COLLECT", "PAY", "RENEW", "CANCEL", "CONFIRM_EXECUTION"].includes(action)) {
     await resolveNotification(dueKey);
   }
 
@@ -82,7 +153,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     await upsertNotification({
       type: "FINANCIAL_CLAIM_SENT",
       uniqueKey: `claim:${claim.id}:sent`,
-      titleAr: "تم إرسال المطالبة إلى المحاسب",
+      titleAr: "تم إرسال مطالبة للمحاسب",
       titleEn: "Financial claim sent to accountant",
       messageAr: `تم إرسال مطالبة المسئول ${claim.investor.nameAr} إلى المحاسب`,
       messageEn: `Financial claim for ${claim.investor.nameEn ?? claim.investor.nameAr} was sent to the accountant`,
@@ -94,6 +165,26 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       dueDate: claim.dueDate,
       severity: "INFO",
       targetRole: "ACCOUNTANT",
+      refModule: "investor_claims",
+      refId: claim.id,
+    });
+  }
+
+  if (action === "COLLECT") {
+    await upsertNotification({
+      type: "FINANCIAL_CLAIM_SENT",
+      uniqueKey: `claim:${claim.id}:collected`,
+      titleAr: "تم تحصيل المطالبة",
+      titleEn: "Claim collected",
+      messageAr: `تم تسجيل تحصيل مطالبة ${claim.investor.nameAr} — يرجى تأكيد تنفيذ الخدمة`,
+      messageEn: `Claim for ${claim.investor.nameEn ?? claim.investor.nameAr} was collected — please confirm service execution`,
+      companyId: claim.companyId,
+      branchId: claim.branchId ?? undefined,
+      investorId: claim.investorId,
+      entityType: "INVESTOR_CLAIM",
+      entityId: claim.id,
+      severity: "INFO",
+      targetRole: "ADMIN",
       refModule: "investor_claims",
       refId: claim.id,
     });
@@ -126,7 +217,6 @@ export async function PUT(request: NextRequest, { params }: Props) {
     });
     if (permissionError) return permissionError;
 
-    // Only allow editing PENDING or SENT_TO_ACCOUNTANT claims
     if (!["PENDING", "SENT_TO_ACCOUNTANT"].includes(claim.status)) {
       return NextResponse.json(
         { success: false, error: "لا يمكن تعديل مطالبة تم تحصيلها أو إلغاؤها" },

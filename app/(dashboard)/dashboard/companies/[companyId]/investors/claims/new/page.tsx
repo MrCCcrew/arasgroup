@@ -21,7 +21,6 @@ interface Branch {
 
 interface ClaimLine {
   descriptionAr: string;
-  collectedAmount: string;
   actualAmount: string;
   groupIncome: string;
   notes: string;
@@ -50,7 +49,6 @@ const claimTypeLabels = {
 
 const emptyLine = (): ClaimLine => ({
   descriptionAr: "",
-  collectedAmount: "",
   actualAmount: "",
   groupIncome: "0",
   notes: "",
@@ -58,10 +56,9 @@ const emptyLine = (): ClaimLine => ({
 
 export default function NewClaimPage() {
   const router = useRouter();
-  const params = useParams<{ companyId: string }>();
+  const { companyId } = useParams<{ companyId: string }>();
   const searchParams = useSearchParams();
   const { locale } = useLocale();
-  const companyId = params.companyId;
   const initialInvestorId = searchParams.get("investorId") ?? "";
 
   const today = new Date().toISOString().split("T")[0];
@@ -122,7 +119,6 @@ export default function NewClaimPage() {
     setLines((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
   }
 
-  const totalCollected = lines.reduce((sum, line) => sum + (parseFloat(line.collectedAmount) || 0), 0);
   const totalActual = lines.reduce((sum, line) => sum + (parseFloat(line.actualAmount) || 0), 0);
   const totalIncome = lines.reduce((sum, line) => sum + (parseFloat(line.groupIncome) || 0), 0);
 
@@ -156,7 +152,6 @@ export default function NewClaimPage() {
           notes: form.notes || undefined,
           lines: lines.map((line) => ({
             descriptionAr: line.descriptionAr,
-            collectedAmount: parseFloat(line.collectedAmount) || 0,
             actualAmount: parseFloat(line.actualAmount) || 0,
             groupIncome: parseFloat(line.groupIncome) || 0,
             notes: line.notes || undefined,
@@ -300,9 +295,8 @@ export default function NewClaimPage() {
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Description" : "البيان"}</th>
-                    <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Collected amount" : "المبلغ المحصل"}</th>
-                    <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Actual amount" : "المبلغ الفعلي"}</th>
-                    <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Group income" : "دخل المجموعة"}</th>
+                    <th className="w-36 px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Required amount" : "المبلغ المطلوب"}</th>
+                    <th className="w-36 px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Group income" : "دخل المجموعة"}</th>
                     <th className="px-3 py-2 text-right font-bold text-muted-foreground">{locale === "en" ? "Notes" : "ملاحظات"}</th>
                     <th className="w-10"></th>
                   </tr>
@@ -319,9 +313,6 @@ export default function NewClaimPage() {
                           placeholder={locale === "en" ? "Line description" : "وصف البند"}
                           required
                         />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input type="number" step="0.001" min="0" value={line.collectedAmount} onChange={(event) => setLine(index, "collectedAmount", event.target.value)} className="input-field w-full" dir="ltr" placeholder="0.000" />
                       </td>
                       <td className="px-3 py-2">
                         <input type="number" step="0.001" min="0" value={line.actualAmount} onChange={(event) => setLine(index, "actualAmount", event.target.value)} className="input-field w-full" dir="ltr" placeholder="0.000" />
@@ -351,7 +342,6 @@ export default function NewClaimPage() {
                 <tfoot className="border-t-2 bg-muted/30 font-bold">
                   <tr>
                     <td className="px-3 py-2 text-center">{locale === "en" ? "Total" : "الإجمالي"}</td>
-                    <td className="px-3 py-2 text-left number">{totalCollected.toFixed(3)}</td>
                     <td className="px-3 py-2 text-left number">{totalActual.toFixed(3)}</td>
                     <td className="px-3 py-2 text-left number text-green-600">{totalIncome.toFixed(3)}</td>
                     <td colSpan={2}></td>

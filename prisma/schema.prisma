@@ -1808,10 +1808,12 @@ model InvestorClaim {
   claimDate     DateTime
   dueDate       DateTime?
   status        ClaimStatus @default(PENDING)
-  sentToAccountantAt DateTime?
-  collectedAt   DateTime?
-  paidAt        DateTime?
-  renewedAt     DateTime?
+  sentToAccountantAt  DateTime?
+  sentToInvestorAt    DateTime?
+  collectedAt         DateTime?
+  completedAt         DateTime?
+  paidAt              DateTime?
+  renewedAt           DateTime?
   journalEntryId String?
   notes         String?
 
@@ -1844,8 +1846,10 @@ enum ClaimType {
 enum ClaimStatus {
   PENDING
   SENT_TO_ACCOUNTANT
+  SENT_TO_INVESTOR
   PARTIALLY_COLLECTED
   COLLECTED
+  COMPLETED
   PAID
   RENEWED
   OVERDUE

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { ClaimStatus, ClaimType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { createInvestorClaimCollectionJE } from "@/lib/accounting/auto-entries";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { upsertNotification } from "@/lib/notifications";
 
 const claimLineSchema = z.object({
   descriptionAr: z.string(),
-  collectedAmount: z.number().min(0),
+  // collectedAmount يُدخله المحاسب لاحقاً عند تسجيل التحصيل — ليس في نموذج الإنشاء
+  collectedAmount: z.number().min(0).default(0),
   actualAmount: z.number().min(0),
   groupIncome: z.number().min(0).default(0),
   notes: z.string().optional(),
@@ -80,63 +80,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const data = parsed.data;
-    const companyAccessError = assertCompanyAccess(session, data.companyId);
+    const { companyId, investorId, branchId, type, descriptionAr, claimDate, dueDate, notes, lines } = parsed.data;
+
+    const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
-    const permissionError = assertPermission(session, "INVESTOR_CLAIMS", "CREATE", {
-      companyId: data.companyId,
-      branchId: data.branchId,
-    });
+    const permissionError = assertPermission(session, "INVESTOR_CLAIMS", "CREATE", { companyId, branchId });
     if (permissionError) return permissionError;
 
-    const claim = await prisma.$transaction(async (tx) => {
-      const createdClaim = await tx.investorClaim.create({
-        data: {
-          investorId: data.investorId,
-          branchId: data.branchId,
-          companyId: data.companyId,
-          type: data.type,
-          descriptionAr: data.descriptionAr,
-          claimDate: data.claimDate,
-          dueDate: data.dueDate,
-          notes: data.notes,
-          lines: {
-            create: data.lines.map((line) => ({
-              descriptionAr: line.descriptionAr,
-              collectedAmount: line.collectedAmount,
-              actualAmount: line.actualAmount,
-              groupIncome: line.groupIncome,
-              notes: line.notes,
-            })),
-          },
+    // الإنشاء بحالة PENDING — المحاسب هو من يسجل التحصيل لاحقاً
+    const claim = await prisma.investorClaim.create({
+      data: {
+        investorId,
+        branchId,
+        companyId,
+        type,
+        descriptionAr,
+        claimDate,
+        dueDate,
+        notes,
+        lines: {
+          create: lines.map((line) => ({
+            descriptionAr: line.descriptionAr,
+            collectedAmount: 0, // يُملأ لاحقاً من المحاسب
+            actualAmount: line.actualAmount,
+            groupIncome: line.groupIncome,
+            notes: line.notes,
+          })),
         },
-        include: { lines: true, investor: true },
-      });
-
-      const totalCollected = data.lines.reduce((sum, line) => sum + line.collectedAmount, 0);
-      const totalActual = data.lines.reduce((sum, line) => sum + line.actualAmount, 0);
-      const totalIncome = data.lines.reduce((sum, line) => sum + line.groupIncome, 0);
-
-      if (totalCollected > 0) {
-        const entry = await createInvestorClaimCollectionJE({
-          companyId: data.companyId,
-          userId: session.id,
-          investorId: data.investorId,
-          claimType: data.type,
-          collectedAmount: totalCollected,
-          actualAmount: totalActual,
-          groupIncome: totalIncome,
-          refId: createdClaim.id,
-          descriptionAr: data.descriptionAr,
-        });
-
-        await tx.investorClaim.update({
-          where: { id: createdClaim.id },
-          data: { journalEntryId: entry.id, status: "COLLECTED" },
-        });
-      }
-
-      return createdClaim;
+      },
+      include: { lines: true, investor: true },
     });
 
     if (claim.dueDate) {
@@ -147,9 +119,9 @@ export async function POST(request: NextRequest) {
         titleEn: "Investor claim due",
         messageAr: `مطالبة المسئول ${claim.investor.nameAr} مستحقة قريباً`,
         messageEn: `Investor claim for ${claim.investor.nameEn ?? claim.investor.nameAr} is due soon`,
-        companyId: claim.companyId,
+        companyId,
         branchId: claim.branchId ?? undefined,
-        investorId: claim.investorId,
+        investorId,
         entityType: "INVESTOR_CLAIM",
         entityId: claim.id,
         dueDate: claim.dueDate,
