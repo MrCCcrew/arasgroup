@@ -30,6 +30,8 @@ const patchSchema = z.object({
 export async function PATCH(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
+
+  try {
   const { claimId } = await params;
 
   const body = await request.json();
@@ -104,20 +106,23 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     const totalActual = claim.lines.reduce((s, l) => s + Number(l.actualAmount), 0);
     const totalIncome = claim.lines.reduce((s, l) => s + Number(l.groupIncome), 0);
 
-    // إنشاء قيد محاسبي
     if (totalCollected > 0) {
-      const entry = await createInvestorClaimCollectionJE({
-        companyId: claim.companyId,
-        userId: session.id,
-        investorId: claim.investorId,
-        claimType: claim.type,
-        collectedAmount: totalCollected,
-        actualAmount: totalActual,
-        groupIncome: totalIncome,
-        refId: claim.id,
-        descriptionAr: claim.descriptionAr,
-      });
-      updateData.journalEntryId = entry.id;
+      try {
+        const entry = await createInvestorClaimCollectionJE({
+          companyId: claim.companyId,
+          userId: session.id,
+          investorId: claim.investorId,
+          claimType: claim.type,
+          collectedAmount: totalCollected,
+          actualAmount: totalActual,
+          groupIncome: totalIncome,
+          refId: claim.id,
+          descriptionAr: claim.descriptionAr,
+        });
+        updateData.journalEntryId = entry.id;
+      } catch (jeError) {
+        console.error("JE creation skipped:", jeError);
+      }
     }
 
     updateData = { ...updateData, status: "COLLECTED", collectedAt: now };
@@ -191,6 +196,10 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   }
 
   return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في تحديث المطالبة";
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
 }
 
 // Full edit (description, amount lines, type, dueDate)
