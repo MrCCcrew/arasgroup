@@ -76,6 +76,10 @@ export default function NewClaimPage() {
   const searchParams = useSearchParams();
   const { locale } = useLocale();
   const initialInvestorId = searchParams.get("investorId") ?? "";
+  const initialType = searchParams.get("type") ?? "OTHER";
+  const prefillEmployeeId = searchParams.get("prefillEmployeeId") ?? "";
+  const prefillEmployeeNameAr = searchParams.get("prefillEmployeeNameAr") ?? "";
+  const prefillEmployeeNameEn = searchParams.get("prefillEmployeeNameEn") ?? "";
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -88,14 +92,18 @@ export default function NewClaimPage() {
   const [form, setForm] = useState({
     investorId: initialInvestorId,
     branchId: "",
-    type: "OTHER",
+    type: initialType,
     descriptionAr: "",
     claimDate: today,
     dueDate: "",
     notes: "",
   });
   const [lines, setLines] = useState<ClaimLine[]>([emptyLine()]);
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(
+    prefillEmployeeId && prefillEmployeeNameAr
+      ? [{ key: prefillEmployeeId, employeeId: prefillEmployeeId, isInvestor: false, nameAr: prefillEmployeeNameAr, nameEn: prefillEmployeeNameEn || null }]
+      : []
+  );
 
   const showBeneficiaries = BENEFICIARY_TYPES.includes(form.type);
 

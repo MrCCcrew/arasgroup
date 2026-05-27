@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { ClaimStatusActions } from "@/components/investors/claim-status-actions";
@@ -138,6 +138,9 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
       />
 
       <div className="page-container space-y-4">
+        {/* ── تجديدات مطلوبة ── */}
+        <RenewalAlertsPanel companyId={companyId} locale={locale} />
+
         {/* ── فلاتر الحالة ── */}
         <div className="flex flex-wrap gap-2">
           {filters.map((status) => {
@@ -268,6 +271,238 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
             </table>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── لوحة التجديدات المطلوبة ──────────────────────────────────────────────────
+
+const OPEN_STATUSES = ["PENDING", "SENT_TO_ACCOUNTANT", "SENT_TO_INVESTOR", "PARTIALLY_COLLECTED", "COLLECTED", "OVERDUE"];
+
+type RenewalAlert = {
+  employeeId: string;
+  nameAr: string;
+  nameEn: string | null;
+  branchNameAr: string | null;
+  branchNameEn: string | null;
+  alertType: "RESIDENCY" | "LICENSE";
+  expiryDate: Date;
+  daysLeft: number;
+  existingClaim: { id: string; status: string } | null;
+};
+
+async function RenewalAlertsPanel({
+  companyId,
+  locale,
+}: {
+  companyId: string;
+  locale: "ar" | "en";
+}) {
+  const now = new Date();
+  const maxLookAhead = 90 * 24 * 60 * 60 * 1000; // نبحث في 90 يوماً كحد أقصى
+
+  const [residencyEmployees, licenseEmployees] = await Promise.all([
+    prisma.employee.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        isDeleted: false,
+        residencyExpiry: { not: null, lte: new Date(now.getTime() + maxLookAhead) },
+      },
+      select: {
+        id: true,
+        nameAr: true,
+        nameEn: true,
+        residencyExpiry: true,
+        residencyAlertDays: true,
+        branch: { select: { nameAr: true, nameEn: true } },
+      },
+      orderBy: { residencyExpiry: "asc" },
+    }),
+    prisma.employee.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        isDeleted: false,
+        licenseExpiry: { not: null, lte: new Date(now.getTime() + maxLookAhead) },
+      },
+      select: {
+        id: true,
+        nameAr: true,
+        nameEn: true,
+        licenseExpiry: true,
+        branch: { select: { nameAr: true, nameEn: true } },
+      },
+      orderBy: { licenseExpiry: "asc" },
+    }),
+  ]);
+
+  // فلتر: فقط اللي وصلوا لحد تنبيههم
+  const residencyAlerts = residencyEmployees.filter((emp) => {
+    if (!emp.residencyExpiry) return false;
+    const daysLeft = Math.ceil((emp.residencyExpiry.getTime() - now.getTime()) / 86400000);
+    return daysLeft <= emp.residencyAlertDays;
+  });
+
+  const licenseAlerts = licenseEmployees.filter((emp) => {
+    if (!emp.licenseExpiry) return false;
+    const daysLeft = Math.ceil((emp.licenseExpiry.getTime() - now.getTime()) / 86400000);
+    return daysLeft <= 60;
+  });
+
+  if (residencyAlerts.length === 0 && licenseAlerts.length === 0) return null;
+
+  // اجلب المطالبات المفتوحة لهؤلاء الموظفين
+  const allIds = [
+    ...residencyAlerts.map((e) => e.id),
+    ...licenseAlerts.map((e) => e.id),
+  ];
+
+  const openBeneficiaries = await prisma.investorClaimBeneficiary.findMany({
+    where: {
+      employeeId: { in: allIds },
+      claim: {
+        companyId,
+        status: { in: OPEN_STATUSES as never[] },
+        type: { in: ["RESIDENCY_RENEWAL", "LICENSE_RENEWAL"] },
+      },
+    },
+    select: {
+      employeeId: true,
+      claim: { select: { id: true, status: true, type: true } },
+    },
+  });
+
+  // بناء خريطة: `employeeId:type` → claim
+  const claimMap = new Map<string, { id: string; status: string }>();
+  for (const b of openBeneficiaries) {
+    if (b.employeeId) {
+      claimMap.set(`${b.employeeId}:${b.claim.type}`, { id: b.claim.id, status: b.claim.status });
+    }
+  }
+
+  const alerts: RenewalAlert[] = [
+    ...residencyAlerts.map((emp) => ({
+      employeeId: emp.id,
+      nameAr: emp.nameAr,
+      nameEn: emp.nameEn ?? null,
+      branchNameAr: emp.branch?.nameAr ?? null,
+      branchNameEn: emp.branch?.nameEn ?? null,
+      alertType: "RESIDENCY" as const,
+      expiryDate: emp.residencyExpiry!,
+      daysLeft: Math.ceil((emp.residencyExpiry!.getTime() - now.getTime()) / 86400000),
+      existingClaim: claimMap.get(`${emp.id}:RESIDENCY_RENEWAL`) ?? null,
+    })),
+    ...licenseAlerts.map((emp) => ({
+      employeeId: emp.id,
+      nameAr: emp.nameAr,
+      nameEn: emp.nameEn ?? null,
+      branchNameAr: emp.branch?.nameAr ?? null,
+      branchNameEn: emp.branch?.nameEn ?? null,
+      alertType: "LICENSE" as const,
+      expiryDate: emp.licenseExpiry!,
+      daysLeft: Math.ceil((emp.licenseExpiry!.getTime() - now.getTime()) / 86400000),
+      existingClaim: claimMap.get(`${emp.id}:LICENSE_RENEWAL`) ?? null,
+    })),
+  ].sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const urgentCount = alerts.filter((a) => a.daysLeft <= 30 && !a.existingClaim).length;
+
+  const claimStatusLabels: Record<string, { ar: string; en: string }> = {
+    PENDING:            { ar: "معلق",             en: "Pending" },
+    SENT_TO_ACCOUNTANT: { ar: "عند المحاسب",       en: "With accountant" },
+    SENT_TO_INVESTOR:   { ar: "عند المسئول",       en: "With investor" },
+    PARTIALLY_COLLECTED:{ ar: "محصل جزئياً",       en: "Partial" },
+    COLLECTED:          { ar: "تم التحصيل",        en: "Collected" },
+    OVERDUE:            { ar: "متأخر",             en: "Overdue" },
+  };
+
+  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+
+  return (
+    <div className="rounded-xl border border-orange-200 bg-orange-50/60 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 bg-orange-100/60 border-b border-orange-200">
+        <AlertTriangle size={16} className="text-orange-600 shrink-0" />
+        <span className="font-bold text-sm text-orange-800">
+          {locale === "en" ? "Renewals needed" : "تجديدات مطلوبة"}
+        </span>
+        {urgentCount > 0 && (
+          <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+            {urgentCount} {locale === "en" ? "urgent" : "عاجل"}
+          </span>
+        )}
+        <span className="ms-auto text-xs text-orange-600">
+          {alerts.length} {locale === "en" ? "item(s)" : "عنصر"}
+        </span>
+      </div>
+
+      <div className="divide-y divide-orange-100">
+        {alerts.map((alert) => {
+          const name = locale === "en" ? alert.nameEn ?? alert.nameAr : alert.nameAr;
+          const branch = locale === "en" ? alert.branchNameEn ?? alert.branchNameAr : alert.branchNameAr;
+          const isExpired = alert.daysLeft < 0;
+          const isUrgent = alert.daysLeft >= 0 && alert.daysLeft <= 30;
+          const isWarning = alert.daysLeft > 30 && alert.daysLeft <= 60;
+
+          const daysColor = isExpired
+            ? "text-red-700 font-bold"
+            : isUrgent
+            ? "text-orange-700 font-bold"
+            : isWarning
+            ? "text-yellow-700"
+            : "text-muted-foreground";
+
+          const claimLabel = alert.alertType === "RESIDENCY"
+            ? (locale === "en" ? "Residency" : "إقامة")
+            : (locale === "en" ? "License" : "رخصة");
+
+          const newClaimType = alert.alertType === "RESIDENCY" ? "RESIDENCY_RENEWAL" : "LICENSE_RENEWAL";
+          const newClaimHref = `/dashboard/companies/${companyId}/investors/claims/new?type=${newClaimType}&prefillEmployeeId=${alert.employeeId}&prefillEmployeeNameAr=${encodeURIComponent(alert.nameAr)}${alert.nameEn ? `&prefillEmployeeNameEn=${encodeURIComponent(alert.nameEn)}` : ""}`;
+
+          return (
+            <div key={`${alert.employeeId}:${alert.alertType}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm">{name}</span>
+                  {branch && <span className="text-xs text-muted-foreground">— {branch}</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${alert.alertType === "RESIDENCY" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                    {claimLabel}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-xs text-muted-foreground">
+                    {locale === "en" ? "Expires:" : "ينتهي:"}{" "}
+                    {alert.expiryDate.toLocaleDateString(numberLocale === "ar-KW" ? "ar-KW" : "en-US")}
+                  </span>
+                  <span className={`text-xs ${daysColor}`}>
+                    {isExpired
+                      ? `${locale === "en" ? "Expired" : "انتهى منذ"} ${Math.abs(alert.daysLeft)} ${locale === "en" ? "day(s) ago" : "يوم"}`
+                      : `${alert.daysLeft} ${locale === "en" ? "day(s) left" : "يوم متبقي"}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                {alert.existingClaim ? (
+                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                    {locale === "en"
+                      ? claimStatusLabels[alert.existingClaim.status]?.en ?? alert.existingClaim.status
+                      : claimStatusLabels[alert.existingClaim.status]?.ar ?? alert.existingClaim.status}
+                  </span>
+                ) : (
+                  <Link
+                    href={newClaimHref}
+                    className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Plus size={12} />
+                    {locale === "en" ? "Create claim" : "إنشاء مطالبة"}
+                  </Link>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
