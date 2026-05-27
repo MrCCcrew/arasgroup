@@ -281,15 +281,39 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
 const OPEN_STATUSES = ["PENDING", "SENT_TO_ACCOUNTANT", "SENT_TO_INVESTOR", "PARTIALLY_COLLECTED", "COLLECTED", "OVERDUE"];
 
 type RenewalAlert = {
-  employeeId: string;
+  key: string;
+  entityType: "EMPLOYEE" | "LICENSE_DOC";
   nameAr: string;
   nameEn: string | null;
   branchNameAr: string | null;
   branchNameEn: string | null;
-  alertType: "RESIDENCY" | "LICENSE";
+  docTypeAr: string;
+  docTypeEn: string;
+  claimType: "RESIDENCY_RENEWAL" | "LICENSE_RENEWAL";
   expiryDate: Date;
   daysLeft: number;
   existingClaim: { id: string; status: string } | null;
+  employeeId?: string;
+  newClaimHref: string;
+};
+
+const LICENSE_DOC_TYPES = [
+  { field: "licenseExpiryDate",          ar: "الرخصة التجارية",      en: "Commercial License",   threshold: 60 },
+  { field: "fireLicenseExpiryDate",       ar: "رخصة الدفاع المدني",   en: "Fire Safety License",  threshold: 60 },
+  { field: "healthLicenseExpiryDate",     ar: "الرخصة الصحية",        en: "Health License",       threshold: 60 },
+  { field: "advertisingLicenseExpiryDate",ar: "رخصة الإعلانات",       en: "Advertising License",  threshold: 60 },
+  { field: "trafficCertExpiryDate",       ar: "شهادة المرور",          en: "Traffic Certificate",  threshold: 60 },
+  { field: "customsCertExpiryDate",       ar: "شهادة الجمارك",         en: "Customs Certificate",  threshold: 60 },
+  { field: "importLicenseExpiryDate",     ar: "رخصة الاستيراد",        en: "Import License",       threshold: 60 },
+] as const;
+
+const CLAIM_STATUS_LABELS: Record<string, { ar: string; en: string }> = {
+  PENDING:             { ar: "معلق",          en: "Pending" },
+  SENT_TO_ACCOUNTANT:  { ar: "عند المحاسب",   en: "With accountant" },
+  SENT_TO_INVESTOR:    { ar: "عند المسئول",   en: "With investor" },
+  PARTIALLY_COLLECTED: { ar: "محصل جزئياً",   en: "Partial" },
+  COLLECTED:           { ar: "تم التحصيل",    en: "Collected" },
+  OVERDUE:             { ar: "متأخر",          en: "Overdue" },
 };
 
 async function RenewalAlertsPanel({
@@ -300,125 +324,143 @@ async function RenewalAlertsPanel({
   locale: "ar" | "en";
 }) {
   const now = new Date();
-  const maxLookAhead = 90 * 24 * 60 * 60 * 1000; // نبحث في 90 يوماً كحد أقصى
+  const maxDate = new Date(now.getTime() + 90 * 86400000);
 
-  const [residencyEmployees, licenseEmployees] = await Promise.all([
+  const [residencyEmps, licenseEmps, companyLicenses] = await Promise.all([
     prisma.employee.findMany({
-      where: {
-        companyId,
-        isActive: true,
-        isDeleted: false,
-        residencyExpiry: { not: null, lte: new Date(now.getTime() + maxLookAhead) },
-      },
-      select: {
-        id: true,
-        nameAr: true,
-        nameEn: true,
-        residencyExpiry: true,
-        residencyAlertDays: true,
-        branch: { select: { nameAr: true, nameEn: true } },
-      },
+      where: { companyId, isActive: true, isDeleted: false, residencyExpiry: { not: null, lte: maxDate } },
+      select: { id: true, nameAr: true, nameEn: true, residencyExpiry: true, residencyAlertDays: true, branch: { select: { nameAr: true, nameEn: true } } },
       orderBy: { residencyExpiry: "asc" },
     }),
     prisma.employee.findMany({
+      where: { companyId, isActive: true, isDeleted: false, licenseExpiry: { not: null, lte: maxDate } },
+      select: { id: true, nameAr: true, nameEn: true, licenseExpiry: true, branch: { select: { nameAr: true, nameEn: true } } },
+      orderBy: { licenseExpiry: "asc" },
+    }),
+    prisma.license.findMany({
       where: {
         companyId,
-        isActive: true,
-        isDeleted: false,
-        licenseExpiry: { not: null, lte: new Date(now.getTime() + maxLookAhead) },
+        status: "ACTIVE",
+        OR: LICENSE_DOC_TYPES.map((d) => ({ [d.field]: { not: null, lte: maxDate } })),
       },
       select: {
         id: true,
-        nameAr: true,
-        nameEn: true,
-        licenseExpiry: true,
+        commercialNameAr: true,
+        commercialNameEn: true,
+        licenseExpiryDate: true,
+        fireLicenseExpiryDate: true,
+        healthLicenseExpiryDate: true,
+        advertisingLicenseExpiryDate: true,
+        trafficCertExpiryDate: true,
+        customsCertExpiryDate: true,
+        importLicenseExpiryDate: true,
         branch: { select: { nameAr: true, nameEn: true } },
       },
-      orderBy: { licenseExpiry: "asc" },
     }),
   ]);
 
-  // فلتر: فقط اللي وصلوا لحد تنبيههم
-  const residencyAlerts = residencyEmployees.filter((emp) => {
-    if (!emp.residencyExpiry) return false;
-    const daysLeft = Math.ceil((emp.residencyExpiry.getTime() - now.getTime()) / 86400000);
-    return daysLeft <= emp.residencyAlertDays;
+  // فلتر الموظفين بحدود التنبيه الخاصة بكل منهم
+  const residencyAlerts = residencyEmps.filter((e) => {
+    const d = Math.ceil((e.residencyExpiry!.getTime() - now.getTime()) / 86400000);
+    return d <= e.residencyAlertDays;
+  });
+  const empLicenseAlerts = licenseEmps.filter((e) => {
+    const d = Math.ceil((e.licenseExpiry!.getTime() - now.getTime()) / 86400000);
+    return d <= 60;
   });
 
-  const licenseAlerts = licenseEmployees.filter((emp) => {
-    if (!emp.licenseExpiry) return false;
-    const daysLeft = Math.ceil((emp.licenseExpiry.getTime() - now.getTime()) / 86400000);
-    return daysLeft <= 60;
-  });
+  // مطالبات موظفين مفتوحة
+  const empIds = [...residencyAlerts.map((e) => e.id), ...empLicenseAlerts.map((e) => e.id)];
+  const openBeneficiaries = empIds.length > 0
+    ? await prisma.investorClaimBeneficiary.findMany({
+        where: {
+          employeeId: { in: empIds },
+          claim: { companyId, status: { in: OPEN_STATUSES as never[] }, type: { in: ["RESIDENCY_RENEWAL", "LICENSE_RENEWAL"] } },
+        },
+        select: { employeeId: true, claim: { select: { id: true, status: true, type: true } } },
+      })
+    : [];
 
-  if (residencyAlerts.length === 0 && licenseAlerts.length === 0) return null;
-
-  // اجلب المطالبات المفتوحة لهؤلاء الموظفين
-  const allIds = [
-    ...residencyAlerts.map((e) => e.id),
-    ...licenseAlerts.map((e) => e.id),
-  ];
-
-  const openBeneficiaries = await prisma.investorClaimBeneficiary.findMany({
-    where: {
-      employeeId: { in: allIds },
-      claim: {
-        companyId,
-        status: { in: OPEN_STATUSES as never[] },
-        type: { in: ["RESIDENCY_RENEWAL", "LICENSE_RENEWAL"] },
-      },
-    },
-    select: {
-      employeeId: true,
-      claim: { select: { id: true, status: true, type: true } },
-    },
-  });
-
-  // بناء خريطة: `employeeId:type` → claim
   const claimMap = new Map<string, { id: string; status: string }>();
   for (const b of openBeneficiaries) {
-    if (b.employeeId) {
-      claimMap.set(`${b.employeeId}:${b.claim.type}`, { id: b.claim.id, status: b.claim.status });
+    if (b.employeeId) claimMap.set(`${b.employeeId}:${b.claim.type}`, { id: b.claim.id, status: b.claim.status });
+  }
+
+  // بناء قائمة التنبيهات
+  const alerts: RenewalAlert[] = [];
+
+  for (const emp of residencyAlerts) {
+    const daysLeft = Math.ceil((emp.residencyExpiry!.getTime() - now.getTime()) / 86400000);
+    alerts.push({
+      key: `emp:${emp.id}:RESIDENCY`,
+      entityType: "EMPLOYEE",
+      nameAr: emp.nameAr,
+      nameEn: emp.nameEn ?? null,
+      branchNameAr: emp.branch?.nameAr ?? null,
+      branchNameEn: emp.branch?.nameEn ?? null,
+      docTypeAr: "إقامة",
+      docTypeEn: "Residency",
+      claimType: "RESIDENCY_RENEWAL",
+      expiryDate: emp.residencyExpiry!,
+      daysLeft,
+      existingClaim: claimMap.get(`${emp.id}:RESIDENCY_RENEWAL`) ?? null,
+      employeeId: emp.id,
+      newClaimHref: `/dashboard/companies/${companyId}/investors/claims/new?type=RESIDENCY_RENEWAL&prefillEmployeeId=${emp.id}&prefillEmployeeNameAr=${encodeURIComponent(emp.nameAr)}${emp.nameEn ? `&prefillEmployeeNameEn=${encodeURIComponent(emp.nameEn)}` : ""}`,
+    });
+  }
+
+  for (const emp of empLicenseAlerts) {
+    const daysLeft = Math.ceil((emp.licenseExpiry!.getTime() - now.getTime()) / 86400000);
+    alerts.push({
+      key: `emp:${emp.id}:LICENSE`,
+      entityType: "EMPLOYEE",
+      nameAr: emp.nameAr,
+      nameEn: emp.nameEn ?? null,
+      branchNameAr: emp.branch?.nameAr ?? null,
+      branchNameEn: emp.branch?.nameEn ?? null,
+      docTypeAr: "رخصة موظف",
+      docTypeEn: "Employee License",
+      claimType: "LICENSE_RENEWAL",
+      expiryDate: emp.licenseExpiry!,
+      daysLeft,
+      existingClaim: claimMap.get(`${emp.id}:LICENSE_RENEWAL`) ?? null,
+      employeeId: emp.id,
+      newClaimHref: `/dashboard/companies/${companyId}/investors/claims/new?type=LICENSE_RENEWAL&prefillEmployeeId=${emp.id}&prefillEmployeeNameAr=${encodeURIComponent(emp.nameAr)}${emp.nameEn ? `&prefillEmployeeNameEn=${encodeURIComponent(emp.nameEn)}` : ""}`,
+    });
+  }
+
+  for (const lic of companyLicenses) {
+    for (const docType of LICENSE_DOC_TYPES) {
+      const expiry = (lic as Record<string, unknown>)[docType.field] as Date | null;
+      if (!expiry) continue;
+      const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000);
+      if (daysLeft > docType.threshold) continue;
+      const licName = locale === "en" ? lic.commercialNameEn ?? lic.commercialNameAr : lic.commercialNameAr;
+      alerts.push({
+        key: `lic:${lic.id}:${docType.field}`,
+        entityType: "LICENSE_DOC",
+        nameAr: lic.commercialNameAr,
+        nameEn: lic.commercialNameEn ?? null,
+        branchNameAr: lic.branch?.nameAr ?? null,
+        branchNameEn: lic.branch?.nameEn ?? null,
+        docTypeAr: docType.ar,
+        docTypeEn: docType.en,
+        claimType: "LICENSE_RENEWAL",
+        expiryDate: expiry,
+        daysLeft,
+        existingClaim: null,
+        newClaimHref: `/dashboard/companies/${companyId}/investors/claims/new?type=LICENSE_RENEWAL&prefillLicenseNameAr=${encodeURIComponent(`${lic.commercialNameAr} — ${docType.ar}`)}`,
+      });
+      void licName;
     }
   }
 
-  const alerts: RenewalAlert[] = [
-    ...residencyAlerts.map((emp) => ({
-      employeeId: emp.id,
-      nameAr: emp.nameAr,
-      nameEn: emp.nameEn ?? null,
-      branchNameAr: emp.branch?.nameAr ?? null,
-      branchNameEn: emp.branch?.nameEn ?? null,
-      alertType: "RESIDENCY" as const,
-      expiryDate: emp.residencyExpiry!,
-      daysLeft: Math.ceil((emp.residencyExpiry!.getTime() - now.getTime()) / 86400000),
-      existingClaim: claimMap.get(`${emp.id}:RESIDENCY_RENEWAL`) ?? null,
-    })),
-    ...licenseAlerts.map((emp) => ({
-      employeeId: emp.id,
-      nameAr: emp.nameAr,
-      nameEn: emp.nameEn ?? null,
-      branchNameAr: emp.branch?.nameAr ?? null,
-      branchNameEn: emp.branch?.nameEn ?? null,
-      alertType: "LICENSE" as const,
-      expiryDate: emp.licenseExpiry!,
-      daysLeft: Math.ceil((emp.licenseExpiry!.getTime() - now.getTime()) / 86400000),
-      existingClaim: claimMap.get(`${emp.id}:LICENSE_RENEWAL`) ?? null,
-    })),
-  ].sort((a, b) => a.daysLeft - b.daysLeft);
+  alerts.sort((a, b) => a.daysLeft - b.daysLeft);
+
+  if (alerts.length === 0) return null;
 
   const urgentCount = alerts.filter((a) => a.daysLeft <= 30 && !a.existingClaim).length;
-
-  const claimStatusLabels: Record<string, { ar: string; en: string }> = {
-    PENDING:            { ar: "معلق",             en: "Pending" },
-    SENT_TO_ACCOUNTANT: { ar: "عند المحاسب",       en: "With accountant" },
-    SENT_TO_INVESTOR:   { ar: "عند المسئول",       en: "With investor" },
-    PARTIALLY_COLLECTED:{ ar: "محصل جزئياً",       en: "Partial" },
-    COLLECTED:          { ar: "تم التحصيل",        en: "Collected" },
-    OVERDUE:            { ar: "متأخر",             en: "Overdue" },
-  };
-
-  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const dateLocale = locale === "en" ? "en-US" : "ar-KW";
 
   return (
     <div className="rounded-xl border border-orange-200 bg-orange-50/60 overflow-hidden">
@@ -441,43 +483,38 @@ async function RenewalAlertsPanel({
         {alerts.map((alert) => {
           const name = locale === "en" ? alert.nameEn ?? alert.nameAr : alert.nameAr;
           const branch = locale === "en" ? alert.branchNameEn ?? alert.branchNameAr : alert.branchNameAr;
+          const docType = locale === "en" ? alert.docTypeEn : alert.docTypeAr;
           const isExpired = alert.daysLeft < 0;
-          const isUrgent = alert.daysLeft >= 0 && alert.daysLeft <= 30;
-          const isWarning = alert.daysLeft > 30 && alert.daysLeft <= 60;
+          const isUrgent  = !isExpired && alert.daysLeft <= 30;
+          const isWarning = !isExpired && alert.daysLeft > 30 && alert.daysLeft <= 60;
 
-          const daysColor = isExpired
-            ? "text-red-700 font-bold"
-            : isUrgent
-            ? "text-orange-700 font-bold"
-            : isWarning
-            ? "text-yellow-700"
+          const daysColor = isExpired ? "text-red-700 font-bold"
+            : isUrgent  ? "text-orange-700 font-bold"
+            : isWarning ? "text-yellow-700"
             : "text-muted-foreground";
 
-          const claimLabel = alert.alertType === "RESIDENCY"
-            ? (locale === "en" ? "Residency" : "إقامة")
-            : (locale === "en" ? "License" : "رخصة");
-
-          const newClaimType = alert.alertType === "RESIDENCY" ? "RESIDENCY_RENEWAL" : "LICENSE_RENEWAL";
-          const newClaimHref = `/dashboard/companies/${companyId}/investors/claims/new?type=${newClaimType}&prefillEmployeeId=${alert.employeeId}&prefillEmployeeNameAr=${encodeURIComponent(alert.nameAr)}${alert.nameEn ? `&prefillEmployeeNameEn=${encodeURIComponent(alert.nameEn)}` : ""}`;
+          const tagColor = alert.claimType === "RESIDENCY_RENEWAL"
+            ? "bg-blue-100 text-blue-700"
+            : alert.entityType === "LICENSE_DOC"
+            ? "bg-green-100 text-green-700"
+            : "bg-purple-100 text-purple-700";
 
           return (
-            <div key={`${alert.employeeId}:${alert.alertType}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50">
+            <div key={alert.key} className="flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{name}</span>
                   {branch && <span className="text-xs text-muted-foreground">— {branch}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${alert.alertType === "RESIDENCY" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
-                    {claimLabel}
-                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${tagColor}`}>{docType}</span>
                 </div>
                 <div className="flex items-center gap-3 mt-0.5">
                   <span className="text-xs text-muted-foreground">
                     {locale === "en" ? "Expires:" : "ينتهي:"}{" "}
-                    {alert.expiryDate.toLocaleDateString(numberLocale === "ar-KW" ? "ar-KW" : "en-US")}
+                    {alert.expiryDate.toLocaleDateString(dateLocale)}
                   </span>
                   <span className={`text-xs ${daysColor}`}>
                     {isExpired
-                      ? `${locale === "en" ? "Expired" : "انتهى منذ"} ${Math.abs(alert.daysLeft)} ${locale === "en" ? "day(s) ago" : "يوم"}`
+                      ? `${locale === "en" ? "Expired" : "انتهى منذ"} ${Math.abs(alert.daysLeft)} ${locale === "en" ? "days" : "يوم"}`
                       : `${alert.daysLeft} ${locale === "en" ? "day(s) left" : "يوم متبقي"}`}
                   </span>
                 </div>
@@ -487,12 +524,12 @@ async function RenewalAlertsPanel({
                 {alert.existingClaim ? (
                   <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
                     {locale === "en"
-                      ? claimStatusLabels[alert.existingClaim.status]?.en ?? alert.existingClaim.status
-                      : claimStatusLabels[alert.existingClaim.status]?.ar ?? alert.existingClaim.status}
+                      ? CLAIM_STATUS_LABELS[alert.existingClaim.status]?.en ?? alert.existingClaim.status
+                      : CLAIM_STATUS_LABELS[alert.existingClaim.status]?.ar ?? alert.existingClaim.status}
                   </span>
                 ) : (
                   <Link
-                    href={newClaimHref}
+                    href={alert.newClaimHref}
                     className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     <Plus size={12} />

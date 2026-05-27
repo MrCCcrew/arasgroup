@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { CheckCircle, KeyRound, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, XCircle } from "lucide-react";
 import { useLocale } from "@/components/providers/locale-provider";
 
@@ -112,6 +112,17 @@ const defaultFlags: AccessFlags = {
   canApprove: false,
 };
 
+const MODULE_GROUPS: Record<string, string[]> = {
+  "الإدارة والمستخدمون": ["DASHBOARD", "COMPANIES", "BRANCHES", "USERS", "SETTINGS", "AUDIT_LOGS", "NOTIFICATIONS"],
+  "الموظفون والرواتب":    ["HR", "SALARIES", "ADMINISTRATIVE_AFFAIRS"],
+  "المحاسبة والمالية":    ["ACCOUNTING", "OWNER_ACCOUNTING", "INVESTOR_ACCOUNTING", "BANKS", "EXPENSES"],
+  "المسئولون والمديرون":  ["INVESTORS", "INVESTOR_CLAIMS", "INVESTOR_STATEMENTS"],
+  "التوصيل":              ["DELIVERY_HR", "DELIVERY_OPERATIONS", "DELIVERY_REPORTS", "DELIVERY_EXPENSES"],
+  "غسيل السيارات":        ["CAR_WASH_HR", "CAR_WASH_OPERATIONS", "CAR_WASH_REPORTS", "CAR_WASH_EXPENSES"],
+  "الأصول والمركبات":     ["VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "LICENSES"],
+  "تقارير ومهام":         ["REPORTS", "TASKS"],
+};
+
 const scopeLabelMap: Record<string, { ar: string; en: string }> = {
   GROUP: { ar: "على مستوى المجموعة", en: "Group scope" },
   COMPANY: { ar: "على مستوى الشركة", en: "Company scope" },
@@ -197,6 +208,8 @@ export function UserManagement({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(false);
   const [selectedPermissionId, setSelectedPermissionId] = useState("");
+  const [selectedModule, setSelectedModule] = useState("");
+  const [selectedAction, setSelectedAction] = useState("");
   const [selectedPermissionCompanyId, setSelectedPermissionCompanyId] = useState("");
   const [selectedPermissionBranchId, setSelectedPermissionBranchId] = useState("");
   const [selectedPermissionAllowed, setSelectedPermissionAllowed] = useState(true);
@@ -223,6 +236,34 @@ export function UserManagement({
     if (!selectedPermissionCompanyId) return [];
     return companies.find((company) => company.id === selectedPermissionCompanyId)?.branches ?? [];
   }, [companies, selectedPermissionCompanyId]);
+
+  const availableModules = useMemo(() => {
+    const existing = new Set(permissions.map((p) => p.module));
+    return Object.entries(MODULE_GROUPS).map(([group, mods]) => ({
+      group,
+      modules: mods.filter((m) => existing.has(m)),
+    })).filter((g) => g.modules.length > 0);
+  }, [permissions]);
+
+  const availableActions = useMemo(() => {
+    if (!selectedModule) return [];
+    const seen = new Set<string>();
+    return permissions
+      .filter((p) => p.module === selectedModule)
+      .map((p) => p.action)
+      .filter((a) => { if (seen.has(a)) return false; seen.add(a); return true; });
+  }, [permissions, selectedModule]);
+
+  useEffect(() => {
+    if (selectedModule && selectedAction) {
+      const found = permissions.find((p) => p.module === selectedModule && p.action === selectedAction);
+      setSelectedPermissionId(found?.id ?? "");
+    } else {
+      setSelectedPermissionId("");
+    }
+    setSelectedPermissionCompanyId("");
+    setSelectedPermissionBranchId("");
+  }, [selectedModule, selectedAction, permissions]);
 
   const text = (ar: string, en: string) => (locale === "en" ? en : ar);
 
@@ -282,6 +323,8 @@ export function UserManagement({
 
   function resetPermissionPicker() {
     setSelectedPermissionId("");
+    setSelectedModule("");
+    setSelectedAction("");
     setSelectedPermissionCompanyId("");
     setSelectedPermissionBranchId("");
     setSelectedPermissionAllowed(true);
@@ -803,34 +846,51 @@ export function UserManagement({
                               <p className="text-sm text-muted-foreground">{text("أضف صلاحيات مباشرة تسمح أو تمنع إجراءات محددة لهذا المستخدم فوق صلاحيات الدور.", "Add direct allow or deny permissions for this user on top of role permissions.")}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                              <Field label={text("الصلاحية", "Permission")}>
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                              {/* ── الخطوة 1: القسم ── */}
+                              <Field label={text("القسم", "Module")}>
                                 <select
                                   className="input-field w-full"
-                                  value={selectedPermissionId}
-                                  onChange={(event) => {
-                                    setSelectedPermissionId(event.target.value);
-                                    setSelectedPermissionCompanyId("");
-                                    setSelectedPermissionBranchId("");
-                                  }}
+                                  value={selectedModule}
+                                  onChange={(e) => { setSelectedModule(e.target.value); setSelectedAction(""); }}
                                 >
-                                  <option value="">{text("اختر الصلاحية", "Select permission")}</option>
-                                  {permissions.map((permission) => (
-                                    <option key={permission.id} value={permission.id}>
-                                      {permissionLabel(permission, locale)}
+                                  <option value="">{text("اختر القسم", "Select module")}</option>
+                                  {availableModules.map(({ group, modules }) => (
+                                    <optgroup key={group} label={group}>
+                                      {modules.map((mod) => (
+                                        <option key={mod} value={mod}>
+                                          {moduleLabelMap[mod]?.[locale] ?? mod}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
+                              </Field>
+
+                              {/* ── الخطوة 2: الإجراء ── */}
+                              <Field label={text("الإجراء", "Action")}>
+                                <select
+                                  className="input-field w-full"
+                                  value={selectedAction}
+                                  disabled={!selectedModule}
+                                  onChange={(e) => setSelectedAction(e.target.value)}
+                                >
+                                  <option value="">{text("اختر الإجراء", "Select action")}</option>
+                                  {availableActions.map((action) => (
+                                    <option key={action} value={action}>
+                                      {actionLabelMap[action]?.[locale] ?? action}
                                     </option>
                                   ))}
                                 </select>
                               </Field>
+
+                              {/* ── الشركة (تظهر لو الصلاحية على مستوى شركة/فرع) ── */}
                               <Field label={text("الشركة", "Company")}>
                                 <select
                                   className="input-field w-full"
                                   value={selectedPermissionCompanyId}
                                   disabled={!selectedPermission || (selectedPermission.scope !== "COMPANY" && selectedPermission.scope !== "BRANCH")}
-                                  onChange={(event) => {
-                                    setSelectedPermissionCompanyId(event.target.value);
-                                    setSelectedPermissionBranchId("");
-                                  }}
+                                  onChange={(event) => { setSelectedPermissionCompanyId(event.target.value); setSelectedPermissionBranchId(""); }}
                                 >
                                   <option value="">{text("غير محدد", "Not specified")}</option>
                                   {companies.map((company) => (
@@ -838,6 +898,8 @@ export function UserManagement({
                                   ))}
                                 </select>
                               </Field>
+
+                              {/* ── الفرع ── */}
                               <Field label={text("الفرع", "Branch")}>
                                 <select
                                   className="input-field w-full"
@@ -851,12 +913,19 @@ export function UserManagement({
                                   ))}
                                 </select>
                               </Field>
-                              <Field label={text("نوع القرار", "Rule")}>
-                                <select className="input-field w-full" value={selectedPermissionAllowed ? "ALLOW" : "DENY"} onChange={(event) => setSelectedPermissionAllowed(event.target.value === "ALLOW")}>
-                                  <option value="ALLOW">{text("سماح", "Allow")}</option>
-                                  <option value="DENY">{text("منع", "Deny")}</option>
-                                </select>
-                              </Field>
+                            </div>
+
+                            {/* ── السماح / المنع (صف مستقل أسفل) ── */}
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm font-medium">{text("نوع القرار:", "Rule:")}</span>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="permAllowed" value="ALLOW" checked={selectedPermissionAllowed} onChange={() => setSelectedPermissionAllowed(true)} className="accent-primary" />
+                                <span className="text-sm text-green-700 font-medium">{text("سماح", "Allow")}</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="permAllowed" value="DENY" checked={!selectedPermissionAllowed} onChange={() => setSelectedPermissionAllowed(false)} className="accent-red-500" />
+                                <span className="text-sm text-red-700 font-medium">{text("منع", "Deny")}</span>
+                              </label>
                             </div>
 
                             <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
