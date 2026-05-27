@@ -102,6 +102,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
       investor: { select: { nameAr: true, nameEn: true, phone: true } },
       branch:   { select: { nameAr: true, nameEn: true } },
       lines: true,
+      beneficiaries: { select: { id: true, nameAr: true, nameEn: true, isInvestor: true } },
     },
     orderBy: { claimDate: "desc" },
   });
@@ -197,9 +198,23 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                       <tr key={claim.id} className="align-top hover:bg-muted/30">
                         <td className="font-medium">{investorName}</td>
                         <td>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                            {typeLabels[locale][claim.type]}
-                          </span>
+                          <div className="space-y-1">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                              {typeLabels[locale][claim.type]}
+                            </span>
+                            {claim.beneficiaries.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {claim.beneficiaries.map((b) => (
+                                  <span
+                                    key={b.id}
+                                    className={`rounded-full px-1.5 py-0.5 text-xs ${b.isInvestor ? "bg-primary/10 text-primary" : "bg-blue-50 text-blue-700"}`}
+                                  >
+                                    {locale === "en" ? b.nameEn ?? b.nameAr : b.nameAr}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="text-sm text-muted-foreground">{branchName}</td>
                         <td className="text-sm">{formatDate(claim.claimDate, dateLocale)}</td>

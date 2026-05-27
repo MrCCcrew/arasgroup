@@ -14,6 +14,13 @@ const claimLineSchema = z.object({
   notes: z.string().optional(),
 });
 
+const beneficiarySchema = z.object({
+  employeeId: z.string().optional(),
+  isInvestor: z.boolean().default(false),
+  nameAr: z.string(),
+  nameEn: z.string().optional().nullable(),
+});
+
 const createClaimSchema = z.object({
   investorId: z.string(),
   branchId: z.string().optional(),
@@ -24,6 +31,7 @@ const createClaimSchema = z.object({
   dueDate: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
   lines: z.array(claimLineSchema).min(1),
   notes: z.string().optional(),
+  beneficiaries: z.array(beneficiarySchema).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -54,10 +62,11 @@ export async function GET(request: NextRequest) {
         ...(type ? { type: type as ClaimType } : {}),
       },
       include: {
-        investor: { select: { nameAr: true, phone: true } },
-        branch: { select: { nameAr: true } },
+        investor: { select: { nameAr: true, nameEn: true, phone: true } },
+        branch: { select: { nameAr: true, nameEn: true } },
         lines: true,
         payments: true,
+        beneficiaries: { select: { id: true, nameAr: true, nameEn: true, isInvestor: true, employeeId: true } },
       },
       orderBy: { claimDate: "desc" },
     });
@@ -80,7 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { companyId, investorId, branchId, type, descriptionAr, claimDate, dueDate, notes, lines } = parsed.data;
+    const { companyId, investorId, branchId, type, descriptionAr, claimDate, dueDate, notes, lines, beneficiaries } = parsed.data;
 
     const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
@@ -101,14 +110,26 @@ export async function POST(request: NextRequest) {
         lines: {
           create: lines.map((line) => ({
             descriptionAr: line.descriptionAr,
-            collectedAmount: 0, // يُملأ لاحقاً من المحاسب
+            collectedAmount: 0,
             actualAmount: line.actualAmount,
             groupIncome: line.groupIncome,
             notes: line.notes,
           })),
         },
+        ...(beneficiaries && beneficiaries.length > 0
+          ? {
+              beneficiaries: {
+                create: beneficiaries.map((b) => ({
+                  employeeId: b.employeeId,
+                  isInvestor: b.isInvestor,
+                  nameAr: b.nameAr,
+                  nameEn: b.nameEn,
+                })),
+              },
+            }
+          : {}),
       },
-      include: { lines: true, investor: true },
+      include: { lines: true, beneficiaries: true, investor: true },
     });
 
     if (claim.dueDate) {

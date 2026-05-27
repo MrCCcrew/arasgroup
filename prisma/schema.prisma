@@ -796,7 +796,8 @@ model Employee {
   leavePayCalcs     LeavePayCalc[]
   assignedVehicles    Vehicle[]                    @relation("VehicleAssignedEmployee")
   notifications       Notification[]
-  licenseAssignments  EmployeeLicenseAssignment[]
+  licenseAssignments     EmployeeLicenseAssignment[]
+  claimBeneficiaries     InvestorClaimBeneficiary[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1817,10 +1818,11 @@ model InvestorClaim {
   journalEntryId String?
   notes         String?
 
-  investor Investor           @relation(fields: [investorId], references: [id], onDelete: Restrict)
-  branch   Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  lines    InvestorClaimLine[]
-  payments InvestorPayment[]
+  investor      Investor                    @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch        Branch?                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines         InvestorClaimLine[]
+  payments      InvestorPayment[]
+  beneficiaries InvestorClaimBeneficiary[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1870,6 +1872,22 @@ model InvestorClaimLine {
 
   @@index([claimId])
   @@map("investor_claim_lines")
+}
+
+model InvestorClaimBeneficiary {
+  id         String  @id @default(cuid())
+  claimId    String
+  employeeId String?
+  isInvestor Boolean @default(false)
+  nameAr     String
+  nameEn     String?
+
+  claim    InvestorClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  employee Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([claimId])
+  @@index([employeeId])
+  @@map("investor_claim_beneficiaries")
 }
 
 model InvestorPayment {
