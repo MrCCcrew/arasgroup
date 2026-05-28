@@ -87,6 +87,7 @@ export const messages: Record<Locale, MessageTree> = {
       assets: "العهد والأصول",
       notifications: "الإشعارات",
       completedTasks: "المهام المنجزة",
+      reminders: "التذكيرات",
       vehicleIncidents: "حوادث وإصلاح المركبات",
     },
     header: {
@@ -256,6 +257,7 @@ export const messages: Record<Locale, MessageTree> = {
       assets: "Assets & Custody",
       notifications: "Notifications",
       completedTasks: "Completed Tasks",
+      reminders: "Reminders",
       vehicleIncidents: "Vehicle Incidents & Repairs",
     },
     header: {

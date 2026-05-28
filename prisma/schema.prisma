@@ -34,6 +34,8 @@ model User {
   approvedJournalEntries JournalEntry[] @relation("JournalApprovedBy")
   vehicleIncidents       VehicleIncident[] @relation("VehicleIncidentCreatedBy")
   completedTasks         CompletedTask[]
+  reminders              Reminder[]
+  pushSubscriptions      PushSubscription[]
   directPermissions      UserPermission[] @relation("UserDirectPermissions")
   grantedPermissions     UserPermission[] @relation("UserPermissionGrantedBy")
 
@@ -2763,4 +2765,43 @@ model OfflineTransaction {
   @@index([userId])
   @@index([companyId])
   @@map("offline_transactions")
+}
+
+// ═══════════════════════════════════════════════════════════
+// REMINDERS & PUSH NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+
+model Reminder {
+  id              String    @id @default(cuid())
+  userId          String
+  title           String
+  notes           String?   @db.Text
+  dueAt           DateTime
+  reminderMinutes Int       @default(15)
+  isCompleted     Boolean   @default(false)
+  completedAt     DateTime?
+  notifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([dueAt])
+  @@index([isCompleted, dueAt])
+  @@map("reminders")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

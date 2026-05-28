@@ -22,6 +22,41 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// ── Web Push ──────────────────────────────────────────────────────────────────
+self.addEventListener("push", function (event) {
+  if (!event.data) return;
+  let data = {};
+  try { data = event.data.json(); } catch { data = { title: "تذكير", body: event.data.text() }; }
+
+  const options = {
+    body: data.body || "",
+    icon: "/favicon.ico",
+    badge: "/favicon.ico",
+    tag: data.tag || "reminder",
+    requireInteraction: true,
+    dir: "rtl",
+    lang: "ar",
+    data: { url: data.url || "/dashboard/reminders" },
+  };
+  event.waitUntil(self.registration.showNotification(data.title || "تذكير", options));
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/dashboard/reminders";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (windowClients) {
+      for (const client of windowClients) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
+  );
+});
+
 // Fetch — never intercept API or auth routes; pass everything else through
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);

@@ -207,11 +207,10 @@ export function UserManagement({
   const [passwordForm, setPasswordForm] = useState({ password: "", confirmPassword: "" });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(false);
-  const [selectedPermissionId, setSelectedPermissionId] = useState("");
   const [selectedModule, setSelectedModule] = useState("");
-  const [selectedAction, setSelectedAction] = useState("");
-  const [selectedPermissionCompanyId, setSelectedPermissionCompanyId] = useState("");
-  const [selectedPermissionBranchId, setSelectedPermissionBranchId] = useState("");
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [selectedPermissionCompanyIds, setSelectedPermissionCompanyIds] = useState<string[]>([]);
+  const [selectedPermissionBranchIds, setSelectedPermissionBranchIds] = useState<string[]>([]);
   const [selectedPermissionAllowed, setSelectedPermissionAllowed] = useState(true);
   const [editingPermissions, setEditingPermissions] = useState<DirectPermissionDraft[]>([]);
   const [form, setForm] = useState({
@@ -228,14 +227,10 @@ export function UserManagement({
   const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>({});
 
   const selectedCompanyIds = useMemo(() => Object.keys(selectedCompanies), [selectedCompanies]);
-  const selectedPermission = useMemo(
-    () => permissions.find((entry) => entry.id === selectedPermissionId) ?? null,
-    [permissions, selectedPermissionId],
-  );
-  const permissionBranchOptions = useMemo(() => {
-    if (!selectedPermissionCompanyId) return [];
-    return companies.find((company) => company.id === selectedPermissionCompanyId)?.branches ?? [];
-  }, [companies, selectedPermissionCompanyId]);
+  const selectedScope = useMemo(() => {
+    if (!selectedModule || selectedActions.length === 0) return null;
+    return permissions.find((p) => p.module === selectedModule && p.action === selectedActions[0])?.scope ?? null;
+  }, [selectedModule, selectedActions, permissions]);
 
   const availableModules = useMemo(() => {
     const existing = new Set(permissions.map((p) => p.module));
@@ -254,16 +249,6 @@ export function UserManagement({
       .filter((a) => { if (seen.has(a)) return false; seen.add(a); return true; });
   }, [permissions, selectedModule]);
 
-  useEffect(() => {
-    if (selectedModule && selectedAction) {
-      const found = permissions.find((p) => p.module === selectedModule && p.action === selectedAction);
-      setSelectedPermissionId(found?.id ?? "");
-    } else {
-      setSelectedPermissionId("");
-    }
-    setSelectedPermissionCompanyId("");
-    setSelectedPermissionBranchId("");
-  }, [selectedModule, selectedAction, permissions]);
 
   const text = (ar: string, en: string) => (locale === "en" ? en : ar);
 
@@ -322,11 +307,10 @@ export function UserManagement({
   }
 
   function resetPermissionPicker() {
-    setSelectedPermissionId("");
     setSelectedModule("");
-    setSelectedAction("");
-    setSelectedPermissionCompanyId("");
-    setSelectedPermissionBranchId("");
+    setSelectedActions([]);
+    setSelectedPermissionCompanyIds([]);
+    setSelectedPermissionBranchIds([]);
     setSelectedPermissionAllowed(true);
   }
 
@@ -350,34 +334,79 @@ export function UserManagement({
   }
 
   function addDirectPermission() {
-    const permission = selectedPermission;
-    if (!permission) {
-      setError(text("اختر الصلاحية أولاً", "Select a permission first"));
+    if (!selectedModule || selectedActions.length === 0) {
+      setError(text("اختر القسم وإجراءً على الأقل", "Select a module and at least one action"));
       return;
     }
-    if (permission.scope === "COMPANY" && !selectedPermissionCompanyId) {
-      setError(text("حدد الشركة لهذه الصلاحية", "Select a company for this permission"));
+    if (selectedScope === "COMPANY" && selectedPermissionCompanyIds.length === 0) {
+      setError(text("حدد شركة واحدة على الأقل", "Select at least one company"));
       return;
     }
-    if (permission.scope === "BRANCH" && (!selectedPermissionCompanyId || !selectedPermissionBranchId)) {
-      setError(text("حدد الشركة والفرع لهذه الصلاحية", "Select both company and branch for this permission"));
+    if (selectedScope === "BRANCH" && selectedPermissionBranchIds.length === 0) {
+      setError(text("حدد فرعًا واحدًا على الأقل", "Select at least one branch"));
       return;
     }
 
-    const draft: DirectPermissionDraft = {
-      permissionId: permission.id,
-      module: permission.module,
-      action: permission.action,
-      scope: permission.scope,
-      companyId: permission.scope === "COMPANY" || permission.scope === "BRANCH" ? selectedPermissionCompanyId || null : null,
-      branchId: permission.scope === "BRANCH" ? selectedPermissionBranchId || null : null,
-      scopeKey: buildScopeKey(permission, selectedPermissionCompanyId, selectedPermissionBranchId),
-      isAllowed: selectedPermissionAllowed,
-    };
+    const drafts: DirectPermissionDraft[] = [];
+
+    for (const action of selectedActions) {
+      const permission = permissions.find((p) => p.module === selectedModule && p.action === action);
+      if (!permission) continue;
+
+      if (permission.scope === "GROUP" || permission.scope === "OWN") {
+        drafts.push({
+          permissionId: permission.id,
+          module: permission.module,
+          action: permission.action,
+          scope: permission.scope,
+          companyId: null,
+          branchId: null,
+          scopeKey: buildScopeKey(permission),
+          isAllowed: selectedPermissionAllowed,
+        });
+      } else if (permission.scope === "COMPANY") {
+        for (const companyId of selectedPermissionCompanyIds) {
+          drafts.push({
+            permissionId: permission.id,
+            module: permission.module,
+            action: permission.action,
+            scope: permission.scope,
+            companyId,
+            branchId: null,
+            scopeKey: buildScopeKey(permission, companyId),
+            isAllowed: selectedPermissionAllowed,
+          });
+        }
+      } else if (permission.scope === "BRANCH") {
+        for (const branchId of selectedPermissionBranchIds) {
+          const ownerCompany = companies.find((c) => c.branches.some((b) => b.id === branchId));
+          const companyId = ownerCompany?.id ?? null;
+          drafts.push({
+            permissionId: permission.id,
+            module: permission.module,
+            action: permission.action,
+            scope: permission.scope,
+            companyId,
+            branchId,
+            scopeKey: buildScopeKey(permission, companyId ?? undefined, branchId),
+            isAllowed: selectedPermissionAllowed,
+          });
+        }
+      }
+    }
+
+    if (drafts.length === 0) {
+      setError(text("لم يتم العثور على صلاحيات مطابقة", "No matching permissions found"));
+      return;
+    }
 
     setEditingPermissions((prev) => {
-      const filtered = prev.filter((entry) => !(entry.permissionId === draft.permissionId && entry.scopeKey === draft.scopeKey));
-      return [...filtered, draft];
+      let next = [...prev];
+      for (const draft of drafts) {
+        next = next.filter((entry) => !(entry.permissionId === draft.permissionId && entry.scopeKey === draft.scopeKey));
+        next.push(draft);
+      }
+      return next;
     });
     resetPermissionPicker();
     setError("");
@@ -846,13 +875,13 @@ export function UserManagement({
                               <p className="text-sm text-muted-foreground">{text("أضف صلاحيات مباشرة تسمح أو تمنع إجراءات محددة لهذا المستخدم فوق صلاحيات الدور.", "Add direct allow or deny permissions for this user on top of role permissions.")}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                            <div className="space-y-3">
                               {/* ── الخطوة 1: القسم ── */}
                               <Field label={text("القسم", "Module")}>
                                 <select
                                   className="input-field w-full"
                                   value={selectedModule}
-                                  onChange={(e) => { setSelectedModule(e.target.value); setSelectedAction(""); }}
+                                  onChange={(e) => { setSelectedModule(e.target.value); setSelectedActions([]); setSelectedPermissionCompanyIds([]); setSelectedPermissionBranchIds([]); }}
                                 >
                                   <option value="">{text("اختر القسم", "Select module")}</option>
                                   {availableModules.map(({ group, modules }) => (
@@ -867,77 +896,128 @@ export function UserManagement({
                                 </select>
                               </Field>
 
-                              {/* ── الخطوة 2: الإجراء ── */}
-                              <Field label={text("الإجراء", "Action")}>
-                                <select
-                                  className="input-field w-full"
-                                  value={selectedAction}
-                                  disabled={!selectedModule}
-                                  onChange={(e) => setSelectedAction(e.target.value)}
-                                >
-                                  <option value="">{text("اختر الإجراء", "Select action")}</option>
-                                  {availableActions.map((action) => (
-                                    <option key={action} value={action}>
-                                      {actionLabelMap[action]?.[locale] ?? action}
-                                    </option>
-                                  ))}
-                                </select>
-                              </Field>
+                              {/* ── الخطوة 2: الإجراءات (متعددة) ── */}
+                              {selectedModule && availableActions.length > 0 && (
+                                <div>
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="text-sm font-medium">{text("الإجراءات", "Actions")}</span>
+                                    <button
+                                      type="button"
+                                      className="text-xs text-primary hover:underline"
+                                      onClick={() => setSelectedActions(selectedActions.length === availableActions.length ? [] : [...availableActions])}
+                                    >
+                                      {selectedActions.length === availableActions.length ? text("إلغاء الكل", "Deselect all") : text("تحديد الكل", "Select all")}
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-3 rounded-lg border p-2">
+                                    {availableActions.map((action) => (
+                                      <label key={action} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedActions.includes(action)}
+                                          onChange={() => setSelectedActions((prev) => prev.includes(action) ? prev.filter((a) => a !== action) : [...prev, action])}
+                                        />
+                                        {actionLabelMap[action]?.[locale] ?? action}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
-                              {/* ── الشركة (تظهر لو الصلاحية على مستوى شركة/فرع) ── */}
-                              <Field label={text("الشركة", "Company")}>
-                                <select
-                                  className="input-field w-full"
-                                  value={selectedPermissionCompanyId}
-                                  disabled={!selectedPermission || (selectedPermission.scope !== "COMPANY" && selectedPermission.scope !== "BRANCH")}
-                                  onChange={(event) => { setSelectedPermissionCompanyId(event.target.value); setSelectedPermissionBranchId(""); }}
-                                >
-                                  <option value="">{text("غير محدد", "Not specified")}</option>
-                                  {companies.map((company) => (
-                                    <option key={company.id} value={company.id}>{company.nameAr}</option>
-                                  ))}
-                                </select>
-                              </Field>
+                              {/* ── الشركات (تظهر لو نطاق الصلاحية = شركة) ── */}
+                              {selectedScope === "COMPANY" && (
+                                <div>
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="text-sm font-medium">{text("الشركات", "Companies")}</span>
+                                    <button
+                                      type="button"
+                                      className="text-xs text-primary hover:underline"
+                                      onClick={() => setSelectedPermissionCompanyIds(selectedPermissionCompanyIds.length === companies.length ? [] : companies.map((c) => c.id))}
+                                    >
+                                      {selectedPermissionCompanyIds.length === companies.length ? text("إلغاء الكل", "Deselect all") : text("تحديد الكل", "Select all")}
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-3 rounded-lg border p-2">
+                                    {companies.map((company) => (
+                                      <label key={company.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedPermissionCompanyIds.includes(company.id)}
+                                          onChange={() => setSelectedPermissionCompanyIds((prev) => prev.includes(company.id) ? prev.filter((id) => id !== company.id) : [...prev, company.id])}
+                                        />
+                                        {company.nameAr}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
-                              {/* ── الفرع ── */}
-                              <Field label={text("الفرع", "Branch")}>
-                                <select
-                                  className="input-field w-full"
-                                  value={selectedPermissionBranchId}
-                                  disabled={!selectedPermission || selectedPermission.scope !== "BRANCH" || !selectedPermissionCompanyId}
-                                  onChange={(event) => setSelectedPermissionBranchId(event.target.value)}
-                                >
-                                  <option value="">{text("غير محدد", "Not specified")}</option>
-                                  {permissionBranchOptions.map((branch) => (
-                                    <option key={branch.id} value={branch.id}>{branch.nameAr}</option>
-                                  ))}
-                                </select>
-                              </Field>
+                              {/* ── الفروع (تظهر لو نطاق الصلاحية = فرع) ── */}
+                              {selectedScope === "BRANCH" && (
+                                <div>
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="text-sm font-medium">{text("الفروع", "Branches")}</span>
+                                    <button
+                                      type="button"
+                                      className="text-xs text-primary hover:underline"
+                                      onClick={() => {
+                                        const allBranchIds = companies.flatMap((c) => c.branches.map((b) => b.id));
+                                        setSelectedPermissionBranchIds(selectedPermissionBranchIds.length === allBranchIds.length ? [] : allBranchIds);
+                                      }}
+                                    >
+                                      {selectedPermissionBranchIds.length === companies.flatMap((c) => c.branches).length ? text("إلغاء الكل", "Deselect all") : text("تحديد الكل", "Select all")}
+                                    </button>
+                                  </div>
+                                  <div className="space-y-2 rounded-lg border p-2">
+                                    {companies.map((company) =>
+                                      company.branches.length === 0 ? null : (
+                                        <div key={company.id}>
+                                          <p className="mb-1 text-xs font-medium text-muted-foreground">{company.nameAr}</p>
+                                          <div className="flex flex-wrap gap-3">
+                                            {company.branches.map((branch) => (
+                                              <label key={branch.id} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selectedPermissionBranchIds.includes(branch.id)}
+                                                  onChange={() => setSelectedPermissionBranchIds((prev) => prev.includes(branch.id) ? prev.filter((id) => id !== branch.id) : [...prev, branch.id])}
+                                                />
+                                                {branch.nameAr}
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
-                            {/* ── السماح / المنع (صف مستقل أسفل) ── */}
+                            {/* ── السماح / المنع ── */}
                             <div className="flex items-center gap-4">
                               <span className="text-sm font-medium">{text("نوع القرار:", "Rule:")}</span>
-                              <label className="flex items-center gap-2 cursor-pointer">
+                              <label className="flex cursor-pointer items-center gap-2">
                                 <input type="radio" name="permAllowed" value="ALLOW" checked={selectedPermissionAllowed} onChange={() => setSelectedPermissionAllowed(true)} className="accent-primary" />
-                                <span className="text-sm text-green-700 font-medium">{text("سماح", "Allow")}</span>
+                                <span className="text-sm font-medium text-green-700">{text("سماح", "Allow")}</span>
                               </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
+                              <label className="flex cursor-pointer items-center gap-2">
                                 <input type="radio" name="permAllowed" value="DENY" checked={!selectedPermissionAllowed} onChange={() => setSelectedPermissionAllowed(false)} className="accent-red-500" />
-                                <span className="text-sm text-red-700 font-medium">{text("منع", "Deny")}</span>
+                                <span className="text-sm font-medium text-red-700">{text("منع", "Deny")}</span>
                               </label>
                             </div>
 
                             <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                              {!selectedPermission
-                                ? text("اختر الصلاحية أولاً لمعرفة هل تحتاج شركة أو فرع.", "Select a permission first to see whether it needs a company or branch.")
-                                : selectedPermission.scope === "GROUP"
-                                  ? text("هذه الصلاحية على مستوى المجموعة ولا تحتاج شركة أو فرع.", "This permission is at group level and does not require a company or branch.")
-                                  : selectedPermission.scope === "COMPANY"
-                                    ? text("هذه الصلاحية على مستوى الشركة. اختر الشركة فقط.", "This permission is company-scoped. Select a company only.")
-                                    : selectedPermission.scope === "BRANCH"
-                                      ? text("هذه الصلاحية على مستوى الفرع. اختر الشركة أولاً ثم الفرع.", "This permission is branch-scoped. Select a company first, then a branch.")
-                                      : text("هذه الصلاحية على مستوى المستخدم نفسه.", "This permission is user-scoped.")}
+                              {!selectedModule
+                                ? text("اختر القسم أولاً.", "Select a module first.")
+                                : selectedActions.length === 0
+                                  ? text("اختر إجراءً على الأقل.", "Select at least one action.")
+                                  : selectedScope === "GROUP" || selectedScope === "OWN"
+                                    ? text("هذه الصلاحيات على مستوى المجموعة ولا تحتاج شركة أو فرع.", "These permissions are group-level and require no company or branch.")
+                                    : selectedScope === "COMPANY"
+                                      ? text("هذه الصلاحيات على مستوى الشركة. حدد الشركات المطلوبة.", "These permissions are company-scoped. Select the target companies.")
+                                      : selectedScope === "BRANCH"
+                                        ? text("هذه الصلاحيات على مستوى الفرع. حدد الفروع المطلوبة.", "These permissions are branch-scoped. Select the target branches.")
+                                        : ""}
                             </div>
 
                             <div className="flex flex-wrap gap-2">
