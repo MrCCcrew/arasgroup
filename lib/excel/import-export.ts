@@ -121,8 +121,8 @@ export function buildWorkbook(
   ws["!cols"] = cols.map((c) => ({ wch: c.width ?? 20 }));
 
   // RTL
-  if (!ws["!sheetView"]) ws["!sheetView"] = [{}];
-  (ws["!sheetView"] as XLSX.SheetView[])[0].rightToLeft = true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ws as any)["!sheetView"] = [{ rightToLeft: true }];
 
   // Style header row
   cols.forEach((_, ci) => {
