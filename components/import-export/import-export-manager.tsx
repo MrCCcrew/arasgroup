@@ -18,6 +18,7 @@ interface EntityConfig {
   description: string;
   apiPath: string;
   color: string;
+  extraParams?: string; // appended to query string e.g. "&licenseType=owner-main"
 }
 
 interface Props {
@@ -60,14 +61,50 @@ const ENTITIES: EntityConfig[] = [
     apiPath: "car-wash-vehicles",
     color: "cyan",
   },
+  {
+    key: "licenses-owner-main",
+    labelAr: "تراخيص المالك الرئيسية",
+    description: "التراخيص الرئيسية للشركة المملوكة للمالك مباشرةً",
+    apiPath: "licenses",
+    color: "emerald",
+    extraParams: "&licenseType=owner-main",
+  },
+  {
+    key: "licenses-owner-sub",
+    labelAr: "تراخيص المالك الفرعية",
+    description: "التراخيص الفرعية المرتبطة بترخيص رئيسي للمالك",
+    apiPath: "licenses",
+    color: "green",
+    extraParams: "&licenseType=owner-sub",
+  },
+  {
+    key: "licenses-investor-main",
+    labelAr: "تراخيص المسئولين الرئيسية",
+    description: "التراخيص الرئيسية للمسئولين والمديرين المستثمرين",
+    apiPath: "licenses",
+    color: "violet",
+    extraParams: "&licenseType=investor-main",
+  },
+  {
+    key: "licenses-investor-sub",
+    labelAr: "تراخيص المسئولين الفرعية",
+    description: "التراخيص الفرعية المرتبطة بترخيص رئيسي لمسئول",
+    apiPath: "licenses",
+    color: "indigo",
+    extraParams: "&licenseType=investor-sub",
+  },
 ];
 
 const COLOR_CLASSES: Record<string, { bg: string; border: string; text: string; badge: string }> = {
-  blue:   { bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700",   badge: "bg-blue-100 text-blue-700" },
-  orange: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", badge: "bg-orange-100 text-orange-700" },
-  purple: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-100 text-purple-700" },
-  slate:  { bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-700",  badge: "bg-slate-100 text-slate-700" },
-  cyan:   { bg: "bg-cyan-50",   border: "border-cyan-200",   text: "text-cyan-700",   badge: "bg-cyan-100 text-cyan-700" },
+  blue:    { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700",    badge: "bg-blue-100 text-blue-700" },
+  orange:  { bg: "bg-orange-50",  border: "border-orange-200",  text: "text-orange-700",  badge: "bg-orange-100 text-orange-700" },
+  purple:  { bg: "bg-purple-50",  border: "border-purple-200",  text: "text-purple-700",  badge: "bg-purple-100 text-purple-700" },
+  slate:   { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700",   badge: "bg-slate-100 text-slate-700" },
+  cyan:    { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-700",    badge: "bg-cyan-100 text-cyan-700" },
+  emerald: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+  green:   { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700",   badge: "bg-green-100 text-green-700" },
+  violet:  { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
+  indigo:  { bg: "bg-indigo-50",  border: "border-indigo-200",  text: "text-indigo-700",  badge: "bg-indigo-100 text-indigo-700" },
 };
 
 function EntityCard({ entity, companyId }: { entity: EntityConfig; companyId: string }) {
@@ -78,10 +115,11 @@ function EntityCard({ entity, companyId }: { entity: EntityConfig; companyId: st
 
   const colors = COLOR_CLASSES[entity.color] ?? COLOR_CLASSES.blue;
 
+  const baseUrl = `/api/import-export/${entity.apiPath}?companyId=${companyId}${entity.extraParams ?? ""}`;
+
   function download(mode: "template" | "export") {
-    const url = `/api/import-export/${entity.apiPath}?companyId=${companyId}&mode=${mode}`;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = `${baseUrl}&mode=${mode}`;
     a.download = "";
     a.click();
   }
@@ -96,7 +134,7 @@ function EntityCard({ entity, companyId }: { entity: EntityConfig; companyId: st
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`/api/import-export/${entity.apiPath}?companyId=${companyId}`, {
+      const res = await fetch(baseUrl, {
         method: "POST",
         body: fd,
       });
