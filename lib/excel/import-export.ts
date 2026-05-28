@@ -37,8 +37,19 @@ export function parseDate(value: unknown): Date | null {
   const ymd = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (ymd) return new Date(+ymd[1], +ymd[2] - 1, +ymd[3]);
 
+  // Pure number → Excel serial date (e.g. 45297 = 2023-12-01)
+  if (/^\d+$/.test(str)) {
+    const serial = parseInt(str, 10);
+    if (serial > 0 && serial < 99999) {
+      const d = XLSX.SSF.parse_date_code(serial);
+      if (d && d.y >= 1900 && d.y <= 2100) return new Date(d.y, d.m - 1, d.d);
+    }
+    return null; // Reject huge numbers like civil IDs
+  }
+
+  // ISO or other string formats — only accept if year is sane
   const d = new Date(str);
-  if (!isNaN(d.getTime())) return d;
+  if (!isNaN(d.getTime()) && d.getFullYear() >= 1900 && d.getFullYear() <= 2100) return d;
   return null;
 }
 
