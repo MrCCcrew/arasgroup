@@ -121,12 +121,12 @@ export async function POST(request: NextRequest) {
       if (data.civilId) {
         const existing = await prisma.employee.findFirst({
           where: { companyId, civilId: data.civilId, isDeleted: false },
-          include: { driver: true },
         });
         if (existing) {
           await prisma.employee.update({ where: { id: existing.id }, data: employeePayload });
-          if (existing.driver) {
-            await prisma.driver.update({ where: { id: existing.driver.id }, data: driverPayload });
+          const existingDriver = await prisma.driver.findUnique({ where: { employeeId: existing.id } });
+          if (existingDriver) {
+            await prisma.driver.update({ where: { id: existingDriver.id }, data: driverPayload });
           } else {
             await prisma.driver.create({ data: { ...driverPayload, employeeId: existing.id } });
           }
