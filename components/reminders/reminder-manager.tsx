@@ -68,11 +68,6 @@ function isOverdue(isoString: string) {
   return new Date(isoString) < new Date();
 }
 
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
-}
 
 export function ReminderManager({ initialReminders, userId: _userId }: Props) {
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
@@ -140,7 +135,7 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+        applicationServerKey: keyData.publicKey as string,
       });
 
       const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
