@@ -86,9 +86,12 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
   });
   const [reminderMinutes, setReminderMinutes] = useState(15);
 
+  const [mounted, setMounted] = useState(false);
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "denied" | "granted" | "loading">("unknown");
   const [pushEndpoint, setPushEndpoint] = useState<string | null>(null);
   const swRef = useRef<ServiceWorkerRegistration | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -394,7 +397,7 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className={`flex items-center gap-1 ${overdue ? "font-medium text-red-600" : ""}`}>
                       <Clock size={11} />
-                      {formatDueAt(r.dueAt)}
+                      {mounted ? formatDueAt(r.dueAt) : r.dueAt.slice(0, 16).replace("T", " ")}
                     </span>
                     <span className="rounded-full bg-muted px-2 py-0.5">
                       {REMINDER_OPTIONS.find((o) => o.value === r.reminderMinutes)?.label ??
