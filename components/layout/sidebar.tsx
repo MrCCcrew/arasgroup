@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   AlarmClock,
+  ArrowLeftRight,
   ArrowDownToLine,
   ArrowUpFromLine,
   BarChart3,
@@ -175,9 +176,10 @@ function buildCompanyNav(base: string): NavItem[] {
       ],
     },
     { href: `${base}/expenses`,    labelKey: "nav.expenses",    icon: <Receipt size={16} />,   iconColor: "red",    module: "EXPENSES" },
-    { href: `${base}/reports`,     labelKey: "nav.reports",     icon: <BarChart3 size={16} />, iconColor: "purple", module: "REPORTS" },
-    { href: `${base}/attachments`, labelKey: "nav.attachments", icon: <Paperclip size={16} />, iconColor: "sky",    module: "ATTACHMENTS" },
-    { href: `${base}/assets`,      labelKey: "nav.assets",      icon: <Package size={16} />,   iconColor: "green",  module: "ASSETS_CUSTODY" },
+    { href: `${base}/reports`,        labelKey: "nav.reports",      icon: <BarChart3 size={16} />,      iconColor: "purple", module: "REPORTS" },
+    { href: `${base}/attachments`,    labelKey: "nav.attachments",  icon: <Paperclip size={16} />,      iconColor: "sky",    module: "ATTACHMENTS" },
+    { href: `${base}/assets`,         labelKey: "nav.assets",       icon: <Package size={16} />,        iconColor: "green",  module: "ASSETS_CUSTODY" },
+    { href: `${base}/import-export`,  labelKey: "nav.importExport", icon: <ArrowLeftRight size={16} />, iconColor: "teal" },
     { href: "/dashboard/completed-tasks", labelKey: "nav.completedTasks", icon: <ClipboardCheck size={16} />, iconColor: "green", module: "TASKS" },
   ];
 }

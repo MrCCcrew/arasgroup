@@ -88,6 +88,7 @@ export const messages: Record<Locale, MessageTree> = {
       notifications: "الإشعارات",
       completedTasks: "المهام المنجزة",
       reminders: "التذكيرات",
+      importExport: "استيراد / تصدير",
       vehicleIncidents: "حوادث وإصلاح المركبات",
     },
     header: {
@@ -258,6 +259,7 @@ export const messages: Record<Locale, MessageTree> = {
       notifications: "Notifications",
       completedTasks: "Completed Tasks",
       reminders: "Reminders",
+      importExport: "Import / Export",
       vehicleIncidents: "Vehicle Incidents & Repairs",
     },
     header: {
