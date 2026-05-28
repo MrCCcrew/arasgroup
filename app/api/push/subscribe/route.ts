@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
-import { VAPID_PUBLIC_KEY } from "@/lib/push";
-
 const subscribeSchema = z.object({
   endpoint: z.string().url(),
   p256dh: z.string(),
   auth: z.string(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
-  return NextResponse.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+  const publicKey = process.env["VAPID_PUBLIC_KEY"] ?? "";
+  return NextResponse.json({ success: true, publicKey });
 }
 
 export async function POST(request: NextRequest) {

@@ -3,8 +3,11 @@ import { prisma } from "@/lib/db";
 import { sendPush } from "@/lib/push";
 
 // Called by cron every minute: GET /api/push/dispatch?secret=PUSH_DISPATCH_SECRET
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
-  const secret = process.env.PUSH_DISPATCH_SECRET;
+  // bracket notation prevents Next.js from inlining the value at build time
+  const secret = process.env["PUSH_DISPATCH_SECRET"];
   if (secret) {
     const provided = request.nextUrl.searchParams.get("secret");
     if (provided !== secret)
