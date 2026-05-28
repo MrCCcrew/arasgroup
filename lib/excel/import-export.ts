@@ -96,7 +96,7 @@ export function buildWorkbook(
   rows: Record<string, unknown>[],
   sheetName = "البيانات",
   includeExampleRow = false,
-): Uint8Array {
+): ArrayBuffer {
   const wb = XLSX.utils.book_new();
   wb.Props = { Title: sheetName };
 
@@ -151,8 +151,10 @@ export function buildWorkbook(
 
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-  const buf: Buffer = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true }));
-  return new Uint8Array(buf);
+  const raw: Buffer = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true }));
+  const ab = new ArrayBuffer(raw.byteLength);
+  new Uint8Array(ab).set(raw);
+  return ab;
 }
 
 // ── Excel parser ──────────────────────────────────────────────────────────────
