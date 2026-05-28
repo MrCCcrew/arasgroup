@@ -99,7 +99,7 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
       setPushStatus("denied");
       return;
     }
-    navigator.serviceWorker.ready.then(async (reg) => {
+    navigator.serviceWorker.register("/sw.js").then(async (reg) => {
       swRef.current = reg;
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
@@ -110,7 +110,8 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
       } else {
         setPushStatus("unknown");
       }
-    });
+    }).catch(() => setPushStatus("unsupported"));
+
   }, []);
 
   async function enablePush() {
@@ -122,7 +123,7 @@ export function ReminderManager({ initialReminders, userId: _userId }: Props) {
         setPushStatus("denied");
         return;
       }
-      const reg = swRef.current ?? (await navigator.serviceWorker.ready);
+        const reg = swRef.current ?? await navigator.serviceWorker.register("/sw.js");
       swRef.current = reg;
 
       const keyRes = await fetch("/api/push/subscribe");
