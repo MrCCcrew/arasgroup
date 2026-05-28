@@ -199,7 +199,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
                           {session.isSuperAdmin && (
                             <DeleteConfirmButton
                               apiUrl={`/api/accounting/journal-entries/${entry.id}`}
-                              confirmMessage={`حذف القيد رقم ${entry.entryNumber}؟`}
+                              confirmMessage={`حذف القيد رقم ${entry.number}؟`}
                               warningMessage="سيتم عكس القيد وحذفه من السجلات المحاسبية نهائياً"
                             />
                           )}
