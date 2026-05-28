@@ -2,18 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendPush } from "@/lib/push";
 
-// Called by cron every minute: GET /api/push/dispatch?secret=PUSH_DISPATCH_SECRET
+// Called by cron every minute: GET /api/push/dispatch
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  // bracket notation prevents Next.js from inlining the value at build time
-  const secret = process.env["PUSH_DISPATCH_SECRET"];
-  if (secret) {
-    const provided = request.nextUrl.searchParams.get("secret");
-    if (provided !== secret)
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET(_request: NextRequest) {
   const now = new Date();
 
   // Find reminders that are due within reminderMinutes and not yet notified
