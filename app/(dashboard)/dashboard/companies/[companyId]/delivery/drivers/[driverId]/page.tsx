@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertTriangle, ArrowRight, CreditCard, Pencil, Phone } from "lucide-react";
+import { DriverDeleteButton } from "./DriverDeleteButton";
+import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { Header } from "@/components/layout/header";
 import { WalletDepositButton } from "@/components/delivery/wallet-deposit-button";
 import { getSession } from "@/lib/auth/session";
@@ -95,13 +97,22 @@ export default async function DriverDetailPage({ params }: Props) {
         subtitle={locale === "en" ? "Driver profile" : "ملف السائق"}
         companyId={companyId}
         actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}/edit`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Pencil size={15} />
-            {locale === "en" ? "Edit" : "تعديل"}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}/edit`}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <Pencil size={15} />
+              {locale === "en" ? "Edit" : "تعديل"}
+            </Link>
+            {session.isSuperAdmin && (
+              <DriverDeleteButton
+                driverId={driverId}
+                companyId={companyId}
+                driverName={driverName}
+              />
+            )}
+          </div>
         }
       />
 
@@ -222,6 +233,7 @@ export default async function DriverDetailPage({ params }: Props) {
                   <th>{locale === "en" ? "Description" : "البيان"}</th>
                   <th>{locale === "en" ? "Amount" : "المبلغ"}</th>
                   <th>{locale === "en" ? "Status" : "الحالة"}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -248,6 +260,15 @@ export default async function DriverDetailPage({ params }: Props) {
                         <span className={`rounded-full px-2 py-0.5 text-xs ${transaction.isSettled ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                           {transaction.isSettled ? (locale === "en" ? "Settled" : "مسوى") : locale === "en" ? "Pending" : "غير مسوى"}
                         </span>
+                      </td>
+                      <td>
+                        {session.isSuperAdmin && (
+                          <DeleteConfirmButton
+                            apiUrl={`/api/delivery/wallet/${transaction.id}`}
+                            confirmMessage="حذف هذه الحركة من المحفظة وعكس المبلغ؟"
+                            warningMessage="سيتم عكس المبلغ تلقائياً على رصيد المحفظة"
+                          />
+                        )}
                       </td>
                     </tr>
                   ))

@@ -130,3 +130,28 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: false, error: "فشل في التحديث" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: Ctx) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 403 });
+  }
+
+  try {
+    const { driverId } = await params;
+    const driver = await prisma.driver.findUnique({ where: { id: driverId }, select: { employeeId: true } });
+    if (!driver) return NextResponse.json({ success: false, error: "السائق غير موجود" }, { status: 404 });
+
+    await prisma.employee.update({
+      where: { id: driver.employeeId },
+      data: { isActive: false, isDeleted: true, deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ success: false, error: "فشل في الحذف" }, { status: 500 });
+  }
+}

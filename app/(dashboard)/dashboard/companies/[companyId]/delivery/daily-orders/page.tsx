@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
+import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -158,13 +159,20 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                         {order.rating ? Number(order.rating).toFixed(1) : "-"}
                       </td>
                       <td className="text-center">
-                        <Link
-                          href={`/dashboard/companies/${companyId}/delivery/daily-orders/${order.id}/edit`}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-primary hover:bg-muted"
-                        >
-                          <Pencil size={12} />
-                          {locale === "en" ? "Edit" : "تعديل"}
-                        </Link>
+                        <div className="flex items-center justify-center gap-1">
+                          <Link
+                            href={`/dashboard/companies/${companyId}/delivery/daily-orders/${order.id}/edit`}
+                            className="inline-flex items-center gap-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            <Pencil size={13} />
+                          </Link>
+                          {session.isSuperAdmin && (
+                            <DeleteConfirmButton
+                              apiUrl={`/api/delivery/daily-orders/${order.id}`}
+                              confirmMessage={`حذف طلبات يوم ${formatDate(order.date, numberLocale)} للسائق ${order.driver.employee.nameAr}؟`}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

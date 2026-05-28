@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { redirect } from "next/navigation";
 import type { JournalStatus } from "@prisma/client";
 import { Header } from "@/components/layout/header";
@@ -194,6 +195,13 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
                             >
                               {locale === "en" ? "Print" : "طباعة"}
                             </Link>
+                          )}
+                          {session.isSuperAdmin && (
+                            <DeleteConfirmButton
+                              apiUrl={`/api/accounting/journal-entries/${entry.id}`}
+                              confirmMessage={`حذف القيد رقم ${entry.entryNumber}؟`}
+                              warningMessage="سيتم عكس القيد وحذفه من السجلات المحاسبية نهائياً"
+                            />
                           )}
                         </div>
                       </td>
