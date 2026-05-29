@@ -10,7 +10,7 @@ import { DeleteButton } from "@/components/ui/delete-button";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ type?: string; search?: string }>;
+  searchParams: Promise<{ type?: string; search?: string; group?: string }>;
 }
 
 const typeLabels = {
@@ -50,11 +50,24 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
 
+  const baseWhere = { companyId, isActive: true, isDeleted: false };
+
+  const [investorEmployeeCount, companyEmployeeCount] = await Promise.all([
+    prisma.employee.count({ where: { ...baseWhere, investorId: { not: null } } }),
+    prisma.employee.count({ where: { ...baseWhere, investorId: null } }),
+  ]);
+
+  const groupFilter =
+    query.group === "investor"
+      ? { investorId: { not: null } }
+      : query.group === "company"
+        ? { investorId: null }
+        : {};
+
   const employees = await prisma.employee.findMany({
     where: {
-      companyId,
-      isActive: true,
-      isDeleted: false,
+      ...baseWhere,
+      ...groupFilter,
       ...(query.type
         ? {
             type: query.type as
@@ -74,6 +87,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     },
     include: {
       branch: { select: { nameAr: true, nameEn: true } },
+      investor: { select: { nameAr: true, nameEn: true } },
       driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
       carWashWorker: { select: { role: true } },
     },
@@ -85,11 +99,13 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     return accumulator;
   }, {});
 
+  const totalCount = investorEmployeeCount + companyEmployeeCount;
+
   return (
     <div>
       <Header
         title={locale === "en" ? "Employees" : "الموظفون"}
-        subtitle={`${employees.length} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`}
+        subtitle={`${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`}
         companyId={companyId}
         actions={
           <Link
@@ -103,20 +119,44 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       />
 
       <div className="page-container space-y-4">
+        {/* تبويبات المجموعة: كل / موظفو المسئولين / موظفو الشركة */}
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/dashboard/companies/${companyId}/hr/employees`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!query.group ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+          >
+            {locale === "en" ? "All" : "الكل"} ({totalCount})
+          </Link>
+          <Link
+            href={`/dashboard/companies/${companyId}/hr/employees?group=investor`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${query.group === "investor" ? "bg-amber-600 text-white" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+          >
+            {locale === "en" ? "Investor employees" : "موظفو المسئولين"} ({investorEmployeeCount})
+          </Link>
+          <Link
+            href={`/dashboard/companies/${companyId}/hr/employees?group=company`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${query.group === "company" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+          >
+            {locale === "en" ? "Company employees" : "موظفو الشركة"} ({companyEmployeeCount})
+          </Link>
+        </div>
+
+        {/* فلاتر النوع */}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/dashboard/companies/${companyId}/hr/employees${query.group ? `?group=${query.group}` : ""}`}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.type ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
-            {locale === "en" ? "All" : "الكل"} ({employees.length})
+            {locale === "en" ? "All types" : "كل الأنواع"}
           </Link>
           {Object.entries(typeLabels[locale]).map(([type, label]) => {
             const count = typeCounts[type] ?? 0;
             if (count === 0) return null;
+            const groupParam = query.group ? `group=${query.group}&` : "";
             return (
               <Link
                 key={type}
-                href={`/dashboard/companies/${companyId}/hr/employees?type=${type}`}
+                href={`/dashboard/companies/${companyId}/hr/employees?${groupParam}type=${type}`}
                 className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.type === type ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               >
                 {label} ({count})
@@ -137,13 +177,16 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Salary" : "الراتب"}</th>
                   <th>{locale === "en" ? "Residency expiry" : "انتهاء الإقامة"}</th>
                   <th>{locale === "en" ? "Branch" : "الفرع"}</th>
+                  {(!query.group || query.group === "investor") && (
+                    <th>{locale === "en" ? "Investor" : "المسئول"}</th>
+                  )}
                   <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={(!query.group || query.group === "investor") ? 9 : 8} className="py-8 text-center text-muted-foreground">
                       {locale === "en" ? "No employees found" : "لا يوجد موظفون"}
                     </td>
                   </tr>
@@ -206,6 +249,17 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                           )}
                         </td>
                         <td className="text-sm">{branchName}</td>
+                        {(!query.group || query.group === "investor") && (
+                          <td className="text-sm">
+                            {employee.investor ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                                {locale === "en" ? employee.investor.nameEn ?? employee.investor.nameAr : employee.investor.nameAr}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        )}
                         <td>
                           <div className="flex items-center gap-1">
                             <Link

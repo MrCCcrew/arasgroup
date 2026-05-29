@@ -19,6 +19,7 @@ interface DriverData {
     make: string | null;
     model: string | null;
   } | null;
+  vehicleAssignments: { assignedFrom: string }[];
   employee: {
     nameAr: string;
     nameEn: string | null;
@@ -27,6 +28,7 @@ interface DriverData {
     civilId: string | null;
     passportNumber: string | null;
     passportExpiryDate: string | null;
+    dateOfBirth: string | null;
     baseSalary: string | null;
     residencyNumber: string | null;
     residencyExpiry: string | null;
@@ -42,6 +44,7 @@ type VehicleOption = {
   plateNumber: string;
   make: string | null;
   model: string | null;
+  company: { id: string; nameAr: string };
 };
 
 export default function EditDriverPage() {
@@ -71,12 +74,15 @@ export default function EditDriverPage() {
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [residentialAddress, setResidentialAddress] = useState("");
 
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [talabatId, setTalabatId] = useState("");
   const [roPopsId, setRoPopsId] = useState("");
   const [isRegisteredTalabat, setIsRegisteredTalabat] = useState(false);
   const [isRegisteredRoPops, setIsRegisteredRoPops] = useState(false);
   const [fuelCardNumber, setFuelCardNumber] = useState("");
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
+  const [originalVehicleId, setOriginalVehicleId] = useState("");
+  const [assignedAt, setAssignedAt] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -100,12 +106,19 @@ export default function EditDriverPage() {
         setLicenseNumber(d.employee.licenseNumber ?? "");
         setLicenseExpiry(d.employee.licenseExpiry ? d.employee.licenseExpiry.slice(0, 10) : "");
         setResidentialAddress(d.employee.residentialAddress ?? "");
+        setDateOfBirth(d.employee.dateOfBirth ? d.employee.dateOfBirth.slice(0, 10) : "");
         setTalabatId(d.talabatId ?? "");
         setRoPopsId(d.roPopsId ?? "");
         setIsRegisteredTalabat(d.isRegisteredTalabat);
         setIsRegisteredRoPops(d.isRegisteredRoPops);
         setFuelCardNumber(d.fuelCardNumber ?? "");
         setAssignedVehicleId(d.assignedVehicleId ?? "");
+        setOriginalVehicleId(d.assignedVehicleId ?? "");
+        if (d.vehicleAssignments[0]?.assignedFrom) {
+          const dt = new Date(d.vehicleAssignments[0].assignedFrom);
+          dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+          setAssignedAt(dt.toISOString().slice(0, 16));
+        }
       } catch (err) {
         setFetchError(err instanceof Error ? err.message : "فشل في تحميل بيانات السائق");
       } finally {
@@ -118,7 +131,7 @@ export default function EditDriverPage() {
   useEffect(() => {
     async function loadVehicles() {
       try {
-        const res = await fetch(`/api/vehicles?companyId=${companyId}&type=DELIVERY&activeOnly=true&availableForDriverId=${driverId}`);
+        const res = await fetch(`/api/vehicles?companyId=${companyId}&groupWide=true&activeOnly=true&availableForDriverId=${driverId}`);
         const json = await res.json();
         if (json.success) setVehicles(json.data);
       } finally {
@@ -134,6 +147,8 @@ export default function EditDriverPage() {
     setSaving(true);
     setSaveError(null);
 
+    const vehicleChanged = assignedVehicleId !== originalVehicleId;
+
     const body: Record<string, unknown> = {
       nameAr,
       nameEn: nameEn || null,
@@ -142,6 +157,7 @@ export default function EditDriverPage() {
       civilId: civilId || null,
       passportNumber: passportNumber || null,
       passportExpiryDate: passportExpiryDate || null,
+      dateOfBirth: dateOfBirth || null,
       baseSalary: baseSalary ? Number(baseSalary) : null,
       residencyNumber: residencyNumber || null,
       residencyExpiry: residencyExpiry || null,
@@ -155,6 +171,7 @@ export default function EditDriverPage() {
       isRegisteredRoPops,
       fuelCardNumber: fuelCardNumber || null,
       assignedVehicleId: assignedVehicleId || null,
+      ...(vehicleChanged && assignedVehicleId ? { assignedAt: assignedAt || null } : {}),
     };
 
     try {
@@ -247,6 +264,10 @@ export default function EditDriverPage() {
                 <label className="mb-1.5 block text-sm font-medium">الراتب الأساسي (د.ك)</label>
                 <input type="number" step="0.001" min="0" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">تاريخ الميلاد</label>
+                <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="input-field w-full" dir="ltr" />
+              </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium">عنوان الإقامة</label>
                 <input type="text" value={residentialAddress} onChange={(e) => setResidentialAddress(e.target.value)} className="input-field w-full" />
@@ -300,15 +321,47 @@ export default function EditDriverPage() {
               <label className="mb-1.5 block text-sm font-medium">المركبة الحالية</label>
               <select value={assignedVehicleId} onChange={(e) => setAssignedVehicleId(e.target.value)} className="input-field w-full" disabled={vehiclesLoading}>
                 <option value="">بدون مركبة حاليا</option>
-                {vehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.plateNumber}
-                    {vehicle.make || vehicle.model ? ` - ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}
-                  </option>
-                ))}
+                {(() => {
+                  const grouped = vehicles.reduce<Record<string, { nameAr: string; items: VehicleOption[] }>>((acc, v) => {
+                    const cid = v.company.id;
+                    if (!acc[cid]) acc[cid] = { nameAr: v.company.nameAr, items: [] };
+                    acc[cid].items.push(v);
+                    return acc;
+                  }, {});
+                  return Object.values(grouped).map((group) => (
+                    <optgroup key={group.nameAr} label={group.nameAr}>
+                      {group.items.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.plateNumber}
+                          {vehicle.make || vehicle.model ? ` - ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ));
+                })()}
               </select>
               <p className="mt-1 text-xs text-muted-foreground">
-                تغيير المركبة هنا يحدث التعيين الحالي ويحفظه في سجل التعيينات.
+                تغيير المركبة هنا يحدث التعيين الحالي ويحفظه في سجل التعيينات. يمكن اختيار مركبة من أي شركة.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                {assignedVehicleId !== originalVehicleId && assignedVehicleId
+                  ? "تاريخ ووقت استلام السيارة الجديدة"
+                  : "تاريخ ووقت استلام السيارة الحالية"}
+              </label>
+              <input
+                type="datetime-local"
+                value={assignedAt}
+                onChange={(e) => setAssignedAt(e.target.value)}
+                className="input-field w-full"
+                dir="ltr"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {assignedVehicleId !== originalVehicleId && assignedVehicleId
+                  ? "وقت استلام السيارة الجديدة — مهم لتحديد مسؤولية المخالفات."
+                  : "وقت استلام السيارة الحالية — معلومة فقط، لا يتم تحديثه إلا عند تغيير السيارة."}
               </p>
             </div>
           </div>

@@ -22,6 +22,8 @@ const updateSchema = z.object({
   licenseNumber: z.string().optional().nullable(),
   licenseExpiry: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
   residentialAddress: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
+  assignedAt: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
   talabatId: z.string().optional().nullable(),
   roPopsId: z.string().optional().nullable(),
   isRegisteredTalabat: z.boolean().optional(),
@@ -48,6 +50,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
             civilId: true,
             passportNumber: true,
             passportExpiryDate: true,
+            dateOfBirth: true,
             baseSalary: true,
             residencyNumber: true,
             residencyExpiry: true,
@@ -64,6 +67,11 @@ export async function GET(request: NextRequest, { params }: Ctx) {
             make: true,
             model: true,
           },
+        },
+        vehicleAssignments: {
+          where: { isActive: true },
+          select: { assignedFrom: true },
+          take: 1,
         },
       },
     });
@@ -98,6 +106,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       isRegisteredRoPops,
       fuelCardNumber,
       assignedVehicleId,
+      assignedAt,
       nameAr,
       nameEn,
       phone,
@@ -105,6 +114,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       civilId,
       passportNumber,
       passportExpiryDate,
+      dateOfBirth,
       baseSalary,
       residencyNumber,
       residencyExpiry,
@@ -130,6 +140,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (licenseNumber !== undefined) employeeData.licenseNumber = licenseNumber;
       if (licenseExpiry !== undefined) employeeData.licenseExpiry = licenseExpiry;
       if (residentialAddress !== undefined) employeeData.residentialAddress = residentialAddress;
+      if (dateOfBirth !== undefined) employeeData.dateOfBirth = dateOfBirth;
 
       const currentDriver = await tx.driver.findUnique({
         where: { id: driverId },
@@ -163,9 +174,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
           const vehicle = await tx.vehicle.findFirst({
             where: {
               id: assignedVehicleId,
-              companyId: currentDriver.employee.companyId,
               isActive: true,
-              type: "DELIVERY",
             },
             select: { id: true, plateNumber: true },
           });
@@ -207,7 +216,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
               companyId: currentDriver.employee.companyId,
               driverId,
               vehicleId: assignedVehicleId,
-              assignedFrom: new Date(),
+              assignedFrom: assignedAt ?? new Date(),
               isActive: true,
               createdById: session.id,
               notes: "تحديث التعيين من ملف السائق",

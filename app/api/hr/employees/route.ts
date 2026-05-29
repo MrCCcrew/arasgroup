@@ -54,6 +54,7 @@ const employeeSchema = z.object({
   passportReceivedDate: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
   passportReleasedDate: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
   passportReleaseNotes: z.string().optional(),
+  investorId: z.string().optional(),
   notes: z.string().optional(),
   carWashWorkerRole: z
     .enum(["DRIVER", "WASHER", "CAR_WASH_DRIVER", "WASHING_WORKER", "SUPERVISOR", "OTHER"])
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const search = searchParams.get("search");
     const expiringResidency = searchParams.get("expiringResidency");
+    const investorOnly = searchParams.get("investorOnly") === "true";
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "معرف الشركة مطلوب" }, { status: 400 });
@@ -102,6 +104,7 @@ export async function GET(request: NextRequest) {
         ...(type ? { type: type as z.infer<typeof employeeSchema>["type"] } : {}),
         ...(search ? { nameAr: { contains: search } } : {}),
         ...(expiryThreshold ? { residencyExpiry: { lte: expiryThreshold, gte: now } } : {}),
+        ...(investorOnly ? { investorId: { not: null } } : {}),
         ...licenseFilter,
       },
       include: {
@@ -185,6 +188,7 @@ export async function POST(request: NextRequest) {
           companyId: data.companyId,
           branchId: data.branchId,
           licenseId: data.licenseId,
+          investorId: data.investorId,
           clientGeneratedId: data.clientGeneratedId,
           positionId: data.positionId,
           employeeNumber: data.employeeNumber,

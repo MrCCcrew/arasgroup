@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const activeOnly = searchParams.get("activeOnly") === "true";
     const availableForDriverId = searchParams.get("availableForDriverId");
+    const groupWide = searchParams.get("groupWide") === "true";
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     const vehicles = await prisma.vehicle.findMany({
       where: {
-        companyId,
+        ...(groupWide ? {} : { companyId }),
         ...(normalizedType ? { type: normalizedType as "DELIVERY" | "CAR_WASH" | "ADMIN" } : {}),
         ...(activeOnly ? { isActive: true } : {}),
         ...(availableForDriverId
@@ -75,8 +76,9 @@ export async function GET(request: NextRequest) {
         make: true,
         model: true,
         vehicleStatus: true,
+        company: { select: { id: true, nameAr: true } },
       },
-      orderBy: { plateNumber: "asc" },
+      orderBy: [{ company: { nameAr: "asc" } }, { plateNumber: "asc" }],
     });
 
     return NextResponse.json({ success: true, data: vehicles });

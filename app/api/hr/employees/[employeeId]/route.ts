@@ -59,6 +59,7 @@ const updateSchema = z.object({
   notes: z.string().optional(),
   isActive: z.boolean().optional(),
   type: z.enum(EMPLOYEE_TYPES).optional(),
+  investorId: z.string().optional().nullable(),
 });
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {

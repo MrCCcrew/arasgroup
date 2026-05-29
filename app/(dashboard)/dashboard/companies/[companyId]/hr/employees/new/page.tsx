@@ -25,6 +25,12 @@ interface BranchLookup {
   unifiedEntityNumber?: string | null;
 }
 
+interface InvestorLookup {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+}
+
 interface PositionLookup {
   id: string;
   nameAr: string;
@@ -205,6 +211,7 @@ export default function NewEmployeePage() {
   const [positions, setPositions] = useState<PositionLookup[]>([]);
   const [licenses, setLicenses] = useState<LicenseLookup[]>([]);
   const [groupLicenses, setGroupLicenses] = useState<LicenseLookup[]>([]);
+  const [investors, setInvestors] = useState<InvestorLookup[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
   const [form, setForm] = useState({
     employeeNumber: "",
@@ -214,6 +221,7 @@ export default function NewEmployeePage() {
     positionId: "",
     branchId: "",
     licenseId: "",
+    investorId: "",
     nationality: "",
     civilId: "",
     passportNumber: "",
@@ -241,13 +249,15 @@ export default function NewEmployeePage() {
       fetch(`/api/hr/positions?companyId=${companyId}`).then((response) => response.json()),
       fetch(`/api/licenses?companyId=${companyId}`).then((response) => response.json()),
       fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`).then((response) => response.json()),
+      fetch(`/api/investors?companyId=${companyId}`).then((response) => response.json()),
     ])
-      .then(([companyPayload, branchesPayload, positionsPayload, licensesPayload, groupPayload]) => {
+      .then(([companyPayload, branchesPayload, positionsPayload, licensesPayload, groupPayload, investorsPayload]) => {
         if (companyPayload.success) setCompanyType((companyPayload.data as CompanyLookup).type);
         if (branchesPayload.success) setBranches(branchesPayload.data);
         if (positionsPayload.success) setPositions(positionsPayload.data);
         if (licensesPayload.success) setLicenses(licensesPayload.data);
         if (groupPayload.success) setGroupLicenses(groupPayload.data);
+        if (investorsPayload.success) setInvestors(investorsPayload.data);
       })
       .catch(() => {
         setError(locale === "en" ? "Failed to load lookup data" : "تعذر تحميل البيانات المساعدة");
@@ -287,6 +297,7 @@ export default function NewEmployeePage() {
           positionId: form.positionId || undefined,
           branchId: form.branchId || undefined,
           licenseId: form.licenseId || undefined,
+          investorId: form.investorId || undefined,
           additionalLicenseIds: showAdditionalLicenses && additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
           nationality: form.nationality || undefined,
           civilId: form.civilId || undefined,
@@ -384,6 +395,20 @@ export default function NewEmployeePage() {
                   }))}
                 />
               </div>
+
+              {investors.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Investor / Manager" : "المسئول / المدير"}</label>
+                  <select value={form.investorId} onChange={(event) => setField("investorId", event.target.value)} className="input-field w-full">
+                    <option value="">{locale === "en" ? "— No investor —" : "— بدون مسئول (موظف شركة) —"}</option>
+                    {investors.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {locale === "en" ? inv.nameEn ?? inv.nameAr : inv.nameAr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {showAdditionalLicenses && (
                 <div className="md:col-span-2">

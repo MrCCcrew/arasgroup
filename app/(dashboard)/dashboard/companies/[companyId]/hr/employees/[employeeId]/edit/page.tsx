@@ -10,9 +10,9 @@ import { allowsCrossCompanyLicenses } from "@/lib/hr/company-employee-rules";
 
 interface SearchableOption { id: string; label: string; sub?: string }
 
-interface CompanyLookup {
-  type: string;
-}
+interface CompanyLookup { type: string; }
+
+interface InvestorLookup { id: string; nameAr: string; nameEn?: string | null; }
 
 function SearchableSelect({
   options, value, onChange, placeholder,
@@ -137,6 +137,7 @@ interface FormState {
   type: string;
   branchId: string;
   licenseId: string;
+  investorId: string;
   nationality: string;
   civilId: string;
   passportNumber: string;
@@ -174,6 +175,7 @@ export default function EditEmployeePage() {
   const [branches, setBranches] = useState<{ id: string; nameAr: string; nameEn?: string | null; unifiedEntityNumber?: string | null }[]>([]);
   const [licenses, setLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null }[]>([]);
   const [groupLicenses, setGroupLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null; company?: { nameAr: string } }[]>([]);
+  const [investors, setInvestors] = useState<InvestorLookup[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
   const [form, setForm] = useState<FormState>({
     employeeNumber: "",
@@ -182,6 +184,7 @@ export default function EditEmployeePage() {
     type: "OFFICE_EMPLOYEE",
     branchId: "",
     licenseId: "",
+    investorId: "",
     nationality: "",
     civilId: "",
     passportNumber: "",
@@ -200,23 +203,26 @@ export default function EditEmployeePage() {
 
   const load = useCallback(async () => {
     try {
-      const [employeeRes, companyRes, branchesRes, licensesRes, groupRes] = await Promise.all([
+      const [employeeRes, companyRes, branchesRes, licensesRes, groupRes, investorsRes] = await Promise.all([
         fetch(`/api/hr/employees/${employeeId}`),
         fetch(`/api/companies/${companyId}`),
         fetch(`/api/companies/${companyId}/branches`),
         fetch(`/api/licenses?companyId=${companyId}`),
         fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`),
+        fetch(`/api/investors?companyId=${companyId}`),
       ]);
       const employeePayload = await employeeRes.json();
       const companyPayload = await companyRes.json();
       const branchesPayload = await branchesRes.json();
       const licensesPayload = await licensesRes.json();
       const groupPayload = await groupRes.json();
+      const investorsPayload = await investorsRes.json();
 
       if (companyPayload.success) setCompanyType((companyPayload.data as CompanyLookup).type);
       if (branchesPayload.success) setBranches(branchesPayload.data);
       if (licensesPayload.success) setLicenses(licensesPayload.data);
       if (groupPayload.success) setGroupLicenses(groupPayload.data);
+      if (investorsPayload.success) setInvestors(investorsPayload.data);
 
       if (employeePayload.success) {
         const e = employeePayload.data;
@@ -231,6 +237,7 @@ export default function EditEmployeePage() {
           type: e.type ?? "OFFICE_EMPLOYEE",
           branchId: e.branchId ?? "",
           licenseId: e.licenseId ?? "",
+          investorId: e.investorId ?? "",
           nationality: e.nationality ?? "",
           civilId: e.civilId ?? "",
           passportNumber: e.passportNumber ?? "",
@@ -278,6 +285,7 @@ export default function EditEmployeePage() {
           nameEn: form.nameEn || undefined,
           branchId: form.branchId || null,
           licenseId: form.licenseId || null,
+          investorId: form.investorId || null,
           additionalLicenseIds: showAdditionalLicenses ? additionalLicenseIds : [],
           nationality: form.nationality || undefined,
           civilId: form.civilId || undefined,
@@ -387,6 +395,20 @@ export default function EditEmployeePage() {
                   }))}
                 />
               </div>
+              {investors.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Investor / Manager" : "المسئول / المدير"}</label>
+                  <select value={form.investorId} onChange={(e) => setField("investorId", e.target.value)} className="input-field w-full">
+                    <option value="">{locale === "en" ? "— No investor —" : "— بدون مسئول (موظف شركة) —"}</option>
+                    {investors.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {locale === "en" ? inv.nameEn ?? inv.nameAr : inv.nameAr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {showAdditionalLicenses && (
                 <div className="md:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium">

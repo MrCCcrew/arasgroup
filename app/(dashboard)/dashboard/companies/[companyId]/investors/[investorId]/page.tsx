@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCard, FileText, Mail, MapPin, Phone, Plus, Pencil } from "lucide-react";
+import { CreditCard, FileText, Mail, MapPin, Phone, Plus, Pencil, Users } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
@@ -11,6 +11,19 @@ import { InvestorDeleteButton } from "./InvestorDeleteButton";
 interface Props {
   params: Promise<{ companyId: string; investorId: string }>;
 }
+
+const employeeTypeLabels: Record<string, { ar: string; en: string }> = {
+  DRIVER: { ar: "سائق", en: "Driver" },
+  DELIVERY_DRIVER: { ar: "سائق توصيل", en: "Delivery Driver" },
+  DELIVERY_ADMIN: { ar: "إداري توصيل", en: "Delivery Admin" },
+  CAR_WASH_DRIVER: { ar: "سائق غسيل", en: "Car Wash Driver" },
+  CAR_WASH_WORKER: { ar: "عامل غسيل", en: "Car Wash Worker" },
+  OFFICE_EMPLOYEE: { ar: "موظف مكتب", en: "Office Employee" },
+  ACCOUNTANT: { ar: "محاسب", en: "Accountant" },
+  MANDOUB: { ar: "مندوب", en: "Mandoub" },
+  OFFICE_BOY: { ar: "فراش", en: "Office Boy" },
+  OTHER: { ar: "أخرى", en: "Other" },
+};
 
 const claimTypeLabels = {
   ar: {
@@ -94,6 +107,19 @@ export default async function InvestorDetailPage({ params }: Props) {
   });
 
   if (!investor) notFound();
+
+  const investorEmployees = await prisma.employee.findMany({
+    where: { investorId, companyId, isActive: true, isDeleted: false },
+    select: {
+      id: true,
+      nameAr: true,
+      nameEn: true,
+      type: true,
+      employeeNumber: true,
+      residencyExpiry: true,
+    },
+    orderBy: { nameAr: "asc" },
+  });
 
   const claims = await prisma.investorClaim.findMany({
     where: { investorId, companyId },
@@ -214,6 +240,73 @@ export default async function InvestorDetailPage({ params }: Props) {
             <StatCard label={locale === "en" ? "Group income" : "دخل المجموعة"} value={formatKWD(totalIncome, numberLocale)} color="text-green-600" />
           </div>
         </div>
+
+        {/* موظفو هذا المسئول */}
+        {investorEmployees.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-amber-600" />
+                <h2 className="text-base font-bold">
+                  {locale === "en" ? "Employees" : "الموظفون"} ({investorEmployees.length})
+                </h2>
+              </div>
+              <Link
+                href={`/dashboard/companies/${companyId}/hr/employees?group=investor`}
+                className="text-xs text-primary hover:underline"
+              >
+                {locale === "en" ? "View all investor employees" : "عرض كل موظفي المسئولين"}
+              </Link>
+            </div>
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <table className="ar-table">
+                <thead>
+                  <tr>
+                    <th>{locale === "en" ? "Name" : "الاسم"}</th>
+                    <th>{locale === "en" ? "Type" : "الوظيفة"}</th>
+                    <th>{locale === "en" ? "Residency expiry" : "انتهاء الإقامة"}</th>
+                    <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investorEmployees.map((emp) => (
+                    <tr key={emp.id} className="transition-colors hover:bg-muted/20">
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{emp.nameAr}</span>
+                          {emp.employeeNumber && (
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                              {emp.employeeNumber}
+                            </span>
+                          )}
+                        </div>
+                        {emp.nameEn && <p className="text-xs text-muted-foreground">{emp.nameEn}</p>}
+                      </td>
+                      <td>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                          {locale === "en"
+                            ? employeeTypeLabels[emp.type]?.en ?? emp.type
+                            : employeeTypeLabels[emp.type]?.ar ?? emp.type}
+                        </span>
+                      </td>
+                      <td className="text-sm text-muted-foreground">
+                        {emp.residencyExpiry ? formatDate(emp.residencyExpiry, dateLocale) : "—"}
+                      </td>
+                      <td>
+                        <Link
+                          href={`/dashboard/companies/${companyId}/hr/employees/${emp.id}`}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {locale === "en" ? "View" : "عرض"}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div>
           <h2 className="mb-3 text-base font-bold">{locale === "en" ? "Claims" : "المطالبات"}</h2>

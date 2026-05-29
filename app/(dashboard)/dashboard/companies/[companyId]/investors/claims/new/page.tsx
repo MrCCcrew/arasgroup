@@ -127,7 +127,7 @@ export default function NewClaimPage() {
   useEffect(() => {
     if (!showBeneficiaries) return;
     const q = employeeSearch.trim();
-    const url = `/api/hr/employees?companyId=${companyId}${q ? `&search=${encodeURIComponent(q)}` : ""}`;
+    const url = `/api/hr/employees?companyId=${companyId}&investorOnly=true${q ? `&search=${encodeURIComponent(q)}` : ""}`;
     fetch(url)
       .then((r) => r.json())
       .then((payload) => { if (payload.success) setEmployees(payload.data); })

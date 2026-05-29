@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, ArrowRight, CreditCard, Pencil, Phone } from "lucide-react";
+import { AlertTriangle, ArrowRight, Calendar, CreditCard, Pencil, Phone } from "lucide-react";
 import { DriverDeleteButton } from "./DriverDeleteButton";
 import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { Header } from "@/components/layout/header";
@@ -50,10 +50,16 @@ export default async function DriverDetailPage({ params }: Props) {
           nationality: true,
           civilId: true,
           baseSalary: true,
+          dateOfBirth: true,
           residencyExpiry: true,
           companyId: true,
           isActive: true,
         },
+      },
+      vehicleAssignments: {
+        where: { isActive: true },
+        select: { assignedFrom: true },
+        take: 1,
       },
       assignedVehicle: {
         select: {
@@ -61,6 +67,8 @@ export default async function DriverDetailPage({ params }: Props) {
           plateNumber: true,
           make: true,
           model: true,
+          companyId: true,
+          company: { select: { nameAr: true } },
         },
       },
       walletTransactions: {
@@ -157,6 +165,12 @@ export default async function DriverDetailPage({ params }: Props) {
                 <span>{driver.employee.nationality}</span>
               </div>
             )}
+            {driver.employee.dateOfBirth && (
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar size={14} className="shrink-0 text-muted-foreground" />
+                <span>{formatDate(driver.employee.dateOfBirth, locale === "en" ? "en-US" : "ar-KW")}</span>
+              </div>
+            )}
             <div className="text-sm">
               <span className="text-muted-foreground">{locale === "en" ? "Base salary: " : "الراتب الأساسي: "}</span>
               <span className="number font-bold">{formatKWD(Number(driver.employee.baseSalary ?? 0), numberLocale)}</span>
@@ -178,6 +192,37 @@ export default async function DriverDetailPage({ params }: Props) {
                 </div>
               )}
             </div>
+
+            {driver.assignedVehicle && (
+              <div className="flex flex-col gap-1 border-t pt-2 text-sm">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-muted-foreground">{locale === "en" ? "Vehicle:" : "المركبة:"}</span>
+                  <span className="font-medium">{driver.assignedVehicle.plateNumber}</span>
+                  {(driver.assignedVehicle.make || driver.assignedVehicle.model) && (
+                    <span className="text-muted-foreground text-xs">
+                      {[driver.assignedVehicle.make, driver.assignedVehicle.model].filter(Boolean).join(" ")}
+                    </span>
+                  )}
+                  {driver.assignedVehicle.companyId !== companyId && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      {driver.assignedVehicle.company.nameAr}
+                    </span>
+                  )}
+                </div>
+                {driver.vehicleAssignments[0]?.assignedFrom && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar size={11} />
+                    <span>
+                      {locale === "en" ? "Received: " : "استلمها: "}
+                      {new Date(driver.vehicleAssignments[0].assignedFrom).toLocaleString(
+                        locale === "en" ? "en-US" : "ar-KW",
+                        { dateStyle: "medium", timeStyle: "short" }
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {residencyDays !== null && residencyDays <= 90 && (
               <div className={`flex items-center gap-1.5 rounded-lg p-2 text-xs font-medium ${
