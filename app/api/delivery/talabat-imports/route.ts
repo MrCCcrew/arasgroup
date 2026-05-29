@@ -199,7 +199,8 @@ export async function POST(request: NextRequest) {
 
 async function checkDbMigrated(): Promise<boolean> {
   try {
-    await (prisma as any).talabatReportImport.count();
+    // Use raw SQL — works regardless of Prisma client version
+    await prisma.$queryRaw`SELECT 1 FROM talabat_report_imports LIMIT 1`;
     return true;
   } catch {
     return false;
