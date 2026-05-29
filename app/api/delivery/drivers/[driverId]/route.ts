@@ -3,10 +3,11 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 
-interface Ctx { params: Promise<{ driverId: string }> }
+interface Ctx {
+  params: Promise<{ driverId: string }>;
+}
 
 const updateSchema = z.object({
-  // بيانات الموظف
   nameAr: z.string().min(2).optional(),
   nameEn: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
@@ -21,16 +22,16 @@ const updateSchema = z.object({
   licenseNumber: z.string().optional().nullable(),
   licenseExpiry: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
   residentialAddress: z.string().optional().nullable(),
-  // بيانات السائق
   talabatId: z.string().optional().nullable(),
   roPopsId: z.string().optional().nullable(),
   isRegisteredTalabat: z.boolean().optional(),
   isRegisteredRoPops: z.boolean().optional(),
   fuelCardNumber: z.string().optional().nullable(),
+  assignedVehicleId: z.string().optional().nullable(),
 });
 
-export async function GET(_request: NextRequest, { params }: Ctx) {
-  const session = await requireRequestSession(_request);
+export async function GET(request: NextRequest, { params }: Ctx) {
+  const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
   try {
@@ -56,9 +57,21 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
             residentialAddress: true,
           },
         },
+        assignedVehicle: {
+          select: {
+            id: true,
+            plateNumber: true,
+            make: true,
+            model: true,
+          },
+        },
       },
     });
-    if (!driver) return NextResponse.json({ success: false, error: "السائق غير موجود" }, { status: 404 });
+
+    if (!driver) {
+      return NextResponse.json({ success: false, error: "السائق غير موجود" }, { status: 404 });
+    }
+
     return NextResponse.json({ success: true, data: driver });
   } catch (error) {
     console.error(error);
@@ -74,18 +87,34 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const { driverId } = await params;
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
-    if (!parsed.success)
+    if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+    }
 
     const {
-      talabatId, roPopsId, isRegisteredTalabat, isRegisteredRoPops, fuelCardNumber,
-      nameAr, nameEn, phone, nationality, civilId, passportNumber, passportExpiryDate,
-      baseSalary, residencyNumber, residencyExpiry, healthCardExpiryDate,
-      licenseNumber, licenseExpiry, residentialAddress,
+      talabatId,
+      roPopsId,
+      isRegisteredTalabat,
+      isRegisteredRoPops,
+      fuelCardNumber,
+      assignedVehicleId,
+      nameAr,
+      nameEn,
+      phone,
+      nationality,
+      civilId,
+      passportNumber,
+      passportExpiryDate,
+      baseSalary,
+      residencyNumber,
+      residencyExpiry,
+      healthCardExpiryDate,
+      licenseNumber,
+      licenseExpiry,
+      residentialAddress,
     } = parsed.data;
 
     const driver = await prisma.$transaction(async (tx) => {
-      // تحديث بيانات الموظف
       const employeeData: Record<string, unknown> = {};
       if (nameAr !== undefined) employeeData.nameAr = nameAr;
       if (nameEn !== undefined) employeeData.nameEn = nameEn;
@@ -102,14 +131,26 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (licenseExpiry !== undefined) employeeData.licenseExpiry = licenseExpiry;
       if (residentialAddress !== undefined) employeeData.residentialAddress = residentialAddress;
 
-      const drv = await tx.driver.findUnique({ where: { id: driverId }, select: { employeeId: true } });
-      if (!drv) throw new Error("السائق غير موجود");
+      const currentDriver = await tx.driver.findUnique({
+        where: { id: driverId },
+        select: {
+          employeeId: true,
+          assignedVehicleId: true,
+          employee: { select: { companyId: true } },
+        },
+      });
 
-      if (Object.keys(employeeData).length > 0) {
-        await tx.employee.update({ where: { id: drv.employeeId }, data: employeeData });
+      if (!currentDriver) {
+        throw new Error("السائق غير موجود");
       }
 
-      // تحديث بيانات السائق
+      if (Object.keys(employeeData).length > 0) {
+        await tx.employee.update({
+          where: { id: currentDriver.employeeId },
+          data: employeeData,
+        });
+      }
+
       const driverData: Record<string, unknown> = {};
       if (talabatId !== undefined) driverData.talabatId = talabatId;
       if (roPopsId !== undefined) driverData.roPopsId = roPopsId;
@@ -117,17 +158,79 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (isRegisteredRoPops !== undefined) driverData.isRegisteredRoPops = isRegisteredRoPops;
       if (fuelCardNumber !== undefined) driverData.fuelCardNumber = fuelCardNumber;
 
+      if (assignedVehicleId !== undefined) {
+        if (assignedVehicleId) {
+          const vehicle = await tx.vehicle.findFirst({
+            where: {
+              id: assignedVehicleId,
+              companyId: currentDriver.employee.companyId,
+              isActive: true,
+              type: "DELIVERY",
+            },
+            select: { id: true, plateNumber: true },
+          });
+
+          if (!vehicle) {
+            throw new Error("المركبة المختارة غير موجودة أو غير نشطة");
+          }
+
+          const conflictingDriver = await tx.driver.findFirst({
+            where: {
+              id: { not: driverId },
+              assignedVehicleId,
+              employee: { isActive: true, isDeleted: false },
+            },
+            select: { employee: { select: { nameAr: true } } },
+          });
+
+          if (conflictingDriver) {
+            throw new Error(`المركبة مخصصة حاليا للسائق ${conflictingDriver.employee.nameAr}`);
+          }
+
+          driverData.assignedVehicleId = vehicle.id;
+          driverData.vehiclePlateNumberSnapshot = vehicle.plateNumber;
+        } else {
+          driverData.assignedVehicleId = null;
+          driverData.vehiclePlateNumberSnapshot = null;
+        }
+      }
+
+      if (assignedVehicleId !== undefined && currentDriver.assignedVehicleId !== assignedVehicleId) {
+        await tx.driverVehicleAssignment.updateMany({
+          where: { driverId, isActive: true },
+          data: { isActive: false, assignedTo: new Date() },
+        });
+
+        if (assignedVehicleId) {
+          await tx.driverVehicleAssignment.create({
+            data: {
+              companyId: currentDriver.employee.companyId,
+              driverId,
+              vehicleId: assignedVehicleId,
+              assignedFrom: new Date(),
+              isActive: true,
+              createdById: session.id,
+              notes: "تحديث التعيين من ملف السائق",
+            },
+          });
+        }
+      }
+
       return tx.driver.update({
         where: { id: driverId },
         data: driverData,
-        include: { employee: { select: { nameAr: true, nameEn: true, residencyExpiry: true } } },
+        include: {
+          employee: { select: { nameAr: true, nameEn: true, residencyExpiry: true } },
+          assignedVehicle: { select: { id: true, plateNumber: true, make: true, model: true } },
+        },
       });
     });
 
     return NextResponse.json({ success: true, data: driver });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ success: false, error: "فشل في التحديث" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في التحديث";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 
@@ -142,7 +245,9 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
   try {
     const { driverId } = await params;
     const driver = await prisma.driver.findUnique({ where: { id: driverId }, select: { employeeId: true } });
-    if (!driver) return NextResponse.json({ success: false, error: "السائق غير موجود" }, { status: 404 });
+    if (!driver) {
+      return NextResponse.json({ success: false, error: "السائق غير موجود" }, { status: 404 });
+    }
 
     await prisma.employee.update({
       where: { id: driver.employeeId },

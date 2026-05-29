@@ -32,6 +32,59 @@ const createVehicleSchema = z.object({
   notes: z.string().optional(),
 });
 
+export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const companyId = searchParams.get("companyId");
+    const type = searchParams.get("type");
+    const activeOnly = searchParams.get("activeOnly") === "true";
+    const availableForDriverId = searchParams.get("availableForDriverId");
+
+    if (!companyId) {
+      return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
+    }
+
+    const companyAccessError = assertCompanyAccess(session, companyId);
+    if (companyAccessError) return companyAccessError;
+    const permissionError = assertPermission(session, "VEHICLES", "VIEW", { companyId });
+    if (permissionError) return permissionError;
+
+    const normalizedType = type && ["DELIVERY", "CAR_WASH", "ADMIN"].includes(type) ? type : null;
+
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        companyId,
+        ...(normalizedType ? { type: normalizedType as "DELIVERY" | "CAR_WASH" | "ADMIN" } : {}),
+        ...(activeOnly ? { isActive: true } : {}),
+        ...(availableForDriverId
+          ? {
+              OR: [
+                { assignedDrivers: { none: { employee: { isActive: true, isDeleted: false } } } },
+                { assignedDrivers: { some: { id: availableForDriverId } } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        plateNumber: true,
+        make: true,
+        model: true,
+        vehicleStatus: true,
+      },
+      orderBy: { plateNumber: "asc" },
+    });
+
+    return NextResponse.json({ success: true, data: vehicles });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "فشل في جلب المركبات";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;

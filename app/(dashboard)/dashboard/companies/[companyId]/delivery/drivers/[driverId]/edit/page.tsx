@@ -12,6 +12,13 @@ interface DriverData {
   isRegisteredTalabat: boolean;
   isRegisteredRoPops: boolean;
   fuelCardNumber: string | null;
+  assignedVehicleId: string | null;
+  assignedVehicle: {
+    id: string;
+    plateNumber: string;
+    make: string | null;
+    model: string | null;
+  } | null;
   employee: {
     nameAr: string;
     nameEn: string | null;
@@ -30,6 +37,13 @@ interface DriverData {
   };
 }
 
+type VehicleOption = {
+  id: string;
+  plateNumber: string;
+  make: string | null;
+  model: string | null;
+};
+
 export default function EditDriverPage() {
   const router = useRouter();
   const params = useParams<{ companyId: string; driverId: string }>();
@@ -37,10 +51,11 @@ export default function EditDriverPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
 
-  // بيانات الموظف
   const [nameAr, setNameAr] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [phone, setPhone] = useState("");
@@ -56,12 +71,12 @@ export default function EditDriverPage() {
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [residentialAddress, setResidentialAddress] = useState("");
 
-  // بيانات السائق
   const [talabatId, setTalabatId] = useState("");
   const [roPopsId, setRoPopsId] = useState("");
   const [isRegisteredTalabat, setIsRegisteredTalabat] = useState(false);
   const [isRegisteredRoPops, setIsRegisteredRoPops] = useState(false);
   const [fuelCardNumber, setFuelCardNumber] = useState("");
+  const [assignedVehicleId, setAssignedVehicleId] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -90,6 +105,7 @@ export default function EditDriverPage() {
         setIsRegisteredTalabat(d.isRegisteredTalabat);
         setIsRegisteredRoPops(d.isRegisteredRoPops);
         setFuelCardNumber(d.fuelCardNumber ?? "");
+        setAssignedVehicleId(d.assignedVehicleId ?? "");
       } catch (err) {
         setFetchError(err instanceof Error ? err.message : "فشل في تحميل بيانات السائق");
       } finally {
@@ -98,6 +114,20 @@ export default function EditDriverPage() {
     }
     load();
   }, [driverId]);
+
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const res = await fetch(`/api/vehicles?companyId=${companyId}&type=DELIVERY&activeOnly=true&availableForDriverId=${driverId}`);
+        const json = await res.json();
+        if (json.success) setVehicles(json.data);
+      } finally {
+        setVehiclesLoading(false);
+      }
+    }
+
+    loadVehicles();
+  }, [companyId, driverId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -124,6 +154,7 @@ export default function EditDriverPage() {
       isRegisteredTalabat,
       isRegisteredRoPops,
       fuelCardNumber: fuelCardNumber || null,
+      assignedVehicleId: assignedVehicleId || null,
     };
 
     try {
@@ -141,17 +172,15 @@ export default function EditDriverPage() {
     }
   }
 
-  // ── حالة التحميل ──
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center gap-3 text-muted-foreground">
         <Loader2 size={24} className="animate-spin" />
-        <span className="text-sm">جاري تحميل البيانات...</span>
+        <span className="text-sm">جار تحميل البيانات...</span>
       </div>
     );
   }
 
-  // ── حالة خطأ التحميل (لا تعرض الـ form) ──
   if (fetchError) {
     return (
       <div className="page-container max-w-lg">
@@ -190,230 +219,125 @@ export default function EditDriverPage() {
             <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
           )}
 
-          {/* ── البيانات الشخصية ── */}
           <div className="section-card space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              البيانات الشخصية
-            </h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">البيانات الشخصية</h2>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  الاسم بالعربي <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={nameAr}
-                  onChange={(e) => setNameAr(e.target.value)}
-                  required
-                  className="input-field w-full"
-                  dir="rtl"
-                />
+                <label className="mb-1.5 block text-sm font-medium">الاسم بالعربي <span className="text-red-500">*</span></label>
+                <input type="text" value={nameAr} onChange={(e) => setNameAr(e.target.value)} required className="input-field w-full" dir="rtl" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">الاسم بالإنجليزي</label>
-                <input
-                  type="text"
-                  value={nameEn}
-                  onChange={(e) => setNameEn(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">رقم الجوال</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                  placeholder="+965XXXXXXXX"
-                />
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">الجنسية</label>
-                <input
-                  type="text"
-                  value={nationality}
-                  onChange={(e) => setNationality(e.target.value)}
-                  className="input-field w-full"
-                />
+                <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} className="input-field w-full" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">رقم البطاقة المدنية</label>
-                <input
-                  type="text"
-                  value={civilId}
-                  onChange={(e) => setCivilId(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="text" value={civilId} onChange={(e) => setCivilId(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">الراتب الأساسي (د.ك)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={baseSalary}
-                  onChange={(e) => setBaseSalary(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="number" step="0.001" min="0" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium">عنوان الإقامة</label>
-                <input
-                  type="text"
-                  value={residentialAddress}
-                  onChange={(e) => setResidentialAddress(e.target.value)}
-                  className="input-field w-full"
-                  placeholder="القطعة، الشارع، المنزل..."
-                />
+                <input type="text" value={residentialAddress} onChange={(e) => setResidentialAddress(e.target.value)} className="input-field w-full" />
               </div>
             </div>
           </div>
 
-          {/* ── جواز السفر ── */}
           <div className="section-card space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              جواز السفر
-            </h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">جواز السفر</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">رقم جواز السفر</label>
-                <input
-                  type="text"
-                  value={passportNumber}
-                  onChange={(e) => setPassportNumber(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="text" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ انتهاء الجواز</label>
-                <input
-                  type="date"
-                  value={passportExpiryDate}
-                  onChange={(e) => setPassportExpiryDate(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="date" value={passportExpiryDate} onChange={(e) => setPassportExpiryDate(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
             </div>
           </div>
 
-          {/* ── الإقامة والرخصة والصحة ── */}
           <div className="section-card space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              الإقامة والرخصة والصحة
-            </h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">الإقامة والرخصة والصحة</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">رقم الإقامة</label>
-                <input
-                  type="text"
-                  value={residencyNumber}
-                  onChange={(e) => setResidencyNumber(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="text" value={residencyNumber} onChange={(e) => setResidencyNumber(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ انتهاء الإقامة</label>
-                <input
-                  type="date"
-                  value={residencyExpiry}
-                  onChange={(e) => setResidencyExpiry(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="date" value={residencyExpiry} onChange={(e) => setResidencyExpiry(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">رقم الرخصة</label>
-                <input
-                  type="text"
-                  value={licenseNumber}
-                  onChange={(e) => setLicenseNumber(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ انتهاء الرخصة</label>
-                <input
-                  type="date"
-                  value={licenseExpiry}
-                  onChange={(e) => setLicenseExpiry(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ انتهاء كارت الصحة</label>
-                <input
-                  type="date"
-                  value={healthCardExpiryDate}
-                  onChange={(e) => setHealthCardExpiryDate(e.target.value)}
-                  className="input-field w-full"
-                  dir="ltr"
-                />
+                <input type="date" value={healthCardExpiryDate} onChange={(e) => setHealthCardExpiryDate(e.target.value)} className="input-field w-full" dir="ltr" />
               </div>
             </div>
           </div>
 
-          {/* ── بيانات المنصات ── */}
           <div className="section-card space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              بيانات المنصات
-            </h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">تعيين المركبة</h2>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">المركبة الحالية</label>
+              <select value={assignedVehicleId} onChange={(e) => setAssignedVehicleId(e.target.value)} className="input-field w-full" disabled={vehiclesLoading}>
+                <option value="">بدون مركبة حاليا</option>
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.plateNumber}
+                    {vehicle.make || vehicle.model ? ` - ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                تغيير المركبة هنا يحدث التعيين الحالي ويحفظه في سجل التعيينات.
+              </p>
+            </div>
+          </div>
 
+          <div className="section-card space-y-4">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">بيانات المنصات</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={isRegisteredTalabat}
-                    onChange={(e) => setIsRegisteredTalabat(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
+                  <input type="checkbox" checked={isRegisteredTalabat} onChange={(e) => setIsRegisteredTalabat(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
                   <span className="font-medium">مسجل في طلبات</span>
                 </label>
                 {isRegisteredTalabat && (
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">معرّف طلبات (Talabat ID)</label>
-                    <input
-                      type="text"
-                      value={talabatId}
-                      onChange={(e) => setTalabatId(e.target.value)}
-                      className="input-field w-full"
-                      dir="ltr"
-                    />
+                    <label className="mb-1.5 block text-sm font-medium">معرف طلبات</label>
+                    <input type="text" value={talabatId} onChange={(e) => setTalabatId(e.target.value)} className="input-field w-full" dir="ltr" />
                   </div>
                 )}
               </div>
 
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={isRegisteredRoPops}
-                    onChange={(e) => setIsRegisteredRoPops(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
+                  <input type="checkbox" checked={isRegisteredRoPops} onChange={(e) => setIsRegisteredRoPops(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
                   <span className="font-medium">مسجل في Ro Pops</span>
                 </label>
                 {isRegisteredRoPops && (
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">معرّف Ro Pops</label>
-                    <input
-                      type="text"
-                      value={roPopsId}
-                      onChange={(e) => setRoPopsId(e.target.value)}
-                      className="input-field w-full"
-                      dir="ltr"
-                    />
+                    <label className="mb-1.5 block text-sm font-medium">معرف Ro Pops</label>
+                    <input type="text" value={roPopsId} onChange={(e) => setRoPopsId(e.target.value)} className="input-field w-full" dir="ltr" />
                   </div>
                 )}
               </div>
@@ -421,31 +345,17 @@ export default function EditDriverPage() {
 
             <div>
               <label className="mb-1.5 block text-sm font-medium">رقم بطاقة الوقود</label>
-              <input
-                type="text"
-                value={fuelCardNumber}
-                onChange={(e) => setFuelCardNumber(e.target.value)}
-                className="input-field w-full"
-                dir="ltr"
-                placeholder="xxxx-xxxx-xxxx"
-              />
+              <input type="text" value={fuelCardNumber} onChange={(e) => setFuelCardNumber(e.target.value)} className="input-field w-full" dir="ltr" />
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-3">
-            <Link
-              href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}`}
-              className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
-            >
+            <Link href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}`} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
               إلغاء
             </Link>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            >
+            <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              {saving ? "جاري الحفظ..." : "حفظ التعديلات"}
+              {saving ? "جار الحفظ..." : "حفظ التعديلات"}
             </button>
           </div>
         </form>

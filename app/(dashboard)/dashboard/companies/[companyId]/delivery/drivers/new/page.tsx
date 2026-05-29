@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+
+type VehicleOption = {
+  id: string;
+  plateNumber: string;
+  make: string | null;
+  model: string | null;
+};
 
 export default function NewDriverPage() {
   const router = useRouter();
@@ -13,7 +20,9 @@ export default function NewDriverPage() {
   const { locale } = useLocale();
 
   const [loading, setLoading] = useState(false);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [error, setError] = useState("");
+  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
   const [form, setForm] = useState({
     nameAr: "",
     nameEn: "",
@@ -29,11 +38,28 @@ export default function NewDriverPage() {
     roPopsId: "",
     isRegisteredTalabat: false,
     isRegisteredRoPops: false,
+    assignedVehicleId: "",
   });
 
   function setField(field: keyof typeof form, value: string | boolean) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
+
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const response = await fetch(`/api/vehicles?companyId=${companyId}&type=DELIVERY&activeOnly=true`);
+        const payload = await response.json();
+        if (response.ok && payload.success) {
+          setVehicles(payload.data);
+        }
+      } finally {
+        setVehiclesLoading(false);
+      }
+    }
+
+    loadVehicles();
+  }, [companyId]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -60,6 +86,7 @@ export default function NewDriverPage() {
           roPopsId: form.roPopsId || undefined,
           isRegisteredTalabat: form.isRegisteredTalabat,
           isRegisteredRoPops: form.isRegisteredRoPops,
+          assignedVehicleId: form.assignedVehicleId || undefined,
         }),
       });
       const payload = await response.json();
@@ -110,7 +137,7 @@ export default function NewDriverPage() {
                   value={form.nameAr}
                   onChange={(event) => setField("nameAr", event.target.value)}
                   className="input-field w-full"
-                  placeholder={locale === "en" ? "Driver full name" : "اسم السائق كاملاً"}
+                  placeholder={locale === "en" ? "Driver full name" : "اسم السائق كاملا"}
                 />
               </div>
               <div className="col-span-2">
@@ -132,7 +159,6 @@ export default function NewDriverPage() {
                   value={form.nationality}
                   onChange={(event) => setField("nationality", event.target.value)}
                   className="input-field w-full"
-                  placeholder={locale === "en" ? "Example: Egyptian" : "مثال: مصري"}
                 />
               </div>
               <div>
@@ -143,7 +169,6 @@ export default function NewDriverPage() {
                   onChange={(event) => setField("phone", event.target.value)}
                   className="input-field w-full"
                   dir="ltr"
-                  placeholder="+965 XXXX XXXX"
                 />
               </div>
               <div>
@@ -170,6 +195,36 @@ export default function NewDriverPage() {
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Join date" : "تاريخ الالتحاق"}</label>
                 <input type="date" value={form.joinDate} onChange={(event) => setField("joinDate", event.target.value)} className="input-field w-full" dir="ltr" />
               </div>
+            </div>
+          </div>
+
+          <div className="section-card space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              {locale === "en" ? "Vehicle assignment" : "تعيين المركبة"}
+            </h3>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                {locale === "en" ? "Current vehicle" : "المركبة الحالية"}
+              </label>
+              <select
+                value={form.assignedVehicleId}
+                onChange={(event) => setField("assignedVehicleId", event.target.value)}
+                className="input-field w-full"
+                disabled={vehiclesLoading}
+              >
+                <option value="">{locale === "en" ? "No vehicle assigned" : "بدون مركبة حاليا"}</option>
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.plateNumber}
+                    {vehicle.make || vehicle.model ? ` - ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {locale === "en"
+                  ? "The assignment is saved in the driver profile and assignment history."
+                  : "يتم حفظ التعيين في ملف السائق وسجل تعيينات المركبات."}
+              </p>
             </div>
           </div>
 

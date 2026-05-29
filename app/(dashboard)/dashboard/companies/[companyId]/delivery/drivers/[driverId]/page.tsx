@@ -55,6 +55,14 @@ export default async function DriverDetailPage({ params }: Props) {
           isActive: true,
         },
       },
+      assignedVehicle: {
+        select: {
+          id: true,
+          plateNumber: true,
+          make: true,
+          model: true,
+        },
+      },
       walletTransactions: {
         orderBy: { date: "desc" },
         take: 20,
