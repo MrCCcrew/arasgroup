@@ -82,21 +82,34 @@ export default async function DriverDetailPage({ params }: Props) {
           contract: { select: { platform: true } },
         },
       },
-      violations: {
-        where: { status: { not: "CANCELLED" } },
-        orderBy: { date: "desc" },
-        take: 10,
-        select: {
-          id: true, date: true, type: true, amount: true,
-          responsibility: true, driverSharePct: true,
-          paymentMode: true, installmentMonths: true, installmentsPaid: true,
-          status: true, locationAr: true,
-        },
-      },
     },
   });
 
   if (!driver || driver.employee.companyId !== companyId) notFound();
+
+  // Violations query is separate + guarded so it doesn't crash if DB migration pending
+  type ViolationRow = {
+    id: string; date: Date; type: string; amount: unknown;
+    responsibility: string; driverSharePct: number | null;
+    paymentMode: string; installmentMonths: number | null;
+    installmentsPaid: number; status: string; locationAr: string | null;
+  };
+  let driverViolations: ViolationRow[] = [];
+  try {
+    driverViolations = await (prisma.driverViolation as any).findMany({
+      where: { driverId, status: { not: "CANCELLED" } },
+      orderBy: { date: "desc" },
+      take: 10,
+      select: {
+        id: true, date: true, type: true, amount: true,
+        responsibility: true, driverSharePct: true,
+        paymentMode: true, installmentMonths: true, installmentsPaid: true,
+        status: true, locationAr: true,
+      },
+    });
+  } catch {
+    // New fields not yet migrated — skip violations section
+  }
 
   const residencyDays = daysUntilExpiry(driver.employee.residencyExpiry);
 
@@ -393,7 +406,7 @@ export default async function DriverDetailPage({ params }: Props) {
         </div>
 
         {/* المخالفات */}
-        {driver.violations.length > 0 && (
+        {driverViolations.length > 0 && (
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-bold">{locale === "en" ? "Violations" : "المخالفات"}</h2>
@@ -418,7 +431,7 @@ export default async function DriverDetailPage({ params }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {driver.violations.map((v) => {
+                  {driverViolations.map((v) => {
                     const driverShare = v.responsibility === "SPLIT" ? (v.driverSharePct ?? 50) / 100 : v.responsibility === "DRIVER" ? 1 : 0;
                     const driverAmount = Number(v.amount) * driverShare;
                     const totalInst = v.paymentMode === "INSTALLMENT" ? (v.installmentMonths ?? 1) : 1;

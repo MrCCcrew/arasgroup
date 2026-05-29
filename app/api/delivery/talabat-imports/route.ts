@@ -28,8 +28,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requireRequestSession(request);
-  if (session instanceof NextResponse) return session;
+  let session;
+  try {
+    const s = await requireRequestSession(request);
+    if (s instanceof NextResponse) return s;
+    session = s;
+  } catch {
+    return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+  }
 
   try {
     const formData = await request.formData();
@@ -89,6 +95,16 @@ export async function POST(request: NextRequest) {
     const totalDropoff = parsed.riders.reduce((s, r) => s + r.totalDropoffPay, 0);
     const totalCalc = parsed.riders.reduce((s, r) => s + r.calculatedOrdersRaw, 0);
     const totalPayment = parsed.riders.reduce((s, r) => s + r.totalPayment, 0);
+
+    // Guard: check if DB table exists (migration not yet run)
+    try {
+      await (prisma.talabatReportImport as any).count({ take: 1 });
+    } catch {
+      return NextResponse.json({
+        success: false,
+        error: "قاعدة البيانات لم يتم تحديثها بعد. يرجى تشغيل 'prisma db push' على السيرفر أولاً. / Database not migrated yet. Please run 'prisma db push' on the server first.",
+      }, { status: 503 });
+    }
 
     const importRecord = await prisma.talabatReportImport.create({
       data: {
