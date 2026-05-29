@@ -4,7 +4,7 @@ import type {
   Employee, Driver, Vehicle, DeliveryContract, DeliveryMonthlyReport,
   CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification, CompletedTask, UserPermission,
   CompanyType, AccountType, JournalEntryType, JournalStatus,
-  EmployeeType, DeliveryPlatform, ClaimType, ClaimStatus, NormalBalance,
+  EmployeeType, ClaimType, ClaimStatus, NormalBalance,
 } from "@prisma/client";
 
 export type {
@@ -13,7 +13,7 @@ export type {
   Employee, Driver, Vehicle, DeliveryContract, DeliveryMonthlyReport,
   CarWashVehicle, Investor, InvestorClaim, Expense, SalaryBatch, License, Notification, CompletedTask, UserPermission,
   CompanyType, AccountType, JournalEntryType, JournalStatus,
-  EmployeeType, DeliveryPlatform, ClaimType, ClaimStatus, NormalBalance,
+  EmployeeType, ClaimType, ClaimStatus, NormalBalance,
 };
 
 // ─── Auth ───────────────────────────────────────────────────
@@ -191,7 +191,7 @@ export interface DriverWithEmployee extends Driver {
 
 export interface MonthlyReportSummary {
   contractId: string;
-  platform: DeliveryPlatform;
+  platform: string | null;
   month: number;
   year: number;
   totalDrivers: number;

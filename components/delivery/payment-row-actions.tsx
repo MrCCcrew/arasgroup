@@ -8,7 +8,7 @@ interface BankAccount { id: string; nameAr: string; bankName: string }
 
 interface Props {
   paymentId: string;
-  platform: string;
+  platform: string | null;
   month: number;
   year: number;
   grossAmount: string;
@@ -21,9 +21,10 @@ interface Props {
 }
 
 const PLATFORM_OPTIONS = [
+  { value: "", label: "— بدون منصة —" },
   { value: "TALABAT", label: "طلبات" },
   { value: "RO_POPS", label: "رو بوبس" },
-] as const;
+];
 
 const MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
@@ -33,7 +34,7 @@ export function PaymentRowActions({ paymentId, platform, month, year, grossAmoun
   // Edit state
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
-    platform,
+    platform: platform ?? "",
     month,
     year,
     grossAmount: Number(grossAmount).toFixed(3),
@@ -53,7 +54,7 @@ export function PaymentRowActions({ paymentId, platform, month, year, grossAmoun
 
   function openEdit() {
     setEditForm({
-      platform,
+      platform: platform ?? "",
       month,
       year,
       grossAmount: Number(grossAmount).toFixed(3),
@@ -81,7 +82,7 @@ export function PaymentRowActions({ paymentId, platform, month, year, grossAmoun
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          platform: editForm.platform,
+          platform: editForm.platform || null,
           month: Number(editForm.month),
           year: Number(editForm.year),
           grossAmount: Number(editForm.grossAmount),

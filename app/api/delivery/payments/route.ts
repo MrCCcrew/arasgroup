@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 const createSchema = z.object({
   companyId: z.string().min(1),
   contractId: z.string().optional(),
-  platform: z.enum(["TALABAT", "RO_POPS"]),
+  platform: z.string().optional().nullable(),
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2020),
   grossAmount: z.number().min(0),

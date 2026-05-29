@@ -9,28 +9,36 @@ interface Contract {
   id: string;
   nameAr: string;
   nameEn: string | null;
-  platform: "TALABAT" | "RO_POPS";
+  platform: string | null;
   startDate: string;
   endDate: string | null;
   notes: string | null;
   isActive: boolean;
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  TALABAT: "طلبات",
-  RO_POPS: "روبوبس",
+const KNOWN_PLATFORMS: Record<string, { label: string; color: string }> = {
+  TALABAT: { label: "طلبات", color: "bg-orange-100 text-orange-700" },
+  RO_POPS: { label: "روبوبس", color: "bg-blue-100 text-blue-700" },
 };
 
-const PLATFORM_COLORS: Record<string, string> = {
-  TALABAT: "bg-orange-100 text-orange-700",
-  RO_POPS: "bg-blue-100 text-blue-700",
-};
+function getPlatformLabel(platform: string | null): string {
+  if (!platform) return "بدون منصة";
+  return KNOWN_PLATFORMS[platform]?.label ?? platform;
+}
+
+function getPlatformColor(platform: string | null): string {
+  if (!platform) return "bg-gray-100 text-gray-500";
+  return KNOWN_PLATFORMS[platform]?.color ?? "bg-purple-100 text-purple-700";
+}
+
+const PREDEFINED = ["TALABAT", "RO_POPS"];
 
 const now = new Date();
 const EMPTY = {
   nameAr: "",
   nameEn: "",
-  platform: "TALABAT" as "TALABAT" | "RO_POPS",
+  platformSelect: "",
+  platformCustom: "",
   startDate: now.toISOString().slice(0, 10),
   endDate: "",
   notes: "",
@@ -82,6 +90,13 @@ export default function ContractsPage() {
       setForm((p) => ({ ...p, [key]: e.target.value }));
   }
 
+  function resolvePlatform(): string | null {
+    if (form.platformSelect === "__custom__") {
+      return form.platformCustom.trim() || null;
+    }
+    return form.platformSelect || null;
+  }
+
   function openAdd() {
     setEditId(null);
     setForm(EMPTY);
@@ -91,10 +106,12 @@ export default function ContractsPage() {
 
   function openEdit(c: Contract) {
     setEditId(c.id);
+    const isKnown = c.platform && PREDEFINED.includes(c.platform);
     setForm({
       nameAr: c.nameAr,
       nameEn: c.nameEn ?? "",
-      platform: c.platform,
+      platformSelect: isKnown ? (c.platform ?? "") : (c.platform ? "__custom__" : ""),
+      platformCustom: isKnown ? "" : (c.platform ?? ""),
       startDate: c.startDate.slice(0, 10),
       endDate: c.endDate?.slice(0, 10) ?? "",
       notes: c.notes ?? "",
@@ -105,21 +122,22 @@ export default function ContractsPage() {
 
   async function save() {
     if (!form.nameAr.trim()) { setFormError("اسم العقد مطلوب"); return; }
+    if (form.platformSelect === "__custom__" && !form.platformCustom.trim()) {
+      setFormError("يرجى كتابة اسم المنصة"); return;
+    }
     setSaving(true); setFormError("");
     const body = {
-      ...form,
+      nameAr: form.nameAr,
       nameEn: form.nameEn || null,
+      platform: resolvePlatform(),
+      startDate: form.startDate,
       endDate: form.endDate || null,
       notes: form.notes || null,
       ...(!editId ? { companyId } : {}),
     };
     const res = await fetch(
       editId ? `/api/delivery/contracts/${editId}` : "/api/delivery/contracts",
-      {
-        method: editId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }
+      { method: editId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     );
     const data = await res.json();
     setSaving(false);
@@ -140,8 +158,6 @@ export default function ContractsPage() {
   }
 
   const activeCount = contracts.filter((c) => c.isActive).length;
-  const talabatCount = contracts.filter((c) => c.platform === "TALABAT").length;
-  const popsCount = contracts.filter((c) => c.platform === "RO_POPS").length;
 
   return (
     <div>
@@ -157,20 +173,25 @@ export default function ContractsPage() {
       />
 
       <div className="page-container space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="stat-card">
+            <p className="text-xs text-muted-foreground">إجمالي العقود</p>
+            <p className="mt-1 text-2xl font-bold">{contracts.length}</p>
+          </div>
           <div className="stat-card">
             <p className="text-xs text-muted-foreground">عقود نشطة</p>
             <p className="mt-1 text-2xl font-bold text-green-600">{activeCount}</p>
           </div>
-          <div className="stat-card">
-            <p className="text-xs text-muted-foreground">طلبات</p>
-            <p className="mt-1 text-2xl font-bold text-orange-600">{talabatCount}</p>
-          </div>
-          <div className="stat-card">
-            <p className="text-xs text-muted-foreground">روبوبس</p>
-            <p className="mt-1 text-2xl font-bold text-blue-600">{popsCount}</p>
-          </div>
+          {Object.entries(KNOWN_PLATFORMS).map(([key, { label, color }]) => {
+            const count = contracts.filter((c) => c.platform === key).length;
+            if (count === 0) return null;
+            return (
+              <div key={key} className="stat-card">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className={`mt-1 text-2xl font-bold ${color.split(" ")[1]}`}>{count}</p>
+              </div>
+            );
+          })}
         </div>
 
         <div className="section-card overflow-hidden">
@@ -200,37 +221,23 @@ export default function ContractsPage() {
                     <tr key={c.id} className="hover:bg-muted/30">
                       <td className="font-medium">{c.nameAr}</td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLATFORM_COLORS[c.platform]}`}>
-                          {PLATFORM_LABELS[c.platform]}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getPlatformColor(c.platform)}`}>
+                          {getPlatformLabel(c.platform)}
                         </span>
                       </td>
                       <td className="text-sm">{new Date(c.startDate).toLocaleDateString("ar-KW")}</td>
                       <td className="text-sm">
-                        {c.endDate
-                          ? new Date(c.endDate).toLocaleDateString("ar-KW")
-                          : <span className="text-muted-foreground">مفتوح</span>}
+                        {c.endDate ? new Date(c.endDate).toLocaleDateString("ar-KW") : <span className="text-muted-foreground">مفتوح</span>}
                       </td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs ${c.isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
                           {c.isActive ? "نشط" : "متوقف"}
                         </span>
                       </td>
-                      <td className="max-w-xs truncate text-sm text-muted-foreground">
-                        {c.notes ?? "—"}
-                      </td>
+                      <td className="max-w-xs truncate text-sm text-muted-foreground">{c.notes ?? "—"}</td>
                       <td className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => openEdit(c)}
-                          className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
-                        >
-                          تعديل
-                        </button>
-                        <button
-                          onClick={() => { setDeleteId(c.id); setDeleteError(""); }}
-                          className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
-                        >
-                          حذف
-                        </button>
+                        <button onClick={() => openEdit(c)} className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">تعديل</button>
+                        <button onClick={() => { setDeleteId(c.id); setDeleteError(""); }} className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50">حذف</button>
                       </td>
                     </tr>
                   ))}
@@ -241,38 +248,50 @@ export default function ContractsPage() {
         </div>
       </div>
 
-      {/* Add / Edit Modal */}
       {showForm && (
         <Modal title={editId ? "تعديل العقد" : "إضافة عقد جديد"} onClose={() => setShowForm(false)}>
           <div className="space-y-3">
             <div>
               <label className="form-label">اسم العقد (عربي) *</label>
-              <input className="input-field" value={form.nameAr} onChange={f("nameAr")} />
+              <input className="input-field w-full" value={form.nameAr} onChange={f("nameAr")} />
             </div>
             <div>
               <label className="form-label">اسم العقد (إنجليزي)</label>
-              <input className="input-field" dir="ltr" value={form.nameEn} onChange={f("nameEn")} />
+              <input className="input-field w-full" dir="ltr" value={form.nameEn} onChange={f("nameEn")} />
             </div>
             <div>
-              <label className="form-label">المنصة *</label>
-              <select className="input-field" value={form.platform} onChange={f("platform")}>
+              <label className="form-label">المنصة</label>
+              <select className="input-field w-full" value={form.platformSelect} onChange={f("platformSelect")}>
+                <option value="">— بدون منصة —</option>
                 <option value="TALABAT">طلبات</option>
                 <option value="RO_POPS">روبوبس</option>
+                <option value="__custom__">منصة أخرى (اكتب يدوياً)...</option>
               </select>
             </div>
+            {form.platformSelect === "__custom__" && (
+              <div>
+                <label className="form-label">اسم المنصة *</label>
+                <input
+                  className="input-field w-full"
+                  value={form.platformCustom}
+                  onChange={f("platformCustom")}
+                  placeholder="مثال: Deliveroo، Careem Food..."
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="form-label">تاريخ البداية *</label>
-                <input type="date" className="input-field" value={form.startDate} onChange={f("startDate")} />
+                <input type="date" className="input-field w-full" value={form.startDate} onChange={f("startDate")} />
               </div>
               <div>
                 <label className="form-label">تاريخ النهاية</label>
-                <input type="date" className="input-field" value={form.endDate} onChange={f("endDate")} />
+                <input type="date" className="input-field w-full" value={form.endDate} onChange={f("endDate")} />
               </div>
             </div>
             <div>
               <label className="form-label">ملاحظات</label>
-              <textarea className="input-field" rows={2} value={form.notes} onChange={f("notes")} />
+              <textarea className="input-field w-full" rows={2} value={form.notes} onChange={f("notes")} />
             </div>
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">
@@ -285,7 +304,6 @@ export default function ContractsPage() {
         </Modal>
       )}
 
-      {/* Delete confirm */}
       {deleteId && (
         <Modal title="تأكيد الحذف" onClose={() => setDeleteId(null)}>
           <p className="text-sm text-muted-foreground">هل أنت متأكد من إيقاف هذا العقد؟</p>

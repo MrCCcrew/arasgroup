@@ -13,16 +13,20 @@ interface Props {
   searchParams: Promise<{ platform?: string; year?: string; month?: string }>;
 }
 
-const PLATFORM_LABELS = {
-  ar: {
-    TALABAT: "طلبات",
-    RO_POPS: "رو بوبس",
-  },
-  en: {
-    TALABAT: "Talabat",
-    RO_POPS: "Ro Pops",
-  },
-} as const;
+const KNOWN_PLATFORMS: Record<string, { ar: string; en: string; color: string }> = {
+  TALABAT: { ar: "طلبات", en: "Talabat", color: "bg-orange-100 text-orange-700" },
+  RO_POPS: { ar: "رو بوبس", en: "Ro Pops", color: "bg-blue-100 text-blue-700" },
+};
+
+function getPlatformLabel(platform: string | null, locale: string): string {
+  if (!platform) return locale === "en" ? "No platform" : "بدون منصة";
+  return KNOWN_PLATFORMS[platform]?.[locale as "ar" | "en"] ?? platform;
+}
+
+function getPlatformColor(platform: string | null): string {
+  if (!platform) return "bg-gray-100 text-gray-500";
+  return KNOWN_PLATFORMS[platform]?.color ?? "bg-purple-100 text-purple-700";
+}
 
 const MONTHS = {
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
@@ -47,7 +51,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
       gte: new Date(year, month ? month - 1 : 0, 1),
       lte: new Date(year, month ? month : 12, 0, 23, 59, 59),
     },
-    ...(sp.platform ? { platform: sp.platform as "TALABAT" | "RO_POPS" } : {}),
+    ...(sp.platform ? { platform: sp.platform } : {}),
   };
 
   const [payments, bankAccounts] = await Promise.all([
@@ -115,8 +119,9 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Platform" : "المنصة"}</label>
               <select name="platform" defaultValue={sp.platform ?? ""} className="input-field">
                 <option value="">{locale === "en" ? "All platforms" : "كل المنصات"}</option>
-                <option value="TALABAT">{PLATFORM_LABELS[locale].TALABAT}</option>
-                <option value="RO_POPS">{PLATFORM_LABELS[locale].RO_POPS}</option>
+                {Object.entries(KNOWN_PLATFORMS).map(([key, val]) => (
+                  <option key={key} value={key}>{locale === "en" ? val.en : val.ar}</option>
+                ))}
               </select>
             </div>
             <button
@@ -181,8 +186,8 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
                     <tr key={payment.id} className="hover:bg-muted/10">
                       <td className="text-sm">{formatDate(payment.receivedDate, numberLocale)}</td>
                       <td>
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                          {PLATFORM_LABELS[locale][payment.platform as keyof typeof PLATFORM_LABELS.ar] ?? payment.platform}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getPlatformColor(payment.platform)}`}>
+                          {getPlatformLabel(payment.platform, locale)}
                         </span>
                       </td>
                       <td className="text-sm">

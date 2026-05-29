@@ -29,7 +29,7 @@ export default function NewDeliveryPaymentPage() {
 
   const [form, setForm] = useState({
     contractId: "",
-    platform: "TALABAT",
+    platform: "",
     month: String(now.getMonth() + 1),
     year: String(now.getFullYear()),
     grossAmount: "",
@@ -82,7 +82,7 @@ export default function NewDeliveryPaymentPage() {
         body: JSON.stringify({
           companyId,
           contractId: form.contractId || undefined,
-          platform: form.platform,
+          platform: form.platform || null,
           month: parseInt(form.month, 10),
           year: parseInt(form.year, 10),
           grossAmount: gross,
@@ -151,11 +151,11 @@ export default function NewDeliveryPaymentPage() {
                 {locale === "en" ? "Platform" : "المنصة"} <span className="text-red-500">*</span>
               </label>
               <select
-                required
                 value={form.platform}
                 onChange={(e) => setField("platform", e.target.value)}
                 className="input-field w-full"
               >
+                <option value="">{locale === "en" ? "— No platform —" : "— بدون منصة —"}</option>
                 <option value="TALABAT">{locale === "en" ? "Talabat" : "طلبات"}</option>
                 <option value="RO_POPS">Ro Pops</option>
               </select>

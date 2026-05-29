@@ -8,7 +8,7 @@ interface Props {
 }
 
 const patchSchema = z.object({
-  platform: z.enum(["TALABAT", "RO_POPS"]).optional(),
+  platform: z.string().optional().nullable(),
   month: z.number().int().min(1).max(12).optional(),
   year: z.number().int().min(2020).optional(),
   grossAmount: z.number().min(0).optional(),

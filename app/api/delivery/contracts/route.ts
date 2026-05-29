@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const createSchema = z.object({
   companyId: z.string(),
-  platform: z.enum(["TALABAT", "RO_POPS"]),
+  platform: z.string().optional().nullable(),
   nameAr: z.string().min(2),
   nameEn: z.string().optional(),
   startDate: z.string().transform((s) => new Date(s)),

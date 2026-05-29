@@ -360,8 +360,15 @@ export default async function DriverDetailPage({ params }: Props) {
                     <tr key={order.id}>
                       <td className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(order.date, numberLocale)}</td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${order.contract.platform === "TALABAT" ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"}`}>
-                          {order.contract.platform === "TALABAT" ? (locale === "en" ? "Talabat" : "طلبات") : "Ro Pops"}
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${
+                          order.contract.platform === "TALABAT" ? "bg-orange-100 text-orange-700"
+                          : order.contract.platform === "RO_POPS" ? "bg-blue-100 text-blue-700"
+                          : order.contract.platform ? "bg-purple-100 text-purple-700"
+                          : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {order.contract.platform === "TALABAT" ? (locale === "en" ? "Talabat" : "طلبات")
+                            : order.contract.platform === "RO_POPS" ? "Ro Pops"
+                            : order.contract.platform ?? (locale === "en" ? "No platform" : "بدون منصة")}
                         </span>
                       </td>
                       <td className="number font-bold">{order.ordersCount}</td>

@@ -148,7 +148,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                           className={`rounded-full px-2 py-0.5 text-xs ${
                             order.contract.platform === "TALABAT"
                               ? "bg-orange-50 text-orange-700"
-                              : "bg-blue-50 text-blue-700"
+                              : order.contract.platform === "RO_POPS"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-purple-50 text-purple-700"
                           }`}
                         >
                           {locale === "en" ? order.contract.nameEn ?? order.contract.nameAr : order.contract.nameAr}

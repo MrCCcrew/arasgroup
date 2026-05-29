@@ -1220,7 +1220,7 @@ model DriverVehicleAssignment {
 model DeliveryContract {
   id        String           @id @default(cuid())
   companyId String
-  platform  DeliveryPlatform
+  platform  String?
   nameAr    String
   nameEn    String?
   startDate DateTime
@@ -1240,10 +1240,6 @@ model DeliveryContract {
   @@map("delivery_contracts")
 }
 
-enum DeliveryPlatform {
-  TALABAT
-  RO_POPS
-}
 
 model DeliveryDailyOrder {
   id          String   @id @default(cuid())
@@ -1379,7 +1375,7 @@ model CompanyPayment {
   companyId        String
   contractId       String?
   reportId         String?
-  platform         DeliveryPlatform
+  platform         String?
   month            Int
   year             Int
   grossAmount      Decimal          @db.Decimal(18, 3)
