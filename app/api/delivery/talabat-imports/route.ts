@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
-import { parseTalabatExcel, applyRounding } from "@/lib/excel/talabat-parser";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
@@ -71,8 +72,9 @@ export async function POST(request: NextRequest) {
     const companyErr = assertCompanyAccess(session, companyId);
     if (companyErr) return companyErr;
 
-    // Step 2: Parse Excel (no DB needed)
+    // Step 2: Parse Excel — dynamic import to avoid module-load issues
     const buffer = Buffer.from(await file.arrayBuffer());
+    const { parseTalabatExcel, applyRounding } = await import("@/lib/excel/talabat-parser");
     const parsed = parseTalabatExcel(buffer);
 
     if (parsed.errors.length > 0 && parsed.riders.length === 0) {
