@@ -2917,6 +2917,12 @@ model TalabatReportImportRider {
   calculatedOrdersRounded Decimal @default(0) @db.Decimal(12, 3)
   totalPayment            Decimal @default(0) @db.Decimal(12, 3)
   totalDeductions         Decimal @default(0) @db.Decimal(12, 3)
+  // Downgraded (Y) rows — substitute driver worked under this Rider ID
+  downgradedRowCount          Int     @default(0)
+  downgradedPickupPay         Decimal @default(0) @db.Decimal(12, 3)
+  downgradedDropoffPay        Decimal @default(0) @db.Decimal(12, 3)
+  downgradedCalculatedOrders  Decimal @default(0) @db.Decimal(12, 3)
+  downgradedTotalPayment      Decimal @default(0) @db.Decimal(12, 3)
   matchingStatus          String  @default("UNMATCHED")
   matchedDriverId         String?
 

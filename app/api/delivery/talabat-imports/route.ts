@@ -159,6 +159,11 @@ export async function POST(request: NextRequest) {
               calculatedOrdersRounded: rounded,
               totalPayment: r.totalPayment,
               totalDeductions: r.totalDeductions,
+              downgradedRowCount: r.downgradedRowCount,
+              downgradedPickupPay: r.downgradedPickupPay,
+              downgradedDropoffPay: r.downgradedDropoffPay,
+              downgradedCalculatedOrders: r.downgradedCalculatedOrders,
+              downgradedTotalPayment: r.downgradedTotalPayment,
               matchingStatus,
               matchedDriverId,
             };

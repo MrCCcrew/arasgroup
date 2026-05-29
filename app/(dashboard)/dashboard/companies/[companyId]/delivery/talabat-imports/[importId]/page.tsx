@@ -31,6 +31,11 @@ interface Rider {
   calculatedOrdersRounded: string;
   totalPayment: string;
   totalDeductions: string;
+  downgradedRowCount: number;
+  downgradedPickupPay: string;
+  downgradedDropoffPay: string;
+  downgradedCalculatedOrders: string;
+  downgradedTotalPayment: string;
   matchingStatus: string;
   matchedDriverId: string | null;
   matchedDriver: { employee: { nameAr: string; nameEn: string | null } } | null;
@@ -103,9 +108,21 @@ export default function TalabatImportDetailPage() {
   }, [companyId]);
 
   function openAlloc(rider: Rider) {
-    const existing = rider.allocations.length > 0
-      ? rider.allocations.map(a => ({ driverId: a.driverId, orders: Number(a.allocatedOrders).toFixed(3), pct: a.percentage ?? "", notes: a.notes ?? "" }))
-      : [{ driverId: rider.matchedDriverId ?? "", orders: Number(rider.calculatedOrdersRounded).toFixed(3), pct: "", notes: "" }];
+    let existing;
+    if (rider.allocations.length > 0) {
+      existing = rider.allocations.map(a => ({ driverId: a.driverId, orders: Number(a.allocatedOrders).toFixed(3), pct: a.percentage ?? "", notes: a.notes ?? "" }));
+    } else if (rider.downgradedRowCount > 0) {
+      // Split: owner driver keeps own orders, downgraded portion goes to a substitute driver
+      const total = Number(rider.calculatedOrdersRounded);
+      const downgraded = Number(rider.downgradedCalculatedOrders);
+      const ownOrders = Math.max(0, total - downgraded);
+      existing = [
+        { driverId: rider.matchedDriverId ?? "", orders: ownOrders.toFixed(3), pct: "", notes: "" },
+        { driverId: "", orders: downgraded.toFixed(3), pct: "", notes: "صفوف مخفّضة (Downgraded)" },
+      ];
+    } else {
+      existing = [{ driverId: rider.matchedDriverId ?? "", orders: Number(rider.calculatedOrdersRounded).toFixed(3), pct: "", notes: "" }];
+    }
     setAllocLines(existing);
     setAllocRider(rider);
     setAllocError("");
@@ -280,7 +297,17 @@ export default function TalabatImportDetailPage() {
                     return (
                       <tr key={rider.id} className={`hover:bg-muted/20 ${rider.matchingStatus === "UNMATCHED" ? "bg-red-50/30" : ""}`}>
                         <td className="font-mono text-sm font-medium">{rider.talabatRiderId}</td>
-                        <td className="text-sm">{rider.talabatRiderName}</td>
+                        <td className="text-sm">
+                          {rider.talabatRiderName}
+                          {rider.downgradedRowCount > 0 && (
+                            <span
+                              className="mr-1 inline-block rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700"
+                              title={`${rider.downgradedRowCount} صف مخفّض — ${fmt3(rider.downgradedCalculatedOrders)} طلب عملها سائق بديل`}
+                            >
+                              مخفّض: {fmt3(rider.downgradedCalculatedOrders)}
+                            </span>
+                          )}
+                        </td>
                         <td className="text-center text-sm">{rider.rowCount}</td>
                         <td className="number text-sm">{fmt3(rider.totalPickupPay)}</td>
                         <td className="number text-sm">{fmt3(rider.totalDropoffPay)}</td>
@@ -330,6 +357,16 @@ export default function TalabatImportDetailPage() {
               </p>
             </div>
             <div className="space-y-4 p-5">
+              {allocRider.downgradedRowCount > 0 && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                  <p className="font-medium">⚠️ يحتوي على صفوف مخفّضة (Downgraded)</p>
+                  <p className="mt-1 text-xs">
+                    {allocRider.downgradedRowCount} صف بإجمالي{" "}
+                    <strong className="number">{fmt3(allocRider.downgradedCalculatedOrders)}</strong> طلب
+                    عملها سائق بديل تحت كود هذا الراكب. تم تجهيز سطر منفصل لها — اختر السائق البديل الذي قام بها.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 {allocLines.map((line, i) => (
                   <div key={i} className="grid grid-cols-12 gap-2 items-end">

@@ -24,6 +24,12 @@ export interface TalabatRiderSummary {
   calculatedOrdersRaw: number;
   totalPayment: number;
   totalDeductions: number;
+  // Downgraded (Y) sub-totals
+  downgradedRowCount: number;
+  downgradedPickupPay: number;
+  downgradedDropoffPay: number;
+  downgradedCalculatedOrders: number;
+  downgradedTotalPayment: number;
 }
 
 export interface TalabatContractSummary {
@@ -169,6 +175,10 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
     const deductions = parseFloat(String(row["Operator Log in & use to the Rider (operator) App Deductions"] ?? "0")) || 0;
     const totalPayment = parseFloat(String(row["Total Payment"] ?? "0")) || 0;
 
+    // Check if this row is a "Downgraded" substitute row (Y = worked by another driver)
+    const downgradedRaw = String(row["Downgraded (Y/N)"] ?? "").trim().toUpperCase();
+    const isDowngraded = downgradedRaw === "Y" || downgradedRaw === "YES";
+
     const existing = riderMap.get(riderId);
     if (existing) {
       existing.rowCount++;
@@ -176,10 +186,15 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
       existing.totalDropoffPay += dropoffPay;
       existing.totalDeductions += deductions;
       existing.totalPayment += totalPayment;
-      // Use most recent non-empty name
       if (!existing.riderName && riderName) existing.riderName = riderName;
       if (!existing.contractName && contractName) existing.contractName = contractName;
       if (!existing.companyCode && companyCode) existing.companyCode = companyCode;
+      if (isDowngraded) {
+        existing.downgradedRowCount++;
+        existing.downgradedPickupPay += pickupPay;
+        existing.downgradedDropoffPay += dropoffPay;
+        existing.downgradedTotalPayment += totalPayment;
+      }
     } else {
       riderMap.set(riderId, {
         riderId,
@@ -189,9 +204,14 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
         rowCount: 1,
         totalPickupPay: pickupPay,
         totalDropoffPay: dropoffPay,
-        calculatedOrdersRaw: 0, // calculated below
+        calculatedOrdersRaw: 0,
         totalPayment,
         totalDeductions: deductions,
+        downgradedRowCount: isDowngraded ? 1 : 0,
+        downgradedPickupPay: isDowngraded ? pickupPay : 0,
+        downgradedDropoffPay: isDowngraded ? dropoffPay : 0,
+        downgradedCalculatedOrders: 0,
+        downgradedTotalPayment: isDowngraded ? totalPayment : 0,
       });
     }
   }
@@ -200,6 +220,8 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
   const riders: TalabatRiderSummary[] = [];
   for (const rider of riderMap.values()) {
     rider.calculatedOrdersRaw = (rider.totalPickupPay + rider.totalDropoffPay) / 1.050;
+    rider.downgradedCalculatedOrders =
+      (rider.downgradedPickupPay + rider.downgradedDropoffPay) / 1.050;
     riders.push(rider);
   }
 
