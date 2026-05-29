@@ -146,6 +146,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/delivery/wallet`,             labelKey: "nav.driverWallets",      icon: <Wallet size={14} />,         iconColor: "indigo" },
         { href: `${base}/delivery/payments`,           labelKey: "nav.companyPayments",    icon: <BarChart3 size={14} />,      iconColor: "indigo" },
         { href: `${base}/delivery/vehicle-incidents`,  labelKey: "nav.vehicleIncidents",   icon: <AlertTriangle size={14} />,  iconColor: "amber"  },
+        { href: `${base}/delivery/violations`,         labelKey: "nav.violations",         icon: <AlertTriangle size={14} />,  iconColor: "red"    },
       ],
     },
     {

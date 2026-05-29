@@ -82,6 +82,17 @@ export default async function DriverDetailPage({ params }: Props) {
           contract: { select: { platform: true } },
         },
       },
+      violations: {
+        where: { status: { not: "CANCELLED" } },
+        orderBy: { date: "desc" },
+        take: 10,
+        select: {
+          id: true, date: true, type: true, amount: true,
+          responsibility: true, driverSharePct: true,
+          paymentMode: true, installmentMonths: true, installmentsPaid: true,
+          status: true, locationAr: true,
+        },
+      },
     },
   });
 
@@ -380,6 +391,82 @@ export default async function DriverDetailPage({ params }: Props) {
             </table>
           </div>
         </div>
+
+        {/* المخالفات */}
+        {driver.violations.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold">{locale === "en" ? "Violations" : "المخالفات"}</h2>
+              <a
+                href={`/dashboard/companies/${companyId}/delivery/violations`}
+                className="text-xs text-primary hover:underline"
+              >
+                {locale === "en" ? "All violations" : "كل المخالفات"}
+              </a>
+            </div>
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <table className="ar-table">
+                <thead>
+                  <tr>
+                    <th>{locale === "en" ? "Date" : "التاريخ"}</th>
+                    <th>{locale === "en" ? "Type" : "النوع"}</th>
+                    <th>{locale === "en" ? "Location" : "المكان"}</th>
+                    <th>{locale === "en" ? "Amount" : "المبلغ"}</th>
+                    <th>{locale === "en" ? "Responsibility" : "المسؤولية"}</th>
+                    <th>{locale === "en" ? "Payment" : "السداد"}</th>
+                    <th>{locale === "en" ? "Status" : "الحالة"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driver.violations.map((v) => {
+                    const driverShare = v.responsibility === "SPLIT" ? (v.driverSharePct ?? 50) / 100 : v.responsibility === "DRIVER" ? 1 : 0;
+                    const driverAmount = Number(v.amount) * driverShare;
+                    const totalInst = v.paymentMode === "INSTALLMENT" ? (v.installmentMonths ?? 1) : 1;
+                    return (
+                      <tr key={v.id} className="hover:bg-muted/20">
+                        <td className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(v.date).toLocaleString(locale === "en" ? "en-US" : "ar-KW", { dateStyle: "short", timeStyle: "short" })}
+                        </td>
+                        <td className="text-sm font-medium">{v.type}</td>
+                        <td className="text-sm text-muted-foreground">{v.locationAr ?? "—"}</td>
+                        <td className="number text-sm font-bold text-red-600">
+                          {driverAmount > 0 ? formatKWD(Number(driverAmount), numberLocale) : "—"}
+                        </td>
+                        <td>
+                          <span className={`rounded-full px-2 py-0.5 text-xs ${
+                            v.responsibility === "DRIVER" ? "bg-red-100 text-red-700"
+                            : v.responsibility === "COMPANY" ? "bg-blue-100 text-blue-700"
+                            : "bg-purple-100 text-purple-700"
+                          }`}>
+                            {v.responsibility === "DRIVER" ? (locale === "en" ? "Driver" : "السائق")
+                              : v.responsibility === "COMPANY" ? (locale === "en" ? "Company" : "الشركة")
+                              : `${locale === "en" ? "Split" : "مقسّم"} ${v.driverSharePct ?? 50}%`}
+                          </span>
+                        </td>
+                        <td className="text-xs text-muted-foreground">
+                          {v.paymentMode === "INSTALLMENT"
+                            ? `${v.installmentsPaid}/${totalInst} ${locale === "en" ? "paid" : "مدفوع"}`
+                            : locale === "en" ? "Lump sum" : "دفعة واحدة"}
+                        </td>
+                        <td>
+                          <span className={`rounded-full px-2 py-0.5 text-xs ${
+                            v.status === "PENDING" ? "bg-yellow-100 text-yellow-700"
+                            : v.status === "SETTLED" ? "bg-emerald-100 text-emerald-700"
+                            : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {v.status === "PENDING" ? (locale === "en" ? "Pending" : "قيد التسوية")
+                              : v.status === "SETTLED" ? (locale === "en" ? "Settled" : "مسوّاة")
+                              : (locale === "en" ? "Cancelled" : "ملغية")}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
