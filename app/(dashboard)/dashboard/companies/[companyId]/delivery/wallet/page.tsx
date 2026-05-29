@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Wallet, X } from "lucide-react";
+import { Wallet, X, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
 interface Driver {
@@ -65,7 +65,7 @@ export default function WalletPage() {
     setLoading(true);
     const [d, t] = await Promise.all([
       fetch(`/api/delivery/drivers?companyId=${companyId}`).then((r) => r.json()),
-      fetch(`/api/delivery/wallet?driverId=all&companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/delivery/wallet?companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
     ]);
     if (d.success) setDrivers(d.data);
     if (t.success && Array.isArray(t.data?.transactions)) setTransactions(t.data.transactions);
@@ -171,12 +171,28 @@ export default function WalletPage() {
                     <div>
                       <p className="text-sm font-medium">{tx.driver.employee.nameAr}</p>
                       <p className="text-xs text-muted-foreground">{TX_LABELS[tx.type] ?? tx.type}</p>
+                      {tx.descriptionAr && <p className="text-xs text-muted-foreground">{tx.descriptionAr}</p>}
                     </div>
-                    <div className="text-left">
-                      <p className={`number text-sm font-bold ${tx.type === "DEPOSIT" ? "text-green-600" : "text-blue-600"}`}>
-                        {Number(tx.amount).toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
-                      </p>
-                      <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("ar-KW")}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-left">
+                        <p className={`number text-sm font-bold ${tx.type === "DEPOSIT" ? "text-green-600" : "text-blue-600"}`}>
+                          {Number(tx.amount).toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                        </p>
+                        <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("ar-KW")}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm("حذف هذه الحركة؟ سيتم عكس المبلغ على رصيد السائق.")) return;
+                          const res = await fetch(`/api/delivery/wallet/${tx.id}`, { method: "DELETE" });
+                          const data = await res.json();
+                          if (data.success) load();
+                          else alert(data.error ?? "فشل الحذف");
+                        }}
+                        className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                        title="حذف الحركة"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Upload, X, FileSpreadsheet, CheckCircle, Clock, AlertTriangle, Ban } from "lucide-react";
+import { Upload, X, FileSpreadsheet, CheckCircle, Clock, AlertTriangle, Ban, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
 interface TalabatImport {
@@ -189,12 +189,29 @@ export default function TalabatImportsPage() {
                         </td>
                         <td className="text-xs text-muted-foreground">{imp.createdBy.nameAr}</td>
                         <td>
-                          <Link
-                            href={`/dashboard/companies/${companyId}/delivery/talabat-imports/${imp.id}`}
-                            className="rounded px-2 py-1 text-xs text-primary hover:underline"
-                          >
-                            عرض
-                          </Link>
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/dashboard/companies/${companyId}/delivery/talabat-imports/${imp.id}`}
+                              className="rounded px-2 py-1 text-xs text-primary hover:underline"
+                            >
+                              عرض
+                            </Link>
+                            {imp.status !== "POSTED" && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm("حذف هذا التقرير نهائياً؟")) return;
+                                  const res = await fetch(`/api/delivery/talabat-imports/${imp.id}`, { method: "DELETE" });
+                                  const data = await res.json();
+                                  if (data.success) load();
+                                  else alert(data.error ?? "فشل الحذف");
+                                }}
+                                className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                                title="حذف التقرير"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
