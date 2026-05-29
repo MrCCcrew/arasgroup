@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import {
   findVehicleIdentityConflict,
@@ -16,6 +16,7 @@ const updateSchema = z.object({
   branchId: z.string().optional().nullable(),
   investorId: z.string().optional().nullable(),
   licenseId: z.string().optional().nullable(),
+  assignedEmployeeId: z.string().optional().nullable(),
   plateNumber: z.string().min(1).optional(),
   vehicleNumber: z.string().optional().nullable(),
   make: z.string().optional().nullable(),
@@ -43,7 +44,9 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   try {
     const { vehicleId } = await params;
     const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-    if (!vehicle) return NextResponse.json({ success: false, error: "المركبة غير موجودة" }, { status: 404 });
+    if (!vehicle) {
+      return NextResponse.json({ success: false, error: "المركبة غير موجودة" }, { status: 404 });
+    }
 
     const companyAccessError = assertCompanyAccess(session, vehicle.companyId);
     if (companyAccessError) return companyAccessError;
@@ -64,6 +67,23 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     if (parsed.data.plateNumber !== undefined && !normalizedData.plateNumber) {
       return NextResponse.json({ success: false, error: "رقم اللوحة مطلوب" }, { status: 400 });
+    }
+
+    if (parsed.data.assignedEmployeeId) {
+      const employee = await prisma.employee.findFirst({
+        where: {
+          id: parsed.data.assignedEmployeeId,
+          companyId: vehicle.companyId,
+          isActive: true,
+          isDeleted: false,
+          type: { in: ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] },
+        },
+        select: { id: true },
+      });
+
+      if (!employee) {
+        return NextResponse.json({ success: false, error: "الموظف المختار غير صالح كموظف إداري للمركبة" }, { status: 400 });
+      }
     }
 
     const conflictMessage = await findVehicleIdentityConflict({
@@ -100,7 +120,9 @@ export async function DELETE(request: NextRequest, { params }: Props) {
   try {
     const { vehicleId } = await params;
     const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-    if (!vehicle) return NextResponse.json({ success: false, error: "المركبة غير موجودة" }, { status: 404 });
+    if (!vehicle) {
+      return NextResponse.json({ success: false, error: "المركبة غير موجودة" }, { status: 404 });
+    }
 
     const companyAccessError = assertCompanyAccess(session, vehicle.companyId);
     if (companyAccessError) return companyAccessError;
@@ -138,13 +160,11 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     if (blockers.length > 0) {
       return NextResponse.json(
         { success: false, error: `لا يمكن حذف المركبة - مرتبطة بـ ${blockers.join("، ")}` },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
-    await prisma.vehicle.delete({
-      where: { id: vehicleId },
-    });
+    await prisma.vehicle.delete({ where: { id: vehicleId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

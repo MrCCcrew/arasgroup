@@ -12,6 +12,13 @@ interface LicenseOption {
   licenseNumber: string;
 }
 
+interface AdminEmployeeOption {
+  id: string;
+  nameAr: string;
+  nameEn: string | null;
+  type?: string;
+}
+
 export default function NewDeliveryVehiclePage() {
   const router = useRouter();
   const { companyId } = useParams<{ companyId: string }>();
@@ -19,7 +26,9 @@ export default function NewDeliveryVehiclePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [licenses, setLicenses] = useState<LicenseOption[]>([]);
+  const [adminEmployees, setAdminEmployees] = useState<AdminEmployeeOption[]>([]);
   const [form, setForm] = useState({
+    assignedEmployeeId: "",
     plateNumber: "",
     vehicleNumber: "",
     make: "",
@@ -60,6 +69,18 @@ export default function NewDeliveryVehiclePage() {
       .catch(() => {});
   }, [companyId]);
 
+  useEffect(() => {
+    fetch(`/api/hr/employees?companyId=${companyId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.data)) {
+          const allowed = new Set(["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"]);
+          setAdminEmployees(d.data.filter((employee: AdminEmployeeOption) => allowed.has(employee.type ?? "")));
+        }
+      })
+      .catch(() => {});
+  }, [companyId]);
+
   function setField(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -74,6 +95,7 @@ export default function NewDeliveryVehiclePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId,
+          assignedEmployeeId: form.assignedEmployeeId || undefined,
           plateNumber: form.plateNumber,
           vehicleNumber: form.vehicleNumber || undefined,
           make: form.make || undefined,
@@ -129,6 +151,21 @@ export default function NewDeliveryVehiclePage() {
           <div>
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">بيانات المركبة</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="form-label">الموظف الإداري الحالي</label>
+                <select
+                  value={form.assignedEmployeeId}
+                  onChange={(e) => setField("assignedEmployeeId", e.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="">— بدون موظف —</option>
+                  {adminEmployees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="form-label">رقم اللوحة <span className="text-red-500">*</span></label>
                 <input

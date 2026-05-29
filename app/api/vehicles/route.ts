@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import {
   findVehicleIdentityConflict,
@@ -13,6 +13,7 @@ const createVehicleSchema = z.object({
   branchId: z.string().optional(),
   investorId: z.string().optional(),
   licenseId: z.string().optional(),
+  assignedEmployeeId: z.string().optional(),
   plateNumber: z.string().min(1, "رقم اللوحة مطلوب"),
   vehicleNumber: z.string().optional(),
   make: z.string().optional(),
@@ -102,6 +103,23 @@ export async function POST(request: NextRequest) {
     const permissionError = assertPermission(session, "VEHICLES", "CREATE", { companyId: data.companyId });
     if (permissionError) return permissionError;
 
+    if (data.assignedEmployeeId) {
+      const employee = await prisma.employee.findFirst({
+        where: {
+          id: data.assignedEmployeeId,
+          companyId: data.companyId,
+          isActive: true,
+          isDeleted: false,
+          type: { in: ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] },
+        },
+        select: { id: true },
+      });
+
+      if (!employee) {
+        return NextResponse.json({ success: false, error: "الموظف المختار غير صالح كموظف إداري للمركبة" }, { status: 400 });
+      }
+    }
+
     const plateNumber = normalizeVehicleString(data.plateNumber);
     const fuelCardNumber = normalizeVehicleString(data.fuelCardNumber) ?? undefined;
 
@@ -124,6 +142,7 @@ export async function POST(request: NextRequest) {
         branchId: data.branchId,
         investorId: data.investorId,
         licenseId: data.licenseId,
+        assignedEmployeeId: data.assignedEmployeeId,
         plateNumber,
         vehicleNumber: data.vehicleNumber,
         make: data.make,
@@ -154,7 +173,7 @@ export async function POST(request: NextRequest) {
         module: "vehicles",
         resourceId: vehicle.id,
         resourceType: "Vehicle",
-        newValues: { plateNumber },
+        newValues: { plateNumber, assignedEmployeeId: data.assignedEmployeeId ?? null },
         ipAddress: request.headers.get("x-forwarded-for") ?? "",
         userAgent: request.headers.get("user-agent") ?? "",
       },

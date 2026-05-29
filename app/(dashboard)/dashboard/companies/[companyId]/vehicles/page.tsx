@@ -18,13 +18,13 @@ export default async function VehiclesPage({ params }: Props) {
   const { companyId } = await params;
   const locale = await getLocale();
 
-  const [vehicles, branches, licenses] = await Promise.all([
+  const [vehicles, branches, licenses, adminEmployees] = await Promise.all([
     prisma.vehicle.findMany({
       where: { companyId, isActive: true, type: { not: "CAR_WASH" } },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
-        assignedEmployee: { select: { nameAr: true, nameEn: true } },
+        assignedEmployee: { select: { id: true, nameAr: true, nameEn: true } },
         license: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
       },
       orderBy: { plateNumber: "asc" },
@@ -38,6 +38,16 @@ export default async function VehiclesPage({ params }: Props) {
       where: { companyId, status: { not: "CANCELLED" } },
       select: { id: true, commercialNameAr: true, licenseNumber: true },
       orderBy: { commercialNameAr: "asc" },
+    }),
+    prisma.employee.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        isDeleted: false,
+        type: { in: ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] },
+      },
+      select: { id: true, nameAr: true, nameEn: true, type: true },
+      orderBy: { nameAr: "asc" },
     }),
   ]);
 
@@ -65,6 +75,7 @@ export default async function VehiclesPage({ params }: Props) {
         initialVehicles={vehicles as VehicleRow[]}
         branches={branches}
         licenses={licenses}
+        adminEmployees={adminEmployees}
         companyId={companyId}
         locale={locale}
       />
@@ -97,6 +108,6 @@ export type VehicleRow = {
   licenseId: string | null;
   branch: { nameAr: string; nameEn: string | null } | null;
   investor: { nameAr: string; nameEn: string | null } | null;
-  assignedEmployee: { nameAr: string; nameEn: string | null } | null;
+  assignedEmployee: { id: string; nameAr: string; nameEn: string | null } | null;
   license: { id: string; commercialNameAr: string; licenseNumber: string } | null;
 };

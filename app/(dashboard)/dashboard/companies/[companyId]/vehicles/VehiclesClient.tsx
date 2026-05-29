@@ -18,10 +18,18 @@ interface LicenseOption {
   licenseNumber: string;
 }
 
+interface AdminEmployeeOption {
+  id: string;
+  nameAr: string;
+  nameEn: string | null;
+  type: string;
+}
+
 interface Props {
   initialVehicles: VehicleRow[];
   branches: Branch[];
   licenses: LicenseOption[];
+  adminEmployees: AdminEmployeeOption[];
   companyId: string;
   locale: string;
 }
@@ -71,6 +79,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 const EMPTY_EDIT = {
+  assignedEmployeeId: "",
   plateNumber: "",
   vehicleNumber: "",
   make: "",
@@ -91,7 +100,7 @@ const EMPTY_EDIT = {
   notes: "",
 };
 
-export function VehiclesClient({ initialVehicles, branches, licenses, companyId, locale }: Props) {
+export function VehiclesClient({ initialVehicles, branches, licenses, adminEmployees, companyId, locale }: Props) {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<VehicleRow[]>(initialVehicles);
   const [editVehicle, setEditVehicle] = useState<VehicleRow | null>(null);
@@ -130,6 +139,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, companyId,
     setEditVehicle(v);
     const eff = (d: Date | null | undefined) => d ? new Date(d).toISOString().slice(0, 10) : "";
     setEditForm({
+      assignedEmployeeId: v.assignedEmployee?.id ?? "",
       plateNumber: v.plateNumber,
       vehicleNumber: v.vehicleNumber ?? "",
       make: v.make ?? "",
@@ -182,6 +192,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, companyId,
           advertisingCardNumber: editForm.advertisingCardNumber || null,
           advertisingCardExpiryDate: editForm.advertisingCardExpiryDate || null,
           licenseId: editForm.licenseId || null,
+          assignedEmployeeId: editForm.assignedEmployeeId || null,
           notes: editForm.notes || null,
         }),
       });
@@ -349,6 +360,17 @@ export function VehiclesClient({ initialVehicles, branches, licenses, companyId,
         <Modal title={`تعديل: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">الموظف الإداري الحالي</label>
+                <select className="input-field w-full" value={editForm.assignedEmployeeId} onChange={ef("assignedEmployeeId")}>
+                  <option value="">— بدون موظف —</option>
+                  {adminEmployees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {locale === "en" ? employee.nameEn ?? employee.nameAr : employee.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="form-label">رقم اللوحة *</label>
                 <input className="input-field w-full" dir="ltr" value={editForm.plateNumber} onChange={ef("plateNumber")} />
