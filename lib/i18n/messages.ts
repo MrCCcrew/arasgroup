@@ -91,6 +91,7 @@ export const messages: Record<Locale, MessageTree> = {
       importExport: "استيراد / تصدير",
       vehicleIncidents: "حوادث وإصلاح المركبات",
       violations: "مخالفات السائقين",
+      talabatImports: "تقارير طلبات",
     },
     header: {
       unsyncedTransactions: (params?: Record<string, string | number>) =>
@@ -263,6 +264,7 @@ export const messages: Record<Locale, MessageTree> = {
       importExport: "Import / Export",
       vehicleIncidents: "Vehicle Incidents & Repairs",
       violations: "Driver Violations",
+      talabatImports: "Talabat Reports",
     },
     header: {
       unsyncedTransactions: (params?: Record<string, string | number>) =>
