@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
+import { ReportRowActions } from "./report-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -92,12 +93,13 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                   <th>{locale === "en" ? "Wallet deduction" : "خصم المحفظة"}</th>
                   <th>{locale === "en" ? "Net payment" : "صافي الدفع"}</th>
                   <th>{locale === "en" ? "Status" : "الحالة"}</th>
+                  <th className="text-left">{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
               </thead>
               <tbody>
                 {reports.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
                       {locale === "en" ? "No reports found" : "لا توجد تقارير"}
                     </td>
                   </tr>
@@ -134,6 +136,9 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                         <span className={`status-${report.status.toLowerCase()} rounded-full px-2 py-0.5 text-xs`}>
                           {STATUS_LABELS[locale][report.status as keyof typeof STATUS_LABELS.ar]}
                         </span>
+                      </td>
+                      <td>
+                        <ReportRowActions companyId={companyId} reportId={report.id} locale={locale} />
                       </td>
                     </tr>
                   ))
