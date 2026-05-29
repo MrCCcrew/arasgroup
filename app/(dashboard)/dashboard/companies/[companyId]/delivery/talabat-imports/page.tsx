@@ -96,8 +96,15 @@ export default function TalabatImportsPage() {
     if (form.contractId) fd.append("contractId", form.contractId);
 
     const res = await fetch("/api/delivery/talabat-imports", { method: "POST", body: fd });
-    const data = await res.json();
     setUploading(false);
+
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      setUploadError([`خطأ في الاتصال بالسيرفر (HTTP ${res.status}). تأكد من تشغيل 'npx prisma db push' على السيرفر.`]);
+      return;
+    }
 
     if (!data.success) {
       setUploadError(data.errors ?? [data.error ?? "فشل في الرفع"]);
