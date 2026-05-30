@@ -29,6 +29,10 @@ const updateSchema = z.object({
   isRegisteredTalabat: z.boolean().optional(),
   isRegisteredRoPops: z.boolean().optional(),
   targetOrders: z.number().int().min(0).optional(),
+  employeeType: z.enum([
+    "DRIVER", "DELIVERY_DRIVER", "DELIVERY_ADMIN", "OFFICE_EMPLOYEE",
+    "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER",
+  ]).optional(),
   fuelCardNumber: z.string().optional().nullable(),
   assignedVehicleId: z.string().optional().nullable(),
 });
@@ -46,6 +50,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
           select: {
             nameAr: true,
             nameEn: true,
+            type: true,
             phone: true,
             nationality: true,
             civilId: true,
@@ -106,6 +111,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       isRegisteredTalabat,
       isRegisteredRoPops,
       targetOrders,
+      employeeType,
       fuelCardNumber,
       assignedVehicleId,
       assignedAt,
@@ -143,6 +149,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (licenseExpiry !== undefined) employeeData.licenseExpiry = licenseExpiry;
       if (residentialAddress !== undefined) employeeData.residentialAddress = residentialAddress;
       if (dateOfBirth !== undefined) employeeData.dateOfBirth = dateOfBirth;
+      if (employeeType !== undefined) employeeData.type = employeeType;
 
       const currentDriver = await tx.driver.findUnique({
         where: { id: driverId },

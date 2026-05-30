@@ -24,6 +24,7 @@ interface DriverData {
   employee: {
     nameAr: string;
     nameEn: string | null;
+    type: string;
     phone: string | null;
     nationality: string | null;
     civilId: string | null;
@@ -81,6 +82,7 @@ export default function EditDriverPage() {
   const [isRegisteredTalabat, setIsRegisteredTalabat] = useState(false);
   const [isRegisteredRoPops, setIsRegisteredRoPops] = useState(false);
   const [targetOrders, setTargetOrders] = useState("370");
+  const [isOfficeStaff, setIsOfficeStaff] = useState(false);
   const [fuelCardNumber, setFuelCardNumber] = useState("");
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
   const [originalVehicleId, setOriginalVehicleId] = useState("");
@@ -114,6 +116,7 @@ export default function EditDriverPage() {
         setIsRegisteredTalabat(d.isRegisteredTalabat);
         setIsRegisteredRoPops(d.isRegisteredRoPops);
         setTargetOrders(String(d.targetOrders ?? 370));
+        setIsOfficeStaff(!["DRIVER", "DELIVERY_DRIVER"].includes(d.employee.type));
         setFuelCardNumber(d.fuelCardNumber ?? "");
         setAssignedVehicleId(d.assignedVehicleId ?? "");
         setOriginalVehicleId(d.assignedVehicleId ?? "");
@@ -173,6 +176,7 @@ export default function EditDriverPage() {
       isRegisteredTalabat,
       isRegisteredRoPops,
       targetOrders: targetOrders ? Number(targetOrders) : undefined,
+      employeeType: isOfficeStaff ? "DELIVERY_ADMIN" : "DELIVERY_DRIVER",
       fuelCardNumber: fuelCardNumber || null,
       assignedVehicleId: assignedVehicleId || null,
       ...(vehicleChanged && assignedVehicleId ? { assignedAt: assignedAt || null } : {}),
@@ -270,9 +274,23 @@ export default function EditDriverPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تارجيت الطلبات</label>
-                <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" />
+                <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" disabled={isOfficeStaff} />
                 <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب الحافز/الخصم تلقائياً في الرواتب.</p>
               </div>
+              <label className="col-span-2 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
+                <input
+                  type="checkbox"
+                  checked={isOfficeStaff}
+                  onChange={(e) => setIsOfficeStaff(e.target.checked)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">يعمل في الإدارة (موظف مكتب)</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    مسجّل كسائق لكنه يعمل إدارياً — يظهر في الرواتب ضمن «الموظفين الآخرين» بدون حساب تارجيت التوصيل.
+                  </p>
+                </div>
+              </label>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ الميلاد</label>
                 <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="input-field w-full" dir="ltr" />

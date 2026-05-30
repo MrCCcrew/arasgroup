@@ -39,6 +39,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // حل احتياطي: لو لا يوجد تقرير شهري مرحّل لهذا الشهر، نأخذ الطلبات الموزّعة
+    // من تقارير الطلبات المستوردة (Talabat) مباشرةً — وهي تعكس التوزيع على
+    // السائقين البدلاء، فتظهر الطلبات بمجرد التوزيع حتى قبل ترحيل التقرير.
+    if (Object.keys(totals).length === 0) {
+      const imports = await prisma.talabatReportImport.findMany({
+        where: { companyId, month, year, status: { not: "CANCELLED" } },
+        select: { riders: { select: { allocations: { select: { driverId: true, allocatedOrders: true } } } } },
+      });
+      for (const imp of imports) {
+        for (const rider of imp.riders) {
+          for (const alloc of rider.allocations) {
+            totals[alloc.driverId] = (totals[alloc.driverId] ?? 0) + Math.round(Number(alloc.allocatedOrders));
+          }
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, data: totals });
   } catch (error) {
     console.error(error);

@@ -11,6 +11,11 @@ import { useLocale } from "@/components/providers/locale-provider";
 const INCENTIVE_RATE = 0.5;
 const DEFAULT_FOOD_ALLOWANCE = "15";
 
+// أنواع سائقي التوصيل الذين يخضعون لحساب التارجيت. الموظفون المسجّلون كسائقين
+// لكن نوعهم إداري/مكتب (مثل DELIVERY_ADMIN أو OFFICE_EMPLOYEE) يظهرون في قسم
+// الموظفين الآخرين بدون تارجيت.
+const DELIVERY_DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER"];
+
 interface DriverInfo {
   id: string;
   targetOrders: number;
@@ -95,15 +100,17 @@ export default function NewSalaryBatchPage() {
           setLines(
             items.map((employee) => {
               const driver = employee.driver;
+              // يُعامل كسائق توصيل (له تارجيت) فقط إذا كان نوعه سائق توصيل وله سجل سائق
+              const isDriver = !!driver && DELIVERY_DRIVER_TYPES.includes(employee.type);
               return {
                 employeeId: employee.id,
-                isDriver: !!driver,
+                isDriver,
                 driverId: driver?.id ?? null,
                 baseAmount: employee.baseSalary != null ? String(employee.baseSalary) : "",
-                targetOrders: driver ? String(driver.targetOrders ?? 370) : "",
+                targetOrders: isDriver ? String(driver?.targetOrders ?? 370) : "",
                 actualOrders: "",
                 incentive: "0",
-                foodAllowance: driver ? DEFAULT_FOOD_ALLOWANCE : "0",
+                foodAllowance: isDriver ? DEFAULT_FOOD_ALLOWANCE : "0",
                 companyAddition: "0",
                 fuelAddition: "0",
                 targetDeduction: "0",
