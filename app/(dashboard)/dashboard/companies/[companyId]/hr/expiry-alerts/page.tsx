@@ -26,7 +26,8 @@ type ExpiryAlert = {
   href: string;
 };
 
-const ALERT_WINDOW_DAYS = 90;
+const EMPLOYEE_VEHICLE_WINDOW_DAYS = 60;
+const LICENSE_WINDOW_DAYS = 90;
 const EMPLOYEE_TYPES: Array<{
   key: keyof EmployeeAlertRow;
   label: string;
@@ -113,6 +114,21 @@ function daysLeft(date: Date, now: Date) {
 
 function asDate(value: Date | string) {
   return value instanceof Date ? value : new Date(value);
+}
+
+function dedupeAlerts(alerts: ExpiryAlert[]) {
+  const seen = new Set<string>();
+  return alerts.filter((alert) => {
+    const key = [
+      alert.category,
+      alert.entityId,
+      alert.expiryType,
+      alert.expiryDate.toISOString().slice(0, 10),
+    ].join(":");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function severity(days: number) {
@@ -255,7 +271,8 @@ export default async function ExpiryAlertsPage({ params }: Props) {
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const branchIds = getAccessibleBranchIds(session, companyId);
   const now = new Date();
-  const in90 = new Date(now.getTime() + ALERT_WINDOW_DAYS * 864e5);
+  const in60 = new Date(now.getTime() + EMPLOYEE_VEHICLE_WINDOW_DAYS * 864e5);
+  const in90 = new Date(now.getTime() + LICENSE_WINDOW_DAYS * 864e5);
 
   const canViewEmployees =
     hasPermission(session, "HR", "VIEW", { companyId }) ||
@@ -339,10 +356,10 @@ export default async function ExpiryAlertsPage({ params }: Props) {
       : Promise.resolve([] as LicenseAlertRow[]),
   ]);
 
-  const employeeAlerts: ExpiryAlert[] = employees.flatMap((employee) =>
+  const employeeAlerts = dedupeAlerts(employees.flatMap((employee) =>
     EMPLOYEE_TYPES.flatMap(({ key, label }) => {
       const date = employee[key];
-      if (!date || date > in90) return [];
+      if (!date || date > in60) return [];
       const expiryDate = asDate(date);
       const left = daysLeft(expiryDate, now);
       return [
@@ -361,12 +378,12 @@ export default async function ExpiryAlertsPage({ params }: Props) {
         },
       ];
     }),
-  );
+  ));
 
-  const vehicleAlerts: ExpiryAlert[] = vehicles.flatMap((vehicle) =>
+  const vehicleAlerts = dedupeAlerts(vehicles.flatMap((vehicle) =>
     VEHICLE_TYPES.flatMap(({ key, label }) => {
       const date = vehicle[key];
-      if (!date || date > in90) return [];
+      if (!date || date > in60) return [];
       const expiryDate = asDate(date);
       const left = daysLeft(expiryDate, now);
       const description = [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "بدون موديل";
@@ -386,9 +403,9 @@ export default async function ExpiryAlertsPage({ params }: Props) {
         },
       ];
     }),
-  );
+  ));
 
-  const licenseAlerts: ExpiryAlert[] = licenses.flatMap((license) =>
+  const licenseAlerts = dedupeAlerts(licenses.flatMap((license) =>
     LICENSE_TYPES.flatMap(({ key, label }) => {
       const date = license[key];
       if (!date || date > in90) return [];
@@ -408,7 +425,7 @@ export default async function ExpiryAlertsPage({ params }: Props) {
         },
       ];
     }),
-  );
+  ));
 
   const allAlerts = [...employeeAlerts, ...vehicleAlerts, ...licenseAlerts].sort((a, b) => {
     if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
@@ -429,7 +446,7 @@ export default async function ExpiryAlertsPage({ params }: Props) {
           <StatCard label="منتهية الآن" count={stats.expired} tone="red" />
           <StatCard label="خلال 30 يوم" count={stats.in30} tone="orange" />
           <StatCard label="خلال 60 يوم" count={stats.in60} tone="yellow" />
-          <StatCard label="خلال 90 يوم" count={stats.in90} tone="blue" />
+          <StatCard label="خلال 90 يوم للتراخيص" count={stats.in90} tone="blue" />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
