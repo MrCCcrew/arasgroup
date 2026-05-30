@@ -27,8 +27,10 @@ export async function GET(request: NextRequest) {
   let rows: Record<string, unknown>[] = [];
 
   if (mode === "export") {
+    // نفلتر بعلاقة الشركة (companies) لتطابق قائمة "المسئولون والمديرون"،
+    // بحيث يظهر كل مستثمر مرتبط بالشركة حتى لو لم يُربط بفرع بعد.
     const investors = await prisma.investor.findMany({
-      where: { isActive: true, investorBranches: { some: { branch: { companyId } } } },
+      where: { isActive: true, companies: { some: { id: companyId } } },
       orderBy: { nameAr: "asc" },
     });
     rows = investors.map((inv) => ({
@@ -58,6 +60,10 @@ export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
+  const { searchParams } = request.nextUrl;
+  const companyId = searchParams.get("companyId");
+  if (!companyId) return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "الملف مطلوب" }, { status: 400 });
@@ -83,15 +89,22 @@ export async function POST(request: NextRequest) {
     };
 
     try {
+      // نبحث عن مستثمر بنفس الهوية المدنية مرتبط بهذه الشركة فقط
       if (data.civilId) {
-        const existing = await prisma.investor.findFirst({ where: { civilId: data.civilId, isActive: true } });
+        const existing = await prisma.investor.findFirst({
+          where: { civilId: data.civilId, isActive: true, companies: { some: { id: companyId } } },
+        });
         if (existing) {
           await prisma.investor.update({ where: { id: existing.id }, data: payload });
           result.updated++;
           continue;
         }
       }
-      await prisma.investor.create({ data: payload });
+      // عند الإنشاء نربط المستثمر بالشركة (نفس آلية app/api/investors)
+      // حتى يظهر مباشرةً في قائمة "المسئولون والمديرون".
+      await prisma.investor.create({
+        data: { ...payload, companies: { connect: { id: companyId } } },
+      });
       result.created++;
     } catch (err) {
       result.errors.push({ row: rowIndex, message: `الصف ${rowIndex}: ${err instanceof Error ? err.message : "خطأ غير متوقع"}` });
