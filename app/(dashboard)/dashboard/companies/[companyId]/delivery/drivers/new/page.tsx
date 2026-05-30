@@ -34,6 +34,7 @@ export default function NewDriverPage() {
     phone: "",
     baseSalary: "",
     joinDate: new Date().toISOString().split("T")[0],
+    targetOrders: "370",
     talabatId: "",
     roPopsId: "",
     isRegisteredTalabat: false,
@@ -82,6 +83,7 @@ export default function NewDriverPage() {
           phone: form.phone || undefined,
           baseSalary: form.baseSalary ? Number.parseFloat(form.baseSalary) : undefined,
           joinDate: form.joinDate || undefined,
+          targetOrders: form.targetOrders ? Number.parseInt(form.targetOrders, 10) : undefined,
           talabatId: form.talabatId || undefined,
           roPopsId: form.roPopsId || undefined,
           isRegisteredTalabat: form.isRegisteredTalabat,
@@ -194,6 +196,13 @@ export default function NewDriverPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Join date" : "تاريخ الالتحاق"}</label>
                 <input type="date" value={form.joinDate} onChange={(event) => setField("joinDate", event.target.value)} className="input-field w-full" dir="ltr" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Orders target" : "تارجيت الطلبات"}</label>
+                <input type="number" min="0" step="1" value={form.targetOrders} onChange={(event) => setField("targetOrders", event.target.value)} className="input-field w-full" dir="ltr" placeholder="370" />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en" ? "Monthly orders target used to compute incentive/deduction." : "تارجيت الطلبات الشهري المستخدم لحساب الحافز/الخصم في الرواتب."}
+                </p>
               </div>
             </div>
           </div>

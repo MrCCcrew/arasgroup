@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle, XCircle, DollarSign, Printer } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -62,6 +62,17 @@ interface Payment {
   };
 }
 
+interface SalaryItem {
+  id: string;
+  salaryPaymentId: string | null;
+  employeeId: string | null;
+  type: string;
+  category: string;
+  titleAr: string;
+  titleEn?: string | null;
+  amount: string | number;
+}
+
 interface Batch {
   id: string;
   companyId: string;
@@ -73,6 +84,7 @@ interface Batch {
   totalNet: string | number;
   notes?: string | null;
   payments: Payment[];
+  items: SalaryItem[];
   branch?: { nameAr: string; nameEn?: string | null } | null;
 }
 
@@ -87,6 +99,7 @@ export default function SalaryBatchDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -258,11 +271,21 @@ export default function SalaryBatchDetailPage() {
                     const hasAdditions = Number(payment.additionalEarnings) > 0;
                     const hasDeductions = Number(payment.deductions) > 0;
 
+                    const paymentItems = batch.items.filter((it) => it.salaryPaymentId === payment.id && it.type !== "BASE_SALARY");
+                    const earningItems = paymentItems.filter((it) => it.category === "EARNING");
+                    const deductionItems = paymentItems.filter((it) => it.category === "DEDUCTION");
+                    const isExpanded = expandedId === payment.id;
+                    const canExpand = paymentItems.length > 0 || payment.actualOrders != null;
+
                     return (
-                      <tr key={payment.id} className="hover:bg-muted/20">
+                      <Fragment key={payment.id}>
+                      <tr
+                        className={`hover:bg-muted/20 ${canExpand ? "cursor-pointer" : ""}`}
+                        onClick={() => canExpand && setExpandedId(isExpanded ? null : payment.id)}
+                      >
                         <td>
                           <div>
-                            <p className="font-medium">{name}</p>
+                            <p className="font-medium">{name}{canExpand && <span className="ml-1 text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>}</p>
                             {payment.employee.employeeNumber && (
                               <p className="text-xs text-muted-foreground">{payment.employee.employeeNumber}</p>
                             )}
@@ -284,10 +307,67 @@ export default function SalaryBatchDetailPage() {
                         <td className="number font-bold text-green-700">
                           {formatKWD(Number(payment.netAmount), numLocale)}
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <SalaryWhatsAppButton paymentId={payment.id} />
                         </td>
                       </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-muted/10">
+                          <td colSpan={8} className="px-5 py-3">
+                            <div className="grid gap-4 sm:grid-cols-3 text-sm">
+                              {payment.actualOrders != null && (
+                                <div>
+                                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {locale === "en" ? "Orders" : "الطلبات"}
+                                  </p>
+                                  <p>
+                                    {locale === "en" ? "Actual:" : "المنفّذة:"} <span className="font-medium">{payment.actualOrders}</span>
+                                    {payment.targetOrders != null && (
+                                      <> &nbsp;|&nbsp; {locale === "en" ? "Target:" : "التارجيت:"} <span className="font-medium">{payment.targetOrders}</span></>
+                                    )}
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">
+                                  {locale === "en" ? "Additions" : "الإضافات"}
+                                </p>
+                                {earningItems.length === 0 ? (
+                                  <p className="text-muted-foreground">—</p>
+                                ) : (
+                                  <ul className="space-y-0.5">
+                                    {earningItems.map((it) => (
+                                      <li key={it.id} className="flex justify-between gap-3">
+                                        <span className="text-muted-foreground">{it.titleAr}</span>
+                                        <span className="number text-green-600">{formatKWD(Number(it.amount), numLocale)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              <div>
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                                  {locale === "en" ? "Deductions" : "الخصومات"}
+                                </p>
+                                {deductionItems.length === 0 ? (
+                                  <p className="text-muted-foreground">—</p>
+                                ) : (
+                                  <ul className="space-y-0.5">
+                                    {deductionItems.map((it) => (
+                                      <li key={it.id} className="flex justify-between gap-3">
+                                        <span className="text-muted-foreground">{it.titleAr}</span>
+                                        <span className="number text-red-600">{formatKWD(Number(it.amount), numLocale)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })
                 )}

@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         licenseAssignments: {
           select: { licenseId: true, license: { select: { commercialNameAr: true, licenseNumber: true } } },
         },
-        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true } },
+        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, targetOrders: true } },
         carWashWorker: {
           select: {
             id: true,

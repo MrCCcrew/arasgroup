@@ -28,6 +28,7 @@ const updateSchema = z.object({
   roPopsId: z.string().optional().nullable(),
   isRegisteredTalabat: z.boolean().optional(),
   isRegisteredRoPops: z.boolean().optional(),
+  targetOrders: z.number().int().min(0).optional(),
   fuelCardNumber: z.string().optional().nullable(),
   assignedVehicleId: z.string().optional().nullable(),
 });
@@ -104,6 +105,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       roPopsId,
       isRegisteredTalabat,
       isRegisteredRoPops,
+      targetOrders,
       fuelCardNumber,
       assignedVehicleId,
       assignedAt,
@@ -167,6 +169,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (roPopsId !== undefined) driverData.roPopsId = roPopsId;
       if (isRegisteredTalabat !== undefined) driverData.isRegisteredTalabat = isRegisteredTalabat;
       if (isRegisteredRoPops !== undefined) driverData.isRegisteredRoPops = isRegisteredRoPops;
+      if (targetOrders !== undefined) driverData.targetOrders = targetOrders;
       if (fuelCardNumber !== undefined) driverData.fuelCardNumber = fuelCardNumber;
 
       if (assignedVehicleId !== undefined) {

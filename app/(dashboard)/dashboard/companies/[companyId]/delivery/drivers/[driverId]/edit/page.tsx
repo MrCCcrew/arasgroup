@@ -11,6 +11,7 @@ interface DriverData {
   roPopsId: string | null;
   isRegisteredTalabat: boolean;
   isRegisteredRoPops: boolean;
+  targetOrders: number;
   fuelCardNumber: string | null;
   assignedVehicleId: string | null;
   assignedVehicle: {
@@ -79,6 +80,7 @@ export default function EditDriverPage() {
   const [roPopsId, setRoPopsId] = useState("");
   const [isRegisteredTalabat, setIsRegisteredTalabat] = useState(false);
   const [isRegisteredRoPops, setIsRegisteredRoPops] = useState(false);
+  const [targetOrders, setTargetOrders] = useState("370");
   const [fuelCardNumber, setFuelCardNumber] = useState("");
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
   const [originalVehicleId, setOriginalVehicleId] = useState("");
@@ -111,6 +113,7 @@ export default function EditDriverPage() {
         setRoPopsId(d.roPopsId ?? "");
         setIsRegisteredTalabat(d.isRegisteredTalabat);
         setIsRegisteredRoPops(d.isRegisteredRoPops);
+        setTargetOrders(String(d.targetOrders ?? 370));
         setFuelCardNumber(d.fuelCardNumber ?? "");
         setAssignedVehicleId(d.assignedVehicleId ?? "");
         setOriginalVehicleId(d.assignedVehicleId ?? "");
@@ -169,6 +172,7 @@ export default function EditDriverPage() {
       roPopsId: roPopsId || null,
       isRegisteredTalabat,
       isRegisteredRoPops,
+      targetOrders: targetOrders ? Number(targetOrders) : undefined,
       fuelCardNumber: fuelCardNumber || null,
       assignedVehicleId: assignedVehicleId || null,
       ...(vehicleChanged && assignedVehicleId ? { assignedAt: assignedAt || null } : {}),
@@ -263,6 +267,11 @@ export default function EditDriverPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">الراتب الأساسي (د.ك)</label>
                 <input type="number" step="0.001" min="0" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="input-field w-full" dir="ltr" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">تارجيت الطلبات</label>
+                <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" />
+                <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب الحافز/الخصم تلقائياً في الرواتب.</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">تاريخ الميلاد</label>

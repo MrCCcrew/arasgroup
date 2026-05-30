@@ -10,6 +10,12 @@ const paymentLineSchema = z.object({
   incentives: z.number().min(0).default(0),
   deductions: z.number().min(0).default(0),
   additionalEarnings: z.number().min(0).default(0),
+  // تفصيل الإضافات/الخصومات للسائقين
+  foodAllowance: z.number().min(0).default(0),
+  companyAddition: z.number().min(0).default(0),
+  fuelAddition: z.number().min(0).default(0),
+  targetDeduction: z.number().min(0).default(0),
+  companyDeduction: z.number().min(0).default(0),
   attendanceDays: z.number().min(0).optional(),
   evaluationScore: z.number().min(0).optional(),
   targetOrders: z.number().int().min(0).optional(),
@@ -91,10 +97,21 @@ export async function POST(request: NextRequest) {
     });
     if (permissionError) return permissionError;
 
-    const payments = data.payments.map((payment) => ({
-      ...payment,
-      netAmount: payment.baseAmount + payment.incentives + payment.additionalEarnings - payment.deductions,
-    }));
+    const round3 = (value: number) => Math.round(value * 1000) / 1000;
+
+    // الإضافات الإجمالية = إضافة عامة + بدل طعام + إضافة شركة + بنزين وبنشر
+    // الخصومات الإجمالية = خصم عام + خصم تارجيت + خصم شركة
+    const payments = data.payments.map((payment) => {
+      // نحتفظ بالقيم العامة الأصلية (للموظفين غير السائقين) لترقيم البنود
+      const additionalEarningsRaw = payment.additionalEarnings;
+      const deductionsRaw = payment.deductions;
+      const additionalEarnings = round3(
+        additionalEarningsRaw + payment.foodAllowance + payment.companyAddition + payment.fuelAddition,
+      );
+      const deductions = round3(deductionsRaw + payment.targetDeduction + payment.companyDeduction);
+      const netAmount = round3(payment.baseAmount + payment.incentives + additionalEarnings - deductions);
+      return { ...payment, additionalEarnings, deductions, netAmount, additionalEarningsRaw, deductionsRaw };
+    });
 
     const totalGross = payments.reduce(
       (sum, payment) => sum + payment.baseAmount + payment.incentives + payment.additionalEarnings,
@@ -136,7 +153,10 @@ export async function POST(request: NextRequest) {
           },
           items: {
             create: payments.flatMap((payment) => {
-              const items = [
+              const items: Array<{
+                employeeId: string; type: string; category: string;
+                titleAr: string; titleEn: string; amount: number;
+              }> = [
                 {
                   employeeId: payment.employeeId,
                   type: "BASE_SALARY",
@@ -147,38 +167,23 @@ export async function POST(request: NextRequest) {
                 },
               ];
 
-              if (payment.incentives > 0) {
-                items.push({
-                  employeeId: payment.employeeId,
-                  type: "INCENTIVE",
-                  category: "EARNING",
-                  titleAr: "حافز",
-                  titleEn: "Incentive",
-                  amount: payment.incentives,
-                });
-              }
+              const add = (cond: boolean, type: string, category: string, titleAr: string, titleEn: string, amount: number) => {
+                if (cond && amount > 0) {
+                  items.push({ employeeId: payment.employeeId, type, category, titleAr, titleEn, amount });
+                }
+              };
 
-              if (payment.additionalEarnings > 0) {
-                items.push({
-                  employeeId: payment.employeeId,
-                  type: "ADDITIONAL_EARNING",
-                  category: "EARNING",
-                  titleAr: "إضافة أخرى",
-                  titleEn: "Additional Earning",
-                  amount: payment.additionalEarnings,
-                });
-              }
+              // الإضافات (EARNING)
+              add(true, "INCENTIVE", "EARNING", "حافز", "Incentive", payment.incentives);
+              add(true, "FOOD_ALLOWANCE", "EARNING", "بدل طعام", "Food Allowance", payment.foodAllowance);
+              add(true, "COMPANY_ADDITION", "EARNING", "إضافة شركة", "Company Addition", payment.companyAddition);
+              add(true, "FUEL_ADDITION", "EARNING", "إضافة بنزين وبنشر", "Fuel & Tire Addition", payment.fuelAddition);
+              add(true, "ADDITIONAL_EARNING", "EARNING", "إضافة أخرى", "Additional Earning", payment.additionalEarningsRaw);
 
-              if (payment.deductions > 0) {
-                items.push({
-                  employeeId: payment.employeeId,
-                  type: "DEDUCTION",
-                  category: "DEDUCTION",
-                  titleAr: "خصم",
-                  titleEn: "Deduction",
-                  amount: payment.deductions,
-                });
-              }
+              // الخصومات (DEDUCTION)
+              add(true, "TARGET_DEDUCTION", "DEDUCTION", "خصم تارجيت", "Target Deduction", payment.targetDeduction);
+              add(true, "COMPANY_DEDUCTION", "DEDUCTION", "خصم شركة", "Company Deduction", payment.companyDeduction);
+              add(true, "DEDUCTION", "DEDUCTION", "خصم", "Deduction", payment.deductionsRaw);
 
               return items;
             }),

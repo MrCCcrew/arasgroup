@@ -1071,6 +1071,7 @@ model Driver {
   isRegisteredTalabat Boolean @default(false)
   isRegisteredRoPops  Boolean @default(false)
   walletBalance       Decimal @default(0) @db.Decimal(18, 3)
+  targetOrders        Int     @default(370)
   assignedVehicleId   String?
   vehiclePlateNumberSnapshot String?
   fuelCardNumber      String?
