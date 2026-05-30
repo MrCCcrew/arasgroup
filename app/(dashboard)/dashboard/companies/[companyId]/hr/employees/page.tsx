@@ -7,10 +7,17 @@ import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 import { DeleteButton } from "@/components/ui/delete-button";
+import { RestoreEmployeeButton } from "@/components/hr/restore-employee-button";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ type?: string; search?: string; group?: string }>;
+  searchParams: Promise<{
+    type?: string;
+    search?: string;
+    group?: string;
+    status?: string;
+    category?: string;
+  }>;
 }
 
 const typeLabels = {
@@ -40,6 +47,32 @@ const typeLabels = {
   },
 } as const;
 
+const DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER", "CAR_WASH_DRIVER"] as const;
+const ADMIN_TYPES = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] as const;
+
+type EmployeeType = keyof typeof typeLabels.ar;
+
+function buildEmployeesHref(
+  companyId: string,
+  params: {
+    group?: string;
+    type?: string;
+    status?: string;
+    category?: string;
+    search?: string;
+  } = {},
+) {
+  const searchParams = new URLSearchParams();
+  if (params.group) searchParams.set("group", params.group);
+  if (params.type) searchParams.set("type", params.type);
+  if (params.status) searchParams.set("status", params.status);
+  if (params.category) searchParams.set("category", params.category);
+  if (params.search) searchParams.set("search", params.search);
+
+  const query = searchParams.toString();
+  return `/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`;
+}
+
 export default async function EmployeesPage({ params, searchParams }: Props) {
   const { companyId } = await params;
   const query = await searchParams;
@@ -49,13 +82,18 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
+  const showingDeleted = query.status === "deleted";
 
-  const baseWhere = { companyId, isActive: true, isDeleted: false };
+  const activeWhere = { companyId, isActive: true, isDeleted: false };
+  const deletedWhere = { companyId, isDeleted: true };
+  const baseWhere = showingDeleted ? deletedWhere : activeWhere;
 
-  const [investorEmployeeCount, companyEmployeeCount] = await Promise.all([
-    prisma.employee.count({ where: { ...baseWhere, investorId: { not: null } } }),
-    prisma.employee.count({ where: { ...baseWhere, investorId: null } }),
-  ]);
+  const categoryFilter =
+    query.category === "drivers"
+      ? { type: { in: [...DRIVER_TYPES] } }
+      : query.category === "admins"
+        ? { investorId: null, type: { in: [...ADMIN_TYPES] } }
+        : {};
 
   const groupFilter =
     query.group === "investor"
@@ -64,35 +102,35 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         ? { investorId: null }
         : {};
 
-  const employees = await prisma.employee.findMany({
-    where: {
-      ...baseWhere,
-      ...groupFilter,
-      ...(query.type
-        ? {
-            type: query.type as
-              | "DRIVER"
-              | "DELIVERY_DRIVER"
-              | "DELIVERY_ADMIN"
-              | "CAR_WASH_DRIVER"
-              | "CAR_WASH_WORKER"
-              | "OFFICE_EMPLOYEE"
-              | "ACCOUNTANT"
-              | "MANDOUB"
-              | "OFFICE_BOY"
-              | "OTHER",
-          }
-        : {}),
-      ...(query.search ? { nameAr: { contains: query.search } } : {}),
-    },
-    include: {
-      branch: { select: { nameAr: true, nameEn: true } },
-      investor: { select: { nameAr: true, nameEn: true } },
-      driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
-      carWashWorker: { select: { role: true } },
-    },
-    orderBy: [{ type: "asc" }, { nameAr: "asc" }],
-  });
+  const typeFilter = query.type
+    ? {
+        type: query.type as EmployeeType,
+      }
+    : {};
+
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, employees] = await Promise.all([
+    prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
+    prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
+    prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
+    prisma.employee.count({ where: { ...activeWhere, investorId: null, type: { in: [...ADMIN_TYPES] } } }),
+    prisma.employee.count({ where: deletedWhere }),
+    prisma.employee.findMany({
+      where: {
+        ...baseWhere,
+        ...groupFilter,
+        ...categoryFilter,
+        ...typeFilter,
+        ...(query.search ? { nameAr: { contains: query.search } } : {}),
+      },
+      include: {
+        branch: { select: { nameAr: true, nameEn: true } },
+        investor: { select: { nameAr: true, nameEn: true } },
+        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
+        carWashWorker: { select: { role: true } },
+      },
+      orderBy: showingDeleted ? [{ deletedAt: "desc" }, { nameAr: "asc" }] : [{ type: "asc" }, { nameAr: "asc" }],
+    }),
+  ]);
 
   const typeCounts = employees.reduce<Record<string, number>>((accumulator, employee) => {
     accumulator[employee.type] = (accumulator[employee.type] ?? 0) + 1;
@@ -100,51 +138,79 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   }, {});
 
   const totalCount = investorEmployeeCount + companyEmployeeCount;
+  const subtitle = showingDeleted
+    ? `${deletedCount} ${locale === "en" ? "deleted employee(s)" : "موظف محذوف"}`
+    : `${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`;
+  const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
+  const tableColSpan = showInvestorColumn ? (showingDeleted ? 10 : 9) : showingDeleted ? 9 : 8;
 
   return (
     <div>
       <Header
         title={locale === "en" ? "Employees" : "الموظفون"}
-        subtitle={`${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`}
+        subtitle={subtitle}
         companyId={companyId}
         actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/hr/employees/new`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus size={16} />
-            {locale === "en" ? "New employee" : "موظف جديد"}
-          </Link>
+          showingDeleted ? null : (
+            <Link
+              href={`/dashboard/companies/${companyId}/hr/employees/new`}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              {locale === "en" ? "New employee" : "موظف جديد"}
+            </Link>
+          )
         }
       />
 
       <div className="page-container space-y-4">
-        {/* تبويبات المجموعة: كل / موظفو المسئولين / موظفو الشركة */}
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/dashboard/companies/${companyId}/hr/employees`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!query.group ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            href={buildEmployeesHref(companyId)}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && !query.group && !query.category ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
-            {locale === "en" ? "All" : "الكل"} ({totalCount})
+            {locale === "en" ? "All active" : "كل النشطين"} ({totalCount})
           </Link>
           <Link
-            href={`/dashboard/companies/${companyId}/hr/employees?group=investor`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${query.group === "investor" ? "bg-amber-600 text-white" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+            href={buildEmployeesHref(companyId, { category: "drivers" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.category === "drivers" ? "bg-sky-600 text-white" : "border-sky-300 text-sky-700 hover:bg-sky-50"}`}
+          >
+            {locale === "en" ? "Drivers" : "السائقون"} ({driverCount})
+          </Link>
+          <Link
+            href={buildEmployeesHref(companyId, { category: "admins" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.category === "admins" ? "bg-blue-600 text-white" : "border-blue-300 text-blue-700 hover:bg-blue-50"}`}
+          >
+            {locale === "en" ? "Administrative" : "الإداريون"} ({adminCount})
+          </Link>
+          <Link
+            href={buildEmployeesHref(companyId, { group: "investor" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.group === "investor" ? "bg-amber-600 text-white" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
           >
             {locale === "en" ? "Investor employees" : "موظفو المسئولين"} ({investorEmployeeCount})
           </Link>
           <Link
-            href={`/dashboard/companies/${companyId}/hr/employees?group=company`}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${query.group === "company" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            href={buildEmployeesHref(companyId, { group: "company" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.group === "company" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "Company employees" : "موظفو الشركة"} ({companyEmployeeCount})
           </Link>
+          <Link
+            href={buildEmployeesHref(companyId, { status: "deleted" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${showingDeleted ? "bg-red-600 text-white" : "border-red-300 text-red-700 hover:bg-red-50"}`}
+          >
+            {locale === "en" ? "Deleted" : "المحذوفون"} ({deletedCount})
+          </Link>
         </div>
 
-        {/* فلاتر النوع */}
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/dashboard/companies/${companyId}/hr/employees${query.group ? `?group=${query.group}` : ""}`}
+            href={buildEmployeesHref(companyId, {
+              group: query.group,
+              status: query.status,
+              category: query.category,
+              search: query.search,
+            })}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.type ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "All types" : "كل الأنواع"}
@@ -152,11 +218,17 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           {Object.entries(typeLabels[locale]).map(([type, label]) => {
             const count = typeCounts[type] ?? 0;
             if (count === 0) return null;
-            const groupParam = query.group ? `group=${query.group}&` : "";
+
             return (
               <Link
                 key={type}
-                href={`/dashboard/companies/${companyId}/hr/employees?${groupParam}type=${type}`}
+                href={buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type,
+                })}
                 className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.type === type ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               >
                 {label} ({count})
@@ -177,16 +249,15 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Salary" : "الراتب"}</th>
                   <th>{locale === "en" ? "Residency expiry" : "انتهاء الإقامة"}</th>
                   <th>{locale === "en" ? "Branch" : "الفرع"}</th>
-                  {(!query.group || query.group === "investor") && (
-                    <th>{locale === "en" ? "Investor" : "المسئول"}</th>
-                  )}
+                  {showInvestorColumn ? <th>{locale === "en" ? "Investor" : "المسئول"}</th> : null}
+                  {showingDeleted ? <th>{locale === "en" ? "Deleted at" : "تاريخ الحذف"}</th> : null}
                   <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={(!query.group || query.group === "investor") ? 9 : 8} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={tableColSpan} className="py-8 text-center text-muted-foreground">
                       {locale === "en" ? "No employees found" : "لا يوجد موظفون"}
                     </td>
                   </tr>
@@ -206,25 +277,23 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                     return (
                       <tr
                         key={employee.id}
-                        className={`transition-colors hover:bg-muted/20 ${isExpiringSoon ? "bg-yellow-50/30" : ""}`}
+                        className={`transition-colors hover:bg-muted/20 ${!showingDeleted && isExpiringSoon ? "bg-yellow-50/30" : ""}`}
                       >
                         <td>
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{employee.nameAr}</p>
-                              {employee.employeeNumber && (
+                              {employee.employeeNumber ? (
                                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                                   {employee.employeeNumber}
                                 </span>
-                              )}
+                              ) : null}
                             </div>
-                            {employee.nameEn && <p className="text-xs text-muted-foreground">{employee.nameEn}</p>}
+                            {employee.nameEn ? <p className="text-xs text-muted-foreground">{employee.nameEn}</p> : null}
                           </div>
                         </td>
                         <td>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                            {typeLabels[locale][employee.type]}
-                          </span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{typeLabels[locale][employee.type]}</span>
                         </td>
                         <td className="text-sm">{employee.nationality ?? (locale === "en" ? "Not set" : "غير محدد")}</td>
                         <td className="number text-sm" dir="ltr">
@@ -237,19 +306,19 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                           {employee.residencyExpiry ? (
                             <div className="flex items-center gap-1">
                               <span className="text-xs">{formatDate(employee.residencyExpiry, dateLocale)}</span>
-                              {isExpiringSoon && (
+                              {!showingDeleted && isExpiringSoon ? (
                                 <AlertTriangle
                                   size={12}
                                   className={isExpired || (days !== null && days <= 30) ? "text-red-500" : "text-yellow-500"}
                                 />
-                              )}
+                              ) : null}
                             </div>
                           ) : (
                             locale === "en" ? "Not set" : "غير محدد"
                           )}
                         </td>
                         <td className="text-sm">{branchName}</td>
-                        {(!query.group || query.group === "investor") && (
+                        {showInvestorColumn ? (
                           <td className="text-sm">
                             {employee.investor ? (
                               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
@@ -259,26 +328,30 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </td>
-                        )}
+                        ) : null}
+                        {showingDeleted ? (
+                          <td className="text-sm">{employee.deletedAt ? formatDate(employee.deletedAt, dateLocale) : "—"}</td>
+                        ) : null}
                         <td>
-                          <div className="flex items-center gap-1">
-                            <Link
-                              href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}`}
-                              className="rounded p-1.5 text-xs text-primary hover:underline"
-                            >
-                              {locale === "en" ? "View" : "عرض"}
-                            </Link>
-                            <Link
-                              href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`}
-                              className="rounded p-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
-                            >
-                              {locale === "en" ? "Edit" : "تعديل"}
-                            </Link>
-                            <DeleteButton
-                              apiUrl={`/api/hr/employees/${employee.id}`}
-                              label={locale === "en" ? "Delete" : "حذف"}
-                            />
-                          </div>
+                          {showingDeleted ? (
+                            <RestoreEmployeeButton employeeId={employee.id} label={locale === "en" ? "Restore" : "استعادة"} />
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <Link
+                                href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}`}
+                                className="rounded p-1.5 text-xs text-primary hover:underline"
+                              >
+                                {locale === "en" ? "View" : "عرض"}
+                              </Link>
+                              <Link
+                                href={`/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`}
+                                className="rounded p-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                              >
+                                {locale === "en" ? "Edit" : "تعديل"}
+                              </Link>
+                              <DeleteButton apiUrl={`/api/hr/employees/${employee.id}`} label={locale === "en" ? "Delete" : "حذف"} />
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
