@@ -100,6 +100,17 @@ export default function WalletPage() {
   const totalBalance = drivers.reduce((s, d) => s + Number(d.walletBalance), 0);
   const negativeCount = drivers.filter((d) => Number(d.walletBalance) < 0).length;
 
+  // نرتّب الأرصدة: غير الصفرية أولاً (الأكثر سالبية في الأعلى) ثم الصفرية،
+  // حتى يظهر صاحب الرصيد السالب مباشرةً بدل أن يكون مدفوناً أبجدياً.
+  const sortedDrivers = [...drivers].sort((a, b) => {
+    const ba = Number(a.walletBalance);
+    const bb = Number(b.walletBalance);
+    const za = ba === 0 ? 1 : 0;
+    const zb = bb === 0 ? 1 : 0;
+    if (za !== zb) return za - zb;
+    return ba - bb;
+  });
+
   return (
     <div>
       <Header
@@ -145,9 +156,9 @@ export default function WalletPage() {
             <div className="section-card">
               <h2 className="mb-4 text-base font-bold">أرصدة السائقين</h2>
               <div className="space-y-2">
-                {drivers.length === 0 ? (
+                {sortedDrivers.length === 0 ? (
                   <p className="py-4 text-center text-sm text-muted-foreground">لا يوجد سائقون</p>
-                ) : drivers.map((d) => {
+                ) : sortedDrivers.map((d) => {
                   const balance = Number(d.walletBalance);
                   return (
                     <div key={d.id} className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
