@@ -60,6 +60,7 @@ export default function WalletPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [settlingId, setSettlingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +74,20 @@ export default function WalletPage() {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function settleBalance(driverId: string, name: string, balance: number) {
+    if (!confirm(`تسوية وتصفير رصيد ${name} (${balance.toFixed(3)} د.ك)؟ سيتم تسجيل حركة تسوية موثّقة.`)) return;
+    setSettlingId(driverId);
+    const res = await fetch("/api/delivery/wallet/settle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ driverId, companyId }),
+    });
+    const data = await res.json();
+    setSettlingId(null);
+    if (data.success) load();
+    else alert(data.error ?? "فشل في التسوية");
+  }
 
   async function save() {
     if (!form.driverId) { setFormError("اختر السائق"); return; }
@@ -163,9 +178,21 @@ export default function WalletPage() {
                   return (
                     <div key={d.id} className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
                       <span className="text-sm font-medium">{d.employee.nameAr}</span>
-                      <span className={`number text-sm font-bold ${balance < 0 ? "text-red-600" : balance > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
-                        {balance.toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className={`number text-sm font-bold ${balance < 0 ? "text-red-600" : balance > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
+                          {balance.toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                        </span>
+                        {balance !== 0 && (
+                          <button
+                            onClick={() => settleBalance(d.id, d.employee.nameAr, balance)}
+                            disabled={settlingId === d.id}
+                            className="rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
+                            title="تسوية وتصفير الرصيد"
+                          >
+                            {settlingId === d.id ? "..." : "تسوية"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
