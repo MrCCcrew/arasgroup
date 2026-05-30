@@ -117,6 +117,7 @@ function buildCompanyNav(base: string): NavItem[] {
       iconColor: "emerald",
       module: "ACCOUNTING",
       children: [
+        { href: `${base}/accounting/guide`,                        labelKey: "nav.accountingGuide", icon: <BookOpen size={14} />,        iconColor: "emerald" },
         { href: `${base}/accounting/receipts`,                     labelKey: "nav.receipts",        icon: <ArrowDownToLine size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/payments`,                     labelKey: "nav.payments",        icon: <ArrowUpFromLine size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/journal-entries`,              labelKey: "nav.journalEntries",  icon: <FileText size={14} />,        iconColor: "emerald" },
