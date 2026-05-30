@@ -172,6 +172,7 @@ function buildCompanyNav(base: string): NavItem[] {
       module: "INVESTORS",
       children: [
         { href: `${base}/investors/branches`, labelKey: "nav.investorBranches",   icon: <Building2 size={14} />,iconColor: "teal" },
+        { href: `${base}/investors/accounts`, labelKey: "nav.investorAccounts",   icon: <Wallet size={14} />,   iconColor: "teal" },
         { href: `${base}/investors/claims`,   labelKey: "nav.investorClaims",     icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/statements`,labelKey: "nav.investorStatements",icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/salaries`, labelKey: "nav.investorSalaries",   icon: <Wallet size={14} />,   iconColor: "teal" },

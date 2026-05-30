@@ -1,19 +1,8 @@
 "use client";
 
-import { Printer } from "lucide-react";
-
-interface Props {
-  label?: string;
-  className?: string;
-}
-
-export function PrintButton({ label = "طباعة", className }: Props) {
+export function PrintButton({ label = "Print" }: { label?: string }) {
   return (
-    <button
-      onClick={() => window.print()}
-      className={className ?? "flex items-center gap-2 border px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors"}
-    >
-      <Printer size={16} />
+    <button onClick={() => window.print()} className="rounded border px-4 py-2 text-sm">
       {label}
     </button>
   );

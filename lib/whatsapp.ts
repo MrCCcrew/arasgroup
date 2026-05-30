@@ -35,3 +35,42 @@ export function buildSalaryWhatsAppMessage(input: {
     `صافي الراتب: ${formatKWD(input.netAmount)}`,
   ].join("\n");
 }
+
+export function buildInvestorSalaryFundingReminder(input: {
+  locale: "ar" | "en";
+  investorName: string;
+  month: number;
+  year: number;
+  workersCount: number;
+  amount: number;
+  customTemplate?: string | null;
+}) {
+  if (input.customTemplate?.trim()) {
+    return input.customTemplate
+      .replaceAll("{name}", input.investorName)
+      .replaceAll("{month}", String(input.month))
+      .replaceAll("{year}", String(input.year))
+      .replaceAll("{workersCount}", String(input.workersCount))
+      .replaceAll("{amount}", formatKWD(input.amount, input.locale === "en" ? "en-US" : "ar-KW"));
+  }
+
+  if (input.locale === "en") {
+    return [
+      `Dear ${input.investorName},`,
+      "Please deposit the salary funding amount as soon as possible.",
+      `Period: ${input.month}/${input.year}`,
+      `Workers count: ${input.workersCount}`,
+      `Required amount: ${formatKWD(input.amount, "en-US")}`,
+      "Kindly transfer the amount to the owner's account at the earliest convenience.",
+    ].join("\n");
+  }
+
+  return [
+    `الأستاذ / ${input.investorName}`,
+    "برجاء سرعة إيداع مبالغ الرواتب في حساب المالك في أسرع وقت.",
+    `الفترة: ${input.month}/${input.year}`,
+    `عدد العمال: ${input.workersCount}`,
+    `المبلغ المطلوب: ${formatKWD(input.amount, "ar-KW")}`,
+    "شاكرين تعاونكم الدائم.",
+  ].join("\n");
+}

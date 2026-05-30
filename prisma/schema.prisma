@@ -344,6 +344,8 @@ model Branch {
   salaryBatches    SalaryBatch[]
   claims           InvestorClaim[]
   investorBranches InvestorBranch[]
+  investorAccountAgreements InvestorAccountAgreement[]
+  investorSalaryFundingProfiles InvestorSalaryFundingProfile[]
   userAccess       UserBranchAccess[]
   deliveryPlatformProfiles DeliveryPlatformProfile[]
   deliveryAbsences DeliveryAbsence[]
@@ -803,6 +805,7 @@ model Employee {
   notifications       Notification[]
   licenseAssignments     EmployeeLicenseAssignment[]
   claimBeneficiaries     InvestorClaimBeneficiary[]
+  investorAccountAgreements InvestorAccountAgreement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1779,6 +1782,8 @@ model Investor {
   investorBranches  InvestorBranch[]
   claims            InvestorClaim[]
   salaryCollections InvestorSalaryCollection[]
+  accountAgreements InvestorAccountAgreement[]
+  salaryFundingProfiles InvestorSalaryFundingProfile[]
   salaryBatches     SalaryBatch[]
   expenses          Expense[]
   employees         Employee[]
@@ -1953,6 +1958,92 @@ model InvestorSalaryCollection {
   @@map("investor_salary_collections")
 }
 
+enum InvestorAccountChargeCategory {
+  MONTHLY_FEE
+  ANNUAL_FEE
+  RENT
+  LICENSE_ISSUANCE
+  LICENSE_RENEWAL
+  EMPLOYEE_RESIDENCY_RENEWAL
+  INVESTOR_RESIDENCY_RENEWAL
+  SALARY_FUNDING
+  OTHER
+}
+
+enum InvestorAccountBillingCycle {
+  MONTHLY
+  ANNUAL
+  MANUAL
+  ONE_TIME
+}
+
+model InvestorAccountAgreement {
+  id            String                        @id @default(cuid())
+  companyId     String
+  investorId    String
+  branchId      String?
+  licenseId     String?
+  employeeId    String?
+  titleAr       String
+  titleEn       String?
+  chargeCategory InvestorAccountChargeCategory
+  claimType     ClaimType
+  billingCycle  InvestorAccountBillingCycle   @default(MANUAL)
+  amount        Decimal                       @db.Decimal(18, 3)
+  dueDay        Int?
+  dueMonth      Int?
+  startDate     DateTime?
+  nextDueDate   DateTime?
+  isActive      Boolean                       @default(true)
+  autoCreateClaim Boolean                     @default(false)
+  notes         String?
+
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  license  License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([branchId])
+  @@index([licenseId])
+  @@index([employeeId])
+  @@index([claimType])
+  @@index([billingCycle])
+  @@index([isActive])
+  @@map("investor_account_agreements")
+}
+
+model InvestorSalaryFundingProfile {
+  id                 String  @id @default(cuid())
+  companyId          String
+  investorId         String
+  branchId           String?
+  workersCount       Int     @default(0)
+  monthlyAmount      Decimal @db.Decimal(18, 3)
+  collectionStartDay Int     @default(22)
+  collectionEndDay   Int     @default(31)
+  whatsappTemplateAr String?
+  whatsappTemplateEn String?
+  isActive           Boolean @default(true)
+  notes              String?
+
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("investor_salary_funding_profiles")
+}
+
 model License {
   id                         String @id @default(cuid())
   companyId                  String
@@ -2000,6 +2091,7 @@ model License {
   mainLicense    License?        @relation("LicenseHierarchy", fields: [mainLicenseId], references: [id], onDelete: SetNull)
   branchLicenses License[]       @relation("LicenseHierarchy")
   employees              Employee[]
+  investorAccountAgreements InvestorAccountAgreement[]
   employeeAssignments    EmployeeLicenseAssignment[]
   branchMainFor          Branch[]        @relation("BranchMainLicense")
   notifications          Notification[]
