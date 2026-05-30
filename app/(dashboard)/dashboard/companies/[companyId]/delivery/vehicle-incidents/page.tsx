@@ -15,10 +15,13 @@ export default async function VehicleIncidentsPage({ params }: Props) {
   const { companyId } = await params;
   const locale = await getLocale();
 
-  // Fetch drivers for the dropdown
+  // Fetch drivers for the dropdown (with their currently-assigned vehicle for auto-fill)
   const driversRaw = await prisma.driver.findMany({
     where: { employee: { companyId, isActive: true } },
-    include: { employee: { select: { nameAr: true, nameEn: true } } },
+    include: {
+      employee: { select: { nameAr: true, nameEn: true } },
+      assignedVehicle: { select: { id: true, plateNumber: true, make: true, model: true } },
+    },
     orderBy: { employee: { nameAr: "asc" } },
   });
 
@@ -53,6 +56,7 @@ export default async function VehicleIncidentsPage({ params }: Props) {
   const drivers:          DriverRow[]  = driversRaw.map((d) => ({
     id: d.id,
     employee: { nameAr: d.employee.nameAr, nameEn: d.employee.nameEn },
+    assignedVehicleId: d.assignedVehicleId ?? null,
   }));
 
   const toVehicleRow = (v: typeof ownVehiclesRaw[number]): VehicleRow => ({
@@ -65,7 +69,11 @@ export default async function VehicleIncidentsPage({ params }: Props) {
 
   const ownVehicles:      VehicleRow[] = ownVehiclesRaw.map(toVehicleRow);
   const rentedVehicles:   VehicleRow[] = rentedVehiclesRaw.map(toVehicleRow);
-  const incidentVehicles: VehicleRow[] = rentedVehicles.length > 0 ? rentedVehicles : ownVehicles;
+  // قائمة "المركبة المتضررة" يجب أن تعرض كل المركبات (المملوكة + المستأجرة)،
+  // وليس المستأجرة فقط — مع إزالة التكرار لأن المستأجرة قد تكون من نوع DELIVERY أيضاً.
+  const incidentVehicles: VehicleRow[] = Array.from(
+    new Map([...ownVehicles, ...rentedVehicles].map((v) => [v.id, v])).values(),
+  ).sort((a, b) => a.plateNumber.localeCompare(b.plateNumber, "ar"));
 
   const incidents: Incident[] = serialize(
     incidentsRaw.map((inc) => ({

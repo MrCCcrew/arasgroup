@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/utils";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type VehicleRow = { id: string; plateNumber: string; make: string | null; model: string | null; ownershipModel?: string };
-export type DriverRow  = { id: string; employee: { nameAr: string; nameEn: string | null } };
+export type DriverRow  = { id: string; employee: { nameAr: string; nameEn: string | null }; assignedVehicleId?: string | null };
 
 export type Incident = {
   id: string;
@@ -230,6 +230,16 @@ export function VehicleIncidentsClient({
   const f = (key: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  // عند اختيار السائق، نملأ "المركبة المتضررة" تلقائياً بسيارته الحالية المخصّصة
+  // (إن وُجدت ضمن قائمة المركبات). يبقى بإمكان المستخدم تغييرها يدوياً.
+  function onDriverChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const driverId = e.target.value;
+    const driver = drivers.find((d) => d.id === driverId);
+    const assignedId = driver?.assignedVehicleId ?? "";
+    const exists = assignedId && incidentVehicles.some((v) => v.id === assignedId);
+    setForm((p) => ({ ...p, driverId, vehicleId: exists ? assignedId : p.vehicleId }));
+  }
 
   const visible = incidents.filter((i) => !statusFilter || i.status === statusFilter);
   const openCount     = incidents.filter((i) => i.status === "OPEN").length;
@@ -548,7 +558,7 @@ export function VehicleIncidentsClient({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="form-label">{ar ? "السائق" : "Driver"} <span className="text-destructive">*</span></label>
-                    <select value={form.driverId} onChange={f("driverId")} className="input-field">
+                    <select value={form.driverId} onChange={onDriverChange} className="input-field">
                       <option value="">{ar ? "اختر السائق" : "Select driver"}</option>
                       {drivers.map((d) => (
                         <option key={d.id} value={d.id}>

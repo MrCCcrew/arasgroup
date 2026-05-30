@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { AlertTriangle, Car, Plus, User, X } from "lucide-react";
+import { AlertTriangle, Car, Plus, Trash2, User, X } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
 interface Driver {
@@ -109,8 +109,12 @@ export default function ViolationsPage() {
   const [formError, setFormError] = useState("");
 
   const [actionId, setActionId] = useState<string | null>(null);
-  const [actionType, setActionType] = useState<"settle" | "cancel" | null>(null);
+  const [actionType, setActionType] = useState<"settle" | "cancel" | "delete" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  // السيارة المقترحة تلقائياً للسائق في تاريخ المخالفة (من سجل تبديل السيارات)
+  const [vehicleAutoFilled, setVehicleAutoFilled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +144,27 @@ export default function ViolationsPage() {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((p) => ({ ...p, [key]: e.target.value }));
   }
+
+  // عند اختيار السائق أو تغيير التاريخ، نحدّد سيارته المخصّصة في ذلك الوقت تلقائياً.
+  // يمكن للمستخدم تغييرها يدوياً (مثلاً لو كان راكب سيارة بديلة في ذلك التاريخ).
+  useEffect(() => {
+    if (!form.driverId || !form.date) { setVehicleAutoFilled(false); return; }
+    let cancelled = false;
+    const params = new URLSearchParams({ date: new Date(form.date).toISOString() });
+    fetch(`/api/delivery/drivers/${form.driverId}/vehicle-at?${params}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data?.id) {
+          setForm((p) => ({ ...p, vehicleId: res.data.id }));
+          setVehicleAutoFilled(true);
+        } else {
+          setVehicleAutoFilled(false);
+        }
+      })
+      .catch(() => { if (!cancelled) setVehicleAutoFilled(false); });
+    return () => { cancelled = true; };
+  }, [form.driverId, form.date]);
 
   async function save() {
     if (!form.driverId) { setFormError("يرجى اختيار السائق"); return; }
@@ -182,16 +207,36 @@ export default function ViolationsPage() {
     load();
   }
 
+  function closeAction() {
+    setActionId(null);
+    setActionType(null);
+    setActionError("");
+  }
+
   async function doAction() {
     if (!actionId || !actionType) return;
     setActionLoading(true);
-    const res = await fetch(`/api/delivery/violations/${actionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: actionType === "settle" ? "SETTLED" : "CANCELLED" }),
-    });
+    setActionError("");
+
+    let res: Response;
+    if (actionType === "delete") {
+      res = await fetch(`/api/delivery/violations/${actionId}`, { method: "DELETE" });
+    } else {
+      res = await fetch(`/api/delivery/violations/${actionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: actionType === "settle" ? "SETTLED" : "CANCELLED" }),
+      });
+    }
+
+    const data = await res.json().catch(() => ({}));
     setActionLoading(false);
-    if (res.ok) { setActionId(null); setActionType(null); load(); }
+    if (res.ok && data.success !== false) {
+      closeAction();
+      load();
+    } else {
+      setActionError(data.error ?? "حدث خطأ");
+    }
   }
 
   const pending = violations.filter((v) => v.status === "PENDING").length;
@@ -332,22 +377,33 @@ export default function ViolationsPage() {
                           </span>
                         </td>
                         <td>
-                          {v.status === "PENDING" && (
-                            <div className="flex gap-1">
+                          <div className="flex items-center gap-1">
+                            {v.status === "PENDING" && (
+                              <>
+                                <button
+                                  onClick={() => { setActionId(v.id); setActionType("settle"); setActionError(""); }}
+                                  className="rounded px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50"
+                                >
+                                  تسوية
+                                </button>
+                                <button
+                                  onClick={() => { setActionId(v.id); setActionType("cancel"); setActionError(""); }}
+                                  className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                                >
+                                  إلغاء
+                                </button>
+                              </>
+                            )}
+                            {v.status !== "SETTLED" && (
                               <button
-                                onClick={() => { setActionId(v.id); setActionType("settle"); }}
-                                className="rounded px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50"
+                                onClick={() => { setActionId(v.id); setActionType("delete"); setActionError(""); }}
+                                title="حذف المخالفة"
+                                className="rounded p-1.5 text-destructive hover:bg-destructive/10"
                               >
-                                تسوية
+                                <Trash2 size={14} />
                               </button>
-                              <button
-                                onClick={() => { setActionId(v.id); setActionType("cancel"); }}
-                                className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
-                              >
-                                إلغاء
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -379,7 +435,11 @@ export default function ViolationsPage() {
                 </div>
                 <div>
                   <label className="form-label">السيارة</label>
-                  <select value={form.vehicleId} onChange={f("vehicleId")} className="input-field w-full">
+                  <select
+                    value={form.vehicleId}
+                    onChange={(e) => { setVehicleAutoFilled(false); f("vehicleId")(e); }}
+                    className="input-field w-full"
+                  >
                     <option value="">— بدون سيارة —</option>
                     {vehicles.map((v) => (
                       <option key={v.id} value={v.id}>
@@ -387,6 +447,11 @@ export default function ViolationsPage() {
                       </option>
                     ))}
                   </select>
+                  {vehicleAutoFilled && form.vehicleId && (
+                    <p className="mt-1 text-xs text-emerald-600">
+                      ✓ سيارة السائق في هذا التاريخ — غيّرها يدوياً لو كان راكب سيارة أخرى
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -501,26 +566,34 @@ export default function ViolationsPage() {
         </div>
       )}
 
-      {/* Settle / Cancel confirm */}
+      {/* Settle / Cancel / Delete confirm */}
       {actionId && actionType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-xl bg-card p-5 shadow-2xl">
             <p className="font-medium">
-              {actionType === "settle" ? "تأكيد تسوية المخالفة؟" : "تأكيد إلغاء المخالفة؟"}
+              {actionType === "settle" ? "تأكيد تسوية المخالفة؟"
+                : actionType === "cancel" ? "تأكيد إلغاء المخالفة؟"
+                : "تأكيد حذف المخالفة؟"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {actionType === "settle"
                 ? "سيتم تغيير الحالة إلى مسوّاة ولن تظهر في الخصومات المستقبلية."
-                : "سيتم إلغاء المخالفة ولن تُحتسب في الرواتب."}
+                : actionType === "cancel"
+                  ? "سيتم إلغاء المخالفة ولن تُحتسب في الرواتب."
+                  : "سيتم حذف المخالفة نهائياً. إن كان جزء منها محمّلاً على الشركة سيُلغى مصروفه أيضاً."}
             </p>
+            {actionError && <p className="mt-2 rounded-lg bg-red-50 p-2 text-sm text-red-600">{actionError}</p>}
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => { setActionId(null); setActionType(null); }} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+              <button onClick={closeAction} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">تراجع</button>
               <button
                 onClick={doAction}
                 disabled={actionLoading}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${actionType === "settle" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
               >
-                {actionLoading ? "جاري..." : actionType === "settle" ? "تسوية" : "إلغاء المخالفة"}
+                {actionLoading ? "جاري..."
+                  : actionType === "settle" ? "تسوية"
+                  : actionType === "cancel" ? "إلغاء المخالفة"
+                  : "حذف المخالفة"}
               </button>
             </div>
           </div>
