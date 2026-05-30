@@ -15,17 +15,22 @@ export default async function ExpiryAlertsPage({ params }: Props) {
 
   const { companyId } = await params;
   const locale = await getLocale();
-  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
-  const alerts = await getExpiryAlertsData(session, companyId);
+  const en = locale === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const alerts = await getExpiryAlertsData(session, companyId, en ? "en" : "ar");
 
   return (
     <div>
       <Header
-        title="تنبيهات الانتهاء"
-        subtitle="كل ما سينتهي قريبًا للموظفين والمركبات والتراخيص بحسب صلاحياتك"
+        title={en ? "Expiry Alerts" : "تنبيهات الانتهاء"}
+        subtitle={
+          en
+            ? "Everything expiring soon for employees, vehicles and licenses, based on your permissions"
+            : "كل ما سينتهي قريبًا للموظفين والمركبات والتراخيص بحسب صلاحياتك"
+        }
         companyId={companyId}
       />
-      <ExpiryAlertsClient alerts={alerts} companyId={companyId} numberLocale={numberLocale} />
+      <ExpiryAlertsClient alerts={alerts} companyId={companyId} numberLocale={numberLocale} locale={en ? "en" : "ar"} />
     </div>
   );
 }

@@ -3,8 +3,24 @@ import { getAccessibleBranchIds, hasPermission } from "@/lib/auth/permissions";
 import type { SessionUser } from "@/lib/types";
 import type { AlertCategory, ExpiryAlertItem } from "./shared";
 
+export type AlertLocale = "ar" | "en";
+
 const EMPLOYEE_VEHICLE_WINDOW_DAYS = 60;
 const LICENSE_WINDOW_DAYS = 90;
+
+// مسميات أنواع الموظفين (عربي/إنجليزي) — تستخدم في عمود التفصيل بدل عرض الـ enum الخام
+const EMPLOYEE_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
+  DRIVER: { ar: "سائق", en: "Driver" },
+  DELIVERY_DRIVER: { ar: "سائق توصيل", en: "Delivery Driver" },
+  DELIVERY_ADMIN: { ar: "إداري توصيل", en: "Delivery Admin" },
+  CAR_WASH_DRIVER: { ar: "سائق غسيل", en: "Car Wash Driver" },
+  CAR_WASH_WORKER: { ar: "عامل غسيل", en: "Car Wash Worker" },
+  OFFICE_EMPLOYEE: { ar: "موظف مكتب", en: "Office Employee" },
+  ACCOUNTANT: { ar: "محاسب", en: "Accountant" },
+  MANDOUB: { ar: "مندوب", en: "Mandoub" },
+  OFFICE_BOY: { ar: "عامل خدمات", en: "Office Boy" },
+  OTHER: { ar: "أخرى", en: "Other" },
+};
 
 type EmployeeAlertRow = {
   id: string;
@@ -45,32 +61,34 @@ type LicenseAlertRow = {
   importLicenseExpiryDate: Date | null;
 };
 
-const EMPLOYEE_TYPES: Array<{ key: keyof EmployeeAlertRow; label: string }> = [
-  { key: "residencyExpiry", label: "انتهاء الإقامة" },
-  { key: "licenseExpiry", label: "انتهاء رخصة القيادة" },
-  { key: "healthCardExpiryDate", label: "انتهاء كارت الصحة" },
-  { key: "passportExpiryDate", label: "انتهاء جواز السفر" },
-  { key: "municipalityCardExpiryDate", label: "انتهاء بطاقة البلدية" },
-  { key: "visaExpiryDate", label: "انتهاء الفيزا" },
+type TypeDef<R> = { key: keyof R; ar: string; en: string };
+
+const EMPLOYEE_TYPES: Array<TypeDef<EmployeeAlertRow>> = [
+  { key: "residencyExpiry", ar: "انتهاء الإقامة", en: "Residency expiry" },
+  { key: "licenseExpiry", ar: "انتهاء رخصة القيادة", en: "Driving license expiry" },
+  { key: "healthCardExpiryDate", ar: "انتهاء كارت الصحة", en: "Health card expiry" },
+  { key: "passportExpiryDate", ar: "انتهاء جواز السفر", en: "Passport expiry" },
+  { key: "municipalityCardExpiryDate", ar: "انتهاء بطاقة البلدية", en: "Municipality card expiry" },
+  { key: "visaExpiryDate", ar: "انتهاء الفيزا", en: "Visa expiry" },
 ];
 
-const VEHICLE_TYPES: Array<{ key: keyof VehicleAlertRow; label: string }> = [
-  { key: "insuranceExpiry", label: "انتهاء التأمين" },
-  { key: "insuranceExpiryDate", label: "انتهاء التأمين" },
-  { key: "registrationExpiry", label: "انتهاء التسجيل" },
-  { key: "municipalityCardExpiryDate", label: "انتهاء بطاقة البلدية" },
-  { key: "advertisingCardExpiryDate", label: "انتهاء بطاقة الإعلان" },
-  { key: "foodLicenseExpiryDate", label: "انتهاء الترخيص الصحي للمركبة" },
+const VEHICLE_TYPES: Array<TypeDef<VehicleAlertRow>> = [
+  { key: "insuranceExpiry", ar: "انتهاء التأمين", en: "Insurance expiry" },
+  { key: "insuranceExpiryDate", ar: "انتهاء التأمين", en: "Insurance expiry" },
+  { key: "registrationExpiry", ar: "انتهاء التسجيل", en: "Registration expiry" },
+  { key: "municipalityCardExpiryDate", ar: "انتهاء بطاقة البلدية", en: "Municipality card expiry" },
+  { key: "advertisingCardExpiryDate", ar: "انتهاء بطاقة الإعلان", en: "Advertising card expiry" },
+  { key: "foodLicenseExpiryDate", ar: "انتهاء الترخيص الصحي للمركبة", en: "Vehicle food license expiry" },
 ];
 
-const LICENSE_TYPES: Array<{ key: keyof LicenseAlertRow; label: string }> = [
-  { key: "licenseExpiryDate", label: "انتهاء الرخصة التجارية" },
-  { key: "fireLicenseExpiryDate", label: "انتهاء رخصة الإطفاء" },
-  { key: "healthLicenseExpiryDate", label: "انتهاء الرخصة الصحية" },
-  { key: "advertisingLicenseExpiryDate", label: "انتهاء رخصة الإعلانات" },
-  { key: "trafficCertExpiryDate", label: "انتهاء شهادة المرور" },
-  { key: "customsCertExpiryDate", label: "انتهاء الشهادة الجمركية" },
-  { key: "importLicenseExpiryDate", label: "انتهاء رخصة الاستيراد" },
+const LICENSE_TYPES: Array<TypeDef<LicenseAlertRow>> = [
+  { key: "licenseExpiryDate", ar: "انتهاء الرخصة التجارية", en: "Commercial license expiry" },
+  { key: "fireLicenseExpiryDate", ar: "انتهاء رخصة الإطفاء", en: "Fire license expiry" },
+  { key: "healthLicenseExpiryDate", ar: "انتهاء الرخصة الصحية", en: "Health license expiry" },
+  { key: "advertisingLicenseExpiryDate", ar: "انتهاء رخصة الإعلانات", en: "Advertising license expiry" },
+  { key: "trafficCertExpiryDate", ar: "انتهاء شهادة المرور", en: "Traffic certificate expiry" },
+  { key: "customsCertExpiryDate", ar: "انتهاء الشهادة الجمركية", en: "Customs certificate expiry" },
+  { key: "importLicenseExpiryDate", ar: "انتهاء رخصة الاستيراد", en: "Import license expiry" },
 ];
 
 function daysLeft(date: Date, now: Date) {
@@ -114,7 +132,8 @@ function makeAlert(
   };
 }
 
-export async function getExpiryAlertsData(session: SessionUser, companyId: string) {
+export async function getExpiryAlertsData(session: SessionUser, companyId: string, locale: AlertLocale = "ar") {
+  const en = locale === "en";
   const branchIds = getAccessibleBranchIds(session, companyId);
   const now = new Date();
   const in60 = new Date(now.getTime() + EMPLOYEE_VEHICLE_WINDOW_DAYS * 864e5);
@@ -200,17 +219,18 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
 
   const employeeAlerts = dedupeAlerts(
     employees.flatMap((employee) =>
-      EMPLOYEE_TYPES.flatMap(({ key, label }) => {
+      EMPLOYEE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
         const date = employee[key];
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
+        const typeLabel = EMPLOYEE_TYPE_LABELS[employee.type]?.[locale] ?? employee.type;
         return [
           makeAlert(
             "employee",
             employee.id,
             employee.nameAr,
-            employee.type,
-            label,
+            typeLabel,
+            en ? enLabel : ar,
             expiryDate,
             now,
             canUpdateEmployees
@@ -224,18 +244,21 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
 
   const vehicleAlerts = dedupeAlerts(
     vehicles.flatMap((vehicle) =>
-      VEHICLE_TYPES.flatMap(({ key, label }) => {
+      VEHICLE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
         const date = vehicle[key];
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
-        const description = [vehicle.vehicleNumber ?? "بدون رقم", [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "بدون موديل"].join(" • ");
+        const description = [
+          vehicle.vehicleNumber ?? (en ? "No number" : "بدون رقم"),
+          [vehicle.make, vehicle.model].filter(Boolean).join(" ") || (en ? "No model" : "بدون موديل"),
+        ].join(" • ");
         return [
           makeAlert(
             "vehicle",
             vehicle.id,
             vehicle.plateNumber,
             description,
-            label,
+            en ? enLabel : ar,
             expiryDate,
             now,
             canUpdateVehicles
@@ -249,7 +272,7 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
 
   const licenseAlerts = dedupeAlerts(
     licenses.flatMap((license) =>
-      LICENSE_TYPES.flatMap(({ key, label }) => {
+      LICENSE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
         const date = license[key];
         if (!date || date > in90) return [];
         const expiryDate = ensureDate(date);
@@ -258,8 +281,8 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
             "license",
             license.id,
             license.commercialNameAr,
-            `رقم الترخيص: ${license.licenseNumber}`,
-            label,
+            en ? `License no: ${license.licenseNumber}` : `رقم الترخيص: ${license.licenseNumber}`,
+            en ? enLabel : ar,
             expiryDate,
             now,
             `/dashboard/companies/${companyId}/licenses/${license.id}`,

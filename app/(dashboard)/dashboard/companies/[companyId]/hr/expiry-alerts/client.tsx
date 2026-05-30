@@ -43,7 +43,7 @@ function StatCard({
   );
 }
 
-function Badge({ days }: { days: number }) {
+function Badge({ days, en }: { days: number; en: boolean }) {
   const level = severityFromDays(days);
   const classes =
     level === "expired"
@@ -56,7 +56,7 @@ function Badge({ days }: { days: number }) {
 
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${classes}`}>
-      {level === "expired" ? "منتهي" : `${days} يوم`}
+      {level === "expired" ? (en ? "Expired" : "منتهي") : en ? `${days} days` : `${days} يوم`}
     </span>
   );
 }
@@ -65,11 +65,46 @@ export function ExpiryAlertsClient({
   alerts,
   companyId,
   numberLocale,
+  locale,
 }: {
   alerts: ExpiryAlertItem[];
   companyId: string;
   numberLocale: string;
+  locale: "ar" | "en";
 }) {
+  const en = locale === "en";
+  const t = {
+    expiredNow: en ? "Expired now" : "منتهية الآن",
+    in30: en ? "Within 30 days" : "خلال 30 يوم",
+    in60: en ? "Within 60 days" : "خلال 60 يوم",
+    in90: en ? "Within 90 days (licenses)" : "خلال 90 يوم للتراخيص",
+    employees: en ? "Employees" : "الموظفون",
+    vehicles: en ? "Vehicles" : "المركبات",
+    licenses: en ? "Licenses" : "التراخيص",
+    employeesDesc: en ? "Residency, passports, licenses, health & municipality cards, visas" : "إقامات وجوازات ورخص وكروت صحة وبطاقات بلدية وفيزا",
+    vehiclesDesc: en ? "Insurance, registration, municipality & advertising cards, vehicle health licenses" : "تأمين وتسجيل وبطاقات بلدية وإعلان وتراخيص صحية للمركبات",
+    licensesDesc: en ? "Commercial, fire, health, advertising, traffic, customs & import" : "تجارية وإطفاء وصحية وإعلانات ومرور وجمارك واستيراد",
+    searchPlaceholder: en ? "Search by name, type or detail..." : "بحث بالاسم أو النوع أو التفصيل...",
+    allCategories: en ? "All sections" : "كل الأقسام",
+    allStatuses: en ? "All statuses" : "كل الحالات",
+    expired: en ? "Expired" : "منتهي",
+    allTypes: en ? "All expiry types" : "كل أنواع الانتهاء",
+    printPdf: en ? "Print PDF (filtered)" : "طباعة PDF حسب الفلتر",
+    clear: en ? "Clear filters" : "مسح الفلاتر",
+    result: en ? "result(s)" : "نتيجة",
+    colSection: en ? "Section" : "القسم",
+    colItem: en ? "Item" : "العنصر",
+    colDetail: en ? "Detail" : "التفصيل",
+    colType: en ? "Expiry type" : "نوع الانتهاء",
+    colDate: en ? "Expiry date" : "تاريخ الانتهاء",
+    colStatus: en ? "Status" : "الحالة",
+    colAction: en ? "Action" : "الإجراء",
+    noResults: en ? "No results match the current filters" : "لا توجد نتائج مطابقة للفلاتر الحالية",
+    updateData: en ? "Update data" : "تحديث البيانات",
+  };
+  const categoryLabel = (c: ExpiryAlertItem["category"]) =>
+    c === "employee" ? t.employees : c === "vehicle" ? t.vehicles : t.licenses;
+
   const [filters, setFilters] = useState<ExpiryAlertFilters>({
     search: "",
     category: "all",
@@ -86,38 +121,38 @@ export function ExpiryAlertsClient({
   return (
     <div className="page-container space-y-6">
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="منتهية الآن" count={stats.expired} tone="red" />
-        <StatCard label="خلال 30 يوم" count={stats.in30} tone="orange" />
-        <StatCard label="خلال 60 يوم" count={stats.in60} tone="yellow" />
-        <StatCard label="خلال 90 يوم للتراخيص" count={stats.in90} tone="blue" />
+        <StatCard label={t.expiredNow} count={stats.expired} tone="red" />
+        <StatCard label={t.in30} count={stats.in30} tone="orange" />
+        <StatCard label={t.in60} count={stats.in60} tone="yellow" />
+        <StatCard label={t.in90} count={stats.in90} tone="blue" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-2 flex items-center gap-2">
             <Users size={18} className="text-orange-500" />
-            <h2 className="font-bold">الموظفون</h2>
+            <h2 className="font-bold">{t.employees}</h2>
           </div>
           <p className="text-2xl font-bold">{filteredAlerts.filter((alert) => alert.category === "employee").length}</p>
-          <p className="text-xs text-muted-foreground">إقامات وجوازات ورخص وكروت صحة وبطاقات بلدية وفيزا</p>
+          <p className="text-xs text-muted-foreground">{t.employeesDesc}</p>
         </div>
 
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-2 flex items-center gap-2">
             <Car size={18} className="text-blue-500" />
-            <h2 className="font-bold">المركبات</h2>
+            <h2 className="font-bold">{t.vehicles}</h2>
           </div>
           <p className="text-2xl font-bold">{filteredAlerts.filter((alert) => alert.category === "vehicle").length}</p>
-          <p className="text-xs text-muted-foreground">تأمين وتسجيل وبطاقات بلدية وإعلان وتراخيص صحية للمركبات</p>
+          <p className="text-xs text-muted-foreground">{t.vehiclesDesc}</p>
         </div>
 
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-2 flex items-center gap-2">
             <FileText size={18} className="text-amber-500" />
-            <h2 className="font-bold">التراخيص</h2>
+            <h2 className="font-bold">{t.licenses}</h2>
           </div>
           <p className="text-2xl font-bold">{filteredAlerts.filter((alert) => alert.category === "license").length}</p>
-          <p className="text-xs text-muted-foreground">تجارية وإطفاء وصحية وإعلانات ومرور وجمارك واستيراد</p>
+          <p className="text-xs text-muted-foreground">{t.licensesDesc}</p>
         </div>
       </div>
 
@@ -127,7 +162,7 @@ export function ExpiryAlertsClient({
             <Search size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               className="input-field w-full pr-8 text-sm"
-              placeholder="بحث بالاسم أو النوع أو التفصيل..."
+              placeholder={t.searchPlaceholder}
               value={filters.search}
               onChange={(e) => setFilters((current) => ({ ...current, search: e.target.value }))}
             />
@@ -138,10 +173,10 @@ export function ExpiryAlertsClient({
             value={filters.category}
             onChange={(e) => setFilters((current) => ({ ...current, category: e.target.value as ExpiryAlertFilters["category"] }))}
           >
-            <option value="all">كل الأقسام</option>
-            <option value="employee">الموظفون</option>
-            <option value="vehicle">المركبات</option>
-            <option value="license">التراخيص</option>
+            <option value="all">{t.allCategories}</option>
+            <option value="employee">{t.employees}</option>
+            <option value="vehicle">{t.vehicles}</option>
+            <option value="license">{t.licenses}</option>
           </select>
 
           <select
@@ -149,11 +184,11 @@ export function ExpiryAlertsClient({
             value={filters.status}
             onChange={(e) => setFilters((current) => ({ ...current, status: e.target.value as ExpiryAlertFilters["status"] }))}
           >
-            <option value="all">كل الحالات</option>
-            <option value="expired">منتهي</option>
-            <option value="critical">خلال 30 يوم</option>
-            <option value="warning">خلال 60 يوم</option>
-            <option value="upcoming">خلال 90 يوم للتراخيص</option>
+            <option value="all">{t.allStatuses}</option>
+            <option value="expired">{t.expired}</option>
+            <option value="critical">{t.in30}</option>
+            <option value="warning">{t.in60}</option>
+            <option value="upcoming">{t.in90}</option>
           </select>
 
           <select
@@ -161,7 +196,7 @@ export function ExpiryAlertsClient({
             value={filters.expiryType}
             onChange={(e) => setFilters((current) => ({ ...current, expiryType: e.target.value }))}
           >
-            <option value="all">كل أنواع الانتهاء</option>
+            <option value="all">{t.allTypes}</option>
             {expiryTypeOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -177,16 +212,16 @@ export function ExpiryAlertsClient({
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Printer size={14} />
-            طباعة PDF حسب الفلتر
+            {t.printPdf}
           </Link>
           <button
             onClick={() => setFilters({ search: "", category: "all", status: "all", expiryType: "all" })}
             className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
           >
-            مسح الفلاتر
+            {t.clear}
           </button>
           <span className="text-sm text-muted-foreground">
-            {filteredAlerts.length} نتيجة
+            {filteredAlerts.length} {t.result}
           </span>
         </div>
       </div>
@@ -196,38 +231,38 @@ export function ExpiryAlertsClient({
           <table className="ar-table text-sm">
             <thead>
               <tr>
-                <th>القسم</th>
-                <th>العنصر</th>
-                <th>التفصيل</th>
-                <th>نوع الانتهاء</th>
-                <th>تاريخ الانتهاء</th>
-                <th>الحالة</th>
-                <th>الإجراء</th>
+                <th>{t.colSection}</th>
+                <th>{t.colItem}</th>
+                <th>{t.colDetail}</th>
+                <th>{t.colType}</th>
+                <th>{t.colDate}</th>
+                <th>{t.colStatus}</th>
+                <th>{t.colAction}</th>
               </tr>
             </thead>
             <tbody>
               {filteredAlerts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    لا توجد نتائج مطابقة للفلاتر الحالية
+                    {t.noResults}
                   </td>
                 </tr>
               ) : (
                 filteredAlerts.map((alert) => (
                   <tr key={alert.id} className="hover:bg-muted/20">
                     <td className="text-xs font-medium text-muted-foreground">
-                      {alert.category === "employee" ? "الموظفون" : alert.category === "vehicle" ? "المركبات" : "التراخيص"}
+                      {categoryLabel(alert.category)}
                     </td>
                     <td className="font-medium">{alert.title}</td>
                     <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
                     <td>{alert.expiryType}</td>
                     <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
                     <td>
-                      <Badge days={alert.daysLeft} />
+                      <Badge days={alert.daysLeft} en={en} />
                     </td>
                     <td>
                       <Link href={alert.href} className="text-primary hover:underline">
-                        تحديث البيانات
+                        {t.updateData}
                       </Link>
                     </td>
                   </tr>
