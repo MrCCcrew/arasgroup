@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Pencil, PowerOff, X, FolderOpen, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { VehicleRow } from "./page";
 
@@ -102,6 +102,8 @@ const EMPTY_EDIT = {
 
 export function VehiclesClient({ initialVehicles, branches, licenses, adminEmployees, companyId, locale }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [vehicles, setVehicles] = useState<VehicleRow[]>(initialVehicles);
   const [editVehicle, setEditVehicle] = useState<VehicleRow | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
@@ -162,6 +164,20 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
     setEditError("");
   }
 
+  function closeEdit() {
+    setEditVehicle(null);
+    if (searchParams.get("edit")) {
+      router.replace(pathname, { scroll: false });
+    }
+  }
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || editVehicle) return;
+    const target = vehicles.find((vehicle) => vehicle.id === editId);
+    if (target) openEdit(target);
+  }, [editVehicle, pathname, router, searchParams, vehicles]);
+
   function ef(key: keyof typeof EMPTY_EDIT) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setEditForm((p) => ({ ...p, [key]: e.target.value }));
@@ -198,7 +214,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "حدث خطأ");
-      setEditVehicle(null);
+      closeEdit();
       router.refresh();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "فشل الحفظ");
@@ -357,7 +373,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
 
       {/* Edit Modal */}
       {editVehicle && (
-        <Modal title={`تعديل: ${editVehicle.plateNumber}`} onClose={() => setEditVehicle(null)}>
+        <Modal title={`تعديل: ${editVehicle.plateNumber}`} onClose={closeEdit}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -441,7 +457,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
             </div>
             {editError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{editError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditVehicle(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+              <button onClick={closeEdit} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
               <button onClick={saveEdit} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
                 {saving ? "جاري الحفظ..." : "حفظ"}
               </button>

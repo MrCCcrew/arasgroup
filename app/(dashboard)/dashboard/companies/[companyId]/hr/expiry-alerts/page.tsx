@@ -1,61 +1,248 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, FileText, Users } from "lucide-react";
+import { AlertTriangle, Car, FileText, Users } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
-import { upsertNotification } from "@/lib/notifications";
-import Link from "next/link";
+import { getAccessibleBranchIds, hasPermission } from "@/lib/auth/permissions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
 }
 
-const EMP_TYPE_LABELS: Record<string, string> = {
-  DRIVER: "سائق",
-  CAR_WASH_DRIVER: "سائق غسيل",
-  CAR_WASH_WORKER: "عامل غسيل",
-  OFFICE_EMPLOYEE: "موظف مكتب",
-  ACCOUNTANT: "محاسب",
-  MANDOUB: "مندوب",
-  OFFICE_BOY: "عامل خدمات",
+type AlertCategory = "employee" | "vehicle" | "license";
+
+type ExpiryAlert = {
+  id: string;
+  category: AlertCategory;
+  entityId: string;
+  title: string;
+  subtitle: string;
+  expiryType: string;
+  expiryDate: Date;
+  daysLeft: number;
+  href: string;
 };
 
-const LICENSE_TYPE_LABELS: Record<string, string> = {
-  licenseExpiryDate: "الرخصة التجارية",
-  fireLicenseExpiryDate: "رخصة الإطفاء",
-  healthLicenseExpiryDate: "الرخصة الصحية",
-  advertisingLicenseExpiryDate: "رخصة الإعلانات",
+const ALERT_WINDOW_DAYS = 90;
+const EMPLOYEE_TYPES: Array<{
+  key: keyof EmployeeAlertRow;
+  label: string;
+}> = [
+  { key: "residencyExpiry", label: "انتهاء الإقامة" },
+  { key: "licenseExpiry", label: "انتهاء رخصة القيادة" },
+  { key: "healthCardExpiryDate", label: "انتهاء كارت الصحة" },
+  { key: "passportExpiryDate", label: "انتهاء جواز السفر" },
+  { key: "municipalityCardExpiryDate", label: "انتهاء بطاقة البلدية" },
+  { key: "visaExpiryDate", label: "انتهاء الفيزا" },
+];
+
+const VEHICLE_TYPES: Array<{
+  key: keyof VehicleAlertRow;
+  label: string;
+}> = [
+  { key: "insuranceExpiry", label: "انتهاء التأمين" },
+  { key: "insuranceExpiryDate", label: "انتهاء التأمين" },
+  { key: "registrationExpiry", label: "انتهاء التسجيل" },
+  { key: "municipalityCardExpiryDate", label: "انتهاء بطاقة البلدية" },
+  { key: "advertisingCardExpiryDate", label: "انتهاء بطاقة الإعلان" },
+  { key: "foodLicenseExpiryDate", label: "انتهاء الترخيص الصحي للمركبة" },
+];
+
+const LICENSE_TYPES: Array<{
+  key: keyof LicenseAlertRow;
+  label: string;
+}> = [
+  { key: "licenseExpiryDate", label: "انتهاء الرخصة التجارية" },
+  { key: "fireLicenseExpiryDate", label: "انتهاء رخصة الإطفاء" },
+  { key: "healthLicenseExpiryDate", label: "انتهاء الرخصة الصحية" },
+  { key: "advertisingLicenseExpiryDate", label: "انتهاء رخصة الإعلانات" },
+  { key: "trafficCertExpiryDate", label: "انتهاء شهادة المرور" },
+  { key: "customsCertExpiryDate", label: "انتهاء الشهادة الجمركية" },
+  { key: "importLicenseExpiryDate", label: "انتهاء رخصة الاستيراد" },
+];
+
+type EmployeeAlertRow = {
+  id: string;
+  nameAr: string;
+  nameEn: string | null;
+  type: string;
+  branchId: string | null;
+  residencyExpiry: Date | null;
+  licenseExpiry: Date | null;
+  healthCardExpiryDate: Date | null;
+  passportExpiryDate: Date | null;
+  municipalityCardExpiryDate: Date | null;
+  visaExpiryDate: Date | null;
 };
 
-function urgency(date: Date | null | undefined, now: Date) {
-  if (!date) return "none";
-  const days = Math.ceil((date.getTime() - now.getTime()) / 864e5);
-  if (days < 0) return "expired";
-  if (days <= 30) return "critical";
-  if (days <= 60) return "warning";
-  return "ok";
-}
+type VehicleAlertRow = {
+  id: string;
+  plateNumber: string;
+  vehicleNumber: string | null;
+  make: string | null;
+  model: string | null;
+  branchId: string | null;
+  insuranceExpiry: Date | null;
+  insuranceExpiryDate: Date | null;
+  registrationExpiry: Date | null;
+  municipalityCardExpiryDate: Date | null;
+  advertisingCardExpiryDate: Date | null;
+  foodLicenseExpiryDate: Date | null;
+};
 
-function daysLeft(date: Date | null | undefined, now: Date) {
-  if (!date) return null;
+type LicenseAlertRow = {
+  id: string;
+  commercialNameAr: string;
+  licenseNumber: string;
+  branchId: string | null;
+  licenseExpiryDate: Date | null;
+  fireLicenseExpiryDate: Date | null;
+  healthLicenseExpiryDate: Date | null;
+  advertisingLicenseExpiryDate: Date | null;
+  trafficCertExpiryDate: Date | null;
+  customsCertExpiryDate: Date | null;
+  importLicenseExpiryDate: Date | null;
+};
+
+function daysLeft(date: Date, now: Date) {
   return Math.ceil((date.getTime() - now.getTime()) / 864e5);
 }
 
-function UrgencyBadge({ date, now }: { date: Date | null | undefined; now: Date }) {
-  const days = daysLeft(date, now);
-  const level = urgency(date, now);
-  if (days === null) return <span className="text-muted-foreground">—</span>;
-  const styles =
-    level === "expired"  ? "bg-red-100 text-red-700" :
-    level === "critical" ? "bg-orange-100 text-orange-700" :
-    level === "warning"  ? "bg-yellow-100 text-yellow-700" :
-                           "bg-blue-100 text-blue-700";
+function asDate(value: Date | string) {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function severity(days: number) {
+  if (days < 0) return "expired";
+  if (days <= 30) return "critical";
+  if (days <= 60) return "warning";
+  return "upcoming";
+}
+
+function buildStats(alerts: ExpiryAlert[]) {
+  return alerts.reduce(
+    (acc, alert) => {
+      const level = severity(alert.daysLeft);
+      if (level === "expired") acc.expired += 1;
+      else if (level === "critical") acc.in30 += 1;
+      else if (level === "warning") acc.in60 += 1;
+      else acc.in90 += 1;
+      return acc;
+    },
+    { expired: 0, in30: 0, in60: 0, in90: 0 },
+  );
+}
+
+function StatCard({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "red" | "orange" | "yellow" | "blue";
+}) {
+  const toneClasses = {
+    red: "bg-red-50 text-red-500",
+    orange: "bg-orange-50 text-orange-500",
+    yellow: "bg-yellow-50 text-yellow-500",
+    blue: "bg-blue-50 text-blue-500",
+  }[tone];
+
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${styles}`}>
-      {level === "expired" ? "منتهية" : `${days} يوم`}
+    <div className="stat-card">
+      <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClasses}`}>
+        <AlertTriangle size={18} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold">{count}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function Badge({ days }: { days: number }) {
+  const level = severity(days);
+  const classes =
+    level === "expired"
+      ? "bg-red-100 text-red-700"
+      : level === "critical"
+        ? "bg-orange-100 text-orange-700"
+        : level === "warning"
+          ? "bg-yellow-100 text-yellow-700"
+          : "bg-blue-100 text-blue-700";
+
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${classes}`}>
+      {level === "expired" ? "منتهي" : `${days} يوم`}
     </span>
+  );
+}
+
+function AlertsTable({
+  alerts,
+  numberLocale,
+}: {
+  alerts: ExpiryAlert[];
+  numberLocale: string;
+}) {
+  if (alerts.length === 0) {
+    return (
+      <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+        لا توجد عناصر منتهية أو قريبة من الانتهاء ضمن الصلاحيات الحالية
+      </div>
+    );
+  }
+
+  return (
+    <div className="section-card overflow-hidden p-0">
+      <div className="overflow-x-auto">
+        <table className="ar-table text-sm">
+          <thead>
+            <tr>
+              <th>القسم</th>
+              <th>العنصر</th>
+              <th>التفصيل</th>
+              <th>نوع الانتهاء</th>
+              <th>تاريخ الانتهاء</th>
+              <th>الحالة</th>
+              <th>الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((alert) => (
+              <tr key={alert.id} className="hover:bg-muted/20">
+                <td>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {alert.category === "employee"
+                      ? "الموظفون"
+                      : alert.category === "vehicle"
+                        ? "المركبات"
+                        : "التراخيص"}
+                  </span>
+                </td>
+                <td className="font-medium">{alert.title}</td>
+                <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
+                <td>{alert.expiryType}</td>
+                <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
+                <td>
+                  <Badge days={alert.daysLeft} />
+                </td>
+                <td>
+                  <Link href={alert.href} className="text-primary hover:underline">
+                    تحديث البيانات
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -66,279 +253,215 @@ export default async function ExpiryAlertsPage({ params }: Props) {
   const { companyId } = await params;
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
-
+  const branchIds = getAccessibleBranchIds(session, companyId);
   const now = new Date();
-  const in90 = new Date(now.getTime() + 90 * 864e5);
+  const in90 = new Date(now.getTime() + ALERT_WINDOW_DAYS * 864e5);
 
-  // ── Employees (residency + license) ──
-  const employees = await prisma.employee.findMany({
-    where: {
-      companyId,
-      isActive: true,
-      isDeleted: false,
-      OR: [
-        { residencyExpiry: { lte: in90 } },
-        { licenseExpiry: { lte: in90 } },
-      ],
-    },
-    orderBy: { residencyExpiry: "asc" },
-  });
+  const canViewEmployees =
+    hasPermission(session, "HR", "VIEW", { companyId }) ||
+    hasPermission(session, "DELIVERY_HR", "VIEW", { companyId }) ||
+    hasPermission(session, "CAR_WASH_HR", "VIEW", { companyId });
+  const canUpdateEmployees =
+    hasPermission(session, "HR", "UPDATE", { companyId }) ||
+    hasPermission(session, "DELIVERY_HR", "UPDATE", { companyId }) ||
+    hasPermission(session, "CAR_WASH_HR", "UPDATE", { companyId });
+  const canViewVehicles = hasPermission(session, "VEHICLES", "VIEW", { companyId });
+  const canUpdateVehicles = hasPermission(session, "VEHICLES", "UPDATE", { companyId });
+  const canViewLicenses = hasPermission(session, "LICENSES", "VIEW", { companyId });
 
-  // ── Licenses ──
-  const licenses = await prisma.license.findMany({
-    where: {
-      companyId,
-      status: { not: "CANCELLED" },
-      OR: [
-        { licenseExpiryDate: { lte: in90 } },
-        { fireLicenseExpiryDate: { lte: in90 } },
-        { healthLicenseExpiryDate: { lte: in90 } },
-        { advertisingLicenseExpiryDate: { lte: in90 } },
-      ],
-    },
-    orderBy: { licenseExpiryDate: "asc" },
-    select: {
-      id: true,
-      commercialNameAr: true,
-      licenseNumber: true,
-      isMainLicense: true,
-      licenseExpiryDate: true,
-      fireLicenseExpiryDate: true,
-      healthLicenseExpiryDate: true,
-      advertisingLicenseExpiryDate: true,
-    },
-  });
+  const employeeWhere =
+    branchIds.length > 0 ? { companyId, branchId: { in: branchIds }, isActive: true, isDeleted: false } : { companyId, isActive: true, isDeleted: false };
+  const vehicleWhere =
+    branchIds.length > 0 ? { companyId, branchId: { in: branchIds }, isActive: true } : { companyId, isActive: true };
+  const licenseWhere =
+    branchIds.length > 0
+      ? { companyId, branchId: { in: branchIds }, status: { not: "CANCELLED" } }
+      : { companyId, status: { not: "CANCELLED" } };
 
-  // ── Stat counts ──
-  const empExpired  = employees.filter((e) => urgency(e.residencyExpiry, now) === "expired").length;
-  const empCritical = employees.filter((e) => urgency(e.residencyExpiry, now) === "critical").length;
-  const empWarning  = employees.filter((e) => urgency(e.residencyExpiry, now) === "warning").length;
+  const [employees, vehicles, licenses] = await Promise.all([
+    canViewEmployees
+      ? prisma.employee.findMany({
+          where: employeeWhere,
+          select: {
+            id: true,
+            nameAr: true,
+            nameEn: true,
+            type: true,
+            branchId: true,
+            residencyExpiry: true,
+            licenseExpiry: true,
+            healthCardExpiryDate: true,
+            passportExpiryDate: true,
+            municipalityCardExpiryDate: true,
+            visaExpiryDate: true,
+          },
+          orderBy: { nameAr: "asc" },
+        })
+      : Promise.resolve([] as EmployeeAlertRow[]),
+    canViewVehicles
+      ? prisma.vehicle.findMany({
+          where: vehicleWhere,
+          select: {
+            id: true,
+            plateNumber: true,
+            vehicleNumber: true,
+            make: true,
+            model: true,
+            branchId: true,
+            insuranceExpiry: true,
+            insuranceExpiryDate: true,
+            registrationExpiry: true,
+            municipalityCardExpiryDate: true,
+            advertisingCardExpiryDate: true,
+            foodLicenseExpiryDate: true,
+          },
+          orderBy: { plateNumber: "asc" },
+        })
+      : Promise.resolve([] as VehicleAlertRow[]),
+    canViewLicenses
+      ? prisma.license.findMany({
+          where: licenseWhere,
+          select: {
+            id: true,
+            commercialNameAr: true,
+            licenseNumber: true,
+            branchId: true,
+            licenseExpiryDate: true,
+            fireLicenseExpiryDate: true,
+            healthLicenseExpiryDate: true,
+            advertisingLicenseExpiryDate: true,
+            trafficCertExpiryDate: true,
+            customsCertExpiryDate: true,
+            importLicenseExpiryDate: true,
+          },
+          orderBy: { commercialNameAr: "asc" },
+        })
+      : Promise.resolve([] as LicenseAlertRow[]),
+  ]);
 
-  const licExpired  = licenses.filter((l) =>
-    ["licenseExpiryDate","fireLicenseExpiryDate","healthLicenseExpiryDate","advertisingLicenseExpiryDate"]
-      .some((k) => urgency(l[k as keyof typeof l] as Date | null, now) === "expired")
-  ).length;
-  const licCritical = licenses.filter((l) =>
-    ["licenseExpiryDate","fireLicenseExpiryDate","healthLicenseExpiryDate","advertisingLicenseExpiryDate"]
-      .some((k) => urgency(l[k as keyof typeof l] as Date | null, now) === "critical")
-  ).length;
-  const licWarning  = licenses.filter((l) =>
-    ["licenseExpiryDate","fireLicenseExpiryDate","healthLicenseExpiryDate","advertisingLicenseExpiryDate"]
-      .some((k) => urgency(l[k as keyof typeof l] as Date | null, now) === "warning")
-  ).length;
-
-  // ── Auto-notifications for expired residencies ──
-  await Promise.all(
-    employees
-      .filter((e) => e.residencyExpiry && urgency(e.residencyExpiry, now) === "expired")
-      .map((e) =>
-        upsertNotification({
-          type: "RESIDENCY_EXPIRY",
-          uniqueKey: `employee:${e.id}:residency:expired:${e.residencyExpiry!.toISOString().slice(0, 10)}`,
-          titleAr: "انتهت الإقامة — يرجى التجديد",
-          titleEn: "Residency expired — renewal required",
-          messageAr: `انتهت إقامة الموظف ${e.nameAr} — يرجى التجديد أو تحديث البيانات`,
-          messageEn: `Residency for ${e.nameEn ?? e.nameAr} has expired — please renew or update data`,
-          companyId: e.companyId,
-          branchId: e.branchId ?? undefined,
-          employeeId: e.id,
-          entityType: "EMPLOYEE",
-          entityId: e.id,
-          dueDate: e.residencyExpiry,
-          severity: "DANGER",
-          targetRole: "ADMINISTRATIVE_AFFAIRS",
-          refModule: "hr",
-          refId: e.id,
-        }),
-      ),
+  const employeeAlerts: ExpiryAlert[] = employees.flatMap((employee) =>
+    EMPLOYEE_TYPES.flatMap(({ key, label }) => {
+      const date = employee[key];
+      if (!date || date > in90) return [];
+      const expiryDate = asDate(date);
+      const left = daysLeft(expiryDate, now);
+      return [
+        {
+          id: `employee-${employee.id}-${key}`,
+          category: "employee" as const,
+          entityId: employee.id,
+          title: employee.nameAr,
+          subtitle: employee.type,
+          expiryType: label,
+          expiryDate,
+          daysLeft: left,
+          href: canUpdateEmployees
+            ? `/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`
+            : `/dashboard/companies/${companyId}/hr/employees/${employee.id}`,
+        },
+      ];
+    }),
   );
+
+  const vehicleAlerts: ExpiryAlert[] = vehicles.flatMap((vehicle) =>
+    VEHICLE_TYPES.flatMap(({ key, label }) => {
+      const date = vehicle[key];
+      if (!date || date > in90) return [];
+      const expiryDate = asDate(date);
+      const left = daysLeft(expiryDate, now);
+      const description = [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "بدون موديل";
+      return [
+        {
+          id: `vehicle-${vehicle.id}-${key}`,
+          category: "vehicle" as const,
+          entityId: vehicle.id,
+          title: vehicle.plateNumber,
+          subtitle: `${vehicle.vehicleNumber ?? "بدون رقم"} • ${description}`,
+          expiryType: label,
+          expiryDate,
+          daysLeft: left,
+          href: canUpdateVehicles
+            ? `/dashboard/companies/${companyId}/vehicles?edit=${vehicle.id}`
+            : `/dashboard/companies/${companyId}/vehicles/${vehicle.id}`,
+        },
+      ];
+    }),
+  );
+
+  const licenseAlerts: ExpiryAlert[] = licenses.flatMap((license) =>
+    LICENSE_TYPES.flatMap(({ key, label }) => {
+      const date = license[key];
+      if (!date || date > in90) return [];
+      const expiryDate = asDate(date);
+      const left = daysLeft(expiryDate, now);
+      return [
+        {
+          id: `license-${license.id}-${key}`,
+          category: "license" as const,
+          entityId: license.id,
+          title: license.commercialNameAr,
+          subtitle: `رقم الترخيص: ${license.licenseNumber}`,
+          expiryType: label,
+          expiryDate,
+          daysLeft: left,
+          href: `/dashboard/companies/${companyId}/licenses/${license.id}`,
+        },
+      ];
+    }),
+  );
+
+  const allAlerts = [...employeeAlerts, ...vehicleAlerts, ...licenseAlerts].sort((a, b) => {
+    if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
+    return a.expiryDate.getTime() - b.expiryDate.getTime();
+  });
+  const stats = buildStats(allAlerts);
 
   return (
     <div>
       <Header
         title="تنبيهات الانتهاء"
-        subtitle="إقامات وتراخيص ورخص تنتهي قريباً"
+        subtitle="كل ما سينتهي قريبًا للموظفين والمركبات والتراخيص بحسب صلاحياتك"
         companyId={companyId}
       />
 
       <div className="page-container space-y-6">
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard label="منتهية الآن" count={stats.expired} tone="red" />
+          <StatCard label="خلال 30 يوم" count={stats.in30} tone="orange" />
+          <StatCard label="خلال 60 يوم" count={stats.in60} tone="yellow" />
+          <StatCard label="خلال 90 يوم" count={stats.in90} tone="blue" />
+        </div>
 
-        {/* ══ EMPLOYEES section ══ */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Users size={18} className="text-orange-500" />
-            <h2 className="text-base font-bold">الموظفون والعمال</h2>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "منتهية الآن",   count: empExpired,  color: "red"    },
-              { label: "خلال 30 يوم",   count: empCritical, color: "orange" },
-              { label: "خلال 60 يوم",   count: empWarning,  color: "yellow" },
-            ].map((s) => (
-              <div key={s.label} className="stat-card">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-${s.color}-50`}>
-                  <AlertTriangle size={18} className={`text-${s.color}-500`} />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{s.count}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Table */}
-          <div className="section-card overflow-hidden p-0">
-            <div className="overflow-x-auto">
-              <table className="ar-table text-sm">
-                <thead>
-                  <tr>
-                    <th>الموظف</th>
-                    <th>الوظيفة</th>
-                    <th>انتهاء الإقامة</th>
-                    <th>الأيام المتبقية</th>
-                    <th>انتهاء الرخصة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                        لا توجد انتهاءات قريبة للموظفين
-                      </td>
-                    </tr>
-                  ) : (
-                    employees.map((emp) => (
-                      <tr key={emp.id} className="hover:bg-muted/20">
-                        <td>
-                          <Link
-                            href={`/dashboard/companies/${companyId}/hr/employees/${emp.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {emp.nameAr}
-                          </Link>
-                        </td>
-                        <td className="text-xs text-muted-foreground">
-                          {EMP_TYPE_LABELS[emp.type] ?? emp.type}
-                        </td>
-                        <td className="number text-sm">
-                          {emp.residencyExpiry ? formatDate(emp.residencyExpiry, numberLocale) : "—"}
-                        </td>
-                        <td>
-                          <UrgencyBadge date={emp.residencyExpiry} now={now} />
-                        </td>
-                        <td className="number text-sm">
-                          {emp.licenseExpiry ? formatDate(emp.licenseExpiry, numberLocale) : "—"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border bg-card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Users size={18} className="text-orange-500" />
+              <h2 className="font-bold">الموظفون</h2>
             </div>
+            <p className="text-2xl font-bold">{employeeAlerts.length}</p>
+            <p className="text-xs text-muted-foreground">إقامات وجوازات ورخص وكروت صحة وبطاقات بلدية وفيزا</p>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Car size={18} className="text-blue-500" />
+              <h2 className="font-bold">المركبات</h2>
+            </div>
+            <p className="text-2xl font-bold">{vehicleAlerts.length}</p>
+            <p className="text-xs text-muted-foreground">تأمين وتسجيل وبطاقات بلدية وإعلان وتراخيص صحية للمركبات</p>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <FileText size={18} className="text-amber-500" />
+              <h2 className="font-bold">التراخيص</h2>
+            </div>
+            <p className="text-2xl font-bold">{licenseAlerts.length}</p>
+            <p className="text-xs text-muted-foreground">تجارية وإطفاء وصحية وإعلانات ومرور وجمارك واستيراد</p>
           </div>
         </div>
 
-        {/* ══ LICENSES section ══ */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <FileText size={18} className="text-amber-500" />
-            <h2 className="text-base font-bold">التراخيص</h2>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "منتهية الآن",   count: licExpired,  color: "red"    },
-              { label: "خلال 30 يوم",   count: licCritical, color: "orange" },
-              { label: "خلال 60 يوم",   count: licWarning,  color: "yellow" },
-            ].map((s) => (
-              <div key={s.label} className="stat-card">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-${s.color}-50`}>
-                  <AlertTriangle size={18} className={`text-${s.color}-500`} />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{s.count}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Table */}
-          <div className="section-card overflow-hidden p-0">
-            <div className="overflow-x-auto">
-              <table className="ar-table text-sm">
-                <thead>
-                  <tr>
-                    <th>الاسم التجاري</th>
-                    <th>رقم الرخصة</th>
-                    <th>نوع الرخصة</th>
-                    <th>تاريخ الانتهاء</th>
-                    <th>الأيام المتبقية</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {licenses.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                        لا توجد تراخيص منتهية أو قريبة من الانتهاء
-                      </td>
-                    </tr>
-                  ) : (
-                    licenses.flatMap((lic) =>
-                      (
-                        [
-                          "licenseExpiryDate",
-                          "fireLicenseExpiryDate",
-                          "healthLicenseExpiryDate",
-                          "advertisingLicenseExpiryDate",
-                        ] as const
-                      )
-                        .filter((k) => {
-                          const d = lic[k] as Date | null;
-                          return d && d <= in90;
-                        })
-                        .map((k) => {
-                          const d = lic[k] as Date;
-                          return (
-                            <tr key={`${lic.id}-${k}`} className="hover:bg-muted/20">
-                              <td>
-                                <Link
-                                  href={`/dashboard/companies/${companyId}/licenses/${lic.id}`}
-                                  className="font-medium hover:underline"
-                                >
-                                  {lic.commercialNameAr}
-                                </Link>
-                                {!lic.isMainLicense && (
-                                  <span className="mr-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                                    فرعي
-                                  </span>
-                                )}
-                              </td>
-                              <td className="font-mono text-xs">{lic.licenseNumber}</td>
-                              <td className="text-sm">
-                                {LICENSE_TYPE_LABELS[k] ?? k}
-                              </td>
-                              <td className="number text-sm">
-                                {formatDate(d, numberLocale)}
-                              </td>
-                              <td>
-                                <UrgencyBadge date={d} now={now} />
-                              </td>
-                            </tr>
-                          );
-                        }),
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
+        <AlertsTable alerts={allAlerts} numberLocale={numberLocale} />
       </div>
     </div>
   );
