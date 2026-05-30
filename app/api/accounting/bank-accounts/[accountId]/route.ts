@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 
 interface Props {
   params: Promise<{ accountId: string }>;
@@ -18,30 +18,51 @@ const updateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+async function getBankAccountForAccess(accountId: string) {
+  return prisma.bankAccount.findUnique({
+    where: { id: accountId },
+    select: { id: true, companyId: true },
+  });
+}
+
 export async function PATCH(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
   try {
     const { accountId } = await params;
-    const body = await request.json();
-    const parsed = updateSchema.safeParse(body);
+    const bankAccount = await getBankAccountForAccess(accountId);
+    if (!bankAccount) {
+      return NextResponse.json({ success: false, error: "الحساب البنكي غير موجود" }, { status: 404 });
+    }
+
+    const companyAccessError = assertCompanyAccess(session, bankAccount.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    const permissionError = assertPermission(session, "BANKS", "UPDATE", { companyId: bankAccount.companyId });
+    if (permissionError) return permissionError;
+
+    const parsed = updateSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
     if (parsed.data.isDefault) {
-      const existing = await prisma.bankAccount.findUnique({ where: { id: accountId }, select: { companyId: true } });
-      if (existing) {
-        await prisma.bankAccount.updateMany({ where: { companyId: existing.companyId }, data: { isDefault: false } });
-      }
+      await prisma.bankAccount.updateMany({
+        where: { companyId: bankAccount.companyId },
+        data: { isDefault: false },
+      });
     }
 
-    const account = await prisma.bankAccount.update({ where: { id: accountId }, data: parsed.data });
-    return NextResponse.json({ success: true, data: account });
+    const updatedAccount = await prisma.bankAccount.update({
+      where: { id: accountId },
+      data: parsed.data,
+    });
+
+    return NextResponse.json({ success: true, data: updatedAccount });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "فشل في تحديث الحساب";
-    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    const message = error instanceof Error ? error.message : "فشل في تحديث الحساب";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }
 
@@ -51,19 +72,29 @@ export async function DELETE(request: NextRequest, { params }: Props) {
 
   try {
     const { accountId } = await params;
+    const bankAccount = await getBankAccountForAccess(accountId);
+    if (!bankAccount) {
+      return NextResponse.json({ success: false, error: "الحساب البنكي غير موجود" }, { status: 404 });
+    }
+
+    const companyAccessError = assertCompanyAccess(session, bankAccount.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    const permissionError = assertPermission(session, "BANKS", "DELETE", { companyId: bankAccount.companyId });
+    if (permissionError) return permissionError;
 
     const expenseCount = await prisma.expense.count({ where: { bankAccountId: accountId, isDeleted: false } });
     if (expenseCount > 0) {
       return NextResponse.json(
-        { success: false, error: `لا يمكن حذف الحساب — مرتبط بـ ${expenseCount} مصروف` },
-        { status: 400 }
+        { success: false, error: `لا يمكن حذف الحساب - مرتبط بـ ${expenseCount} مصروف` },
+        { status: 400 },
       );
     }
 
     await prisma.bankAccount.update({ where: { id: accountId }, data: { isActive: false } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "فشل في حذف الحساب";
-    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    const message = error instanceof Error ? error.message : "فشل في حذف الحساب";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 
 const createFYSchema = z.object({
   companyId: z.string(),
@@ -11,6 +12,9 @@ const createFYSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
@@ -19,38 +23,51 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
     }
 
+    const companyAccessError = assertCompanyAccess(session, companyId);
+    if (companyAccessError) return companyAccessError;
+
+    const permissionError = assertPermission(session, "ACCOUNTING", "VIEW", { companyId });
+    if (permissionError) return permissionError;
+
     const fiscalYears = await prisma.fiscalYear.findMany({
       where: { companyId },
       orderBy: { year: "desc" },
     });
 
     return NextResponse.json({ success: true, data: fiscalYears });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: "فشل في جلب السنوات المالية" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
-    const body = await request.json();
-    const parsed = createFYSchema.safeParse(body);
+    const parsed = createFYSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const data = parsed.data;
+    const companyAccessError = assertCompanyAccess(session, parsed.data.companyId);
+    if (companyAccessError) return companyAccessError;
 
-    // If setting as current, unset all others
-    if (data.isCurrent) {
+    const permissionError = assertPermission(session, "ACCOUNTING", "CREATE", {
+      companyId: parsed.data.companyId,
+    });
+    if (permissionError) return permissionError;
+
+    if (parsed.data.isCurrent) {
       await prisma.fiscalYear.updateMany({
-        where: { companyId: data.companyId },
+        where: { companyId: parsed.data.companyId },
         data: { isCurrent: false },
       });
     }
 
-    const fy = await prisma.fiscalYear.create({ data });
-    return NextResponse.json({ success: true, data: fy }, { status: 201 });
-  } catch (error) {
+    const fiscalYear = await prisma.fiscalYear.create({ data: parsed.data });
+    return NextResponse.json({ success: true, data: fiscalYear }, { status: 201 });
+  } catch {
     return NextResponse.json({ success: false, error: "فشل في إنشاء السنة المالية" }, { status: 500 });
   }
 }

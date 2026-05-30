@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createJournalEntry, getCurrentFiscalYear } from "@/lib/accounting/journal-engine";
-import { assertPermission, requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 
 const transferSchema = z.object({
   sourceBankAccountId: z.string(),
@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: "معرف الشركة مطلوب" }, { status: 400 });
   }
 
+  const companyAccessError = assertCompanyAccess(session, companyId);
+  if (companyAccessError) return companyAccessError;
+
   const permissionError = assertPermission(session, "BANKS", "VIEW", { companyId });
   if (permissionError) return permissionError;
 
@@ -43,26 +46,38 @@ export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
-  const body = await request.json();
-  const parsed = transferSchema.safeParse(body);
+  const parsed = transferSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
   }
 
   const data = parsed.data;
-  const source = await prisma.bankAccount.findUnique({ where: { id: data.sourceBankAccountId } });
-  const destination = await prisma.bankAccount.findUnique({ where: { id: data.destinationBankAccountId } });
+  const [source, destination] = await Promise.all([
+    prisma.bankAccount.findUnique({ where: { id: data.sourceBankAccountId } }),
+    prisma.bankAccount.findUnique({ where: { id: data.destinationBankAccountId } }),
+  ]);
 
   if (!source || !destination) {
     return NextResponse.json({ success: false, error: "الحساب البنكي المصدر أو الوجهة غير موجود" }, { status: 400 });
   }
 
+  if (source.companyId !== destination.companyId) {
+    return NextResponse.json({ success: false, error: "لا يمكن التحويل بين حسابات بنكية من شركتين مختلفتين" }, { status: 400 });
+  }
+
+  if (data.companyId && data.companyId !== source.companyId) {
+    return NextResponse.json({ success: false, error: "الشركة المختارة لا تطابق الحساب البنكي المصدر" }, { status: 400 });
+  }
+
+  const companyAccessError = assertCompanyAccess(session, source.companyId);
+  if (companyAccessError) return companyAccessError;
+
   const permissionError = assertPermission(session, "BANKS", "CREATE", { companyId: source.companyId });
   if (permissionError) return permissionError;
 
   const [sourceChart, destinationChart] = await Promise.all([
-    source.chartAccountId ? prisma.chartOfAccount.findUnique({ where: { id: source.chartAccountId } }) : null,
-    destination.chartAccountId ? prisma.chartOfAccount.findUnique({ where: { id: destination.chartAccountId } }) : null,
+    source.chartAccountId ? prisma.chartOfAccount.findFirst({ where: { id: source.chartAccountId, companyId: source.companyId } }) : null,
+    destination.chartAccountId ? prisma.chartOfAccount.findFirst({ where: { id: destination.chartAccountId, companyId: source.companyId } }) : null,
   ]);
 
   if (!sourceChart || !destinationChart) {
@@ -92,7 +107,7 @@ export async function POST(request: NextRequest) {
     data: {
       sourceBankAccountId: data.sourceBankAccountId,
       destinationBankAccountId: data.destinationBankAccountId,
-      companyId: data.companyId ?? source.companyId,
+      companyId: source.companyId,
       branchId: data.branchId,
       investorId: data.investorId,
       amount: data.amount,

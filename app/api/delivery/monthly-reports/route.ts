@@ -121,7 +121,34 @@ export async function POST(request: NextRequest) {
       return report;
     });
 
-    return NextResponse.json({ success: true, data: report }, { status: 201 });
+    const journalEntry = await createDeliveryPaymentJE({
+      companyId: data.companyId,
+      userId: session.id,
+      platform: report.contract.platform ?? "غير محدد",
+      month: data.month,
+      year: data.year,
+      grossAmount: totalGross,
+      walletDeducted: totalWallet,
+      netReceived: netPayment,
+      refId: report.id,
+      descriptionAr: `تحصيل منصة ${report.contract.platform} لشهر ${data.month}/${data.year}`,
+    });
+
+    const updatedReport = await prisma.deliveryMonthlyReport.update({
+      where: { id: report.id },
+      data: {
+        journalEntryId: journalEntry.id,
+        status: "POSTED",
+      },
+      include: {
+        contract: { select: { platform: true, nameAr: true } },
+        lines: {
+          include: { driver: { include: { employee: { select: { nameAr: true } } } } },
+        },
+      },
+    });
+
+    return NextResponse.json({ success: true, data: updatedReport }, { status: 201 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "فشل في إنشاء التقرير";
     return NextResponse.json({ success: false, error: msg }, { status: 400 });

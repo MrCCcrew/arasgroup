@@ -1,33 +1,7 @@
-import { prisma } from "@/lib/db";
-import { createJournalEntry, getCurrentFiscalYear } from "./journal-engine";
 import type { JournalEntry } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { createJournalEntry, getCurrentFiscalYear, postJournalEntry } from "./journal-engine";
 
-/**
- * Auto journal entry generators.
- * Each function creates a specific journal entry for a business event.
- * All entries follow Kuwait double-entry accounting standards.
- */
-
-interface AccountCodes {
-  // Assets
-  bank: string;
-  cash: string;
-  knetReceivable: string;
-  driverWalletReceivable: string;
-  // Revenues
-  deliveryRevenue: string;
-  carWashRevenue: string;
-  investorServiceRevenue: string;
-  // Expenses
-  knetCommission: string;
-  salaryExpense: string;
-  // Liabilities
-  employeeSalariesPayable: string;
-  licenseFeePayable: string;
-  residencyFeePayable: string;
-}
-
-/** Get account ID by code for a company */
 async function getAccountId(companyId: string, code: string): Promise<string> {
   const account = await prisma.chartOfAccount.findUnique({
     where: { companyId_code: { companyId, code } },
@@ -38,15 +12,11 @@ async function getAccountId(companyId: string, code: string): Promise<string> {
   return account.id;
 }
 
-// ─── DELIVERY MODULE ────────────────────────────────────────
+async function createAndPostEntry(args: Parameters<typeof createJournalEntry>[0]): Promise<JournalEntry> {
+  const entry = await createJournalEntry(args);
+  return postJournalEntry(entry.id, args.createdById);
+}
 
-/**
- * JE for receiving monthly payment from Talabat/RoPops
- *
- * DR  Bank Account              [netReceived]
- * DR  Driver Wallet Receivable  [walletDeducted]  ← company is owed from drivers
- * CR  Delivery Revenue          [grossAmount]
- */
 export async function createDeliveryPaymentJE(params: {
   companyId: string;
   userId: string;
@@ -56,27 +26,35 @@ export async function createDeliveryPaymentJE(params: {
   grossAmount: number;
   walletDeducted: number;
   netReceived: number;
-  bankAccountId: string;
+  bankAccountId?: string;
   refId: string;
   descriptionAr: string;
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
-  const [bankAcctId, walletReceivableId, deliveryRevenueId] = await Promise.all([
-    getAccountId(params.companyId, "1010"),  // Bank
-    getAccountId(params.companyId, "1030"),  // Driver Wallet Receivable
-    getAccountId(params.companyId, "4010"),  // Delivery Revenue
+  const bankAccount = params.bankAccountId
+    ? await prisma.bankAccount.findFirst({
+        where: { id: params.bankAccountId, companyId: params.companyId, isActive: true },
+        include: { chartAccount: true },
+      })
+    : null;
+
+  const [walletReceivableId, deliveryRevenueId] = await Promise.all([
+    getAccountId(params.companyId, "1030"),
+    getAccountId(params.companyId, "4010"),
   ]);
 
+  const bankAccountId = bankAccount?.chartAccountId ?? (await getAccountId(params.companyId, "1010"));
+
   const lines = [
-    { accountId: bankAcctId, debit: params.netReceived, credit: 0, descriptionAr: "صافي الدفعة المستلمة" },
+    { accountId: bankAccountId, debit: params.netReceived, credit: 0, descriptionAr: "صافي الدفعة المستلمة" },
     ...(params.walletDeducted > 0
       ? [{ accountId: walletReceivableId, debit: params.walletDeducted, credit: 0, descriptionAr: "محفظة سائقين مخصومة من الدفعة" }]
       : []),
     { accountId: deliveryRevenueId, debit: 0, credit: params.grossAmount, descriptionAr: "إيراد توصيل" },
   ];
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -90,12 +68,6 @@ export async function createDeliveryPaymentJE(params: {
   });
 }
 
-/**
- * JE for driver wallet deposit (driver pays company to settle wallet)
- *
- * DR  Cash / Bank               [amount]
- * CR  Driver Wallet Receivable  [amount]  ← reduces what driver owes
- */
 export async function createDriverWalletDepositJE(params: {
   companyId: string;
   userId: string;
@@ -106,14 +78,14 @@ export async function createDriverWalletDepositJE(params: {
   descriptionAr: string;
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
+  const cashOrBankCode = params.isBankDeposit ? "1010" : "1000";
 
-  const cashOrBankCode = params.isBankDeposit ? "1010" : "1000"; // Bank or Cash
   const [cashBankId, walletReceivableId] = await Promise.all([
     getAccountId(params.companyId, cashOrBankCode),
     getAccountId(params.companyId, "1030"),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -130,15 +102,6 @@ export async function createDriverWalletDepositJE(params: {
   });
 }
 
-// ─── CAR WASH MODULE ─────────────────────────────────────────
-
-/**
- * JE for car wash daily operations
- *
- * DR  Cash              [cashAmount]
- * DR  KNET Receivable   [knetAmount]
- * CR  Car Wash Revenue  [totalRevenue]
- */
 export async function createCarWashDailyJE(params: {
   companyId: string;
   userId: string;
@@ -153,9 +116,9 @@ export async function createCarWashDailyJE(params: {
   const totalRevenue = params.cashAmount + params.knetAmount;
 
   const [cashId, knetReceivableId, revenueId] = await Promise.all([
-    getAccountId(params.companyId, "1000"),  // Cash
-    getAccountId(params.companyId, "1020"),  // KNET Receivable
-    getAccountId(params.companyId, "4020"),  // Car Wash Revenue
+    getAccountId(params.companyId, "1000"),
+    getAccountId(params.companyId, "1020"),
+    getAccountId(params.companyId, "4020"),
   ]);
 
   const lines = [];
@@ -167,11 +130,11 @@ export async function createCarWashDailyJE(params: {
   }
   lines.push({ accountId: revenueId, debit: 0, credit: totalRevenue, carWashVehicleId: params.vehicleId, costCenterId: params.costCenterId });
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: params.date,
-    descriptionAr: `إيراد غسيل سيارات يومي`,
+    descriptionAr: "إيراد غسيل سيارات يومي",
     type: "CAR_WASH_REVENUE",
     refModule: "car_wash",
     refId: params.refId,
@@ -182,13 +145,6 @@ export async function createCarWashDailyJE(params: {
   });
 }
 
-/**
- * JE for KNET settlement (next-day bank deposit minus commission)
- *
- * DR  Bank Account          [netAmount]
- * DR  KNET Commission       [commission]
- * CR  KNET Receivable       [grossAmount]
- */
 export async function createKnetSettlementJE(params: {
   companyId: string;
   userId: string;
@@ -201,16 +157,16 @@ export async function createKnetSettlementJE(params: {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
   const [bankId, commissionId, knetReceivableId] = await Promise.all([
-    getAccountId(params.companyId, "1010"),  // Bank
-    getAccountId(params.companyId, "5040"),  // KNET Commission Expense
-    getAccountId(params.companyId, "1020"),  // KNET Receivable
+    getAccountId(params.companyId, "1010"),
+    getAccountId(params.companyId, "5040"),
+    getAccountId(params.companyId, "1020"),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: params.date,
-    descriptionAr: `تسوية مدفوعات KNET`,
+    descriptionAr: "تسوية مدفوعات KNET",
     type: "KNET_SETTLEMENT",
     refModule: "car_wash",
     refId: params.refId,
@@ -224,15 +180,6 @@ export async function createKnetSettlementJE(params: {
   });
 }
 
-// ─── INVESTORS MODULE ────────────────────────────────────────
-
-/**
- * JE for investor fee collection (license, residency, rent, etc.)
- *
- * DR  Cash / Bank           [collectedAmount]
- * CR  Fee Payable           [actualAmount]
- * CR  Group Service Revenue [groupIncome / margin]
- */
 export async function createInvestorClaimCollectionJE(params: {
   companyId: string;
   userId: string;
@@ -246,16 +193,19 @@ export async function createInvestorClaimCollectionJE(params: {
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
-  // Pick payable account based on claim type
-  const payableCode = params.claimType === "LICENSE_RENEWAL" ? "2020"
-    : params.claimType === "RESIDENCY_RENEWAL" ? "2021"
-    : params.claimType === "RENT" ? "2022"
-    : "2029"; // Other payable
+  const payableCode =
+    params.claimType === "LICENSE_RENEWAL"
+      ? "2020"
+      : params.claimType === "RESIDENCY_RENEWAL"
+      ? "2021"
+      : params.claimType === "RENT"
+      ? "2022"
+      : "2029";
 
   const [cashId, payableId, serviceRevenueId] = await Promise.all([
-    getAccountId(params.companyId, "1000"),  // Cash
+    getAccountId(params.companyId, "1000"),
     getAccountId(params.companyId, payableCode),
-    getAccountId(params.companyId, "4030"),  // Group Service Revenue
+    getAccountId(params.companyId, "4030"),
   ]);
 
   const lines: { accountId: string; debit: number; credit: number; investorId?: string; descriptionAr?: string }[] = [
@@ -270,7 +220,7 @@ export async function createInvestorClaimCollectionJE(params: {
     lines.push({ accountId: serviceRevenueId, debit: 0, credit: params.groupIncome, descriptionAr: "هامش ربح المجموعة" });
   }
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -284,12 +234,6 @@ export async function createInvestorClaimCollectionJE(params: {
   });
 }
 
-/**
- * JE for investor salary collection (LIABILITY — not revenue)
- *
- * DR  Bank Account              [collectedAmount]
- * CR  Employee Salaries Payable [collectedAmount]
- */
 export async function createInvestorSalaryCollectionJE(params: {
   companyId: string;
   userId: string;
@@ -301,11 +245,11 @@ export async function createInvestorSalaryCollectionJE(params: {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
   const [bankId, salariesPayableId] = await Promise.all([
-    getAccountId(params.companyId, "1010"),  // Bank
-    getAccountId(params.companyId, "2010"),  // Employee Salaries Payable
+    getAccountId(params.companyId, "1010"),
+    getAccountId(params.companyId, "2010"),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -322,12 +266,6 @@ export async function createInvestorSalaryCollectionJE(params: {
   });
 }
 
-/**
- * JE for disbursing salaries funded by investor
- *
- * DR  Employee Salaries Payable [amount]
- * CR  Bank Account              [amount]
- */
 export async function createInvestorSalaryDisbursementJE(params: {
   companyId: string;
   userId: string;
@@ -342,7 +280,7 @@ export async function createInvestorSalaryDisbursementJE(params: {
     getAccountId(params.companyId, "2010"),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -359,14 +297,6 @@ export async function createInvestorSalaryDisbursementJE(params: {
   });
 }
 
-// ─── HR / SALARIES ───────────────────────────────────────────
-
-/**
- * JE for company salary payment (own employees)
- *
- * DR  Salary Expense  [amount]
- * CR  Bank Account    [amount]
- */
 export async function createSalaryPaymentJE(params: {
   companyId: string;
   userId: string;
@@ -379,10 +309,10 @@ export async function createSalaryPaymentJE(params: {
 
   const [bankId, salaryExpenseId] = await Promise.all([
     getAccountId(params.companyId, "1010"),
-    getAccountId(params.companyId, "5010"),  // Salary Expense
+    getAccountId(params.companyId, "5010"),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -399,14 +329,6 @@ export async function createSalaryPaymentJE(params: {
   });
 }
 
-// ─── EXPENSES ────────────────────────────────────────────────
-
-/**
- * JE for general expense
- *
- * DR  Expense Account  [amount]
- * CR  Cash / Bank      [amount]
- */
 export async function createExpenseJE(params: {
   companyId: string;
   userId: string;
@@ -425,7 +347,7 @@ export async function createExpenseJE(params: {
     getAccountId(params.companyId, params.expenseAccountCode),
   ]);
 
-  return createJournalEntry({
+  return createAndPostEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),

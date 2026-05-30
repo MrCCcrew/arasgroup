@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
-import { createJournalEntry } from "@/lib/accounting/journal-engine";
 import { z } from "zod";
-import type { JournalStatus, JournalEntryType } from "@prisma/client";
+import type { JournalEntryType, JournalStatus } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
+import { createJournalEntry } from "@/lib/accounting/journal-engine";
 
 const lineSchema = z.object({
   accountId: z.string(),
@@ -24,11 +24,22 @@ const createJESchema = z.object({
   descriptionAr: z.string().min(3, "الوصف مطلوب"),
   descriptionEn: z.string().optional(),
   type: z.enum([
-    "GENERAL", "RECEIPT", "PAYMENT", "TRANSFER", "SALARY",
-    "OPENING_BALANCE", "DEPRECIATION", "ADJUSTMENT",
-    "DELIVERY_INCOME", "DELIVERY_WALLET", "CAR_WASH_REVENUE",
-    "KNET_SETTLEMENT", "INVESTOR_COLLECTION",
-    "INVESTOR_SALARY_COLLECTION", "INVESTOR_SALARY_DISBURSEMENT", "EXPENSE",
+    "GENERAL",
+    "RECEIPT",
+    "PAYMENT",
+    "TRANSFER",
+    "SALARY",
+    "OPENING_BALANCE",
+    "DEPRECIATION",
+    "ADJUSTMENT",
+    "DELIVERY_INCOME",
+    "DELIVERY_WALLET",
+    "CAR_WASH_REVENUE",
+    "KNET_SETTLEMENT",
+    "INVESTOR_COLLECTION",
+    "INVESTOR_SALARY_COLLECTION",
+    "INVESTOR_SALARY_DISBURSEMENT",
+    "EXPENSE",
   ]),
   reference: z.string().optional(),
   costCenterId: z.string().optional(),
@@ -36,18 +47,27 @@ const createJESchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
     const fiscalYearId = searchParams.get("fiscalYearId");
     const status = searchParams.get("status");
     const type = searchParams.get("type");
-    const page = parseInt(searchParams.get("page") ?? "1");
-    const pageSize = parseInt(searchParams.get("pageSize") ?? "20");
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10);
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
     }
+
+    const companyAccessError = assertCompanyAccess(session, companyId);
+    if (companyAccessError) return companyAccessError;
+
+    const permissionError = assertPermission(session, "ACCOUNTING", "VIEW", { companyId });
+    if (permissionError) return permissionError;
 
     const where = {
       companyId,
@@ -62,9 +82,7 @@ export async function GET(request: NextRequest) {
       prisma.journalEntry.findMany({
         where,
         include: {
-          lines: {
-            include: { account: { select: { code: true, nameAr: true } } },
-          },
+          lines: { include: { account: { select: { code: true, nameAr: true } } } },
           createdBy: { select: { nameAr: true } },
           costCenter: { select: { code: true, nameAr: true } },
         },
@@ -93,23 +111,29 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
+
   try {
-    const userId = session.id;
-    const body = await request.json();
-    const parsed = createJESchema.safeParse(body);
+    const parsed = createJESchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    const companyAccessError = assertCompanyAccess(session, parsed.data.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    const permissionError = assertPermission(session, "ACCOUNTING", "CREATE", {
+      companyId: parsed.data.companyId,
+    });
+    if (permissionError) return permissionError;
+
     const entry = await createJournalEntry({
       ...parsed.data,
-      createdById: userId,
+      createdById: session.id,
     });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
-        userId,
+        userId: session.id,
         action: "CREATE",
         module: "accounting",
         resourceId: entry.id,
@@ -122,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: entry }, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "فشل في إنشاء القيد";
-    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    const message = error instanceof Error ? error.message : "فشل في إنشاء القيد";
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }
