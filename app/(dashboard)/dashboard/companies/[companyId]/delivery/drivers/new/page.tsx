@@ -35,6 +35,7 @@ export default function NewDriverPage() {
     baseSalary: "",
     joinDate: new Date().toISOString().split("T")[0],
     targetOrders: "370",
+    isOfficeStaff: false,
     talabatId: "",
     roPopsId: "",
     isRegisteredTalabat: false,
@@ -84,6 +85,7 @@ export default function NewDriverPage() {
           baseSalary: form.baseSalary ? Number.parseFloat(form.baseSalary) : undefined,
           joinDate: form.joinDate || undefined,
           targetOrders: form.targetOrders ? Number.parseInt(form.targetOrders, 10) : undefined,
+          employeeType: form.isOfficeStaff ? "DELIVERY_ADMIN" : "DELIVERY_DRIVER",
           talabatId: form.talabatId || undefined,
           roPopsId: form.roPopsId || undefined,
           isRegisteredTalabat: form.isRegisteredTalabat,
@@ -199,11 +201,27 @@ export default function NewDriverPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Orders target" : "تارجيت الطلبات"}</label>
-                <input type="number" min="0" step="1" value={form.targetOrders} onChange={(event) => setField("targetOrders", event.target.value)} className="input-field w-full" dir="ltr" placeholder="370" />
+                <input type="number" min="0" step="1" value={form.targetOrders} onChange={(event) => setField("targetOrders", event.target.value)} className="input-field w-full" dir="ltr" placeholder="370" disabled={form.isOfficeStaff} />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {locale === "en" ? "Monthly orders target used to compute incentive/deduction." : "تارجيت الطلبات الشهري المستخدم لحساب الحافز/الخصم في الرواتب."}
                 </p>
               </div>
+              <label className="col-span-2 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
+                <input
+                  type="checkbox"
+                  checked={form.isOfficeStaff}
+                  onChange={(event) => setField("isOfficeStaff", event.target.checked)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{locale === "en" ? "Works in administration (office staff)" : "يعمل في الإدارة (موظف مكتب)"}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {locale === "en"
+                      ? "Registered as a driver but works in admin — appears in salaries under \"other employees\" with no delivery target."
+                      : "مسجّل كسائق لكنه يعمل إدارياً — يظهر في الرواتب ضمن «الموظفين الآخرين» بدون حساب تارجيت التوصيل."}
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
 

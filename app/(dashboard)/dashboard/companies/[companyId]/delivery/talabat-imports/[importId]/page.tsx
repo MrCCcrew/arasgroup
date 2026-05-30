@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, AlertTriangle, Users, Send, Ban, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, CheckCircle, AlertTriangle, Users, Send, Ban, Plus, Trash2, Wand2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 
 interface DriverOption { id: string; employee: { nameAr: string; nameEn: string | null } }
@@ -85,6 +85,8 @@ export default function TalabatImportDetailPage() {
   const [postError, setPostError] = useState("");
   const [postConfirm, setPostConfirm] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [allocAllLoading, setAllocAllLoading] = useState(false);
+  const [allocAllMsg, setAllocAllMsg] = useState("");
 
   // Allocation modal state
   const [allocRider, setAllocRider] = useState<Rider | null>(null);
@@ -184,12 +186,27 @@ export default function TalabatImportDetailPage() {
     load();
   }
 
+  async function allocateAll() {
+    setAllocAllLoading(true); setAllocAllMsg("");
+    const res = await fetch(`/api/delivery/talabat-imports/${importId}/allocate-all`, { method: "POST" });
+    const data = await res.json();
+    setAllocAllLoading(false);
+    if (!data.success) { setAllocAllMsg(data.error ?? "فشل التوزيع التلقائي"); return; }
+    const parts: string[] = [];
+    if (data.allocated > 0) parts.push(`تم توزيع ${data.allocated} سائق مطابق تلقائياً`);
+    if (data.skipped > 0) parts.push(`${data.skipped} سائق يحتاج توزيعاً يدوياً (كود مشترك/غير مطابق)`);
+    setAllocAllMsg(data.message ?? parts.join(" — "));
+    await load();
+  }
+
   if (loading || !imp) {
     return <div className="page-container py-16 text-center text-sm text-muted-foreground">جاري التحميل...</div>;
   }
 
   const unresolved = imp.riders.filter(r => r.matchingStatus === "UNMATCHED" || r.matchingStatus === "SHARED_ID_NEEDS_ALLOCATION");
-  const canPost = imp.status !== "POSTED" && imp.status !== "CANCELLED" && unresolved.length === 0;
+  const isEditable = imp.status !== "POSTED" && imp.status !== "CANCELLED";
+  const autoAllocatable = imp.riders.filter(r => r.matchingStatus === "MATCHED" && r.matchedDriverId && r.allocations.length === 0);
+  const canPost = isEditable && unresolved.length === 0;
   const totalDataPayment = Number(imp.totalPayment);
   const totalSummaryPayment = imp.contractSummaryFinalPayment ? Number(imp.contractSummaryFinalPayment) : null;
   const paymentDiff = totalSummaryPayment !== null ? totalDataPayment - totalSummaryPayment : null;
@@ -202,12 +219,22 @@ export default function TalabatImportDetailPage() {
         companyId={companyId}
         actions={
           <div className="flex items-center gap-2">
-            {imp.status !== "POSTED" && imp.status !== "CANCELLED" && (
+            {isEditable && (
               <button
                 onClick={() => setCancelConfirm(true)}
                 className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
               >
                 <Ban size={14} />إلغاء
+              </button>
+            )}
+            {isEditable && autoAllocatable.length > 0 && (
+              <button
+                onClick={allocateAll}
+                disabled={allocAllLoading}
+                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Wand2 size={14} />
+                {allocAllLoading ? "جاري التوزيع..." : `توزيع الكل تلقائياً (${autoAllocatable.length})`}
               </button>
             )}
             {canPost && (
@@ -234,6 +261,12 @@ export default function TalabatImportDetailPage() {
 
         {postError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{postError}</div>
+        )}
+
+        {allocAllMsg && (
+          <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
+            <CheckCircle size={16} />{allocAllMsg}
+          </div>
         )}
 
         {/* Stats */}

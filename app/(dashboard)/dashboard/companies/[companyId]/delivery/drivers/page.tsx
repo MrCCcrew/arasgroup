@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Search } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -9,7 +9,7 @@ import { daysUntilExpiry, formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ platform?: string; search?: string }>;
+  searchParams: Promise<{ platform?: string; search?: string; view?: string }>;
 }
 
 export default async function DriversPage({ params, searchParams }: Props) {
@@ -19,15 +19,24 @@ export default async function DriversPage({ params, searchParams }: Props) {
   const { companyId } = await params;
   const sp = await searchParams;
   const locale = await getLocale();
-  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const en = locale === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const search = sp.search?.trim() ?? "";
+  const view = sp.view ?? "active"; // active (افتراضي) | inactive | all
+
+  // فلتر الحالة: افتراضياً النشطون فقط؛ "غير النشطين" يعرض المعطّلين؛ "الكل" يعرض الجميع
+  const activeFilter =
+    view === "inactive" ? { isActive: false } : view === "all" ? {} : { isActive: true };
 
   const drivers = await prisma.driver.findMany({
     where: {
       employee: {
         companyId,
-        isActive: true,
         isDeleted: false,
-        ...(sp.search ? { nameAr: { contains: sp.search } } : {}),
+        ...activeFilter,
+        ...(search
+          ? { OR: [{ nameAr: { contains: search } }, { nameEn: { contains: search } }, { phone: { contains: search } }, { civilId: { contains: search } }] }
+          : {}),
       },
       ...(sp.platform === "TALABAT" ? { isRegisteredTalabat: true } : {}),
       ...(sp.platform === "RO_POPS" ? { isRegisteredRoPops: true } : {}),
@@ -38,6 +47,7 @@ export default async function DriversPage({ params, searchParams }: Props) {
           nameAr: true,
           nameEn: true,
           phone: true,
+          isActive: true,
           residencyExpiry: true,
           nationality: true,
           baseSalary: true,
@@ -47,6 +57,19 @@ export default async function DriversPage({ params, searchParams }: Props) {
     },
     orderBy: { employee: { nameAr: "asc" } },
   });
+
+  // بناء رابط مع الحفاظ على باقي عناصر الفلترة
+  const buildHref = (overrides: { platform?: string; view?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    const platform = overrides.platform ?? sp.platform ?? "";
+    const v = overrides.view ?? view;
+    const s = overrides.search ?? search;
+    if (platform) q.set("platform", platform);
+    if (v && v !== "active") q.set("view", v);
+    if (s) q.set("search", s);
+    const qs = q.toString();
+    return `/dashboard/companies/${companyId}/delivery/drivers${qs ? `?${qs}` : ""}`;
+  };
 
   return (
     <div>
@@ -66,15 +89,40 @@ export default async function DriversPage({ params, searchParams }: Props) {
       />
 
       <div className="page-container space-y-4">
-        <div className="flex gap-3">
+        {/* بحث بالاسم/الجوال/الرقم المدني */}
+        <form method="GET" className="flex flex-wrap items-center gap-2">
+          {sp.platform && <input type="hidden" name="platform" value={sp.platform} />}
+          {view !== "active" && <input type="hidden" name="view" value={view} />}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={15} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground ltr:left-3 rtl:right-3" />
+            <input
+              type="text"
+              name="search"
+              defaultValue={search}
+              placeholder={en ? "Search by name, phone, civil ID..." : "ابحث بالاسم أو الجوال أو الرقم المدني..."}
+              className="input-field w-full ltr:pl-9 rtl:pr-9"
+            />
+          </div>
+          <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            {en ? "Search" : "بحث"}
+          </button>
+          {search && (
+            <Link href={buildHref({ search: "" })} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+              {en ? "Clear" : "مسح"}
+            </Link>
+          )}
+        </form>
+
+        {/* فلاتر المنصّة */}
+        <div className="flex flex-wrap gap-3">
           {[
-            { value: "", label: locale === "en" ? `All (${drivers.length})` : `الكل (${drivers.length})` },
-            { value: "TALABAT", label: locale === "en" ? "Talabat" : "طلبات" },
+            { value: "", label: en ? `All (${drivers.length})` : `الكل (${drivers.length})` },
+            { value: "TALABAT", label: en ? "Talabat" : "طلبات" },
             { value: "RO_POPS", label: "Ro Pops" },
           ].map((filterItem) => (
             <Link
               key={filterItem.value}
-              href={`/dashboard/companies/${companyId}/delivery/drivers${filterItem.value ? `?platform=${filterItem.value}` : ""}`}
+              href={buildHref({ platform: filterItem.value })}
               className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
                 (sp.platform ?? "") === filterItem.value
                   ? "border-primary bg-primary text-primary-foreground"
@@ -86,6 +134,27 @@ export default async function DriversPage({ params, searchParams }: Props) {
           ))}
         </div>
 
+        {/* فلاتر الحالة (نشط / غير نشط / الكل) */}
+        <div className="flex flex-wrap gap-3">
+          {[
+            { value: "active", label: en ? "Active" : "النشطون" },
+            { value: "inactive", label: en ? "Inactive" : "غير النشطين" },
+            { value: "all", label: en ? "All statuses" : "كل الحالات" },
+          ].map((item) => (
+            <Link
+              key={item.value}
+              href={buildHref({ view: item.value })}
+              className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                view === item.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {drivers.map((driver) => {
             const days = daysUntilExpiry(driver.employee.residencyExpiry);
@@ -93,15 +162,22 @@ export default async function DriversPage({ params, searchParams }: Props) {
             const isExpiringSoon = days !== null && days <= 60;
             const driverName = locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr;
 
+            const isInactive = !driver.employee.isActive;
+
             return (
               <Link key={driver.id} href={`/dashboard/companies/${companyId}/delivery/drivers/${driver.id}`} className="group block">
-                <div className={`rounded-xl border bg-card p-4 transition-all hover:shadow-md ${isExpiringSoon ? "border-yellow-300" : ""}`}>
+                <div className={`rounded-xl border bg-card p-4 transition-all hover:shadow-md ${isInactive ? "border-dashed opacity-70" : isExpiringSoon ? "border-yellow-300" : ""}`}>
                   <div className="mb-3 flex items-start justify-between">
                     <div>
                       <h3 className="font-bold text-foreground">{driverName}</h3>
                       <p className="text-xs text-muted-foreground">{driver.employee.nationality}</p>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col items-end gap-1">
+                      {isInactive && (
+                        <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                          {en ? "Inactive" : "غير نشط"}
+                        </span>
+                      )}
                       {driver.isRegisteredTalabat && (
                         <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
                           {locale === "en" ? "Talabat" : "طلبات"}
