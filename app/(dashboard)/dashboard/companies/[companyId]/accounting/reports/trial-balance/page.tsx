@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getTrialBalance } from "@/lib/accounting/journal-engine";
-import { formatKWD } from "@/lib/utils";
-import { Download, FileDown } from "lucide-react";
+import { getLocale } from "@/lib/i18n";
+import { FileDown } from "lucide-react";
 import Link from "next/link";
 import { PrintButton } from "@/components/ui/print-button";
 
@@ -18,6 +18,25 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
   const sp = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const en = (await getLocale()) === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const t = {
+    title: en ? "Trial Balance" : "ميزان المراجعة",
+    forYear: en ? "For fiscal year" : "للسنة المالية",
+    to: en ? "to" : "إلى",
+    noFiscalYear: en ? "No fiscal year set. Please create a fiscal year first." : "لا توجد سنة مالية محددة. يرجى إنشاء سنة مالية أولاً.",
+    accountCode: en ? "Account code" : "كود الحساب",
+    accountName: en ? "Account name" : "اسم الحساب",
+    opening: en ? "Opening balances" : "الأرصدة الافتتاحية",
+    period: en ? "Period movement" : "حركة الفترة",
+    closing: en ? "Closing balances" : "الأرصدة الختامية",
+    debit: en ? "Debit" : "مدين",
+    credit: en ? "Credit" : "دائن",
+    total: en ? "Total" : "الإجمالي",
+    balanced: en ? "✓ The trial balance is balanced" : "✓ الميزان متوازن",
+    diff: (d: string) => (en ? `✗ Balance difference: ${d}` : `✗ فرق الميزان: ${d}`),
+  };
 
   // Get current fiscal year
   const fiscalYear = sp.fiscalYearId
@@ -43,7 +62,7 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
   return (
     <div>
       <Header
-        title="ميزان المراجعة"
+        title={t.title}
         subtitle={`${company?.nameAr} — ${fiscalYear?.year ?? "—"}`}
         companyId={companyId}
         actions={
@@ -66,16 +85,16 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
         {/* Report Header */}
         <div className="section-card text-center space-y-1">
           <h2 className="text-xl font-bold">{company?.nameAr}</h2>
-          <p className="text-muted-foreground">ميزان المراجعة</p>
-          <p className="text-sm">للسنة المالية {fiscalYear?.year}</p>
+          <p className="text-muted-foreground">{t.title}</p>
+          <p className="text-sm">{t.forYear} {fiscalYear?.year}</p>
           <p className="text-xs text-muted-foreground">
-            {fiscalYear?.startDate?.toLocaleDateString("ar-KW")} إلى {fiscalYear?.endDate?.toLocaleDateString("ar-KW")}
+            {fiscalYear?.startDate?.toLocaleDateString(numberLocale)} {t.to} {fiscalYear?.endDate?.toLocaleDateString(numberLocale)}
           </p>
         </div>
 
         {!fiscalYear ? (
           <div className="text-center py-12 text-muted-foreground">
-            لا توجد سنة مالية محددة. يرجى إنشاء سنة مالية أولاً.
+            {t.noFiscalYear}
           </div>
         ) : (
           <div className="bg-card border rounded-xl overflow-hidden">
@@ -83,21 +102,21 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
               <table className="ar-table text-xs">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="w-24">كود الحساب</th>
-                    <th>اسم الحساب</th>
-                    <th className="text-center" colSpan={2}>الأرصدة الافتتاحية</th>
-                    <th className="text-center" colSpan={2}>حركة الفترة</th>
-                    <th className="text-center" colSpan={2}>الأرصدة الختامية</th>
+                    <th className="w-24">{t.accountCode}</th>
+                    <th>{t.accountName}</th>
+                    <th className="text-center" colSpan={2}>{t.opening}</th>
+                    <th className="text-center" colSpan={2}>{t.period}</th>
+                    <th className="text-center" colSpan={2}>{t.closing}</th>
                   </tr>
                   <tr className="bg-muted/30 text-muted-foreground">
                     <th></th>
                     <th></th>
-                    <th>مدين</th>
-                    <th>دائن</th>
-                    <th>مدين</th>
-                    <th>دائن</th>
-                    <th>مدين</th>
-                    <th>دائن</th>
+                    <th>{t.debit}</th>
+                    <th>{t.credit}</th>
+                    <th>{t.debit}</th>
+                    <th>{t.credit}</th>
+                    <th>{t.debit}</th>
+                    <th>{t.credit}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -121,7 +140,7 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
                 </tbody>
                 <tfoot className="border-t-2 border-border font-bold bg-muted/30">
                   <tr>
-                    <td colSpan={2} className="text-center py-2">الإجمالي</td>
+                    <td colSpan={2} className="text-center py-2">{t.total}</td>
                     <td className="number text-left">{totalOpeningDebit.toFixed(3)}</td>
                     <td className="number text-left">{totalOpeningCredit.toFixed(3)}</td>
                     <td className="number text-left text-blue-600">{totalPeriodDebit.toFixed(3)}</td>
@@ -133,8 +152,8 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
                   <tr className={`text-xs ${Math.abs(totalClosingDebit - totalClosingCredit) < 0.001 ? "text-green-600" : "text-red-600"}`}>
                     <td colSpan={8} className="text-center py-1">
                       {Math.abs(totalClosingDebit - totalClosingCredit) < 0.001
-                        ? "✓ الميزان متوازن"
-                        : `✗ فرق الميزان: ${Math.abs(totalClosingDebit - totalClosingCredit).toFixed(3)}`}
+                        ? t.balanced
+                        : t.diff(Math.abs(totalClosingDebit - totalClosingCredit).toFixed(3))}
                     </td>
                   </tr>
                 </tfoot>

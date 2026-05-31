@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getIncomeStatement } from "@/lib/accounting/reports";
+import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
 import { TrendingUp, TrendingDown, FileDown } from "lucide-react";
 import Link from "next/link";
@@ -43,10 +44,34 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
 
   const isProfit = (report?.netIncome ?? 0) >= 0;
 
+  const en = (await getLocale()) === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const t = {
+    title: en ? "Income Statement" : "قائمة الدخل",
+    fiscalYear: en ? "Fiscal year" : "السنة المالية",
+    current: en ? "(current)" : "(الحالية)",
+    from: en ? "From date" : "من تاريخ",
+    to: en ? "To date" : "إلى تاريخ",
+    show: en ? "Show" : "عرض",
+    noFiscalYear: en ? "No fiscal year. Please create a fiscal year first." : "لا توجد سنة مالية. يرجى إنشاء سنة مالية أولاً.",
+    totalRevenue: en ? "Total revenue" : "إجمالي الإيرادات",
+    totalExpenses: en ? "Total expenses" : "إجمالي المصروفات",
+    netProfit: en ? "Net profit" : "صافي الربح",
+    netLoss: en ? "Net loss" : "صافي الخسارة",
+    reportName: en ? "Income Statement (Profit & Loss)" : "قائمة الدخل (الأرباح والخسائر)",
+    forYear: en ? "For fiscal year" : "للسنة المالية",
+    toWord: en ? "to" : "إلى",
+    revenues: en ? "Revenues" : "الإيرادات",
+    expenses: en ? "Expenses" : "المصروفات",
+    noRevenues: en ? "No revenues" : "لا توجد إيرادات",
+    noExpenses: en ? "No expenses" : "لا توجد مصروفات",
+    kwd: en ? "KWD" : "د.ك",
+  };
+
   return (
     <div>
       <Header
-        title="قائمة الدخل"
+        title={t.title}
         subtitle={`${company?.nameAr} — ${fiscalYear?.year ?? "—"}`}
         companyId={companyId}
         actions={
@@ -77,7 +102,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
         <form method="get" className="section-card">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="block text-sm font-medium mb-1.5">السنة المالية</label>
+              <label className="block text-sm font-medium mb-1.5">{t.fiscalYear}</label>
               <select
                 name="fiscalYearId"
                 defaultValue={fiscalYear?.id ?? ""}
@@ -85,13 +110,13 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
               >
                 {allFiscalYears.map((fy) => (
                   <option key={fy.id} value={fy.id}>
-                    {fy.year} {fy.isCurrent ? "(الحالية)" : ""}
+                    {fy.year} {fy.isCurrent ? t.current : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">من تاريخ</label>
+              <label className="block text-sm font-medium mb-1.5">{t.from}</label>
               <input
                 type="date"
                 name="startDate"
@@ -100,7 +125,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">إلى تاريخ</label>
+              <label className="block text-sm font-medium mb-1.5">{t.to}</label>
               <input
                 type="date"
                 name="endDate"
@@ -112,14 +137,14 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
               type="submit"
               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm hover:bg-primary/90 transition-colors"
             >
-              عرض
+              {t.show}
             </button>
           </div>
         </form>
 
         {!fiscalYear ? (
           <div className="text-center py-12 text-muted-foreground">
-            لا توجد سنة مالية. يرجى إنشاء سنة مالية أولاً.
+            {t.noFiscalYear}
           </div>
         ) : !report ? null : (
           <>
@@ -128,28 +153,28 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
               <div className="stat-card">
                 <div className="flex items-center gap-2 text-green-600">
                   <TrendingUp size={18} />
-                  <span className="text-sm font-medium">إجمالي الإيرادات</span>
+                  <span className="text-sm font-medium">{t.totalRevenue}</span>
                 </div>
                 <div className="text-2xl font-bold text-green-600 number">
-                  {formatKWD(report.totalRevenue)}
+                  {formatKWD(report.totalRevenue, numberLocale)}
                 </div>
               </div>
               <div className="stat-card">
                 <div className="flex items-center gap-2 text-red-600">
                   <TrendingDown size={18} />
-                  <span className="text-sm font-medium">إجمالي المصروفات</span>
+                  <span className="text-sm font-medium">{t.totalExpenses}</span>
                 </div>
                 <div className="text-2xl font-bold text-red-600 number">
-                  {formatKWD(report.totalExpenses)}
+                  {formatKWD(report.totalExpenses, numberLocale)}
                 </div>
               </div>
               <div className="stat-card">
                 <div className={`flex items-center gap-2 ${isProfit ? "text-emerald-600" : "text-red-600"}`}>
                   {isProfit ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-                  <span className="text-sm font-medium">{isProfit ? "صافي الربح" : "صافي الخسارة"}</span>
+                  <span className="text-sm font-medium">{isProfit ? t.netProfit : t.netLoss}</span>
                 </div>
                 <div className={`text-2xl font-bold number ${isProfit ? "text-emerald-600" : "text-red-600"}`}>
-                  {formatKWD(Math.abs(report.netIncome))}
+                  {formatKWD(Math.abs(report.netIncome), numberLocale)}
                 </div>
               </div>
             </div>
@@ -157,11 +182,11 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
             {/* Report Header */}
             <div className="section-card text-center space-y-1">
               <h2 className="text-xl font-bold">{company?.nameAr}</h2>
-              <p className="text-muted-foreground font-medium">قائمة الدخل (الأرباح والخسائر)</p>
-              <p className="text-sm">للسنة المالية {fiscalYear.year}</p>
+              <p className="text-muted-foreground font-medium">{t.reportName}</p>
+              <p className="text-sm">{t.forYear} {fiscalYear.year}</p>
               {(startDate || endDate) && (
                 <p className="text-xs text-muted-foreground">
-                  {startDate?.toLocaleDateString("ar-KW") ?? "—"} إلى {endDate?.toLocaleDateString("ar-KW") ?? "—"}
+                  {startDate?.toLocaleDateString(numberLocale) ?? "—"} {t.toWord} {endDate?.toLocaleDateString(numberLocale) ?? "—"}
                 </p>
               )}
             </div>
@@ -169,12 +194,12 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
             <div className="bg-card border rounded-xl overflow-hidden">
               {/* Revenues */}
               <div className="border-b">
-                <div className="bg-green-50 px-4 py-2 font-bold text-green-800 text-sm">الإيرادات</div>
+                <div className="bg-green-50 px-4 py-2 font-bold text-green-800 text-sm">{t.revenues}</div>
                 <table className="ar-table">
                   <tbody>
                     {report.revenues.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="text-center text-muted-foreground py-4">لا توجد إيرادات</td>
+                        <td colSpan={2} className="text-center text-muted-foreground py-4">{t.noRevenues}</td>
                       </tr>
                     ) : (
                       report.revenues.map((row) => (
@@ -193,7 +218,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
                       ))
                     )}
                     <tr className="bg-green-50 font-bold border-t-2">
-                      <td colSpan={2} className="text-green-800">إجمالي الإيرادات</td>
+                      <td colSpan={2} className="text-green-800">{t.totalRevenue}</td>
                       <td className="text-left number text-green-700 text-base">{report.totalRevenue.toFixed(3)}</td>
                     </tr>
                   </tbody>
@@ -202,12 +227,12 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
 
               {/* Expenses */}
               <div className="border-b">
-                <div className="bg-red-50 px-4 py-2 font-bold text-red-800 text-sm">المصروفات</div>
+                <div className="bg-red-50 px-4 py-2 font-bold text-red-800 text-sm">{t.expenses}</div>
                 <table className="ar-table">
                   <tbody>
                     {report.expenses.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="text-center text-muted-foreground py-4">لا توجد مصروفات</td>
+                        <td colSpan={2} className="text-center text-muted-foreground py-4">{t.noExpenses}</td>
                       </tr>
                     ) : (
                       report.expenses.map((row) => (
@@ -226,7 +251,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
                       ))
                     )}
                     <tr className="bg-red-50 font-bold border-t-2">
-                      <td colSpan={2} className="text-red-800">إجمالي المصروفات</td>
+                      <td colSpan={2} className="text-red-800">{t.totalExpenses}</td>
                       <td className="text-left number text-red-700 text-base">{report.totalExpenses.toFixed(3)}</td>
                     </tr>
                   </tbody>
@@ -235,8 +260,8 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
 
               {/* Net Income */}
               <div className={`px-4 py-4 flex items-center justify-between font-bold text-lg ${isProfit ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
-                <span>{isProfit ? "صافي الربح" : "صافي الخسارة"}</span>
-                <span className="number text-xl">{Math.abs(report.netIncome).toFixed(3)} د.ك</span>
+                <span>{isProfit ? t.netProfit : t.netLoss}</span>
+                <span className="number text-xl">{Math.abs(report.netIncome).toFixed(3)} {t.kwd}</span>
               </div>
             </div>
           </>
