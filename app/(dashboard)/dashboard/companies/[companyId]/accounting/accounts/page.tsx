@@ -266,7 +266,7 @@ export default function AccountsPage() {
                       .filter((account) => account.isHeader && account.type === form.type)
                       .map((account) => (
                         <option key={account.id} value={account.id}>
-                          {account.code} - {account.nameAr}
+                          {account.code} - {locale === "en" ? account.nameEn ?? account.nameAr : account.nameAr}
                         </option>
                       ))}
                   </select>
@@ -343,7 +343,7 @@ export default function AccountsPage() {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-sm">{account.nameAr}</span>
+                          <span className="text-sm">{locale === "en" ? account.nameEn ?? account.nameAr : account.nameAr}</span>
                         )}
                       </td>
                       <td>
