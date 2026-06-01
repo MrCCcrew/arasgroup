@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Wallet, X, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { useLocale } from "@/components/providers/locale-provider";
 
 interface Driver {
   id: string;
@@ -19,13 +20,13 @@ interface Transaction {
   driver: { employee: { nameAr: string } };
 }
 
-const TX_LABELS: Record<string, string> = {
-  CHARGE: "شحن من المنصة",
-  DEPOSIT: "إيداع من السائق",
-  SETTLEMENT: "تسوية",
-  DEDUCTION: "خصم",
-  INCENTIVE: "حافز",
-  DEDUCTION_PENALTY: "غرامة",
+const TX_LABELS: Record<string, { ar: string; en: string }> = {
+  CHARGE: { ar: "شحن من المنصة", en: "Platform charge" },
+  DEPOSIT: { ar: "إيداع من السائق", en: "Driver deposit" },
+  SETTLEMENT: { ar: "تسوية", en: "Settlement" },
+  DEDUCTION: { ar: "خصم", en: "Deduction" },
+  INCENTIVE: { ar: "حافز", en: "Incentive" },
+  DEDUCTION_PENALTY: { ar: "غرامة", en: "Penalty" },
 };
 
 const now = new Date();
@@ -53,6 +54,43 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 export default function WalletPage() {
   const { companyId } = useParams<{ companyId: string }>();
+  const { locale } = useLocale();
+  const en = locale === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const kwd = en ? "KWD" : "د.ك";
+  const t = {
+    title: en ? "Driver Wallets" : "محافظ السائقين",
+    subtitle: en ? "Driver wallet balances and movements" : "أرصدة وحركات محافظ السائقين",
+    registerDeposit: en ? "Register deposit" : "تسجيل إيداع",
+    totalBalances: en ? "Total balances" : "إجمالي الأرصدة",
+    driver: en ? "Driver" : "سائق",
+    negativeBalance: en ? "Negative balance" : "رصيد سالب",
+    loading: en ? "Loading..." : "جاري التحميل...",
+    balances: en ? "Driver balances" : "أرصدة السائقين",
+    noDrivers: en ? "No drivers" : "لا يوجد سائقون",
+    settle: en ? "Settle" : "تسوية",
+    recentMovements: en ? "Recent movements" : "آخر الحركات",
+    noMovements: en ? "No movements" : "لا توجد حركات",
+    deleteMovementTitle: en ? "Delete movement" : "حذف الحركة",
+    confirmDeleteTx: en ? "Delete this movement? The amount will be reversed on the driver's balance." : "حذف هذه الحركة؟ سيتم عكس المبلغ على رصيد السائق.",
+    deleteFailed: en ? "Delete failed" : "فشل الحذف",
+    depositModal: en ? "Register a wallet deposit" : "تسجيل إيداع في المحفظة",
+    chooseDriver: en ? "— Select driver —" : "— اختر السائق —",
+    driverRequired: en ? "Select a driver" : "اختر السائق",
+    amountInvalid: en ? "Enter a valid amount" : "أدخل مبلغاً صحيحاً",
+    amountLabel: en ? "Amount (KWD) *" : "المبلغ (د.ك) *",
+    dateLabel: en ? "Date *" : "التاريخ *",
+    description: en ? "Description" : "الوصف",
+    bankDeposit: en ? "Bank deposit" : "إيداع بنكي",
+    cancel: en ? "Cancel" : "إلغاء",
+    saving: en ? "Saving..." : "جاري الحفظ...",
+    saveDeposit: en ? "Register deposit" : "تسجيل الإيداع",
+    settleConfirm: (name: string, bal: string) => en
+      ? `Settle and zero ${name}'s balance (${bal} KWD)? A documented settlement movement will be recorded.`
+      : `تسوية وتصفير رصيد ${name} (${bal} د.ك)؟ سيتم تسجيل حركة تسوية موثّقة.`,
+    settleFailed: en ? "Settlement failed" : "فشل في التسوية",
+    genericError: en ? "An error occurred" : "حدث خطأ",
+  };
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +114,7 @@ export default function WalletPage() {
   useEffect(() => { load(); }, [load]);
 
   async function settleBalance(driverId: string, name: string, balance: number) {
-    if (!confirm(`تسوية وتصفير رصيد ${name} (${balance.toFixed(3)} د.ك)؟ سيتم تسجيل حركة تسوية موثّقة.`)) return;
+    if (!confirm(t.settleConfirm(name, balance.toFixed(3)))) return;
     setSettlingId(driverId);
     const res = await fetch("/api/delivery/wallet/settle", {
       method: "POST",
@@ -86,12 +124,12 @@ export default function WalletPage() {
     const data = await res.json();
     setSettlingId(null);
     if (data.success) load();
-    else alert(data.error ?? "فشل في التسوية");
+    else alert(data.error ?? t.settleFailed);
   }
 
   async function save() {
-    if (!form.driverId) { setFormError("اختر السائق"); return; }
-    if (!form.amount || Number(form.amount) <= 0) { setFormError("أدخل مبلغاً صحيحاً"); return; }
+    if (!form.driverId) { setFormError(t.driverRequired); return; }
+    if (!form.amount || Number(form.amount) <= 0) { setFormError(t.amountInvalid); return; }
     setSaving(true); setFormError("");
     const res = await fetch("/api/delivery/wallet", {
       method: "POST",
@@ -107,7 +145,7 @@ export default function WalletPage() {
     });
     const data = await res.json();
     setSaving(false);
-    if (!data.success) { setFormError(data.error ?? "حدث خطأ"); return; }
+    if (!data.success) { setFormError(data.error ?? t.genericError); return; }
     setShowForm(false);
     load();
   }
@@ -129,15 +167,15 @@ export default function WalletPage() {
   return (
     <div>
       <Header
-        title="محافظ السائقين"
-        subtitle="أرصدة وحركات محافظ السائقين"
+        title={t.title}
+        subtitle={t.subtitle}
         companyId={companyId}
         actions={
           <button
             onClick={() => { setForm(EMPTY); setFormError(""); setShowForm(true); }}
             className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
           >
-            + تسجيل إيداع
+            + {t.registerDeposit}
           </button>
         }
       />
@@ -149,30 +187,30 @@ export default function WalletPage() {
             </div>
             <div>
               <p className="number text-xl font-bold">
-                {totalBalance.toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                {totalBalance.toLocaleString(numberLocale, { minimumFractionDigits: 3 })} {kwd}
               </p>
-              <p className="text-xs text-muted-foreground">إجمالي الأرصدة</p>
+              <p className="text-xs text-muted-foreground">{t.totalBalances}</p>
             </div>
           </div>
           <div className="stat-card">
             <p className="text-2xl font-bold">{drivers.length}</p>
-            <p className="text-xs text-muted-foreground">سائق</p>
+            <p className="text-xs text-muted-foreground">{t.driver}</p>
           </div>
           <div className="stat-card">
             <p className={`text-2xl font-bold ${negativeCount > 0 ? "text-red-600" : "text-muted-foreground"}`}>{negativeCount}</p>
-            <p className="text-xs text-muted-foreground">رصيد سالب</p>
+            <p className="text-xs text-muted-foreground">{t.negativeBalance}</p>
           </div>
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">جاري التحميل...</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">{t.loading}</div>
         ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="section-card">
-              <h2 className="mb-4 text-base font-bold">أرصدة السائقين</h2>
+              <h2 className="mb-4 text-base font-bold">{t.balances}</h2>
               <div className="space-y-2">
                 {sortedDrivers.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-muted-foreground">لا يوجد سائقون</p>
+                  <p className="py-4 text-center text-sm text-muted-foreground">{t.noDrivers}</p>
                 ) : sortedDrivers.map((d) => {
                   const balance = Number(d.walletBalance);
                   return (
@@ -180,16 +218,16 @@ export default function WalletPage() {
                       <span className="text-sm font-medium">{d.employee.nameAr}</span>
                       <div className="flex items-center gap-3">
                         <span className={`number text-sm font-bold ${balance < 0 ? "text-red-600" : balance > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
-                          {balance.toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                          {balance.toLocaleString(numberLocale, { minimumFractionDigits: 3 })} {kwd}
                         </span>
                         {balance !== 0 && (
                           <button
                             onClick={() => settleBalance(d.id, d.employee.nameAr, balance)}
                             disabled={settlingId === d.id}
                             className="rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
-                            title="تسوية وتصفير الرصيد"
+                            title={t.settle}
                           >
-                            {settlingId === d.id ? "..." : "تسوية"}
+                            {settlingId === d.id ? "..." : t.settle}
                           </button>
                         )}
                       </div>
@@ -200,34 +238,34 @@ export default function WalletPage() {
             </div>
 
             <div className="section-card">
-              <h2 className="mb-4 text-base font-bold">آخر الحركات</h2>
+              <h2 className="mb-4 text-base font-bold">{t.recentMovements}</h2>
               <div className="space-y-2">
                 {transactions.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-muted-foreground">لا توجد حركات</p>
+                  <p className="py-4 text-center text-sm text-muted-foreground">{t.noMovements}</p>
                 ) : transactions.slice(0, 20).map((tx) => (
                   <div key={tx.id} className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
                     <div>
                       <p className="text-sm font-medium">{tx.driver.employee.nameAr}</p>
-                      <p className="text-xs text-muted-foreground">{TX_LABELS[tx.type] ?? tx.type}</p>
+                      <p className="text-xs text-muted-foreground">{(TX_LABELS[tx.type] && (en ? TX_LABELS[tx.type].en : TX_LABELS[tx.type].ar)) ?? tx.type}</p>
                       {tx.descriptionAr && <p className="text-xs text-muted-foreground">{tx.descriptionAr}</p>}
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-left">
                         <p className={`number text-sm font-bold ${tx.type === "DEPOSIT" ? "text-green-600" : "text-blue-600"}`}>
-                          {Number(tx.amount).toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                          {Number(tx.amount).toLocaleString(numberLocale, { minimumFractionDigits: 3 })} {kwd}
                         </p>
-                        <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("ar-KW")}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString(numberLocale)}</p>
                       </div>
                       <button
                         onClick={async () => {
-                          if (!confirm("حذف هذه الحركة؟ سيتم عكس المبلغ على رصيد السائق.")) return;
+                          if (!confirm(t.confirmDeleteTx)) return;
                           const res = await fetch(`/api/delivery/wallet/${tx.id}`, { method: "DELETE" });
                           const data = await res.json();
                           if (data.success) load();
-                          else alert(data.error ?? "فشل الحذف");
+                          else alert(data.error ?? t.deleteFailed);
                         }}
                         className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
-                        title="حذف الحركة"
+                        title={t.deleteMovementTitle}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -241,46 +279,46 @@ export default function WalletPage() {
       </div>
 
       {showForm && (
-        <Modal title="تسجيل إيداع في المحفظة" onClose={() => setShowForm(false)}>
+        <Modal title={t.depositModal} onClose={() => setShowForm(false)}>
           <div className="space-y-3">
             <div>
-              <label className="form-label">السائق *</label>
+              <label className="form-label">{t.driver} *</label>
               <select className="input-field" value={form.driverId} onChange={(e) => setForm((p) => ({ ...p, driverId: e.target.value }))}>
-                <option value="">— اختر السائق —</option>
+                <option value="">{t.chooseDriver}</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.employee.nameAr} ({Number(d.walletBalance).toFixed(3)} د.ك)
+                    {d.employee.nameAr} ({Number(d.walletBalance).toFixed(3)} {kwd})
                   </option>
                 ))}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="form-label">المبلغ (د.ك) *</label>
+                <label className="form-label">{t.amountLabel}</label>
                 <input type="number" step="0.001" min="0" className="input-field" value={form.amount}
                   onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
               </div>
               <div>
-                <label className="form-label">التاريخ *</label>
+                <label className="form-label">{t.dateLabel}</label>
                 <input type="date" className="input-field" value={form.date}
                   onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
               </div>
             </div>
             <div>
-              <label className="form-label">الوصف</label>
+              <label className="form-label">{t.description}</label>
               <input className="input-field" value={form.descriptionAr}
                 onChange={(e) => setForm((p) => ({ ...p, descriptionAr: e.target.value }))} />
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="isBankDep" checked={form.isBankDeposit}
                 onChange={(e) => setForm((p) => ({ ...p, isBankDeposit: e.target.checked }))} className="h-4 w-4" />
-              <label htmlFor="isBankDep" className="text-sm">إيداع بنكي</label>
+              <label htmlFor="isBankDep" className="text-sm">{t.bankDeposit}</label>
             </div>
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">إلغاء</button>
+              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
               <button onClick={save} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
-                {saving ? "جاري الحفظ..." : "تسجيل الإيداع"}
+                {saving ? t.saving : t.saveDeposit}
               </button>
             </div>
           </div>
