@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
+import { getLocale } from "@/lib/i18n";
 import { PrintButton } from "@/components/ui/print-button";
 import { GeneralLedgerClient } from "./GeneralLedgerClient";
 
@@ -91,11 +92,26 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
   const grandTotalDebit = accountData.reduce((s, a) => s + a.totalDebit, 0);
   const grandTotalCredit = accountData.reduce((s, a) => s + a.totalCredit, 0);
 
+  const en = (await getLocale()) === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const allPeriods = en ? "All periods" : "كل الفترات";
+  const t = {
+    title: en ? "General Ledger" : "دفتر الأستاذ العام",
+    fiscalYear: en ? "Fiscal year" : "السنة المالية",
+    allPeriodsOpt: en ? "— All periods —" : "— كل الفترات —",
+    from: en ? "From date" : "من تاريخ",
+    to: en ? "To date" : "إلى تاريخ",
+    show: en ? "Show" : "عرض",
+    forYear: en ? "Fiscal year" : "السنة المالية",
+    toWord: en ? "to" : "إلى",
+    empty: en ? "No posted entries in this period" : "لا توجد قيود مرحّلة في هذه الفترة",
+  };
+
   return (
     <div>
       <Header
-        title="دفتر الأستاذ العام"
-        subtitle={`${company?.nameAr ?? ""} — ${selectedFiscalYear?.year ?? "كل الفترات"}`}
+        title={t.title}
+        subtitle={`${company?.nameAr ?? ""} — ${selectedFiscalYear?.year ?? allPeriods}`}
         companyId={companyId}
         actions={<PrintButton />}
       />
@@ -105,13 +121,13 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
         <div className="section-card no-print">
           <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="form-label">السنة المالية</label>
+              <label className="form-label">{t.fiscalYear}</label>
               <select
                 name="fiscalYearId"
                 defaultValue={selectedFiscalYearId ?? ""}
                 className="input-field"
               >
-                <option value="">— كل الفترات —</option>
+                <option value="">{t.allPeriodsOpt}</option>
                 {fiscalYears.map((fy) => (
                   <option key={fy.id} value={fy.id}>
                     {fy.year}
@@ -120,7 +136,7 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
               </select>
             </div>
             <div>
-              <label className="form-label">من تاريخ</label>
+              <label className="form-label">{t.from}</label>
               <input
                 type="date"
                 name="startDate"
@@ -129,7 +145,7 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
               />
             </div>
             <div>
-              <label className="form-label">إلى تاريخ</label>
+              <label className="form-label">{t.to}</label>
               <input
                 type="date"
                 name="endDate"
@@ -139,7 +155,7 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
             </div>
             <div className="flex items-end">
               <button type="submit" className="btn-primary w-full rounded-lg px-4 py-2 text-sm font-medium">
-                عرض
+                {t.show}
               </button>
             </div>
           </form>
@@ -148,23 +164,23 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
         {/* ── Report header ── */}
         <div className="section-card space-y-1 text-center">
           <h2 className="text-xl font-bold">{company?.nameAr}</h2>
-          <p className="text-muted-foreground">دفتر الأستاذ العام</p>
+          <p className="text-muted-foreground">{t.title}</p>
           {selectedFiscalYear ? (
             <p className="text-sm text-muted-foreground">
-              السنة المالية {selectedFiscalYear.year}&nbsp;|&nbsp;
-              {selectedFiscalYear.startDate?.toLocaleDateString("ar-KW")} —{" "}
-              {selectedFiscalYear.endDate?.toLocaleDateString("ar-KW")}
+              {t.forYear} {selectedFiscalYear.year}&nbsp;|&nbsp;
+              {selectedFiscalYear.startDate?.toLocaleDateString(numberLocale)} —{" "}
+              {selectedFiscalYear.endDate?.toLocaleDateString(numberLocale)}
             </p>
           ) : (sp.startDate || sp.endDate) ? (
             <p className="text-sm text-muted-foreground">
-              {sp.startDate ?? "—"} إلى {sp.endDate ?? "—"}
+              {sp.startDate ?? "—"} {t.toWord} {sp.endDate ?? "—"}
             </p>
           ) : null}
         </div>
 
         {accountData.length === 0 ? (
           <div className="section-card py-16 text-center text-muted-foreground">
-            لا توجد قيود مرحّلة في هذه الفترة
+            {t.empty}
           </div>
         ) : (
           <GeneralLedgerClient
@@ -175,6 +191,7 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
             endDate={sp.endDate}
             grandTotalDebit={grandTotalDebit}
             grandTotalCredit={grandTotalCredit}
+            locale={en ? "en" : "ar"}
           />
         )}
       </div>

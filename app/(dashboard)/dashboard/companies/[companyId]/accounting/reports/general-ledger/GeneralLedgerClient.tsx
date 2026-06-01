@@ -4,12 +4,12 @@ import { useState, useCallback } from "react";
 import { ChevronDown, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  ASSET: "أصول",
-  LIABILITY: "خصوم",
-  EQUITY: "حقوق الملكية",
-  REVENUE: "إيرادات",
-  EXPENSE: "مصروفات",
+const ACCOUNT_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
+  ASSET: { ar: "أصول", en: "Assets" },
+  LIABILITY: { ar: "خصوم", en: "Liabilities" },
+  EQUITY: { ar: "حقوق الملكية", en: "Equity" },
+  REVENUE: { ar: "إيرادات", en: "Revenue" },
+  EXPENSE: { ar: "مصروفات", en: "Expenses" },
 };
 
 const ACCOUNT_TYPE_COLORS: Record<string, { header: string; badge: string }> = {
@@ -50,6 +50,7 @@ interface Props {
   endDate?: string;
   grandTotalDebit: number;
   grandTotalCredit: number;
+  locale?: "ar" | "en";
 }
 
 export function GeneralLedgerClient({
@@ -60,7 +61,31 @@ export function GeneralLedgerClient({
   endDate,
   grandTotalDebit,
   grandTotalCredit,
+  locale = "ar",
 }: Props) {
+  const en = locale === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const t = {
+    accountsHint: (n: number) => (en ? `${n} account(s)  |  click any account to view its movements` : `${n} حساب  |  انقر على أي حساب لعرض حركاته`),
+    expandAll: en ? "Expand all" : "فتح الكل",
+    collapseAll: en ? "Collapse all" : "طي الكل",
+    lines: (n: number) => (en ? `${n} line(s)` : `${n} سطر`),
+    debit: en ? "Debit" : "مدين",
+    credit: en ? "Credit" : "دائن",
+    balance: en ? "Balance" : "رصيد",
+    loading: en ? "Loading..." : "جاري التحميل...",
+    noMovements: en ? "No movements in this period" : "لا توجد حركات في هذه الفترة",
+    date: en ? "Date" : "التاريخ",
+    entryNo: en ? "Entry no." : "رقم القيد",
+    statement: en ? "Statement" : "البيان",
+    accountTotal: en ? "Account total" : "إجمالي الحساب",
+    grandTotal: en ? "Grand total" : "الإجمالي العام",
+    totalDebit: en ? "Total debit:" : "إجمالي المدين:",
+    totalCredit: en ? "Total credit:" : "إجمالي الدائن:",
+    kwd: en ? "KWD" : "د.ك",
+    balanced: en ? "✓ The ledger is balanced" : "✓ الدفتر متوازن",
+    diff: (d: string) => (en ? `✗ Difference: ${d}` : `✗ فرق: ${d}`),
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [linesCache, setLinesCache] = useState<Record<string, LedgerLine[]>>({});
   const [loadingSet, setLoadingSet] = useState<Set<string>>(new Set());
@@ -121,20 +146,20 @@ export function GeneralLedgerClient({
       {/* ── Toolbar ── */}
       <div className="no-print flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {accounts.length} حساب &nbsp;|&nbsp; انقر على أي حساب لعرض حركاته
+          {t.accountsHint(accounts.length)}
         </p>
         <div className="flex gap-2">
           <button
             onClick={expandAll}
             className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
           >
-            فتح الكل
+            {t.expandAll}
           </button>
           <button
             onClick={collapseAll}
             className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
           >
-            طي الكل
+            {t.collapseAll}
           </button>
         </div>
       </div>
@@ -170,27 +195,27 @@ export function GeneralLedgerClient({
                 <span className="font-mono font-semibold">{acc.code}</span>
                 <span className="font-bold">{acc.nameAr}</span>
                 <span className={cn("rounded-full px-2 py-0.5 text-xs font-normal", colors.badge)}>
-                  {ACCOUNT_TYPE_LABELS[acc.type] ?? acc.type}
+                  {(ACCOUNT_TYPE_LABELS[acc.type] && (en ? ACCOUNT_TYPE_LABELS[acc.type].en : ACCOUNT_TYPE_LABELS[acc.type].ar)) ?? acc.type}
                 </span>
-                <span className="text-xs opacity-60">{acc.lineCount} سطر</span>
+                <span className="text-xs opacity-60">{t.lines(acc.lineCount)}</span>
               </div>
 
               {/* Right: totals summary */}
               <div className="flex gap-5 text-xs font-medium">
                 <span>
-                  مدين:{" "}
+                  {t.debit}:{" "}
                   <span className="number font-mono text-blue-700">
                     {acc.totalDebit.toFixed(3)}
                   </span>
                 </span>
                 <span>
-                  دائن:{" "}
+                  {t.credit}:{" "}
                   <span className="number font-mono text-green-700">
                     {acc.totalCredit.toFixed(3)}
                   </span>
                 </span>
                 <span>
-                  رصيد:{" "}
+                  {t.balance}:{" "}
                   <span
                     className={cn(
                       "number font-mono font-bold",
@@ -209,29 +234,29 @@ export function GeneralLedgerClient({
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
                     <Loader2 size={16} className="animate-spin" />
-                    جاري التحميل...
+                    {t.loading}
                   </div>
                 ) : !lines || lines.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    لا توجد حركات في هذه الفترة
+                    {t.noMovements}
                   </p>
                 ) : (
                   <table className="ar-table text-xs">
                     <thead>
                       <tr className="bg-muted/30">
-                        <th className="w-28">التاريخ</th>
-                        <th className="w-28">رقم القيد</th>
-                        <th>البيان</th>
-                        <th className="w-28 text-start">مدين</th>
-                        <th className="w-28 text-start">دائن</th>
-                        <th className="w-28 text-start">الرصيد</th>
+                        <th className="w-28">{t.date}</th>
+                        <th className="w-28">{t.entryNo}</th>
+                        <th>{t.statement}</th>
+                        <th className="w-28 text-start">{t.debit}</th>
+                        <th className="w-28 text-start">{t.credit}</th>
+                        <th className="w-28 text-start">{t.balance}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {lines.map((line, i) => (
                         <tr key={line.lineId} className={i % 2 === 0 ? "" : "bg-muted/5"}>
                           <td className="number">
-                            {new Date(line.date).toLocaleDateString("ar-KW")}
+                            {new Date(line.date).toLocaleDateString(numberLocale)}
                           </td>
                           <td className="font-mono">{line.journalNumber}</td>
                           <td>{line.description ?? "—"}</td>
@@ -255,7 +280,7 @@ export function GeneralLedgerClient({
                     <tfoot className="border-t border-border bg-muted/20 font-bold">
                       <tr>
                         <td colSpan={3} className="py-1.5 text-center text-xs">
-                          إجمالي الحساب
+                          {t.accountTotal}
                         </td>
                         <td className="number text-start text-blue-600">
                           {acc.totalDebit.toFixed(3)}
@@ -285,24 +310,24 @@ export function GeneralLedgerClient({
       {accounts.length > 0 && (
         <div className="rounded-xl border-2 border-border bg-card px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-base font-bold">الإجمالي العام</span>
+            <span className="text-base font-bold">{t.grandTotal}</span>
             <div className="flex flex-wrap gap-6 text-sm font-bold">
               <span>
-                إجمالي المدين:{" "}
+                {t.totalDebit}{" "}
                 <span className="number text-blue-600">
-                  {grandTotalDebit.toFixed(3)} د.ك
+                  {grandTotalDebit.toFixed(3)} {t.kwd}
                 </span>
               </span>
               <span>
-                إجمالي الدائن:{" "}
+                {t.totalCredit}{" "}
                 <span className="number text-green-600">
-                  {grandTotalCredit.toFixed(3)} د.ك
+                  {grandTotalCredit.toFixed(3)} {t.kwd}
                 </span>
               </span>
               <span className={isBalanced ? "text-emerald-600" : "text-red-600"}>
                 {isBalanced
-                  ? "✓ الدفتر متوازن"
-                  : `✗ فرق: ${Math.abs(grandTotalDebit - grandTotalCredit).toFixed(3)}`}
+                  ? t.balanced
+                  : t.diff(Math.abs(grandTotalDebit - grandTotalCredit).toFixed(3))}
               </span>
             </div>
           </div>
