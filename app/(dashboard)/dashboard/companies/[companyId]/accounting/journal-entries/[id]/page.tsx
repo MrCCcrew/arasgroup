@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
+import { getLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
 import { JournalEntryActions } from "./journal-entry-actions";
 
@@ -11,32 +12,32 @@ interface Props {
   params: Promise<{ companyId: string; id: string }>;
 }
 
-const typeLabels: Record<string, string> = {
-  GENERAL: "قيد عام",
-  RECEIPT: "قبض",
-  PAYMENT: "صرف",
-  TRANSFER: "تحويل",
-  SALARY: "رواتب",
-  DELIVERY_INCOME: "إيراد توصيل",
-  DELIVERY_WALLET: "محفظة توصيل",
-  CAR_WASH_REVENUE: "إيراد غسيل",
-  KNET_SETTLEMENT: "تسوية KNET",
-  INVESTOR_COLLECTION: "تحصيل مسؤول",
-  INVESTOR_SALARY_COLLECTION: "تحصيل رواتب مسؤول",
-  INVESTOR_SALARY_DISBURSEMENT: "صرف رواتب مسؤول",
-  EXPENSE: "مصروف",
-  ADJUSTMENT: "تسوية",
-  OPENING_BALANCE: "رصيد افتتاحي",
-  DEPRECIATION: "إهلاك",
+const typeLabels: Record<string, { ar: string; en: string }> = {
+  GENERAL: { ar: "قيد عام", en: "General entry" },
+  RECEIPT: { ar: "قبض", en: "Receipt" },
+  PAYMENT: { ar: "صرف", en: "Payment" },
+  TRANSFER: { ar: "تحويل", en: "Transfer" },
+  SALARY: { ar: "رواتب", en: "Salaries" },
+  DELIVERY_INCOME: { ar: "إيراد توصيل", en: "Delivery income" },
+  DELIVERY_WALLET: { ar: "محفظة توصيل", en: "Delivery wallet" },
+  CAR_WASH_REVENUE: { ar: "إيراد غسيل", en: "Car wash revenue" },
+  KNET_SETTLEMENT: { ar: "تسوية KNET", en: "KNET settlement" },
+  INVESTOR_COLLECTION: { ar: "تحصيل مسؤول", en: "Investor collection" },
+  INVESTOR_SALARY_COLLECTION: { ar: "تحصيل رواتب مسؤول", en: "Investor salary collection" },
+  INVESTOR_SALARY_DISBURSEMENT: { ar: "صرف رواتب مسؤول", en: "Investor salary disbursement" },
+  EXPENSE: { ar: "مصروف", en: "Expense" },
+  ADJUSTMENT: { ar: "تسوية", en: "Adjustment" },
+  OPENING_BALANCE: { ar: "رصيد افتتاحي", en: "Opening balance" },
+  DEPRECIATION: { ar: "إهلاك", en: "Depreciation" },
 };
 
-const statusLabels: Record<string, string> = {
-  DRAFT: "مسودة",
-  PENDING_APPROVAL: "بانتظار الموافقة",
-  APPROVED: "معتمد",
-  POSTED: "مرحّل",
-  REJECTED: "مرفوض",
-  CANCELLED: "ملغي",
+const statusLabels: Record<string, { ar: string; en: string }> = {
+  DRAFT: { ar: "مسودة", en: "Draft" },
+  PENDING_APPROVAL: { ar: "بانتظار الموافقة", en: "Pending approval" },
+  APPROVED: { ar: "معتمد", en: "Approved" },
+  POSTED: { ar: "مرحّل", en: "Posted" },
+  REJECTED: { ar: "مرفوض", en: "Rejected" },
+  CANCELLED: { ar: "ملغي", en: "Cancelled" },
 };
 
 const statusColors: Record<string, string> = {
@@ -72,6 +73,34 @@ export default async function JournalEntryDetailPage({ params }: Props) {
 
   if (!entry) notFound();
 
+  const en = (await getLocale()) === "en";
+  const numberLocale = en ? "en-US" : "ar-KW";
+  const lang = en ? "en" : "ar";
+  const typeLabel = typeLabels[entry.type]?.[lang] ?? entry.type;
+  const statusLabel = statusLabels[entry.status]?.[lang] ?? entry.status;
+  const t = {
+    entryNo: en ? "Entry no." : "رقم القيد",
+    back: en ? "Back to entries" : "العودة للقيود",
+    print: en ? "Print" : "طباعة",
+    date: en ? "Date" : "التاريخ",
+    type: en ? "Type" : "النوع",
+    status: en ? "Status" : "الحالة",
+    statement: en ? "Statement" : "البيان",
+    reference: en ? "Reference" : "المرجع",
+    fiscalYear: en ? "Fiscal year" : "السنة المالية",
+    locked: en ? "(locked)" : "(مقفلة)",
+    costCenter: en ? "Cost center" : "مركز التكلفة",
+    createdBy: en ? "Created by" : "أنشئ بواسطة",
+    approvedBy: en ? "Approved by" : "اعتمد بواسطة",
+    lines: en ? "Entry lines" : "سطور القيد",
+    accountCode: en ? "Account code" : "كود الحساب",
+    accountName: en ? "Account name" : "اسم الحساب",
+    debit: en ? "Debit" : "مدين",
+    credit: en ? "Credit" : "دائن",
+    total: en ? "Total" : "الإجمالي",
+    unbalanced: (d: string) => (en ? `Entry is unbalanced — difference: ${d}` : `القيد غير متوازن - الفرق: ${d}`),
+  };
+
   const totalDebit = entry.lines.reduce((sum, line) => sum + Number(line.debit), 0);
   const totalCredit = entry.lines.reduce((sum, line) => sum + Number(line.credit), 0);
 
@@ -94,8 +123,8 @@ export default async function JournalEntryDetailPage({ params }: Props) {
   return (
     <div>
       <Header
-        title={`قيد رقم ${entry.number}`}
-        subtitle={typeLabels[entry.type] ?? entry.type}
+        title={`${t.entryNo} ${entry.number}`}
+        subtitle={typeLabel}
         companyId={companyId}
       />
 
@@ -106,7 +135,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
             className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowRight size={14} />
-            العودة للقيود
+            {t.back}
           </Link>
 
           <div className="flex items-center gap-2">
@@ -117,7 +146,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                 className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-muted"
               >
                 <Printer size={15} />
-                طباعة
+                {t.print}
               </Link>
             )}
 
@@ -126,6 +155,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
               companyId={companyId}
               isLocked={entry.fiscalYear.isLocked}
               availableActions={availableActions}
+              locale={lang}
             />
           </div>
         </div>
@@ -133,53 +163,53 @@ export default async function JournalEntryDetailPage({ params }: Props) {
         <div className="section-card">
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">رقم القيد</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.entryNo}</p>
               <p className="font-mono font-bold">{entry.number}</p>
             </div>
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">التاريخ</p>
-              <p className="font-medium">{new Date(entry.date).toLocaleDateString("ar-KW")}</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.date}</p>
+              <p className="font-medium">{new Date(entry.date).toLocaleDateString(numberLocale)}</p>
             </div>
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">النوع</p>
-              <p className="font-medium">{typeLabels[entry.type] ?? entry.type}</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.type}</p>
+              <p className="font-medium">{typeLabel}</p>
             </div>
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">الحالة</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.status}</p>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[entry.status] ?? "bg-muted"}`}>
-                {statusLabels[entry.status] ?? entry.status}
+                {statusLabel}
               </span>
             </div>
             <div className="col-span-2">
-              <p className="mb-1 text-xs text-muted-foreground">البيان</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.statement}</p>
               <p className="font-medium">{entry.descriptionAr}</p>
             </div>
             {entry.reference && (
               <div>
-                <p className="mb-1 text-xs text-muted-foreground">المرجع</p>
+                <p className="mb-1 text-xs text-muted-foreground">{t.reference}</p>
                 <p className="font-mono text-sm">{entry.reference}</p>
               </div>
             )}
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">السنة المالية</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.fiscalYear}</p>
               <p className="font-medium">
                 {entry.fiscalYear.year}
-                {entry.fiscalYear.isLocked && <span className="mr-2 text-xs text-red-500">(مقفلة)</span>}
+                {entry.fiscalYear.isLocked && <span className="mr-2 text-xs text-red-500">{t.locked}</span>}
               </p>
             </div>
             {entry.costCenter && (
               <div>
-                <p className="mb-1 text-xs text-muted-foreground">مركز التكلفة</p>
+                <p className="mb-1 text-xs text-muted-foreground">{t.costCenter}</p>
                 <p className="font-medium">{entry.costCenter.nameAr}</p>
               </div>
             )}
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">أنشئ بواسطة</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t.createdBy}</p>
               <p className="text-sm">{entry.createdBy.nameAr}</p>
             </div>
             {entry.approvedBy && (
               <div>
-                <p className="mb-1 text-xs text-muted-foreground">اعتمد بواسطة</p>
+                <p className="mb-1 text-xs text-muted-foreground">{t.approvedBy}</p>
                 <p className="text-sm">{entry.approvedBy.nameAr}</p>
               </div>
             )}
@@ -187,17 +217,17 @@ export default async function JournalEntryDetailPage({ params }: Props) {
         </div>
 
         <div className="section-card">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">سطور القيد</h3>
+          <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t.lines}</h3>
           <div className="overflow-x-auto">
             <table className="ar-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>كود الحساب</th>
-                  <th>اسم الحساب</th>
-                  <th>البيان</th>
-                  <th>مدين</th>
-                  <th>دائن</th>
+                  <th>{t.accountCode}</th>
+                  <th>{t.accountName}</th>
+                  <th>{t.statement}</th>
+                  <th>{t.debit}</th>
+                  <th>{t.credit}</th>
                 </tr>
               </thead>
               <tbody>
@@ -205,7 +235,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                   <tr key={line.id}>
                     <td className="text-xs text-muted-foreground">{index + 1}</td>
                     <td className="font-mono text-xs">{line.account.code}</td>
-                    <td className="text-sm font-medium">{line.account.nameAr}</td>
+                    <td className="text-sm font-medium">{line.account.nameAr}</td>{/* account name = data */}
                     <td className="text-sm text-muted-foreground">{line.descriptionAr ?? "—"}</td>
                     <td className={`number font-bold ${Number(line.debit) > 0 ? "text-blue-600" : "text-muted-foreground/40"}`}>
                       {Number(line.debit) > 0 ? Number(line.debit).toFixed(3) : "—"}
@@ -218,7 +248,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 bg-muted/30 font-bold">
-                  <td colSpan={4} className="px-4 py-2 text-center">الإجمالي</td>
+                  <td colSpan={4} className="px-4 py-2 text-center">{t.total}</td>
                   <td className="number px-4 py-2 text-blue-600">{totalDebit.toFixed(3)}</td>
                   <td className="number px-4 py-2 text-green-600">{totalCredit.toFixed(3)}</td>
                 </tr>
@@ -227,7 +257,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
           </div>
 
           {Math.abs(totalDebit - totalCredit) > 0.001 && (
-            <p className="mt-2 text-sm text-red-500">القيد غير متوازن - الفرق: {Math.abs(totalDebit - totalCredit).toFixed(3)}</p>
+            <p className="mt-2 text-sm text-red-500">{t.unbalanced(Math.abs(totalDebit - totalCredit).toFixed(3))}</p>
           )}
         </div>
       </div>
