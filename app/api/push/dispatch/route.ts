@@ -5,7 +5,16 @@ import { sendPush } from "@/lib/push";
 // Called by cron every minute: GET /api/push/dispatch
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const secret = request.headers.get("x-cron-secret");
+
+  if (!CRON_SECRET || secret !== CRON_SECRET) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   const now = new Date();
 
   // Find reminders that are due within reminderMinutes and not yet notified
