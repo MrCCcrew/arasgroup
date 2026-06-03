@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 interface Props {
   companyId: string;
   locale: "ar" | "en";
-  contracts: Array<{ id: string; nameAr: string; platform: string }>;
+  contracts: Array<{ id: string; nameAr: string; platform: string | null }>;
 }
 
 const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -100,7 +100,7 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
             <option value="">{locale === "en" ? "All platforms" : "كل المنصات"}</option>
             {contracts.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.nameAr} ({c.platform})
+                {c.nameAr} ({c.platform || "—"})
               </option>
             ))}
           </select>

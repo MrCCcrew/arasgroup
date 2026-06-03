@@ -109,9 +109,12 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
           .total td { padding: 15px; border: none; }
           .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; }
         ` }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          function printPage() { window.print(); }
+        ` }} />
       </head>
       <body>
-        <button className="print-btn no-print" onClick="window.print()">
+        <button className="print-btn no-print" onClick={() => { if (typeof window !== 'undefined') window.print(); }}>
           {locale === "en" ? "🖨️ Print PDF" : "🖨️ طباعة PDF"}
         </button>
         
