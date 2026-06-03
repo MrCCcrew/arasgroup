@@ -23,6 +23,9 @@ interface Driver {
 interface EntryLine {
   driverId: string;
   ordersCount: string;
+  ratePerOrder: string;
+  grossAmount: string;
+  walletDeducted: string;
   rating: string;
   walletAmount: string;
 }
@@ -30,6 +33,9 @@ interface EntryLine {
 interface DailyEntry {
   date: string;
   ordersCount: string;
+  ratePerOrder: string;
+  grossAmount: string;
+  walletDeducted: string;
   rating: string;
   walletAmount: string;
 }
@@ -78,6 +84,9 @@ export default function NewDailyOrdersPage() {
           driverPayload.data.map((d: Driver) => ({
             driverId: d.id,
             ordersCount: "",
+            ratePerOrder: "",
+            grossAmount: "",
+            walletDeducted: "",
             rating: "",
             walletAmount: "",
           }))
@@ -146,7 +155,7 @@ export default function NewDailyOrdersPage() {
     setDailyEntries((prev) => {
       const newEntries: DailyEntry[] = selectedDates.map((date) => {
         const existing = prev.find((e) => e.date === date);
-        return existing ?? { date, ordersCount: "", rating: "", walletAmount: "" };
+        return existing ?? { date, ordersCount: "", ratePerOrder: "", grossAmount: "", walletDeducted: "", rating: "", walletAmount: "" };
       });
       return newEntries;
     });
@@ -170,6 +179,9 @@ export default function NewDailyOrdersPage() {
         .map((line) => ({
           driverId: line.driverId,
           ordersCount: Number.parseInt(line.ordersCount, 10),
+          ...(line.ratePerOrder ? { ratePerOrder: Number(line.ratePerOrder) } : {}),
+          ...(line.grossAmount ? { grossAmount: Number(line.grossAmount) } : {}),
+          ...(line.walletDeducted ? { walletDeducted: Number(line.walletDeducted) } : {}),
           ...(line.rating ? { rating: Number.parseFloat(line.rating) } : {}),
           ...(line.walletAmount && Number(line.walletAmount) > 0
             ? { walletAmount: Number(line.walletAmount) }
@@ -228,6 +240,9 @@ export default function NewDailyOrdersPage() {
             {
               driverId: selectedDriverId,
               ordersCount: Number.parseInt(entry.ordersCount, 10),
+              ...(entry.ratePerOrder ? { ratePerOrder: Number(entry.ratePerOrder) } : {}),
+              ...(entry.grossAmount ? { grossAmount: Number(entry.grossAmount) } : {}),
+              ...(entry.walletDeducted ? { walletDeducted: Number(entry.walletDeducted) } : {}),
               ...(entry.rating ? { rating: Number.parseFloat(entry.rating) } : {}),
               ...(entry.walletAmount && Number(entry.walletAmount) > 0
                 ? { walletAmount: Number(entry.walletAmount) }
@@ -489,19 +504,37 @@ export default function NewDailyOrdersPage() {
                         <th className="py-2 pr-2 text-right font-medium text-muted-foreground">
                           {locale === "en" ? "Driver" : "السائق"}
                         </th>
-                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                        <th className="w-20 py-2 text-center font-medium text-muted-foreground">
                           {locale === "en" ? "Orders" : "الطلبات"}
                         </th>
                         <th className="w-24 py-2 text-center font-medium text-muted-foreground">
+                          <div>{locale === "en" ? "Rate" : "السعر"}</div>
+                          <div className="text-[10px] font-normal text-muted-foreground/70">
+                            {locale === "en" ? "(KWD)" : "(د.ك)"}
+                          </div>
+                        </th>
+                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                          <div>{locale === "en" ? "Gross" : "الإجمالي"}</div>
+                          <div className="text-[10px] font-normal text-muted-foreground/70">
+                            {locale === "en" ? "(KWD)" : "(د.ك)"}
+                          </div>
+                        </th>
+                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                          <div>{locale === "en" ? "Wallet" : "المحفظة"}</div>
+                          <div className="text-[10px] font-normal text-muted-foreground/70">
+                            {locale === "en" ? "(KWD)" : "(د.ك)"}
+                          </div>
+                        </th>
+                        <th className="w-20 py-2 text-center font-medium text-muted-foreground">
                           {locale === "en" ? "Rating" : "التقييم"}
                         </th>
-                        <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
                           <div>{locale === "en" ? "Cash" : "تحصيل"}</div>
                           <div className="text-[10px] font-normal text-muted-foreground/70">
                             {locale === "en" ? "(KWD)" : "(د.ك)"}
                           </div>
                         </th>
-                        <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
                           <div>{locale === "en" ? "Balance" : "الرصيد"}</div>
                         </th>
                       </tr>
@@ -518,6 +551,11 @@ export default function NewDailyOrdersPage() {
                         const walletAmt = line.walletAmount ? Number(line.walletAmount) : 0;
                         const projectedBalance = balance + walletAmt;
 
+                        // Auto-calculate gross from orders × rate
+                        const orders = line.ordersCount ? Number(line.ordersCount) : 0;
+                        const rate = line.ratePerOrder ? Number(line.ratePerOrder) : 0;
+                        const autoGross = orders * rate;
+
                         return (
                           <tr key={line.driverId} className="hover:bg-muted/20">
                             <td className="py-2 pr-2 font-medium">{driverName}</td>
@@ -529,6 +567,42 @@ export default function NewDailyOrdersPage() {
                                 onChange={(e) => updateLine(index, "ordersCount", e.target.value)}
                                 className="input-field w-full text-center"
                                 placeholder="0"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={line.ratePerOrder}
+                                onChange={(e) => updateLine(index, "ratePerOrder", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="0.000"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={line.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")}
+                                onChange={(e) => updateLine(index, "grossAmount", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="0.000"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={line.walletDeducted}
+                                onChange={(e) => updateLine(index, "walletDeducted", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="0.000"
                                 dir="ltr"
                               />
                             </td>
@@ -613,13 +687,31 @@ export default function NewDailyOrdersPage() {
                           <th className="py-2 pr-2 text-right font-medium text-muted-foreground">
                             {locale === "en" ? "Date" : "التاريخ"}
                           </th>
-                          <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                          <th className="w-20 py-2 text-center font-medium text-muted-foreground">
                             {locale === "en" ? "Orders" : "الطلبات"}
                           </th>
                           <th className="w-24 py-2 text-center font-medium text-muted-foreground">
+                            <div>{locale === "en" ? "Rate" : "السعر"}</div>
+                            <div className="text-[10px] font-normal text-muted-foreground/70">
+                              {locale === "en" ? "(KWD)" : "(د.ك)"}
+                            </div>
+                          </th>
+                          <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                            <div>{locale === "en" ? "Gross" : "الإجمالي"}</div>
+                            <div className="text-[10px] font-normal text-muted-foreground/70">
+                              {locale === "en" ? "(KWD)" : "(د.ك)"}
+                            </div>
+                          </th>
+                          <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                            <div>{locale === "en" ? "Wallet" : "المحفظة"}</div>
+                            <div className="text-[10px] font-normal text-muted-foreground/70">
+                              {locale === "en" ? "(KWD)" : "(د.ك)"}
+                            </div>
+                          </th>
+                          <th className="w-20 py-2 text-center font-medium text-muted-foreground">
                             {locale === "en" ? "Rating" : "التقييم"}
                           </th>
-                          <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                          <th className="w-28 py-2 text-center font-medium text-muted-foreground">
                             <div>{locale === "en" ? "Cash" : "تحصيل"}</div>
                             <div className="text-[10px] font-normal text-muted-foreground/70">
                               {locale === "en" ? "(KWD)" : "(د.ك)"}
@@ -638,6 +730,11 @@ export default function NewDailyOrdersPage() {
                             day: "numeric",
                           });
 
+                          // Auto-calculate gross
+                          const orders = entry.ordersCount ? Number(entry.ordersCount) : 0;
+                          const rate = entry.ratePerOrder ? Number(entry.ratePerOrder) : 0;
+                          const autoGross = orders * rate;
+
                           return (
                             <tr key={entry.date} className="hover:bg-muted/20">
                               <td className="py-2 pr-2">
@@ -652,6 +749,42 @@ export default function NewDailyOrdersPage() {
                                   onChange={(e) => updateDailyEntry(entry.date, "ordersCount", e.target.value)}
                                   className="input-field w-full text-center"
                                   placeholder="0"
+                                  dir="ltr"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  value={entry.ratePerOrder}
+                                  onChange={(e) => updateDailyEntry(entry.date, "ratePerOrder", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="0.000"
+                                  dir="ltr"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  value={entry.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")}
+                                  onChange={(e) => updateDailyEntry(entry.date, "grossAmount", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="0.000"
+                                  dir="ltr"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  value={entry.walletDeducted}
+                                  onChange={(e) => updateDailyEntry(entry.date, "walletDeducted", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="0.000"
                                   dir="ltr"
                                 />
                               </td>

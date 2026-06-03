@@ -1,33 +1,15 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
-import { ReportRowActions } from "./report-row-actions";
 import { MonthlyReportsFilters } from "./filters";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ status?: string; month?: string; year?: string; contractId?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; contractId?: string }>;
 }
-
-const STATUS_LABELS = {
-  ar: {
-    DRAFT: "مسودة",
-    SUBMITTED: "مقدم",
-    POSTED: "مرحل",
-    RECONCILED: "مسوى",
-  },
-  en: {
-    DRAFT: "Draft",
-    SUBMITTED: "Submitted",
-    POSTED: "Posted",
-    RECONCILED: "Reconciled",
-  },
-} as const;
 
 const MONTHS = {
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
@@ -46,29 +28,108 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
   // Get all contracts for filters
   const contracts = await prisma.deliveryContract.findMany({
     where: { companyId, isActive: true },
-    select: { id: true, nameAr: true, platform: true },
+    select: { id: true, nameAr: true, nameEn: true, platform: true },
     orderBy: { nameAr: "asc" },
   });
 
-  const reports = await prisma.deliveryMonthlyReport.findMany({
-    where: {
-      companyId,
-      ...(sp.status ? { status: sp.status as never } : {}),
-      ...(sp.month ? { month: parseInt(sp.month) } : {}),
-      ...(sp.year ? { year: parseInt(sp.year) } : {}),
-      ...(sp.contractId ? { contractId: sp.contractId } : {}),
+  // Build where clause for daily orders
+  const whereClause: {
+    companyId: string;
+    date?: { gte: Date; lt: Date };
+    contractId?: string;
+  } = {
+    companyId,
+    ...(sp.contractId ? { contractId: sp.contractId } : {}),
+  };
+
+  // Add date range filter if month/year provided
+  if (sp.month && sp.year) {
+    const month = parseInt(sp.month);
+    const year = parseInt(sp.year);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+    whereClause.date = { gte: startDate, lt: endDate };
+  } else if (sp.year) {
+    const year = parseInt(sp.year);
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year + 1, 0, 1);
+    whereClause.date = { gte: startDate, lt: endDate };
+  }
+
+  // Query daily orders
+  const dailyOrders = await prisma.deliveryDailyOrder.findMany({
+    where: whereClause,
+    include: {
+      driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
+      contract: { select: { nameAr: true, nameEn: true, platform: true } },
     },
-    include: { contract: { select: { nameAr: true, nameEn: true, platform: true } } },
-    orderBy: [{ year: "desc" }, { month: "desc" }],
+    orderBy: [{ date: "desc" }],
   });
+
+  // Group by driver and contract
+  type ReportLine = {
+    driverId: string;
+    driverName: string;
+    contractId: string;
+    contractName: string;
+    platform: string | null;
+    ordersCount: number;
+    grossAmount: number;
+    walletDeducted: number;
+    netAmount: number;
+    rating: number | null;
+  };
+
+  const grouped = new Map<string, ReportLine>();
+
+  dailyOrders.forEach((order) => {
+    const key = `${order.driverId}-${order.contractId}`;
+    const existing = grouped.get(key);
+
+    const grossAmount = order.grossAmount ? Number(order.grossAmount) : 0;
+    const walletDeducted = order.walletDeducted ? Number(order.walletDeducted) : 0;
+    const netAmount = grossAmount - walletDeducted;
+
+    if (existing) {
+      existing.ordersCount += order.ordersCount;
+      existing.grossAmount += grossAmount;
+      existing.walletDeducted += walletDeducted;
+      existing.netAmount += netAmount;
+      // Average rating
+      if (order.rating && existing.rating) {
+        existing.rating = (existing.rating + Number(order.rating)) / 2;
+      } else if (order.rating) {
+        existing.rating = Number(order.rating);
+      }
+    } else {
+      grouped.set(key, {
+        driverId: order.driverId,
+        driverName: locale === "en"
+          ? order.driver.employee.nameEn ?? order.driver.employee.nameAr
+          : order.driver.employee.nameAr,
+        contractId: order.contractId,
+        contractName: locale === "en"
+          ? order.contract.nameEn ?? order.contract.nameAr
+          : order.contract.nameAr,
+        platform: order.contract.platform,
+        ordersCount: order.ordersCount,
+        grossAmount,
+        walletDeducted,
+        netAmount,
+        rating: order.rating ? Number(order.rating) : null,
+      });
+    }
+  });
+
+  const reports = Array.from(grouped.values());
 
   // Calculate totals
   const totals = reports.reduce(
-    (acc: { orders: number; gross: number; wallet: number; net: number }, report) => ({
-      orders: acc.orders + report.totalOrdersCount,
-      gross: acc.gross + Number(report.totalGrossAmount),
-      wallet: acc.wallet + Number(report.totalWalletDeducted),
-      net: acc.net + Number(report.netPayment),
+    (acc, report) => ({
+      orders: acc.orders + report.ordersCount,
+      gross: acc.gross + report.grossAmount,
+      wallet: acc.wallet + report.walletDeducted,
+      net: acc.net + report.netAmount,
     }),
     { orders: 0, gross: 0, wallet: 0, net: 0 }
   );
@@ -77,17 +138,8 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
     <div>
       <Header
         title={locale === "en" ? "Monthly Reports" : "التقارير الشهرية"}
-        subtitle={locale === "en" ? "Monthly delivery reports and settlements" : "تقارير الطلبات والمدفوعات الشهرية"}
+        subtitle={locale === "en" ? "Auto-generated from daily orders" : "تقرير تلقائي من الطلبات اليومية"}
         companyId={companyId}
-        actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/delivery/monthly-reports/new`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus size={16} />
-            {locale === "en" ? "New Report" : "تقرير جديد"}
-          </Link>
-        }
       />
       <div className="page-container space-y-4">
         <MonthlyReportsFilters companyId={companyId} locale={locale} contracts={contracts} />
@@ -97,59 +149,51 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
             <table className="ar-table">
               <thead>
                 <tr>
-                  <th>{locale === "en" ? "Month / Year" : "الشهر / السنة"}</th>
+                  <th>{locale === "en" ? "Driver" : "السائق"}</th>
                   <th>{locale === "en" ? "Contract" : "العقد"}</th>
                   <th>{locale === "en" ? "Total orders" : "إجمالي الطلبات"}</th>
                   <th>{locale === "en" ? "Gross total" : "الإجمالي (د.ك)"}</th>
                   <th>{locale === "en" ? "Wallet deduction" : "خصم المحفظة"}</th>
                   <th>{locale === "en" ? "Net payment" : "صافي الدفع"}</th>
-                  <th>{locale === "en" ? "Status" : "الحالة"}</th>
-                  <th className="text-left">{locale === "en" ? "Actions" : "إجراءات"}</th>
+                  <th>{locale === "en" ? "Rating" : "التقييم"}</th>
                 </tr>
               </thead>
               <tbody>
                 {reports.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                      {locale === "en" ? "No reports found" : "لا توجد تقارير"}
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      {locale === "en" ? "No data found. Try adjusting filters." : "لا توجد بيانات. جرب تغيير الفلاتر."}
                     </td>
                   </tr>
                 ) : (
                   reports.map((report) => (
-                    <tr key={report.id} className="hover:bg-muted/30">
-                      <td className="font-medium">
-                        {MONTHS[locale][report.month - 1]} {report.year}
-                      </td>
+                    <tr key={`${report.driverId}-${report.contractId}`} className="hover:bg-muted/30">
+                      <td className="font-medium">{report.driverName}</td>
                       <td>
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs ${
-                            report.contract.platform === "TALABAT"
+                            report.platform === "TALABAT"
                               ? "bg-orange-50 text-orange-700"
-                              : report.contract.platform === "RO_POPS"
+                              : report.platform === "RO_POPS"
                                 ? "bg-blue-50 text-blue-700"
                                 : "bg-purple-50 text-purple-700"
                           }`}
                         >
-                          {locale === "en" ? report.contract.nameEn ?? report.contract.nameAr : report.contract.nameAr}
+                          {report.contractName}
                         </span>
                       </td>
-                      <td className="number text-center">{report.totalOrdersCount}</td>
+                      <td className="number text-center">{report.ordersCount}</td>
                       <td className="number font-bold text-blue-600">
-                        {formatKWD(Number(report.totalGrossAmount), numberLocale)}
+                        {formatKWD(report.grossAmount, numberLocale)}
                       </td>
                       <td className="number text-red-600">
-                        {formatKWD(Number(report.totalWalletDeducted), numberLocale)}
+                        {formatKWD(report.walletDeducted, numberLocale)}
                       </td>
                       <td className="number font-bold text-green-600">
-                        {formatKWD(Number(report.netPayment), numberLocale)}
+                        {formatKWD(report.netAmount, numberLocale)}
                       </td>
-                      <td>
-                        <span className={`status-${report.status.toLowerCase()} rounded-full px-2 py-0.5 text-xs`}>
-                          {STATUS_LABELS[locale][report.status as keyof typeof STATUS_LABELS.ar]}
-                        </span>
-                      </td>
-                      <td>
-                        <ReportRowActions companyId={companyId} reportId={report.id} locale={locale} />
+                      <td className="number text-center">
+                        {report.rating ? report.rating.toFixed(2) : "—"}
                       </td>
                     </tr>
                   ))
@@ -165,7 +209,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                     <td className="number text-blue-600">{formatKWD(totals.gross, numberLocale)}</td>
                     <td className="number text-red-600">{formatKWD(totals.wallet, numberLocale)}</td>
                     <td className="number text-green-600">{formatKWD(totals.net, numberLocale)}</td>
-                    <td colSpan={2}></td>
+                    <td></td>
                   </tr>
                 </tfoot>
               )}

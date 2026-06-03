@@ -1264,14 +1264,17 @@ model DeliveryContract {
 
 
 model DeliveryDailyOrder {
-  id          String   @id @default(cuid())
-  driverId    String
-  contractId  String
-  companyId   String
-  date        DateTime
-  ordersCount Int      @default(0)
-  rating      Decimal? @db.Decimal(5, 2)
-  notes       String?
+  id             String   @id @default(cuid())
+  driverId       String
+  contractId     String
+  companyId      String
+  date           DateTime
+  ordersCount    Int      @default(0)
+  ratePerOrder   Decimal? @db.Decimal(18, 3)
+  grossAmount    Decimal? @db.Decimal(18, 3)
+  walletDeducted Decimal? @db.Decimal(18, 3)
+  rating         Decimal? @db.Decimal(5, 2)
+  notes          String?
 
   driver   Driver           @relation(fields: [driverId], references: [id], onDelete: Restrict)
   contract DeliveryContract @relation(fields: [contractId], references: [id], onDelete: Restrict)

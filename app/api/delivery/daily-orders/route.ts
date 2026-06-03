@@ -5,9 +5,12 @@ import { z } from "zod";
 const entrySchema = z.object({
   driverId: z.string(),
   ordersCount: z.number().int().min(0),
+  ratePerOrder: z.number().min(0).optional(),
+  grossAmount: z.number().min(0).optional(),
+  walletDeducted: z.number().min(0).optional(),
   rating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
-  walletAmount: z.number().min(0).optional(), // مبلغ التحصيل النقدي اليومي
+  walletAmount: z.number().min(0).optional(), // مبلغ التحصيل النقدي اليومي (للـ wallet transactions)
 });
 
 const createSchema = z.object({
@@ -103,11 +106,17 @@ export async function POST(request: NextRequest) {
                 companyId,
                 date,
                 ordersCount: e.ordersCount,
+                ratePerOrder: e.ratePerOrder ?? null,
+                grossAmount: e.grossAmount ?? null,
+                walletDeducted: e.walletDeducted ?? null,
                 rating: e.rating ?? null,
                 notes: e.notes ?? null,
               },
               update: {
                 ordersCount: e.ordersCount,
+                ratePerOrder: e.ratePerOrder ?? null,
+                grossAmount: e.grossAmount ?? null,
+                walletDeducted: e.walletDeducted ?? null,
                 rating: e.rating ?? null,
                 notes: e.notes ?? null,
               },

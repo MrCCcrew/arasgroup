@@ -20,7 +20,6 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
   const [month, setMonth] = useState(searchParams.get("month") || "");
   const [year, setYear] = useState(searchParams.get("year") || "");
   const [contractId, setContractId] = useState(searchParams.get("contractId") || "");
-  const [status, setStatus] = useState(searchParams.get("status") || "");
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -30,7 +29,6 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
     if (month) params.set("month", month);
     if (year) params.set("year", year);
     if (contractId) params.set("contractId", contractId);
-    if (status) params.set("status", status);
 
     router.push(`/dashboard/companies/${companyId}/delivery/monthly-reports?${params.toString()}`);
   };
@@ -39,7 +37,6 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
     setMonth("");
     setYear("");
     setContractId("");
-    setStatus("");
     router.push(`/dashboard/companies/${companyId}/delivery/monthly-reports`);
   };
 
@@ -47,11 +44,11 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
     window.print();
   };
 
-  const hasActiveFilters = month || year || contractId || status;
+  const hasActiveFilters = month || year || contractId;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium">
             {locale === "en" ? "Month" : "الشهر"}
@@ -103,23 +100,6 @@ export function MonthlyReportsFilters({ companyId, locale, contracts }: Props) {
                 {c.nameAr} ({c.platform || "—"})
               </option>
             ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium">
-            {locale === "en" ? "Status" : "الحالة"}
-          </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="input-field w-full"
-          >
-            <option value="">{locale === "en" ? "All statuses" : "كل الحالات"}</option>
-            <option value="DRAFT">{locale === "en" ? "Draft" : "مسودة"}</option>
-            <option value="SUBMITTED">{locale === "en" ? "Submitted" : "مقدم"}</option>
-            <option value="POSTED">{locale === "en" ? "Posted" : "مرحل"}</option>
-            <option value="RECONCILED">{locale === "en" ? "Reconciled" : "مسوى"}</option>
           </select>
         </div>
 
