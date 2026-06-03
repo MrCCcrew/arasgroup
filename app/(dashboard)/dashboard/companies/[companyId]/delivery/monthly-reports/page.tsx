@@ -7,10 +7,11 @@ import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
 import { ReportRowActions } from "./report-row-actions";
+import { MonthlyReportsFilters } from "./filters";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; month?: string; year?: string; contractId?: string }>;
 }
 
 const STATUS_LABELS = {
@@ -42,11 +43,35 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
 
+  // Get all contracts for filters
+  const contracts = await prisma.deliveryContract.findMany({
+    where: { companyId, isActive: true },
+    select: { id: true, nameAr: true, platform: true },
+    orderBy: { nameAr: "asc" },
+  });
+
   const reports = await prisma.deliveryMonthlyReport.findMany({
-    where: { companyId, ...(sp.status ? { status: sp.status as never } : {}) },
+    where: {
+      companyId,
+      ...(sp.status ? { status: sp.status as never } : {}),
+      ...(sp.month ? { month: parseInt(sp.month) } : {}),
+      ...(sp.year ? { year: parseInt(sp.year) } : {}),
+      ...(sp.contractId ? { contractId: sp.contractId } : {}),
+    },
     include: { contract: { select: { nameAr: true, nameEn: true, platform: true } } },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
+
+  // Calculate totals
+  const totals = reports.reduce(
+    (acc: { orders: number; gross: number; wallet: number; net: number }, report) => ({
+      orders: acc.orders + report.totalOrdersCount,
+      gross: acc.gross + Number(report.totalGrossAmount),
+      wallet: acc.wallet + Number(report.totalWalletDeducted),
+      net: acc.net + Number(report.netPayment),
+    }),
+    { orders: 0, gross: 0, wallet: 0, net: 0 }
+  );
 
   return (
     <div>
@@ -65,21 +90,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
         }
       />
       <div className="page-container space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {["", "DRAFT", "SUBMITTED", "POSTED", "RECONCILED"].map((status) => (
-            <a
-              key={status}
-              href={`/dashboard/companies/${companyId}/delivery/monthly-reports${status ? `?status=${status}` : ""}`}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                sp.status === status || (!sp.status && !status)
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background hover:bg-muted"
-              }`}
-            >
-              {status ? STATUS_LABELS[locale][status as keyof typeof STATUS_LABELS.ar] : locale === "en" ? "All" : "الكل"}
-            </a>
-          ))}
-        </div>
+        <MonthlyReportsFilters companyId={companyId} locale={locale} contracts={contracts} />
 
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
@@ -144,6 +155,20 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                   ))
                 )}
               </tbody>
+              {reports.length > 0 && (
+                <tfoot className="border-t-2 border-primary/20 bg-muted/30">
+                  <tr className="font-bold">
+                    <td colSpan={2} className="text-right">
+                      {locale === "en" ? "Totals:" : "الإجماليات:"}
+                    </td>
+                    <td className="number text-center">{totals.orders.toLocaleString(numberLocale)}</td>
+                    <td className="number text-blue-600">{formatKWD(totals.gross, numberLocale)}</td>
+                    <td className="number text-red-600">{formatKWD(totals.wallet, numberLocale)}</td>
+                    <td className="number text-green-600">{formatKWD(totals.net, numberLocale)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
