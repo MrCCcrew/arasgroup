@@ -99,9 +99,14 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
       }
 
       if (action === "reverse") {
-        const response = await fetch(`/api/accounting/journal-entries/${entryId}/reverse`, { method: "POST" });
+        const response = await fetch(`/api/accounting/journal-entries/${entryId}/reverse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error ?? tr.actionFailed);
+        // Disable further clicks before navigation
+        setLoading("reverse");
         router.push(`/dashboard/companies/${companyId}/accounting/journal-entries/${payload.data.id}`);
         return;
       }
