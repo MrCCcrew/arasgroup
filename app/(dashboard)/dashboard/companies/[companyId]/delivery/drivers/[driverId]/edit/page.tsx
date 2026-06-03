@@ -32,6 +32,7 @@ interface DriverData {
     passportExpiryDate: string | null;
     dateOfBirth: string | null;
     baseSalary: string | null;
+    actualSalary: string | null;
     residencyNumber: string | null;
     residencyExpiry: string | null;
     healthCardExpiryDate: string | null;
@@ -69,6 +70,7 @@ export default function EditDriverPage() {
   const [passportNumber, setPassportNumber] = useState("");
   const [passportExpiryDate, setPassportExpiryDate] = useState("");
   const [baseSalary, setBaseSalary] = useState("");
+  const [actualSalary, setActualSalary] = useState("");
   const [residencyNumber, setResidencyNumber] = useState("");
   const [residencyExpiry, setResidencyExpiry] = useState("");
   const [healthCardExpiryDate, setHealthCardExpiryDate] = useState("");
@@ -104,6 +106,7 @@ export default function EditDriverPage() {
         setPassportNumber(d.employee.passportNumber ?? "");
         setPassportExpiryDate(d.employee.passportExpiryDate ? d.employee.passportExpiryDate.slice(0, 10) : "");
         setBaseSalary(d.employee.baseSalary ?? "");
+        setActualSalary(d.employee.actualSalary ?? "");
         setResidencyNumber(d.employee.residencyNumber ?? "");
         setResidencyExpiry(d.employee.residencyExpiry ? d.employee.residencyExpiry.slice(0, 10) : "");
         setHealthCardExpiryDate(d.employee.healthCardExpiryDate ? d.employee.healthCardExpiryDate.slice(0, 10) : "");
@@ -165,6 +168,7 @@ export default function EditDriverPage() {
       passportExpiryDate: passportExpiryDate || null,
       dateOfBirth: dateOfBirth || null,
       baseSalary: baseSalary ? Number(baseSalary) : null,
+      actualSalary: actualSalary ? Number(actualSalary) : null,
       residencyNumber: residencyNumber || null,
       residencyExpiry: residencyExpiry || null,
       healthCardExpiryDate: healthCardExpiryDate || null,
@@ -271,8 +275,14 @@ export default function EditDriverPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">الراتب الأساسي (د.ك)</label>
                 <input type="number" step="0.001" min="0" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="input-field w-full" dir="ltr" />
+                <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب بدل الإجازة السنوية ومكافأة نهاية الخدمة</p>
               </div>
               <div>
+                <label className="mb-1.5 block text-sm font-medium">الراتب الفعلي (د.ك)</label>
+                <input type="number" step="0.001" min="0" value={actualSalary} onChange={(e) => setActualSalary(e.target.value)} className="input-field w-full" dir="ltr" />
+                <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب دفعة الرواتب الشهرية (إن لم يُحدد، يُستخدم الراتب الأساسي)</p>
+              </div>
+              <div className="col-span-2">
                 <label className="mb-1.5 block text-sm font-medium">تارجيت الطلبات</label>
                 <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" disabled={isOfficeStaff} />
                 <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب الحافز/الخصم تلقائياً في الرواتب.</p>

@@ -784,6 +784,7 @@ model Employee {
   joinDate           DateTime?
   endDate            DateTime?
   baseSalary         Decimal?     @db.Decimal(18, 3)
+  actualSalary       Decimal?     @db.Decimal(18, 3)
   bankAccountNumber  String?
   passportCustodyStatus PassportCustodyStatus @default(WITH_DRIVER)
   passportReceivedDate DateTime?

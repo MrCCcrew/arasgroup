@@ -26,6 +26,7 @@ interface Employee {
   nameAr: string;
   type: string;
   baseSalary: number | null;
+  actualSalary: number | null;
   driver: DriverInfo | null;
 }
 
@@ -106,7 +107,7 @@ export default function NewSalaryBatchPage() {
                 employeeId: employee.id,
                 isDriver,
                 driverId: driver?.id ?? null,
-                baseAmount: employee.baseSalary != null ? String(employee.baseSalary) : "",
+                baseAmount: (employee.actualSalary ?? employee.baseSalary) != null ? String(employee.actualSalary ?? employee.baseSalary) : "",
                 targetOrders: isDriver ? String(driver?.targetOrders ?? 370) : "",
                 actualOrders: "",
                 incentive: "0",

@@ -33,6 +33,7 @@ export default function NewDriverPage() {
     residencyExpiry: "",
     phone: "",
     baseSalary: "",
+    actualSalary: "",
     joinDate: new Date().toISOString().split("T")[0],
     targetOrders: "370",
     isOfficeStaff: false,
@@ -83,6 +84,7 @@ export default function NewDriverPage() {
           residencyExpiry: form.residencyExpiry || undefined,
           phone: form.phone || undefined,
           baseSalary: form.baseSalary ? Number.parseFloat(form.baseSalary) : undefined,
+          actualSalary: form.actualSalary ? Number.parseFloat(form.actualSalary) : undefined,
           joinDate: form.joinDate || undefined,
           targetOrders: form.targetOrders ? Number.parseInt(form.targetOrders, 10) : undefined,
           employeeType: form.isOfficeStaff ? "DELIVERY_ADMIN" : "DELIVERY_DRIVER",
@@ -192,10 +194,20 @@ export default function NewDriverPage() {
                 <input type="date" value={form.residencyExpiry} onChange={(event) => setField("residencyExpiry", event.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Base salary (KWD)" : "الراتب الأساسي (KWD)"}</label>
-                <input type="number" min="0" step="0.001" value={form.baseSalary} onChange={(event) => setField("baseSalary", event.target.value)} className="input-field w-full" dir="ltr" placeholder="0.000" />
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Base salary (KWD)" : "الراتب الأساسي (د.ك)"}</label>
+                <input type="number" min="0" step="0.001" value={form.baseSalary} onChange={(event) => setField("baseSalary", event.target.value)} className="input-field w-full" dir="ltr" placeholder="120" />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en" ? "Used to calculate vacation pay, end-of-service, etc." : "يُستخدم لحساب بدل الإجازة السنوية ومكافأة نهاية الخدمة"}
+                </p>
               </div>
               <div>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Actual salary (KWD)" : "الراتب الفعلي (د.ك)"}</label>
+                <input type="number" min="0" step="0.001" value={form.actualSalary} onChange={(event) => setField("actualSalary", event.target.value)} className="input-field w-full" dir="ltr" placeholder="370" />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en" ? "Used for monthly salary payments (if not set, base salary is used)" : "يُستخدم لحساب دفعة الرواتب الشهرية (إن لم يُحدد، يُستخدم الراتب الأساسي)"}
+                </p>
+              </div>
+              <div className="col-span-2">
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Join date" : "تاريخ الالتحاق"}</label>
                 <input type="date" value={form.joinDate} onChange={(event) => setField("joinDate", event.target.value)} className="input-field w-full" dir="ltr" />
               </div>

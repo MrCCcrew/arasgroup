@@ -16,6 +16,7 @@ const updateSchema = z.object({
   passportNumber: z.string().optional().nullable(),
   passportExpiryDate: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
   baseSalary: z.number().optional().nullable(),
+  actualSalary: z.number().optional().nullable(),
   residencyNumber: z.string().optional().nullable(),
   residencyExpiry: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
   healthCardExpiryDate: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
             passportExpiryDate: true,
             dateOfBirth: true,
             baseSalary: true,
+            actualSalary: true,
             residencyNumber: true,
             residencyExpiry: true,
             healthCardExpiryDate: true,
@@ -124,6 +126,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       passportExpiryDate,
       dateOfBirth,
       baseSalary,
+      actualSalary,
       residencyNumber,
       residencyExpiry,
       healthCardExpiryDate,
@@ -142,6 +145,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (passportNumber !== undefined) employeeData.passportNumber = passportNumber;
       if (passportExpiryDate !== undefined) employeeData.passportExpiryDate = passportExpiryDate;
       if (baseSalary !== undefined) employeeData.baseSalary = baseSalary;
+      if (actualSalary !== undefined) employeeData.actualSalary = actualSalary;
       if (residencyNumber !== undefined) employeeData.residencyNumber = residencyNumber;
       if (residencyExpiry !== undefined) employeeData.residencyExpiry = residencyExpiry;
       if (healthCardExpiryDate !== undefined) employeeData.healthCardExpiryDate = healthCardExpiryDate;
