@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle, XCircle, DollarSign, Printer } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { SalaryWhatsAppButton } from "@/components/hr/salary-whatsapp-button";
+import { SalaryPDFButton } from "@/components/hr/salary-pdf-button";
 import { useLocale } from "@/components/providers/locale-provider";
 import { formatKWD, formatMonthYear } from "@/lib/utils";
 
@@ -254,7 +255,7 @@ export default function SalaryBatchDetailPage() {
                   <th>{locale === "en" ? "Additions" : "إضافات"}</th>
                   <th>{locale === "en" ? "Deductions" : "خصومات"}</th>
                   <th>{locale === "en" ? "Net" : "الصافي"}</th>
-                  <th>{locale === "en" ? "WhatsApp" : "واتساب"}</th>
+                  <th colSpan={2}>{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,7 +309,10 @@ export default function SalaryBatchDetailPage() {
                           {formatKWD(Number(payment.netAmount), numLocale)}
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <SalaryWhatsAppButton paymentId={payment.id} />
+                          <div className="flex gap-2">
+                            <SalaryPDFButton companyId={companyId} batchId={batchId} paymentId={payment.id} />
+                            <SalaryWhatsAppButton paymentId={payment.id} />
+                          </div>
                         </td>
                       </tr>
 
