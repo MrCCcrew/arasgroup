@@ -48,6 +48,13 @@ const ENTITIES: EntityConfig[] = [
     color: "purple",
   },
   {
+    key: "investor-employees",
+    labelAr: "موظفين وعمال المستثمرين",
+    description: "الموظفون والعمال المرتبطون بالمسئولين (للحسابات والمطالبات)",
+    apiPath: "investor-employees",
+    color: "pink",
+  },
+  {
     key: "vehicles",
     labelAr: "المركبات",
     description: "مركبات الشركة (توصيل، غسيل، إدارية)",
@@ -99,6 +106,7 @@ const COLOR_CLASSES: Record<string, { bg: string; border: string; text: string; 
   blue:    { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700",    badge: "bg-blue-100 text-blue-700" },
   orange:  { bg: "bg-orange-50",  border: "border-orange-200",  text: "text-orange-700",  badge: "bg-orange-100 text-orange-700" },
   purple:  { bg: "bg-purple-50",  border: "border-purple-200",  text: "text-purple-700",  badge: "bg-purple-100 text-purple-700" },
+  pink:    { bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-700",    badge: "bg-pink-100 text-pink-700" },
   slate:   { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700",   badge: "bg-slate-100 text-slate-700" },
   cyan:    { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-700",    badge: "bg-cyan-100 text-cyan-700" },
   emerald: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
