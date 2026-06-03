@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendPush } from "@/lib/push";
-
+const CRON_SECRET = process.env.CRON_SECRET;
 // Called by cron every minute: GET /api/push/dispatch
 export const dynamic = "force-dynamic";
 
