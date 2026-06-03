@@ -65,7 +65,7 @@ export default async function EndOfServicePage({ params }: Props) {
   });
 
   const totals = records.reduce(
-    (accumulator: { calculated: number; accrued: number; paid: number }, record) => {
+    (accumulator: { calculated: number; accrued: number; paid: number }, record: typeof records[number]) => {
       if (record.status === "CALCULATED") accumulator.calculated += Number(record.netIndemnity);
       if (record.status === "ACCRUED") accumulator.accrued += Number(record.netIndemnity);
       if (record.status === "PAID") accumulator.paid += Number(record.netIndemnity);
