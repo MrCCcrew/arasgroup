@@ -199,13 +199,15 @@ export default async function GroupDashboardPage() {
                         </div>
                         <div className="mt-1 font-bold">{investorEmployees}</div>
                       </div>
-                      <div className="rounded-lg bg-red-50 px-3 py-2 text-red-700">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>المحذوفون</span>
-                          <AlertTriangle size={13} />
+                      {session.isSuperAdmin && (
+                        <div className="rounded-lg bg-red-50 px-3 py-2 text-red-700">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>المحذوفون</span>
+                            <AlertTriangle size={13} />
+                          </div>
+                          <div className="mt-1 font-bold">{deleted}</div>
                         </div>
-                        <div className="mt-1 font-bold">{deleted}</div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="mt-3 flex items-center justify-between">
