@@ -48,3 +48,10 @@ public/uploads/
 # Type-check output
 *.tsbuildinfo
 next-env.d.ts
+# Security
+.env
+.env.*
+*.backup*
+scanner_linux
+backups/
+logs/
