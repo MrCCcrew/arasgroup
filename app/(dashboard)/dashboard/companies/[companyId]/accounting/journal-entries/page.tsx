@@ -47,6 +47,7 @@ const typeLabels = {
     INVESTOR_COLLECTION: "تحصيل مسئول",
     INVESTOR_SALARY_COLLECTION: "تحصيل رواتب مسئول",
     EXPENSE: "مصروف",
+    REVERSAL: "قيد عكسي",
   },
   en: {
     GENERAL: "General entry",
@@ -61,6 +62,7 @@ const typeLabels = {
     INVESTOR_COLLECTION: "Investor collection",
     INVESTOR_SALARY_COLLECTION: "Investor salary collection",
     EXPENSE: "Expense",
+    REVERSAL: "Reversal entry",
   },
 } as const;
 

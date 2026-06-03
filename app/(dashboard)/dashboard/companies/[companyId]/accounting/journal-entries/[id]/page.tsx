@@ -29,6 +29,7 @@ const typeLabels: Record<string, { ar: string; en: string }> = {
   ADJUSTMENT: { ar: "تسوية", en: "Adjustment" },
   OPENING_BALANCE: { ar: "رصيد افتتاحي", en: "Opening balance" },
   DEPRECIATION: { ar: "إهلاك", en: "Depreciation" },
+  REVERSAL: { ar: "قيد عكسي", en: "Reversal entry" },
 };
 
 const statusLabels: Record<string, { ar: string; en: string }> = {
@@ -116,6 +117,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
     revert: canUpdate && ["PENDING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"].includes(entry.status),
     cancel: canUpdate && ["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"].includes(entry.status),
     delete: canDelete && !entry.isAutomatic && ["DRAFT", "REJECTED", "CANCELLED"].includes(entry.status),
+    reverse: canUpdate && entry.status === "POSTED" && !entry.isReversed,
   };
 
   const isPrintable = entry.type === "RECEIPT" || entry.type === "PAYMENT";

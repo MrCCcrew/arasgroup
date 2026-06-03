@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, CheckCircle, RotateCcw, Send, Trash2, Undo2, XCircle } from "lucide-react";
+import { Ban, CheckCircle, RotateCcw, Send, Trash2, Undo2, XCircle, ArrowLeftRight } from "lucide-react";
 
 interface AvailableActions {
   submit: boolean;
@@ -12,6 +12,7 @@ interface AvailableActions {
   revert: boolean;
   cancel: boolean;
   delete: boolean;
+  reverse: boolean;
 }
 
 interface Props {
@@ -22,10 +23,10 @@ interface Props {
   locale?: "ar" | "en";
 }
 
-type ActionName = "submit" | "approve" | "reject" | "post" | "revert" | "cancel" | "delete";
+type ActionName = "submit" | "approve" | "reject" | "post" | "revert" | "cancel" | "delete" | "reverse";
 
 const ACTION_CONFIG: Record<
-  Exclude<ActionName, "delete">,
+  Exclude<ActionName, "delete" | "reverse">,
   { label: { ar: string; en: string }; loadingLabel: { ar: string; en: string }; className: string; icon: typeof Send }
 > = {
   submit: {
@@ -74,8 +75,12 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
     actionFailed: en ? "Failed to perform the action" : "فشل في تنفيذ الإجراء",
     yearLocked: en ? "Year locked" : "السنة مقفلة",
     confirmDelete: en ? "Delete this entry?" : "هل تريد حذف هذا القيد؟",
+    confirmReverse: en ? "Are you sure you want to reverse this entry? A reversal entry will be created and this action cannot be undone." : "هل أنت متأكد من عكس هذا القيد؟ سيتم إنشاء قيد عكسي ولا يمكن التراجع عن العملية.",
+    reversing: en ? "Reversing..." : "جارٍ العكس...",
+    reverse: en ? "Reverse Entry" : "عكس القيد",
     deleting: en ? "Deleting..." : "جارٍ الحذف...",
     delete: en ? "Delete" : "حذف",
+    reversalSuccess: en ? "Entry reversed successfully" : "تم عكس القيد بنجاح",
   };
   const [loading, setLoading] = useState<ActionName | null>(null);
   const [error, setError] = useState("");
@@ -90,6 +95,14 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error ?? tr.deleteFailed);
         router.push(`/dashboard/companies/${companyId}/accounting/journal-entries`);
+        return;
+      }
+
+      if (action === "reverse") {
+        const response = await fetch(`/api/accounting/journal-entries/${entryId}/reverse`, { method: "POST" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? tr.actionFailed);
+        router.push(`/dashboard/companies/${companyId}/accounting/journal-entries/${payload.data.id}`);
         return;
       }
 
@@ -132,6 +145,23 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
             >
               <Trash2 size={15} />
               {loading === "delete" ? tr.deleting : tr.delete}
+            </button>
+          );
+        }
+
+        if (action === "reverse") {
+          return (
+            <button
+              key={action}
+              type="button"
+              disabled={loading !== null}
+              onClick={() => {
+                if (confirm(tr.confirmReverse)) doAction("reverse");
+              }}
+              className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-600 px-3 py-2 text-sm text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+            >
+              <ArrowLeftRight size={15} />
+              {loading === "reverse" ? tr.reversing : tr.reverse}
             </button>
           );
         }

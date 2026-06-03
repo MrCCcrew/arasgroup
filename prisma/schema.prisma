@@ -514,6 +514,12 @@ model JournalEntry {
   isDeleted     Boolean          @default(false)
   deletedAt     DateTime?
 
+  // Reversal tracking fields
+  isReversed      Boolean   @default(false)
+  reversedAt      DateTime?
+  reversedBy      String?
+  reversalEntryId String?
+
   approvedById String?
   approvedAt   DateTime?
   postedById   String?
@@ -541,6 +547,8 @@ model JournalEntry {
   @@index([type])
   @@index([refModule, refId])
   @@index([isDeleted])
+  @@index([isReversed])
+  @@index([reversalEntryId])
   @@index([createdAt])
   @@map("journal_entries")
 }
@@ -562,6 +570,7 @@ enum JournalEntryType {
   INVESTOR_SALARY_COLLECTION
   INVESTOR_SALARY_DISBURSEMENT
   EXPENSE
+  REVERSAL
 }
 
 enum JournalStatus {

@@ -309,6 +309,94 @@ export async function getAccountBalance(
   return { debit, credit, balance: debit - credit };
 }
 
+export async function reverseJournalEntry(journalEntryId: string, userId: string): Promise<JournalEntry> {
+  const entry = await prisma.journalEntry.findUnique({
+    where: { id: journalEntryId },
+    include: {
+      lines: true,
+      fiscalYear: true,
+    },
+  });
+
+  if (!entry) throw new Error("القيد غير موجود");
+  if (entry.isDeleted) throw new Error("القيد محذوف");
+  if (entry.status !== "POSTED") throw new Error("لا يمكن عكس قيد غير مرحّل");
+  if (entry.isReversed) throw new Error("هذا القيد تم عكسه سابقاً");
+  if (entry.fiscalYear.isLocked) throw new Error("الفترة المالية مغلقة");
+
+  const fiscalYear = entry.fiscalYear;
+  const year = fiscalYear.year;
+  const type = entry.type === "GENERAL" ? "REVERSAL" : entry.type;
+  const number = await getNextJournalNumber(entry.companyId, year, type);
+
+  const totalDebit = entry.lines.reduce((sum, line) => sum + Number(line.credit), 0);
+  const totalCredit = entry.lines.reduce((sum, line) => sum + Number(line.debit), 0);
+
+  const reversalEntry = await prisma.journalEntry.create({
+    data: {
+      companyId: entry.companyId,
+      fiscalYearId: entry.fiscalYearId,
+      number,
+      date: new Date(),
+      descriptionAr: `عكس القيد رقم ${entry.number}`,
+      descriptionEn: entry.descriptionEn ? `Reversal of entry ${entry.number}` : undefined,
+      type,
+      status: "POSTED",
+      reference: entry.reference,
+      refModule: entry.refModule,
+      refId: entry.refId,
+      isAutomatic: false,
+      costCenterId: entry.costCenterId,
+      totalDebit,
+      totalCredit,
+      createdById: userId,
+      postedById: userId,
+      postedAt: new Date(),
+      lines: {
+        create: entry.lines.map((line, index) => ({
+          accountId: line.accountId,
+          descriptionAr: line.descriptionAr,
+          descriptionEn: line.descriptionEn,
+          debit: line.credit,
+          credit: line.debit,
+          sortOrder: index,
+          costCenterId: line.costCenterId,
+          driverId: line.driverId,
+          employeeId: line.employeeId,
+          investorId: line.investorId,
+          branchId: line.branchId,
+          carWashVehicleId: line.carWashVehicleId,
+        })),
+      },
+    },
+    include: { lines: true },
+  });
+
+  await prisma.journalEntry.update({
+    where: { id: journalEntryId },
+    data: {
+      isReversed: true,
+      reversedAt: new Date(),
+      reversedBy: userId,
+      reversalEntryId: reversalEntry.id,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: "REVERSE",
+      module: "accounting",
+      resourceId: journalEntryId,
+      resourceType: "JournalEntry",
+      journalEntryId,
+      newValues: { reversalEntryId: reversalEntry.id },
+    },
+  });
+
+  return reversalEntry;
+}
+
 export async function getTrialBalance(
   companyId: string,
   fiscalYearId: string,
