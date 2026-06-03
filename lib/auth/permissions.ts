@@ -479,13 +479,18 @@ function hasScopedGrant(
   if (options?.branchId) {
     const branchGrant = user.branchAccess.find((entry) => entry.branchId === options.branchId);
     if (branchGrant) return branchGrant[flag];
+    // If branchId specified but no grant found, deny access
+    return false;
   }
 
   if (options?.companyId) {
     const companyGrant = user.companyAccessEntries.find((entry) => entry.companyId === options.companyId);
     if (companyGrant) return companyGrant[flag];
+    // If companyId specified but no grant found, deny access
+    return false;
   }
 
+  // Only check any company if no specific company/branch requested
   return user.companyAccessEntries.some((entry) => entry[flag]);
 }
 
