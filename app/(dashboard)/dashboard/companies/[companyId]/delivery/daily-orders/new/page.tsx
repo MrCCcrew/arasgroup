@@ -24,7 +24,14 @@ interface EntryLine {
   driverId: string;
   ordersCount: string;
   rating: string;
-  walletAmount: string; // مبلغ التحصيل النقدي اليومي
+  walletAmount: string;
+}
+
+interface DailyEntry {
+  date: string;
+  ordersCount: string;
+  rating: string;
+  walletAmount: string;
 }
 
 const PLATFORM_LABELS = {
@@ -42,15 +49,19 @@ export default function NewDailyOrdersPage() {
   const [error, setError] = useState("");
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [date, setDate] = useState(today);
   const [contractId, setContractId] = useState("");
+
+  // Single date mode (legacy - all drivers for one day)
+  const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
+  const [date, setDate] = useState(today);
   const [lines, setLines] = useState<EntryLine[]>([]);
 
-  // Multiple dates support
-  const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
+  // Multiple dates mode (one driver for multiple days)
+  const [selectedDriverId, setSelectedDriverId] = useState("");
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [additionalDates, setAdditionalDates] = useState<string[]>([]);
+  const [dailyEntries, setDailyEntries] = useState<DailyEntry[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -71,9 +82,21 @@ export default function NewDailyOrdersPage() {
             walletAmount: "",
           }))
         );
+        // Set first driver as selected for multiple mode
+        if (driverPayload.data.length > 0) {
+          setSelectedDriverId(driverPayload.data[0].id);
+        }
       }
     });
   }, [companyId]);
+
+  // Sync daily entries when dates change in multiple mode
+  useEffect(() => {
+    if (dateMode === "multiple") {
+      syncDailyEntries();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMode, fromDate, toDate, additionalDates]);
 
   function updateLine(index: number, field: keyof EntryLine, value: string) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, [field]: value } : line)));
@@ -115,51 +138,125 @@ export default function NewDailyOrdersPage() {
     );
   }
 
+  // Update daily entries when selected dates change (multiple mode only)
+  function syncDailyEntries() {
+    if (dateMode !== "multiple") return;
+
+    const selectedDates = getSelectedDates();
+    setDailyEntries((prev) => {
+      const newEntries: DailyEntry[] = selectedDates.map((date) => {
+        const existing = prev.find((e) => e.date === date);
+        return existing ?? { date, ordersCount: "", rating: "", walletAmount: "" };
+      });
+      return newEntries;
+    });
+  }
+
+  // Update a specific day's data
+  function updateDailyEntry(date: string, field: keyof Omit<DailyEntry, "date">, value: string) {
+    setDailyEntries((prev) =>
+      prev.map((entry) => (entry.date === date ? { ...entry, [field]: value } : entry))
+    );
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
 
-    const entries = lines
-      .filter((line) => line.ordersCount !== "" && Number.parseInt(line.ordersCount, 10) >= 0)
-      .map((line) => ({
-        driverId: line.driverId,
-        ordersCount: Number.parseInt(line.ordersCount, 10),
-        ...(line.rating ? { rating: Number.parseFloat(line.rating) } : {}),
-        ...(line.walletAmount && Number(line.walletAmount) > 0
-          ? { walletAmount: Number(line.walletAmount) }
-          : {}),
-      }));
+    if (dateMode === "single") {
+      // Legacy mode: all drivers for one day
+      const entries = lines
+        .filter((line) => line.ordersCount !== "" && Number.parseInt(line.ordersCount, 10) >= 0)
+        .map((line) => ({
+          driverId: line.driverId,
+          ordersCount: Number.parseInt(line.ordersCount, 10),
+          ...(line.rating ? { rating: Number.parseFloat(line.rating) } : {}),
+          ...(line.walletAmount && Number(line.walletAmount) > 0
+            ? { walletAmount: Number(line.walletAmount) }
+            : {}),
+        }));
 
-    if (entries.length === 0) {
-      setError(locale === "en" ? "Enter orders for at least one driver" : "يرجى إدخال عدد الطلبات لسائق واحد على الأقل");
-      return;
-    }
+      if (entries.length === 0) {
+        setError(locale === "en" ? "Enter orders for at least one driver" : "يرجى إدخال عدد الطلبات لسائق واحد على الأقل");
+        return;
+      }
 
-    const selectedDates = getSelectedDates();
-    if (selectedDates.length === 0) {
-      setError(locale === "en" ? "Please select at least one date" : "يرجى اختيار تاريخ واحد على الأقل");
-      return;
-    }
+      setLoading(true);
+      try {
+        const res = await fetch("/api/delivery/daily-orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            contractId,
+            dates: [date],
+            entries,
+          }),
+        });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "فشل في الحفظ");
+        router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "فشل في الحفظ");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Multiple mode: one driver for multiple days
+      if (!selectedDriverId) {
+        setError(locale === "en" ? "Please select a driver" : "يرجى اختيار سائق");
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const res = await fetch("/api/delivery/daily-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const validEntries = dailyEntries.filter(
+        (entry) => entry.ordersCount !== "" && Number.parseInt(entry.ordersCount, 10) >= 0
+      );
+
+      if (validEntries.length === 0) {
+        setError(locale === "en" ? "Enter orders for at least one day" : "يرجى إدخال عدد الطلبات ليوم واحد على الأقل");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Send each day separately with the same driver
+        const requests = validEntries.map((entry) => ({
           companyId,
           contractId,
-          dates: selectedDates,
-          entries,
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "فشل في الحفظ");
-      router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل في الحفظ");
-    } finally {
-      setLoading(false);
+          dates: [entry.date],
+          entries: [
+            {
+              driverId: selectedDriverId,
+              ordersCount: Number.parseInt(entry.ordersCount, 10),
+              ...(entry.rating ? { rating: Number.parseFloat(entry.rating) } : {}),
+              ...(entry.walletAmount && Number(entry.walletAmount) > 0
+                ? { walletAmount: Number(entry.walletAmount) }
+                : {}),
+            },
+          ],
+        }));
+
+        const results = await Promise.all(
+          requests.map((req) =>
+            fetch("/api/delivery/daily-orders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(req),
+            })
+          )
+        );
+
+        const failed = results.filter((r) => !r.ok);
+        if (failed.length > 0) {
+          throw new Error(`فشل في حفظ ${failed.length} من ${results.length} يوم`);
+        }
+
+        router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "فشل في الحفظ");
+      } finally {
+        setLoading(false);
+      }
     }
   }
 
@@ -367,134 +464,249 @@ export default function NewDailyOrdersPage() {
             )}
           </div>
 
-          {/* جدول السائقين */}
-          <div className="section-card">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              {locale === "en" ? "Driver orders" : "طلبات السائقين"}
-              {selectedContract && (
-                <span className="mr-2 font-normal normal-case text-primary">
-                  {" — "}
-                  {locale === "en" ? selectedContract.nameEn ?? selectedContract.nameAr : selectedContract.nameAr}
-                </span>
+          {/* Single Day Mode: All Drivers Table */}
+          {dateMode === "single" && (
+            <div className="section-card">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                {locale === "en" ? "Driver orders" : "طلبات السائقين"}
+                {selectedContract && (
+                  <span className="mr-2 font-normal normal-case text-primary">
+                    {" — "}
+                    {locale === "en" ? selectedContract.nameEn ?? selectedContract.nameAr : selectedContract.nameAr}
+                  </span>
+                )}
+              </h3>
+
+              {drivers.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {locale === "en" ? "No drivers registered" : "لا يوجد سائقون مسجلون"}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="py-2 pr-2 text-right font-medium text-muted-foreground">
+                          {locale === "en" ? "Driver" : "السائق"}
+                        </th>
+                        <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                          {locale === "en" ? "Orders" : "الطلبات"}
+                        </th>
+                        <th className="w-24 py-2 text-center font-medium text-muted-foreground">
+                          {locale === "en" ? "Rating" : "التقييم"}
+                        </th>
+                        <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                          <div>{locale === "en" ? "Cash" : "تحصيل"}</div>
+                          <div className="text-[10px] font-normal text-muted-foreground/70">
+                            {locale === "en" ? "(KWD)" : "(د.ك)"}
+                          </div>
+                        </th>
+                        <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                          <div>{locale === "en" ? "Balance" : "الرصيد"}</div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {lines.map((line, index) => {
+                        const driver = drivers.find((d) => d.id === line.driverId);
+                        const driverName = driver
+                          ? locale === "en"
+                            ? driver.employee.nameEn ?? driver.employee.nameAr
+                            : driver.employee.nameAr
+                          : "-";
+                        const balance = driver ? Number(driver.walletBalance) : 0;
+                        const walletAmt = line.walletAmount ? Number(line.walletAmount) : 0;
+                        const projectedBalance = balance + walletAmt;
+
+                        return (
+                          <tr key={line.driverId} className="hover:bg-muted/20">
+                            <td className="py-2 pr-2 font-medium">{driverName}</td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                value={line.ordersCount}
+                                onChange={(e) => updateLine(index, "ordersCount", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="0"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                max="5"
+                                step="0.1"
+                                value={line.rating}
+                                onChange={(e) => updateLine(index, "rating", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="-"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={line.walletAmount}
+                                onChange={(e) => updateLine(index, "walletAmount", e.target.value)}
+                                className="input-field w-full text-center"
+                                placeholder="0.000"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="py-1.5 text-center">
+                              <div className={`number text-xs font-bold ${projectedBalance > 0 ? "text-red-600" : "text-green-600"}`}>
+                                {fmtKWD(projectedBalance)}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </h3>
-
-            {drivers.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                {locale === "en" ? "No drivers registered" : "لا يوجد سائقون مسجلون"}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-2 pr-2 text-right font-medium text-muted-foreground">
-                        {locale === "en" ? "Driver" : "السائق"}
-                      </th>
-                      <th className="w-28 py-2 text-center font-medium text-muted-foreground">
-                        {locale === "en" ? "Orders" : "الطلبات"}
-                      </th>
-                      <th className="w-24 py-2 text-center font-medium text-muted-foreground">
-                        {locale === "en" ? "Rating" : "التقييم"}
-                      </th>
-                      <th className="w-32 py-2 text-center font-medium text-muted-foreground">
-                        <div>{locale === "en" ? "Today's cash" : "تحصيل اليوم"}</div>
-                        <div className="text-[10px] font-normal text-muted-foreground/70">
-                          {locale === "en" ? "(KWD)" : "(د.ك)"}
-                        </div>
-                      </th>
-                      <th className="w-32 py-2 text-center font-medium text-muted-foreground">
-                        <div>{locale === "en" ? "Balance" : "رصيد المحفظة"}</div>
-                        <div className="text-[10px] font-normal text-muted-foreground/70">
-                          {locale === "en" ? "current" : "الحالي"}
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {lines.map((line, index) => {
-                      const driver = drivers.find((d) => d.id === line.driverId);
-                      const driverName = driver
-                        ? locale === "en"
-                          ? driver.employee.nameEn ?? driver.employee.nameAr
-                          : driver.employee.nameAr
-                        : "-";
-                      const balance = driver ? Number(driver.walletBalance) : 0;
-                      // الرصيد المتوقع بعد إضافة التحصيل اليومي
-                      const walletAmt = line.walletAmount ? Number(line.walletAmount) : 0;
-                      const projectedBalance = balance + walletAmt;
-
-                      return (
-                        <tr key={line.driverId} className="hover:bg-muted/20">
-                          <td className="py-2 pr-2 font-medium">{driverName}</td>
-                          <td className="py-1.5">
-                            <input
-                              type="number"
-                              min="0"
-                              value={line.ordersCount}
-                              onChange={(e) => updateLine(index, "ordersCount", e.target.value)}
-                              className="input-field w-full text-center"
-                              placeholder="0"
-                              dir="ltr"
-                            />
-                          </td>
-                          <td className="py-1.5">
-                            <input
-                              type="number"
-                              min="1"
-                              max="5"
-                              step="0.1"
-                              value={line.rating}
-                              onChange={(e) => updateLine(index, "rating", e.target.value)}
-                              className="input-field w-full text-center"
-                              placeholder="-"
-                              dir="ltr"
-                            />
-                          </td>
-                          <td className="py-1.5">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.001"
-                              value={line.walletAmount}
-                              onChange={(e) => updateLine(index, "walletAmount", e.target.value)}
-                              className="input-field w-full text-center"
-                              placeholder="0.000"
-                              dir="ltr"
-                            />
-                          </td>
-                          <td className="py-1.5 text-center">
-                            <div className={`number text-xs font-bold ${projectedBalance > 0 ? "text-red-600" : "text-green-600"}`}>
-                              {fmtKWD(projectedBalance)}
-                            </div>
-                            {walletAmt > 0 && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {locale === "en" ? "after entry" : "بعد التسجيل"}
-                              </div>
-                            )}
-                            {walletAmt === 0 && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {locale === "en" ? "current" : "حالياً"}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
-              <span className="mt-0.5 text-orange-400">●</span>
-              <span>
-                {locale === "en"
-                  ? "Leave orders count empty to skip the driver. Wallet amount = cash collected today by driver (creates a CHARGE transaction)."
-                  : "اترك خانة الطلبات فارغة لتجاهل السائق. تحصيل اليوم = النقد اللي جمعه السائق اليوم ويُسجّل كحركة شحن على المحفظة."}
-              </span>
             </div>
-          </div>
+          )}
+
+          {/* Multiple Days Mode: Select Driver + Daily Entries */}
+          {dateMode === "multiple" && (
+            <>
+              {/* Select Driver */}
+              <div className="section-card">
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                  {locale === "en" ? "Select driver" : "اختر السائق"}
+                </h3>
+                <select
+                  value={selectedDriverId}
+                  onChange={(e) => setSelectedDriverId(e.target.value)}
+                  className="input-field w-full"
+                  required
+                >
+                  <option value="">{locale === "en" ? "Choose driver..." : "اختر السائق..."}</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {locale === "en" ? d.employee.nameEn ?? d.employee.nameAr : d.employee.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Daily Entries Table */}
+              {dailyEntries.length > 0 && selectedDriverId && (
+                <div className="section-card">
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    {locale === "en" ? "Daily orders" : "الطلبات اليومية"}
+                    <span className="mr-2 font-normal normal-case text-primary">
+                      {" — "}
+                      {drivers.find((d) => d.id === selectedDriverId)?.employee.nameAr}
+                    </span>
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="py-2 pr-2 text-right font-medium text-muted-foreground">
+                            {locale === "en" ? "Date" : "التاريخ"}
+                          </th>
+                          <th className="w-28 py-2 text-center font-medium text-muted-foreground">
+                            {locale === "en" ? "Orders" : "الطلبات"}
+                          </th>
+                          <th className="w-24 py-2 text-center font-medium text-muted-foreground">
+                            {locale === "en" ? "Rating" : "التقييم"}
+                          </th>
+                          <th className="w-32 py-2 text-center font-medium text-muted-foreground">
+                            <div>{locale === "en" ? "Cash" : "تحصيل"}</div>
+                            <div className="text-[10px] font-normal text-muted-foreground/70">
+                              {locale === "en" ? "(KWD)" : "(د.ك)"}
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {dailyEntries.map((entry) => {
+                          const dateObj = new Date(entry.date + "T12:00:00");
+                          const dayName = dateObj.toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
+                            weekday: "short",
+                          });
+                          const dateFormatted = dateObj.toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
+                            month: "short",
+                            day: "numeric",
+                          });
+
+                          return (
+                            <tr key={entry.date} className="hover:bg-muted/20">
+                              <td className="py-2 pr-2">
+                                <div className="font-medium">{dateFormatted}</div>
+                                <div className="text-xs text-muted-foreground">{dayName}</div>
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={entry.ordersCount}
+                                  onChange={(e) => updateDailyEntry(entry.date, "ordersCount", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="0"
+                                  dir="ltr"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  step="0.1"
+                                  value={entry.rating}
+                                  onChange={(e) => updateDailyEntry(entry.date, "rating", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="-"
+                                  dir="ltr"
+                                />
+                              </td>
+                              <td className="py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  value={entry.walletAmount}
+                                  onChange={(e) => updateDailyEntry(entry.date, "walletAmount", e.target.value)}
+                                  className="input-field w-full text-center"
+                                  placeholder="0.000"
+                                  dir="ltr"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <span className="mt-0.5 text-blue-400">ℹ</span>
+                    <span>
+                      {locale === "en"
+                        ? "Enter different data for each day. Leave orders empty to skip that day."
+                        : "أدخل بيانات مختلفة لكل يوم. اترك الطلبات فارغة لتجاهل ذلك اليوم."}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {dailyEntries.length === 0 && (
+                <div className="section-card">
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    {locale === "en" ? "Select dates above to continue" : "اختر التواريخ أعلاه للمتابعة"}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           <div className="flex items-center gap-3">
             <button
