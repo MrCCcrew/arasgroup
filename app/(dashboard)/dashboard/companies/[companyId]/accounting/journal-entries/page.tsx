@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { JournalStatus } from "@prisma/client";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
@@ -103,6 +104,8 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
   const totalPages = Math.ceil(total / pageSize);
   const filters = ["", "DRAFT", "POSTED", "PENDING_APPROVAL"] as const;
 
+  const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
+
   return (
     <div>
       <Header
@@ -198,7 +201,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
                               {locale === "en" ? "Print" : "طباعة"}
                             </Link>
                           )}
-                          {session.isSuperAdmin && (
+                          {canDelete && (
                             <DeleteConfirmButton
                               apiUrl={`/api/accounting/journal-entries/${entry.id}`}
                               confirmMessage={`حذف القيد رقم ${entry.number}؟`}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
@@ -57,6 +58,8 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
   const totalRevenue = totalCash + totalKnet;
   const totalExpenses = operations.reduce((sum, operation) => sum + Number(operation.totalExpenses), 0);
   const netRevenue = operations.reduce((sum, operation) => sum + Number(operation.netRevenue), 0);
+
+  const canDelete = hasPermission(session, "CAR_WASH_OPERATIONS", "DELETE", { companyId });
 
   return (
     <div>
@@ -170,7 +173,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                           >
                             {locale === "en" ? "View" : "عرض"}
                           </Link>
-                          {session.isSuperAdmin && <DeleteOperationButton operationId={operation.id} locale={locale} />}
+                          {canDelete && <DeleteOperationButton operationId={operation.id} locale={locale} />}
                         </div>
                       </td>
                     </tr>

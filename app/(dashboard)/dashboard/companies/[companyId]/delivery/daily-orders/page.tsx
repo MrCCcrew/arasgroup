@@ -4,6 +4,7 @@ import { Pencil, Plus } from "lucide-react";
 import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
@@ -51,6 +52,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
 
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
+
+  const canUpdate = hasPermission(session, "DELIVERY_OPERATIONS", "UPDATE", { companyId });
+  const canDelete = hasPermission(session, "DELIVERY_OPERATIONS", "DELETE", { companyId });
 
   return (
     <div>
@@ -162,13 +166,15 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                       </td>
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <Link
-                            href={`/dashboard/companies/${companyId}/delivery/daily-orders/${order.id}/edit`}
-                            className="inline-flex items-center gap-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <Pencil size={13} />
-                          </Link>
-                          {session.isSuperAdmin && (
+                          {canUpdate && (
+                            <Link
+                              href={`/dashboard/companies/${companyId}/delivery/daily-orders/${order.id}/edit`}
+                              className="inline-flex items-center gap-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              <Pencil size={13} />
+                            </Link>
+                          )}
+                          {canDelete && (
                             <DeleteConfirmButton
                               apiUrl={`/api/delivery/daily-orders/${order.id}`}
                               confirmMessage={`حذف طلبات يوم ${formatDate(order.date, numberLocale)} للسائق ${order.driver.employee.nameAr}؟`}
