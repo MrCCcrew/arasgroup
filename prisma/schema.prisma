@@ -2044,8 +2044,8 @@ model InvestorSalaryFundingProfile {
   monthlyAmount      Decimal @db.Decimal(18, 3)
   collectionStartDay Int     @default(22)
   collectionEndDay   Int     @default(31)
-  whatsappTemplateAr String?
-  whatsappTemplateEn String?
+  whatsappTemplateAr String? @db.Text
+  whatsappTemplateEn String? @db.Text
   isActive           Boolean @default(true)
   notes              String?
 
