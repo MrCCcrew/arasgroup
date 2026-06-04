@@ -285,7 +285,11 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
           totalPayment += getNum(row, "Total Payment");
           contractFee += getNum(row, "Contract Fee");
           brandingFee += getNum(row, "Branding Non-Compliance Fee");
-          finalPayment += getNum(row, "Final Payment");
+
+          // Support both Final Payment column names
+          finalPayment += getNum(row, "Final Payment (excl. finance deductions)") ||
+                          getNum(row, "Final Payment");
+
           if (!contractName) contractName = String(row["Contract Name"] ?? "").trim();
           if (!companyCode) companyCode = String(row["Company Code"] ?? "").trim();
         }
