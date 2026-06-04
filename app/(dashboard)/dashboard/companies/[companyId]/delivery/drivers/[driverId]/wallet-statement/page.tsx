@@ -38,13 +38,19 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
     where: { id: driverId },
     select: {
       id: true,
-      companyId: true,
       walletBalance: true,
-      employee: { select: { nameAr: true, nameEn: true, employeeNumber: true } },
+      employee: {
+        select: {
+          companyId: true,
+          nameAr: true,
+          nameEn: true,
+          employeeNumber: true
+        }
+      },
     },
   });
 
-  if (!driver || driver.companyId !== companyId) {
+  if (!driver || driver.employee.companyId !== companyId) {
     redirect(`/dashboard/companies/${companyId}/delivery/drivers`);
   }
 
