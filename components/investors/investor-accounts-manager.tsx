@@ -228,6 +228,25 @@ export function InvestorAccountsManager(props: Props) {
     });
   }
 
+  async function readJsonResponse(res: Response) {
+    const text = await res.text();
+    if (!text) {
+      return {
+        success: false,
+        error: res.ok ? "استجابة فارغة من الخادم" : `فشل الطلب (${res.status})`,
+      };
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {
+        success: false,
+        error: res.ok ? "تعذر قراءة استجابة الخادم" : `فشل الطلب (${res.status})`,
+      };
+    }
+  }
+
   async function saveAgreement() {
     setAgreementError("");
     if (!agreementForm.titleAr.trim()) {
@@ -266,7 +285,7 @@ export function InvestorAccountsManager(props: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await readJsonResponse(res);
     setIsPending(false);
     if (!data.success) {
       setAgreementError(data.error ?? "فشل حفظ الاتفاق");
@@ -302,7 +321,7 @@ export function InvestorAccountsManager(props: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await readJsonResponse(res);
     setIsPending(false);
     if (!data.success) {
       setProfileError(data.error ?? "فشل حفظ ملف تمويل الرواتب");
@@ -315,7 +334,7 @@ export function InvestorAccountsManager(props: Props) {
   async function createClaimFromAgreement(id: string) {
     setIsPending(true);
     const res = await fetch(`/api/investors/account-agreements/${id}/create-claim`, { method: "POST" });
-    const data = await res.json();
+    const data = await readJsonResponse(res);
     setIsPending(false);
     if (!data.success) {
       setAgreementError(data.error ?? "فشل إنشاء المطالبة");
