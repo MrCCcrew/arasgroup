@@ -296,8 +296,11 @@ export default async function DriverDetailPage({ params }: Props) {
                 currentBalance={Number(driver.walletBalance)}
                 locale={locale}
               />
-              <Link href={`/dashboard/companies/${companyId}/delivery/wallet?driverId=${driverId}`} className="text-xs text-primary hover:underline">
-                {locale === "en" ? "View all" : "عرض الكل"}
+              <Link
+                href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}/wallet-statement`}
+                className="rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
+              >
+                {locale === "en" ? "Full Statement" : "كشف حساب كامل"}
               </Link>
             </div>
           </div>
