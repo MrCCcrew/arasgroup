@@ -14,14 +14,20 @@ interface Props {
 
 const TYPE_LABELS = {
   ar: {
-    CHARGE: "تحصيل (خصم)",
-    DEPOSIT: "إيداع (دفع)",
+    CHARGE: "تحصيل",
+    DEPOSIT: "إيداع",
     SETTLEMENT: "تسوية",
+    DEDUCTION: "خصم",
+    INCENTIVE: "حافز",
+    DEDUCTION_PENALTY: "خصم جزاء",
   },
   en: {
     CHARGE: "Charge",
     DEPOSIT: "Deposit",
     SETTLEMENT: "Settlement",
+    DEDUCTION: "Deduction",
+    INCENTIVE: "Incentive",
+    DEDUCTION_PENALTY: "Penalty",
   },
 } as const;
 
