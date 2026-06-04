@@ -58,8 +58,13 @@ const REQUIRED_COLUMNS = [
   "Contract Name",
   "Company Code",
   "Total Admin & Operational Pickup Pay",
-  "Total Admin & Operational Dropoff Pay",
   "Total Payment",
+];
+
+// Dropoff column has two possible names (old and new format)
+const DROPOFF_PAY_COLUMNS = [
+  "Total Admin & Operational Dropoff Pay", // Old format
+  "Total Admin & Operational Dropoff Total Payment", // New format
 ];
 
 const OPTIONAL_COLUMNS = [
@@ -139,6 +144,14 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
     }
   }
 
+  // Check for at least one of the dropoff columns
+  const hasDropoffColumn = DROPOFF_PAY_COLUMNS.some(col => availableColumns.includes(col));
+  if (!hasDropoffColumn) {
+    errors.push(
+      `العمود المطلوب غير موجود: أحد الأعمدة التالية مطلوب: ${DROPOFF_PAY_COLUMNS.join(" أو ")} / Missing required column: one of ${DROPOFF_PAY_COLUMNS.join(" or ")}`
+    );
+  }
+
   if (errors.length > 0) {
     return { riders: [], contractSummary: null, totalRows: 0, errors };
   }
@@ -171,7 +184,16 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
     const contractName = String(row["Contract Name"] ?? "").trim();
     const companyCode = String(row["Company Code"] ?? "").trim();
     const pickupPay = parseFloat(String(row["Total Admin & Operational Pickup Pay"] ?? "0")) || 0;
-    const dropoffPay = parseFloat(String(row["Total Admin & Operational Dropoff Pay"] ?? "0")) || 0;
+
+    // Support both old and new dropoff column names
+    let dropoffPay = 0;
+    for (const colName of DROPOFF_PAY_COLUMNS) {
+      if (row[colName] !== undefined && row[colName] !== null && row[colName] !== "") {
+        dropoffPay = parseFloat(String(row[colName])) || 0;
+        break;
+      }
+    }
+
     const deductions = parseFloat(String(row["Operator Log in & use to the Rider (operator) App Deductions"] ?? "0")) || 0;
     const totalPayment = parseFloat(String(row["Total Payment"] ?? "0")) || 0;
 
@@ -253,7 +275,13 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
           totalPickups += getNum(row, "Completed Pickups") || getNum(row, "Total Completed Pickups");
           totalPickupPay += getNum(row, "Total Admin & Operational Pickup Pay") || getNum(row, "Total Pickup Pay");
           totalDropoffs += getNum(row, "Completed Dropoffs") || getNum(row, "Total Completed Dropoffs");
-          totalDropoffPay += getNum(row, "Total Admin & Operational Dropoff Pay") || getNum(row, "Total Dropoff Pay");
+
+          // Support both old and new dropoff column names in Contract Summary
+          let dropoffPayValue = getNum(row, "Total Admin & Operational Dropoff Pay") ||
+                                 getNum(row, "Total Admin & Operational Dropoff Total Payment") ||
+                                 getNum(row, "Total Dropoff Pay");
+          totalDropoffPay += dropoffPayValue;
+
           totalPayment += getNum(row, "Total Payment");
           contractFee += getNum(row, "Contract Fee");
           brandingFee += getNum(row, "Branding Non-Compliance Fee");
