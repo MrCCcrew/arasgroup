@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { z } from "zod";
+
+const bulkEntrySchema = z.object({
+  date: z.string().transform((s) => new Date(s)),
+  driverId: z.string(),
+  ordersCount: z.number().int().min(0),
+  ratePerOrder: z.number().min(0).optional(),
+  grossAmount: z.number().min(0).optional(),
+  walletDeducted: z.number().min(0).optional(),
+  rating: z.number().min(1).max(5).optional(),
+  notes: z.string().optional(),
+  walletAmount: z.number().min(0).optional(),
+});
+
+const bulkCreateSchema = z.object({
+  companyId: z.string(),
+  contractId: z.string(),
+  entries: z.array(bulkEntrySchema).min(1),
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const parsed = bulkCreateSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: parsed.error.errors[0].message },
+        { status: 400 }
+      );
+    }
+
+    const { companyId, contractId, entries } = parsed.data;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const saved: string[] = [];
+      const failed: string[] = [];
+      let totalWalletSaved = 0;
+
+      for (const entry of entries) {
+        try {
+          await tx.deliveryDailyOrder.upsert({
+            where: {
+              driverId_contractId_date: {
+                driverId: entry.driverId,
+                contractId,
+                date: entry.date,
+              },
+            },
+            create: {
+              driverId: entry.driverId,
+              contractId,
+              companyId,
+              date: entry.date,
+              ordersCount: entry.ordersCount,
+              ratePerOrder: entry.ratePerOrder ?? null,
+              grossAmount: entry.grossAmount ?? null,
+              walletDeducted: entry.walletDeducted ?? null,
+              rating: entry.rating ?? null,
+              notes: entry.notes ?? null,
+            },
+            update: {
+              ordersCount: entry.ordersCount,
+              ratePerOrder: entry.ratePerOrder ?? null,
+              grossAmount: entry.grossAmount ?? null,
+              walletDeducted: entry.walletDeducted ?? null,
+              rating: entry.rating ?? null,
+              notes: entry.notes ?? null,
+            },
+          });
+
+          if (entry.walletAmount && entry.walletAmount > 0) {
+            await tx.driverWalletTransaction.create({
+              data: {
+                driverId: entry.driverId,
+                contractId,
+                type: "CHARGE",
+                amount: entry.walletAmount,
+                date: entry.date,
+                descriptionAr: `تحصيل يومي — ${entry.date.toISOString().slice(0, 10)}`,
+              },
+            });
+
+            await tx.driver.update({
+              where: { id: entry.driverId },
+              data: { walletBalance: { increment: entry.walletAmount } },
+            });
+
+            totalWalletSaved++;
+          }
+
+          saved.push(entry.date.toISOString().slice(0, 10));
+        } catch (error) {
+          console.error(`Failed to save entry for date ${entry.date}:`, error);
+          failed.push(entry.date.toISOString().slice(0, 10));
+        }
+      }
+
+      return {
+        saved: saved.length,
+        failed,
+        walletSaved: totalWalletSaved,
+        totalEntries: entries.length,
+      };
+    });
+
+    if (result.failed.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `فشل في حفظ ${result.failed.length} من ${result.totalEntries} يوم`,
+          data: result,
+        },
+        { status: 207 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في حفظ البيانات";
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}

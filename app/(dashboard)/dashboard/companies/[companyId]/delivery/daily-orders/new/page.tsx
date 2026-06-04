@@ -231,42 +231,45 @@ export default function NewDailyOrdersPage() {
 
       setLoading(true);
       try {
-        // Send each day separately with the same driver
-        const requests = validEntries.map((entry) => ({
-          companyId,
-          contractId,
-          dates: [entry.date],
-          entries: [
-            {
-              driverId: selectedDriverId,
-              ordersCount: Number.parseInt(entry.ordersCount, 10),
-              ...(entry.ratePerOrder ? { ratePerOrder: Number(entry.ratePerOrder) } : {}),
-              ...(entry.grossAmount ? { grossAmount: Number(entry.grossAmount) } : {}),
-              ...(entry.walletDeducted ? { walletDeducted: Number(entry.walletDeducted) } : {}),
-              ...(entry.rating ? { rating: Number.parseFloat(entry.rating) } : {}),
-              ...(entry.walletAmount && Number(entry.walletAmount) > 0
-                ? { walletAmount: Number(entry.walletAmount) }
-                : {}),
-            },
-          ],
+        // Send all days in ONE request with entries for each date
+        const allDates = validEntries.map((entry) => entry.date);
+        const entriesGroupedByDate = validEntries.map((entry) => ({
+          date: entry.date,
+          driverId: selectedDriverId,
+          ordersCount: Number.parseInt(entry.ordersCount, 10),
+          ...(entry.ratePerOrder ? { ratePerOrder: Number(entry.ratePerOrder) } : {}),
+          ...(entry.grossAmount ? { grossAmount: Number(entry.grossAmount) } : {}),
+          ...(entry.walletDeducted ? { walletDeducted: Number(entry.walletDeducted) } : {}),
+          ...(entry.rating ? { rating: Number.parseFloat(entry.rating) } : {}),
+          ...(entry.walletAmount && Number(entry.walletAmount) > 0
+            ? { walletAmount: Number(entry.walletAmount) }
+            : {}),
         }));
 
-        const results = await Promise.all(
-          requests.map((req) =>
-            fetch("/api/delivery/daily-orders", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(req),
-            })
-          )
-        );
+        const res = await fetch("/api/delivery/daily-orders/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            contractId,
+            entries: entriesGroupedByDate,
+          }),
+        });
 
-        const failed = results.filter((r) => !r.ok);
-        if (failed.length > 0) {
-          throw new Error(`فشل في حفظ ${failed.length} من ${results.length} يوم`);
+        const payload = await res.json();
+        if (!res.ok) {
+          throw new Error(payload.error ?? "فشل في حفظ البيانات");
         }
 
-        router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
+        // Show success message if some failed
+        if (payload.data?.failed && payload.data.failed.length > 0) {
+          setError(`تم حفظ ${payload.data.saved} من ${validEntries.length} يوم. فشل في: ${payload.data.failed.join(", ")}`);
+          setTimeout(() => {
+            router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
+          }, 3000);
+        } else {
+          router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "فشل في الحفظ");
       } finally {

@@ -96,35 +96,31 @@ export async function POST(request: NextRequest) {
 
       for (const date of dates) {
         // 1. upsert الأوردرات اليومية لهذا التاريخ
-        const orderResults = await Promise.allSettled(
-          entries.map((e) =>
-            tx.deliveryDailyOrder.upsert({
-              where: { driverId_contractId_date: { driverId: e.driverId, contractId, date } },
-              create: {
-                driverId: e.driverId,
-                contractId,
-                companyId,
-                date,
-                ordersCount: e.ordersCount,
-                ratePerOrder: e.ratePerOrder ?? null,
-                grossAmount: e.grossAmount ?? null,
-                walletDeducted: e.walletDeducted ?? null,
-                rating: e.rating ?? null,
-                notes: e.notes ?? null,
-              },
-              update: {
-                ordersCount: e.ordersCount,
-                ratePerOrder: e.ratePerOrder ?? null,
-                grossAmount: e.grossAmount ?? null,
-                walletDeducted: e.walletDeducted ?? null,
-                rating: e.rating ?? null,
-                notes: e.notes ?? null,
-              },
-            })
-          )
-        );
-
-        totalSaved += orderResults.filter((r) => r.status === "fulfilled").length;
+        for (const e of entries) {
+          await tx.deliveryDailyOrder.upsert({
+            where: { driverId_contractId_date: { driverId: e.driverId, contractId, date } },
+            create: {
+              driverId: e.driverId,
+              contractId,
+              companyId,
+              date,
+              ordersCount: e.ordersCount,
+              ratePerOrder: e.ratePerOrder ?? null,
+              grossAmount: e.grossAmount ?? null,
+              walletDeducted: e.walletDeducted ?? null,
+              rating: e.rating ?? null,
+              notes: e.notes ?? null,
+            },
+            update: {
+              ordersCount: e.ordersCount,
+              ratePerOrder: e.ratePerOrder ?? null,
+              grossAmount: e.grossAmount ?? null,
+              walletDeducted: e.walletDeducted ?? null,
+              rating: e.rating ?? null,
+              notes: e.notes ?? null,
+            },
+          });
+          totalSaved++;
 
         // 2. تسجيل حركات المحفظة (CHARGE) للسائقين اللي عندهم مبلغ تحصيل
         const walletEntries = entries.filter((e) => e.walletAmount && e.walletAmount > 0);
