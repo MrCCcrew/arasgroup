@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
             },
           });
           totalSaved++;
+        }
 
         // 2. تسجيل حركات المحفظة (CHARGE) للسائقين اللي عندهم مبلغ تحصيل
         const walletEntries = entries.filter((e) => e.walletAmount && e.walletAmount > 0);
