@@ -10,7 +10,8 @@ const walletDepositSchema = z.object({
   companyId: z.string(),
   amount: z.number().positive("المبلغ يجب أن يكون موجباً"),
   date: z.string().transform((s) => new Date(s)),
-  isBankDeposit: z.boolean().default(false),
+  paymentMethod: z.enum(["CASH", "BANK"]).default("CASH"),
+  bankAccountId: z.string().nullable().optional(),
   descriptionAr: z.string().optional(),
 });
 
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
           type: "DEPOSIT",
           amount: data.amount,
           date: data.date,
+          paymentMethod: data.paymentMethod,
+          bankAccountId: data.paymentMethod === "BANK" ? data.bankAccountId : null,
           descriptionAr: data.descriptionAr ?? "إيداع محفظة سائق",
         },
       });
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
         userId,
         driverId: data.driverId,
         amount: data.amount,
-        isBankDeposit: data.isBankDeposit,
+        isBankDeposit: data.paymentMethod === "BANK",
         refId: walletTx.id,
         descriptionAr: data.descriptionAr ?? `إيداع محفظة سائق - ${data.amount.toFixed(3)} د.ك`,
       });

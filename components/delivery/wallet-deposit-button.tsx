@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Wallet, X } from "lucide-react";
+
+interface BankAccount {
+  id: string;
+  nameAr: string;
+  bankName: string;
+}
 
 interface Props {
   driverId: string;
@@ -25,15 +31,39 @@ export function WalletDepositButton({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [descriptionAr, setDescriptionAr] = useState("");
   const [isBankDeposit, setIsBankDeposit] = useState(false);
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [banks, setBanks] = useState<BankAccount[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState(currentBalance);
 
   const remaining = balance - Number(amount || 0);
 
+  // جلب البنوك عند فتح النموذج
+  useEffect(() => {
+    if (open && isBankDeposit && banks.length === 0) {
+      setLoadingBanks(true);
+      fetch(`/api/accounting/bank-accounts?companyId=${companyId}`)
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && json.data) {
+            setBanks(json.data);
+            if (json.data.length > 0) setBankAccountId(json.data[0].id);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingBanks(false));
+    }
+  }, [open, isBankDeposit, companyId, banks.length]);
+
   async function handleSave() {
     if (!amount || Number(amount) <= 0) {
       setError("أدخل مبلغاً صحيحاً");
+      return;
+    }
+    if (isBankDeposit && !bankAccountId) {
+      setError("اختر البنك");
       return;
     }
     setSaving(true);
@@ -47,7 +77,8 @@ export function WalletDepositButton({
           companyId,
           amount: Number(amount),
           date,
-          isBankDeposit,
+          paymentMethod: isBankDeposit ? "BANK" : "CASH",
+          bankAccountId: isBankDeposit ? bankAccountId : null,
           descriptionAr: descriptionAr || "إيداع محفظة سائق",
         }),
       });
@@ -58,6 +89,7 @@ export function WalletDepositButton({
       setAmount("");
       setDescriptionAr("");
       setIsBankDeposit(false);
+      setBankAccountId("");
       setOpen(false);
       onSuccess?.();
     } catch (err) {
@@ -171,6 +203,36 @@ export function WalletDepositButton({
                 />
                 إيداع بنكي
               </label>
+
+              {isBankDeposit && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    البنك <span className="text-red-500">*</span>
+                  </label>
+                  {loadingBanks ? (
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                      <Loader2 size={14} className="animate-spin" />
+                      جاري التحميل...
+                    </div>
+                  ) : banks.length === 0 ? (
+                    <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                      ⚠️ لا توجد بنوك. أضف بنك من إعدادات المحاسبة.
+                    </div>
+                  ) : (
+                    <select
+                      value={bankAccountId}
+                      onChange={(e) => setBankAccountId(e.target.value)}
+                      className="input-field w-full"
+                    >
+                      {banks.map((bank) => (
+                        <option key={bank.id} value={bank.id}>
+                          {bank.nameAr} - {bank.bankName}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>

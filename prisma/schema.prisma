@@ -395,6 +395,7 @@ model BankAccount {
   expenses        Expense[]
   sourceTransfers AccountTransfer[]      @relation("TransferSourceBankAccount")
   destinationTransfers AccountTransfer[] @relation("TransferDestinationBankAccount")
+  driverWalletTransactions DriverWalletTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1363,16 +1364,20 @@ model DriverWalletTransaction {
   date           DateTime
   descriptionAr  String?
   journalEntryId String?
+  bankAccountId  String?
+  paymentMethod  String?               @default("CASH")
   isSettled      Boolean               @default(false)
   settledAt      DateTime?
 
-  driver Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
 
   @@index([driverId])
   @@index([isSettled])
   @@index([date])
+  @@index([bankAccountId])
   @@map("driver_wallet_transactions")
 }
 
