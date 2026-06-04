@@ -125,6 +125,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/accounting/leave-pay`,                    labelKey: "nav.leavePay",        icon: <Receipt size={14} />,         iconColor: "emerald" },
         { href: `${base}/accounting/accounts`,                     labelKey: "nav.accounts",        icon: <Receipt size={14} />,         iconColor: "emerald" },
         { href: `${base}/accounting/bank-accounts`,                labelKey: "nav.bankAccounts",    icon: <Wallet size={14} />,          iconColor: "emerald" },
+        { href: `${base}/accounting/bank-transfers`,               labelKey: "nav.bankTransfers",   icon: <ArrowLeftRight size={14} />,  iconColor: "emerald" },
         { href: `${base}/accounting/fiscal-years`,                 labelKey: "nav.fiscalYears",     icon: <BookOpen size={14} />,        iconColor: "emerald" },
         { href: `${base}/accounting/reports/trial-balance`,        labelKey: "nav.trialBalance",    icon: <BarChart3 size={14} />,       iconColor: "emerald" },
         { href: `${base}/accounting/reports/income-statement`,     labelKey: "nav.incomeStatement", icon: <TrendingUp size={14} />,      iconColor: "emerald" },
