@@ -36,7 +36,12 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
 
   const driver = await prisma.driver.findUnique({
     where: { id: driverId },
-    include: { employee: { select: { nameAr: true, nameEn: true, employeeNumber: true } } },
+    select: {
+      id: true,
+      companyId: true,
+      walletBalance: true,
+      employee: { select: { nameAr: true, nameEn: true, employeeNumber: true } },
+    },
   });
 
   if (!driver || driver.companyId !== companyId) {
