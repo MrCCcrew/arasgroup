@@ -36,7 +36,7 @@ export default async function ReceiptsPage({ params, searchParams }: Props) {
     } : {}),
   };
 
-  const [total, entries] = await Promise.all([
+  const [total, entries, receiptsTotal] = await Promise.all([
     prisma.journalEntry.count({ where }),
     prisma.journalEntry.findMany({
       where,
@@ -49,12 +49,17 @@ export default async function ReceiptsPage({ params, searchParams }: Props) {
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    prisma.journalEntryLine.aggregate({
+      where: {
+        journalEntry: where,
+        credit: { gt: 0 },
+      },
+      _sum: { credit: true },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const totalAmount = entries.reduce((s, e) =>
-    s + e.lines.filter((l) => Number(l.credit) > 0).reduce((a, l) => a + Number(l.credit), 0), 0
-  );
+  const totalAmount = Number(receiptsTotal._sum.credit ?? 0);
 
   function getReceiptInfo(entry: typeof entries[0]) {
     const creditLine = entry.lines.find((l) => Number(l.credit) > 0);

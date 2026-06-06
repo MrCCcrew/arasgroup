@@ -42,7 +42,12 @@ export default function CarWashLocationsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/car-wash/locations?companyId=${companyId}&activeOnly=false`);
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const res = await fetch(
+      `/api/car-wash/locations?companyId=${companyId}&activeOnly=false&month=${month}&year=${year}`
+    );
     const json = await res.json();
     if (json.success) setLocations(json.data);
     setLoading(false);

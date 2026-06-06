@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get("companyId");
   const activeOnly = searchParams.get("activeOnly") !== "false";
+  const month = Number.parseInt(searchParams.get("month") ?? "", 10);
+  const year = Number.parseInt(searchParams.get("year") ?? "", 10);
 
   if (!companyId) return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
 
@@ -24,6 +26,30 @@ export async function GET(request: NextRequest) {
     },
     orderBy: { nameAr: "asc" },
   });
+
+  if (!Number.isNaN(month) && !Number.isNaN(year) && month >= 1 && month <= 12 && year > 0) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const monthlyCounts = await prisma.carWashDailyOperation.groupBy({
+      by: ["locationId"],
+      where: {
+        companyId,
+        date: { gte: startDate, lte: endDate },
+      },
+      _count: { _all: true },
+    });
+
+    const countMap = new Map(monthlyCounts.map((item) => [item.locationId, item._count._all]));
+
+    return NextResponse.json({
+      success: true,
+      data: locations.map((location) => ({
+        ...location,
+        _count: { operations: countMap.get(location.id) ?? 0 },
+      })),
+    });
+  }
 
   return NextResponse.json({ success: true, data: locations });
 }

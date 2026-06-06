@@ -102,7 +102,7 @@ export async function ExpiryAlertsPanel({ companyIds }: Props) {
   for (const lic of licenses) {
     const rows = [
       { date: lic.licenseExpiryDate,            label: `رخصة تجارية: ${lic.commercialNameAr}` },
-      { date: lic.fireLicenseExpiryDate,         label: `رخصة حريق: ${lic.commercialNameAr}` },
+      { date: lic.fireLicenseExpiryDate,         label: `رخصة إطفاء: ${lic.commercialNameAr}` },
       { date: lic.healthLicenseExpiryDate,       label: `ترخيص صحي: ${lic.commercialNameAr}` },
       { date: lic.advertisingLicenseExpiryDate,  label: `رخصة إعلانات: ${lic.commercialNameAr}` },
     ];

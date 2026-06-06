@@ -36,7 +36,7 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
     } : {}),
   };
 
-  const [total, entries] = await Promise.all([
+  const [total, entries, paymentsTotal] = await Promise.all([
     prisma.journalEntry.count({ where }),
     prisma.journalEntry.findMany({
       where,
@@ -49,12 +49,17 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    prisma.journalEntryLine.aggregate({
+      where: {
+        journalEntry: where,
+        debit: { gt: 0 },
+      },
+      _sum: { debit: true },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const totalAmount = entries.reduce((s, e) =>
-    s + e.lines.filter((l) => Number(l.debit) > 0).reduce((a, l) => a + Number(l.debit), 0), 0
-  );
+  const totalAmount = Number(paymentsTotal._sum.debit ?? 0);
 
   function getPaymentInfo(entry: typeof entries[0]) {
     const debitLine = entry.lines.find((l) => Number(l.debit) > 0);

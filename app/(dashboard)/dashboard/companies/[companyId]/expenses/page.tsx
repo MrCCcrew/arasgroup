@@ -36,7 +36,7 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
     ...(sp.categoryId ? { categoryId: sp.categoryId } : {}),
   };
 
-  const [total, expenses, categories, bankAccounts] = await Promise.all([
+  const [total, expenses, categories, bankAccounts, expensesTotal] = await Promise.all([
     prisma.expense.count({ where }),
     prisma.expense.findMany({
       where,
@@ -55,9 +55,13 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
       select: { id: true, nameAr: true, bankName: true },
       orderBy: { nameAr: "asc" },
     }),
+    prisma.expense.aggregate({
+      where,
+      _sum: { amount: true },
+    }),
   ]);
 
-  const totalAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const totalAmount = Number(expensesTotal._sum.amount ?? 0);
   const totalPages = Math.ceil(total / pageSize);
 
   return (

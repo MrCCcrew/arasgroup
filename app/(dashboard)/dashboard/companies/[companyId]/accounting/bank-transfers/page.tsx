@@ -24,7 +24,7 @@ export default async function BankTransfersPage({ params, searchParams }: Props)
   const page = Math.max(1, parseInt(sp.page ?? "1"));
   const pageSize = 25;
 
-  const [total, transfers] = await Promise.all([
+  const [total, transfers, transfersTotal] = await Promise.all([
     prisma.accountTransfer.count({ where: { companyId } }),
     prisma.accountTransfer.findMany({
       where: { companyId },
@@ -36,10 +36,14 @@ export default async function BankTransfersPage({ params, searchParams }: Props)
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    prisma.accountTransfer.aggregate({
+      where: { companyId },
+      _sum: { amount: true },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const totalAmount = transfers.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalAmount = Number(transfersTotal._sum.amount ?? 0);
 
   const t = {
     title: en ? "Bank Transfers" : "التحويلات البنكية",
