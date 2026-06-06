@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
           driver: { include: { employee: { select: { nameAr: true } } } },
           contract: { select: { nameAr: true, platform: true } },
         },
-        orderBy: { date: "desc" },
+        orderBy: [
+          { date: "desc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

@@ -44,7 +44,11 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
         driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
         contract: { select: { nameAr: true, nameEn: true, platform: true } },
       },
-      orderBy: { date: "desc" },
+      orderBy: [
+        { date: "desc" },
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
