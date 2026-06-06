@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Building2, TrendingUp, Truck, UserRound, Users } from "lucide-react";
+import { AlertTriangle, Building2, Search, TrendingUp, Truck, UserRound, Users } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -117,6 +117,7 @@ export default async function GroupDashboardPage() {
   };
 
   const quickLinks = [
+    { href: "/dashboard/search", label: "البحث العام", icon: <Search size={16} /> },
     session.isSuperAdmin || hasPermission(session, "USERS", "VIEW")
       ? { href: "/dashboard/users", label: "إدارة المستخدمين", icon: <Users size={16} /> }
       : null,
@@ -138,6 +139,27 @@ export default async function GroupDashboardPage() {
         </div>
 
         <ExpiryAlertsPanel companyIds={companyIds} />
+
+        <div className="rounded-2xl border bg-card p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">البحث العام</h2>
+              <p className="text-sm text-muted-foreground">ابحث عن ترخيص أو مسئول أو موظف عبر كل الشركات المسموح لك بها.</p>
+            </div>
+            <form action="/dashboard/search" className="flex w-full flex-col gap-2 md:w-auto md:min-w-[32rem] md:flex-row">
+              <input
+                type="text"
+                name="q"
+                placeholder="اكتب الاسم أو الرقم أو الجوال"
+                className="input-field w-full md:min-w-[22rem]"
+              />
+              <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">
+                <Search size={15} />
+                بحث
+              </button>
+            </form>
+          </div>
+        </div>
 
         <div>
           <h2 className="mb-4 text-lg font-bold">الشركات</h2>

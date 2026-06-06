@@ -24,6 +24,7 @@ import {
   Package,
   Paperclip,
   Receipt,
+  Search,
   Settings,
   Shield,
   TrendingUp,
@@ -76,6 +77,7 @@ type ColorKey = keyof typeof C;
 
 const GROUP_NAV: NavItem[] = [
   { href: "/dashboard",              labelKey: "nav.groupDashboard",  icon: <LayoutDashboard size={16} />, iconColor: "blue"    },
+  { href: "/dashboard/search",       labelKey: "nav.globalSearch",    icon: <Search size={16} />,          iconColor: "amber"   },
   { href: "/dashboard/companies",    labelKey: "nav.companies",       icon: <Building2 size={16} />,       iconColor: "teal"    },
   { href: "/dashboard/users",        labelKey: "nav.users",           icon: <Users size={16} />,           iconColor: "violet", module: "USERS" },
   { href: "/dashboard/completed-tasks", labelKey: "nav.completedTasks", icon: <ClipboardCheck size={16} />, iconColor: "green",  module: "TASKS" },

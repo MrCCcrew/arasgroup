@@ -33,6 +33,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       groupDashboard: "لوحة المجموعة",
+      globalSearch: "البحث العام",
       dashboard: "لوحة التحكم",
       companies: "الشركات والفروع",
       users: "المستخدمون",
@@ -209,6 +210,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       groupDashboard: "Group Dashboard",
+      globalSearch: "Global Search",
       dashboard: "Dashboard",
       companies: "Companies & Branches",
       users: "Users",
