@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3, TrendingDown, TrendingUp } from "lucide-react";
+import { BarChart3, FileDown, TrendingDown, TrendingUp } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -116,6 +117,14 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
             <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
               {locale === "en" ? "Show" : "عرض"}
             </button>
+            <Link
+              href={`/dashboard/companies/${companyId}/car-wash/profitability/print?month=${month}&year=${year}`}
+              target="_blank"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+            >
+              <FileDown size={16} />
+              PDF
+            </Link>
           </div>
         </form>
 
@@ -184,7 +193,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
                   <th>{locale === "en" ? "Code" : "الكود"}</th>
                   <th>{locale === "en" ? "Vehicle" : "المركبة"}</th>
                   <th>{locale === "en" ? "Operation days" : "أيام التشغيل"}</th>
-                  <th>{locale === "en" ? "Cash" : "نقداً"}</th>
+                  <th>{locale === "en" ? "Cash" : "نقدًا"}</th>
                   <th>KNET</th>
                   <th>{locale === "en" ? "Gross revenue" : "إجمالي الإيراد"}</th>
                   <th>{locale === "en" ? "Expenses" : "المصروفات"}</th>
@@ -196,9 +205,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
                 {vehicleStats.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-muted-foreground">
-                      {locale === "en"
-                        ? `No data for ${MONTHS.en[month - 1]} ${year}`
-                        : `لا توجد بيانات لـ ${MONTHS.ar[month - 1]} ${year}`}
+                      {locale === "en" ? `No data for ${MONTHS.en[month - 1]} ${year}` : `لا توجد بيانات لشهر ${MONTHS.ar[month - 1]} ${year}`}
                     </td>
                   </tr>
                 ) : (

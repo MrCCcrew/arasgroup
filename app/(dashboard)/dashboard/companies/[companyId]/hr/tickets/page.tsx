@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plane, Plus } from "lucide-react";
+import { FileDown, Plane, Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { TicketRowActions } from "@/components/hr/ticket-row-actions";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
-import { TicketRowActions } from "@/components/hr/ticket-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ year?: string; type?: string }>;
+  searchParams: Promise<{ year?: string; type?: string; paidBy?: string; search?: string }>;
 }
 
 const TICKET_TYPE_LABELS = {
@@ -47,6 +47,17 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
     employee: { companyId },
     createdAt: { gte: yearStart, lte: yearEnd },
     ...(sp.type ? { type: sp.type as keyof typeof TICKET_TYPE_LABELS.ar } : {}),
+    ...(sp.paidBy ? { paidBy: sp.paidBy as "COMPANY" | "INVESTOR" } : {}),
+    ...(sp.search
+      ? {
+          OR: [
+            { destination: { contains: sp.search } },
+            { notes: { contains: sp.search } },
+            { employee: { nameAr: { contains: sp.search } } },
+            { employee: { nameEn: { contains: sp.search } } },
+          ],
+        }
+      : {}),
   };
 
   const [tickets, investors] = await Promise.all([
@@ -55,7 +66,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
       include: {
         employee: { select: { nameAr: true, nameEn: true, type: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ travelDate: "desc" }, { createdAt: "desc" }],
     }),
     prisma.investor.findMany({
       where: { isActive: true, companies: { some: { id: companyId } } },
@@ -65,8 +76,14 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
   ]);
 
   const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
-  const companyCost = tickets.filter((ticket) => ticket.paidBy === "COMPANY").reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
-  const investorCost = tickets.filter((ticket) => ticket.paidBy === "INVESTOR").reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+  const companyCost = tickets
+    .filter((ticket) => ticket.paidBy === "COMPANY")
+    .reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+  const investorCost = tickets
+    .filter((ticket) => ticket.paidBy === "INVESTOR")
+    .reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+
+  const printHref = `/dashboard/companies/${companyId}/hr/tickets/print?year=${year}${sp.type ? `&type=${sp.type}` : ""}${sp.paidBy ? `&paidBy=${sp.paidBy}` : ""}${sp.search ? `&search=${encodeURIComponent(sp.search)}` : ""}`;
 
   return (
     <div>
@@ -109,9 +126,30 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Paid by" : "جهة الدفع"}</label>
+              <select name="paidBy" defaultValue={sp.paidBy ?? ""} className="input-field">
+                <option value="">{locale === "en" ? "All" : "الكل"}</option>
+                <option value="COMPANY">{locale === "en" ? "Company" : "الشركة"}</option>
+                <option value="INVESTOR">{locale === "en" ? "Investor" : "المستثمر"}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Search" : "بحث"}</label>
+              <input
+                name="search"
+                defaultValue={sp.search ?? ""}
+                className="input-field"
+                placeholder={locale === "en" ? "Employee, destination, notes" : "الموظف أو الوجهة أو الملاحظات"}
+              />
+            </div>
             <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
               {locale === "en" ? "Filter" : "بحث"}
             </button>
+            <Link href={printHref} target="_blank" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+              <FileDown size={16} />
+              PDF
+            </Link>
           </div>
         </form>
 
@@ -125,7 +163,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
             <span className="number text-2xl font-bold text-red-600">{formatKWD(companyCost, numberLocale)}</span>
           </div>
           <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Investor cost" : "تكلفة المسئول"}</span>
+            <span className="text-sm text-muted-foreground">{locale === "en" ? "Investor cost" : "تكلفة المستثمر"}</span>
             <span className="number text-2xl font-bold text-orange-600">{formatKWD(investorCost, numberLocale)}</span>
           </div>
         </div>
@@ -175,7 +213,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                         )}
                         {ticket.paidBy === "INVESTOR" && (
                           <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
-                            {locale === "en" ? "Investor" : "المسئول والمدير"}
+                            {locale === "en" ? "Investor" : "المستثمر"}
                           </span>
                         )}
                         {!ticket.paidBy && <span className="text-xs text-muted-foreground">-</span>}

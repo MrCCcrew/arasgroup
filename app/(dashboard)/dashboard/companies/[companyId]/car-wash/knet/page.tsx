@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle, Clock, Plus } from "lucide-react";
+import { CheckCircle, Clock, FileDown, Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { KnetSettlementRowActions } from "@/components/car-wash/knet-settlement-row-actions";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
-import { KnetSettlementRowActions } from "@/components/car-wash/knet-settlement-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -43,7 +43,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
         bankAccount: { select: { nameAr: true, nameEn: true } },
         transactions: { select: { id: true } },
       },
-      orderBy: { settlementDate: "desc" },
+      orderBy: [{ settlementDate: "desc" }, { createdAt: "desc" }],
     }),
     prisma.knetTransaction.aggregate({
       where: {
@@ -120,6 +120,14 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
               {locale === "en" ? "Filter" : "بحث"}
             </button>
+            <Link
+              href={`/dashboard/companies/${companyId}/car-wash/knet/print?month=${month}&year=${year}`}
+              target="_blank"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+            >
+              <FileDown size={16} />
+              PDF
+            </Link>
           </div>
         </form>
 

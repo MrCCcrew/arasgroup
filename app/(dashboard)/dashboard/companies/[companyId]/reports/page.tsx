@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Truck,
   Users,
+  Wallet,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
@@ -18,6 +19,16 @@ import { getLocale } from "@/lib/i18n";
 interface Props {
   params: Promise<{ companyId: string }>;
 }
+
+type ReportCard = {
+  title: string;
+  description: string;
+  href: string;
+  icon: typeof BarChart3;
+  color: string;
+  bg: string;
+  badges?: string[];
+};
 
 export default async function ReportsPage({ params }: Props) {
   const { companyId } = await params;
@@ -41,9 +52,13 @@ export default async function ReportsPage({ params }: Props) {
       : company.nameAr
     : "";
 
+  const filterBadge = locale === "en" ? "Detailed filters" : "فلاتر تفصيلية";
+  const pdfBadge = "PDF";
+  const detailBadge = locale === "en" ? "Operational detail" : "تفاصيل تشغيلية";
+
   const base = `/dashboard/companies/${companyId}`;
 
-  const accountingReports = [
+  const accountingReports: ReportCard[] = [
     {
       title: locale === "en" ? "Trial Balance" : "ميزان المراجعة",
       description: locale === "en" ? "Balances of all accounts in the selected period" : "أرصدة جميع الحسابات في الفترة المحددة",
@@ -51,6 +66,7 @@ export default async function ReportsPage({ params }: Props) {
       icon: Scale,
       color: "text-blue-600",
       bg: "bg-blue-50",
+      badges: [filterBadge, pdfBadge],
     },
     {
       title: locale === "en" ? "Income Statement" : "قائمة الدخل",
@@ -59,6 +75,7 @@ export default async function ReportsPage({ params }: Props) {
       icon: TrendingUp,
       color: "text-green-600",
       bg: "bg-green-50",
+      badges: [filterBadge, pdfBadge],
     },
     {
       title: locale === "en" ? "Balance Sheet" : "الميزانية العمومية",
@@ -67,10 +84,29 @@ export default async function ReportsPage({ params }: Props) {
       icon: BookOpen,
       color: "text-purple-600",
       bg: "bg-purple-50",
+      badges: [filterBadge, pdfBadge],
+    },
+    {
+      title: locale === "en" ? "Account Ledger" : "أستاذ الحساب",
+      description: locale === "en" ? "Detailed movement for a selected account" : "حركة تفصيلية لحساب محدد",
+      href: `${base}/accounting/reports/account-ledger`,
+      icon: FileText,
+      color: "text-sky-600",
+      bg: "bg-sky-50",
+      badges: [filterBadge],
+    },
+    {
+      title: locale === "en" ? "General Ledger" : "دفتر الأستاذ العام",
+      description: locale === "en" ? "Ledger grouped by accounts and periods" : "دفتر الأستاذ مجمع حسب الحسابات والفترات",
+      href: `${base}/accounting/reports/general-ledger`,
+      icon: FileText,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      badges: [filterBadge],
     },
   ];
 
-  const hrReports = [
+  const hrReports: ReportCard[] = [
     {
       title: locale === "en" ? "Expiry Alerts" : "تنبيهات الانتهاء",
       description: locale === "en" ? "Expired or soon-to-expire residencies and licenses" : "الإقامات والرخص المنتهية أو القريبة من الانتهاء",
@@ -78,6 +114,7 @@ export default async function ReportsPage({ params }: Props) {
       icon: Users,
       color: "text-orange-600",
       bg: "bg-orange-50",
+      badges: [filterBadge, pdfBadge],
     },
     {
       title: locale === "en" ? "Travel Tickets" : "تذاكر السفر",
@@ -86,44 +123,76 @@ export default async function ReportsPage({ params }: Props) {
       icon: FileText,
       color: "text-sky-600",
       bg: "bg-sky-50",
+      badges: [filterBadge, pdfBadge],
     },
   ];
 
-  const deliveryReports = [
+  const deliveryReports: ReportCard[] = [
     {
       title: locale === "en" ? "Monthly Reports" : "التقارير الشهرية",
-      description: locale === "en" ? "Monthly summary of delivery orders and payments" : "ملخص أوامر التوصيل والمدفوعات شهرياً",
+      description: locale === "en" ? "Monthly summary of delivery orders and payments" : "ملخص شهري للطلبات والمدفوعات",
       href: `${base}/delivery/monthly-reports`,
       icon: BarChart3,
       color: "text-teal-600",
       bg: "bg-teal-50",
+      badges: [filterBadge, pdfBadge],
+    },
+    {
+      title: locale === "en" ? "Company Payments" : "مدفوعات الشركة",
+      description: locale === "en" ? "Platform receipts by month, year, bank and contract" : "تحصيلات المنصات حسب الشهر والسنة والبنك والعقد",
+      href: `${base}/delivery/payments`,
+      icon: Wallet,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      badges: [filterBadge],
+    },
+    {
+      title: locale === "en" ? "Daily Orders" : "الطلبات اليومية",
+      description: locale === "en" ? "Detailed daily operations by contract and driver" : "تفاصيل تشغيلية يومية حسب العقد والسائق",
+      href: `${base}/delivery/daily-orders`,
+      icon: Truck,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      badges: [detailBadge],
     },
     {
       title: locale === "en" ? "Driver Wallets" : "محفظة السائقين",
-      description: locale === "en" ? "Driver wallet balances and transactions" : "أرصدة محافظ السائقين والمعاملات",
+      description: locale === "en" ? "Driver balances and wallet transactions" : "أرصدة السائقين ومعاملات المحافظ",
       href: `${base}/delivery/wallet`,
       icon: Truck,
       color: "text-indigo-600",
       bg: "bg-indigo-50",
+      badges: [filterBadge],
     },
   ];
 
-  const carWashReports = [
+  const carWashReports: ReportCard[] = [
     {
       title: locale === "en" ? "Vehicle Profitability" : "ربحية المركبات",
-      description: locale === "en" ? "Compare monthly performance of wash vehicles" : "مقارنة أداء مركبات الغسيل شهرياً",
+      description: locale === "en" ? "Compare monthly performance of wash vehicles" : "مقارنة أداء مركبات الغسيل شهريًا",
       href: `${base}/car-wash/profitability`,
       icon: Car,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
+      badges: [filterBadge, pdfBadge],
     },
     {
       title: locale === "en" ? "KNET Settlements" : "تسوية KNET",
       description: locale === "en" ? "Electronic payment settlement records" : "سجل تسويات مبالغ الدفع الإلكتروني",
       href: `${base}/car-wash/knet`,
-      icon: BarChart3,
+      icon: Wallet,
       color: "text-violet-600",
       bg: "bg-violet-50",
+      badges: [filterBadge, pdfBadge],
+    },
+    {
+      title: locale === "en" ? "Daily Operations" : "العمليات اليومية",
+      description: locale === "en" ? "Detailed operations by vehicle, location and month" : "تفاصيل العمليات حسب المركبة والموقع والشهر",
+      href: `${base}/car-wash/operations`,
+      icon: FileText,
+      color: "text-cyan-600",
+      bg: "bg-cyan-50",
+      badges: [detailBadge],
     },
   ];
 
@@ -169,14 +238,7 @@ function ReportSection({
   items,
 }: {
   title: string;
-  items: Array<{
-    title: string;
-    description: string;
-    href: string;
-    icon: typeof BarChart3;
-    color: string;
-    bg: string;
-  }>;
+  items: ReportCard[];
 }) {
   return (
     <div>
@@ -189,6 +251,15 @@ function ReportSection({
             </div>
             <h3 className="mb-1 font-bold transition-colors group-hover:text-primary">{item.title}</h3>
             <p className="text-sm text-muted-foreground">{item.description}</p>
+            {item.badges && item.badges.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.badges.map((badge) => (
+                  <span key={badge} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            )}
           </Link>
         ))}
       </div>
