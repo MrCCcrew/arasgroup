@@ -34,15 +34,22 @@ export async function getCurrentFiscalYear(companyId: string): Promise<string> {
 
 async function getNextJournalNumber(companyId: string, year: number, type?: string): Promise<string> {
   const prefix = TYPE_PREFIX[type ?? "GENERAL"] ?? "QY";
-  const count = await prisma.journalEntry.count({
+  const seriesPrefix = `${prefix}-${year}-`;
+  const latestEntry = await prisma.journalEntry.findFirst({
     where: {
       companyId,
       fiscalYear: { year },
-      type: (type as never) ?? "GENERAL",
+      number: { startsWith: seriesPrefix },
     },
+    select: { number: true },
+    orderBy: { number: "desc" },
   });
 
-  return generateNumber(prefix, year, count + 1);
+  const nextSequence = latestEntry
+    ? Number.parseInt(latestEntry.number.slice(seriesPrefix.length), 10) + 1
+    : 1;
+
+  return generateNumber(prefix, year, Number.isFinite(nextSequence) ? nextSequence : 1);
 }
 
 function validateBalance(lines: JournalEntryLineInput[]): void {
