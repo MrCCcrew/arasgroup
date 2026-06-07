@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import { createDeliveryPaymentJE } from "@/lib/accounting/auto-entries";
-import { z } from "zod";
+import { recomputeDriverWalletStates } from "@/lib/delivery/wallet-state";
 
 const reportLineSchema = z.object({
   driverId: z.string(),
@@ -25,6 +26,8 @@ const createReportSchema = z.object({
   notes: z.string().optional(),
 });
 
+const walletDeductionDesc = (month: number, year: number) => `خصم محفظة شهر ${month}/${year}`;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -37,8 +40,8 @@ export async function GET(request: NextRequest) {
       where: {
         ...(companyId ? { companyId } : {}),
         ...(contractId ? { contractId } : {}),
-        ...(month ? { month: parseInt(month) } : {}),
-        ...(year ? { year: parseInt(year) } : {}),
+        ...(month ? { month: parseInt(month, 10) } : {}),
+        ...(year ? { year: parseInt(year, 10) } : {}),
       },
       include: {
         contract: { select: { platform: true, nameAr: true } },
@@ -59,6 +62,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
+
   try {
     const body = await request.json();
     const parsed = createReportSchema.safeParse(body);
@@ -67,14 +71,15 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
-
-    const totalOrders = data.lines.reduce((s, l) => s + l.ordersCount, 0);
-    const totalGross = data.lines.reduce((s, l) => s + l.grossAmount, 0);
-    const totalWallet = data.lines.reduce((s, l) => s + l.walletDeducted, 0);
+    const totalOrders = data.lines.reduce((sum, line) => sum + line.ordersCount, 0);
+    const totalGross = data.lines.reduce((sum, line) => sum + line.grossAmount, 0);
+    const totalWallet = data.lines.reduce((sum, line) => sum + line.walletDeducted, 0);
     const netPayment = totalGross - totalWallet;
 
     const report = await prisma.$transaction(async (tx) => {
-      const report = await tx.deliveryMonthlyReport.create({
+      const affectedDrivers = new Set<string>();
+
+      const createdReport = await tx.deliveryMonthlyReport.create({
         data: {
           contractId: data.contractId,
           companyId: data.companyId,
@@ -87,22 +92,21 @@ export async function POST(request: NextRequest) {
           netPayment,
           notes: data.notes,
           lines: {
-            create: data.lines.map((l) => ({
-              driverId: l.driverId,
-              ordersCount: l.ordersCount,
-              ratePerOrder: l.ratePerOrder,
-              grossAmount: l.grossAmount,
-              walletDeducted: l.walletDeducted,
-              netAmount: l.netAmount,
-              rating: l.rating,
-              notes: l.notes,
+            create: data.lines.map((line) => ({
+              driverId: line.driverId,
+              ordersCount: line.ordersCount,
+              ratePerOrder: line.ratePerOrder,
+              grossAmount: line.grossAmount,
+              walletDeducted: line.walletDeducted,
+              netAmount: line.netAmount,
+              rating: line.rating,
+              notes: line.notes,
             })),
           },
         },
         include: { lines: true, contract: true },
       });
 
-      // Update driver wallet balances
       for (const line of data.lines) {
         if (line.walletDeducted > 0) {
           await tx.driverWalletTransaction.create({
@@ -112,13 +116,15 @@ export async function POST(request: NextRequest) {
               type: "DEDUCTION",
               amount: line.walletDeducted,
               date: data.reportDate,
-              descriptionAr: `خصم محفظة شهر ${data.month}/${data.year}`,
+              descriptionAr: walletDeductionDesc(data.month, data.year),
             },
           });
+          affectedDrivers.add(line.driverId);
         }
       }
 
-      return report;
+      await recomputeDriverWalletStates(tx, affectedDrivers);
+      return createdReport;
     });
 
     const journalEntry = await createDeliveryPaymentJE({
@@ -138,7 +144,7 @@ export async function POST(request: NextRequest) {
       where: { id: report.id },
       data: {
         journalEntryId: journalEntry.id,
-        status: "POSTED",
+        status: "DRAFT",
       },
       include: {
         contract: { select: { platform: true, nameAr: true } },

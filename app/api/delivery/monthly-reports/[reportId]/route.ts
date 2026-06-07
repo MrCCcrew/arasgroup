@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { recomputeDriverWalletStates } from "@/lib/delivery/wallet-state";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ reportId: string }>;
@@ -29,7 +31,6 @@ const patchSchema = z.object({
 
 const walletDeductionDesc = (month: number, year: number) => `خصم محفظة شهر ${month}/${year}`;
 
-// ── GET — load a single report (used by the edit page) ──────────────────────
 export async function GET(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest, { params }: Props) {
     },
   });
 
-  if (!report) return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+  if (!report) {
+    return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+  }
 
   const err = assertCompanyAccess(session, report.companyId);
   if (err) return err;
@@ -51,7 +54,6 @@ export async function GET(request: NextRequest, { params }: Props) {
   return NextResponse.json({ success: true, data: report });
 }
 
-// ── PATCH — replace report lines, recompute totals, re-sync wallet deductions ─
 export async function PATCH(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -60,9 +62,11 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     const { reportId } = await params;
     const existing = await prisma.deliveryMonthlyReport.findUnique({
       where: { id: reportId },
-      select: { id: true, companyId: true, contractId: true, month: true, year: true },
+      select: { id: true, companyId: true, contractId: true, month: true, year: true, lines: { select: { driverId: true } } },
     });
-    if (!existing) return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+    }
 
     const err = assertCompanyAccess(session, existing.companyId);
     if (err) return err;
@@ -72,15 +76,23 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
-    const data = parsed.data;
 
-    const totalOrders = data.lines.reduce((s, l) => s + l.ordersCount, 0);
-    const totalGross = data.lines.reduce((s, l) => s + l.grossAmount, 0);
-    const totalWallet = data.lines.reduce((s, l) => s + l.walletDeducted, 0);
+    const data = parsed.data;
+    const totalOrders = data.lines.reduce((sum, line) => sum + line.ordersCount, 0);
+    const totalGross = data.lines.reduce((sum, line) => sum + line.grossAmount, 0);
+    const totalWallet = data.lines.reduce((sum, line) => sum + line.walletDeducted, 0);
     const netPayment = totalGross - totalWallet;
 
     const updated = await prisma.$transaction(async (tx) => {
-      // Reverse the OLD wallet deductions tied to this report (matched by old contract/month/year)
+      const previousWalletTransactions = await tx.driverWalletTransaction.findMany({
+        where: {
+          contractId: existing.contractId,
+          type: "DEDUCTION",
+          descriptionAr: walletDeductionDesc(existing.month, existing.year),
+        },
+        select: { driverId: true },
+      });
+
       await tx.driverWalletTransaction.deleteMany({
         where: {
           contractId: existing.contractId,
@@ -89,7 +101,6 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         },
       });
 
-      // Replace lines
       await tx.deliveryMonthlyReportLine.deleteMany({ where: { reportId } });
 
       const report = await tx.deliveryMonthlyReport.update({
@@ -105,22 +116,26 @@ export async function PATCH(request: NextRequest, { params }: Props) {
           netPayment,
           notes: data.notes ?? null,
           lines: {
-            create: data.lines.map((l) => ({
-              driverId: l.driverId,
-              ordersCount: l.ordersCount,
-              ratePerOrder: l.ratePerOrder,
-              grossAmount: l.grossAmount,
-              walletDeducted: l.walletDeducted,
-              netAmount: l.netAmount,
-              rating: l.rating,
-              notes: l.notes,
+            create: data.lines.map((line) => ({
+              driverId: line.driverId,
+              ordersCount: line.ordersCount,
+              ratePerOrder: line.ratePerOrder,
+              grossAmount: line.grossAmount,
+              walletDeducted: line.walletDeducted,
+              netAmount: line.netAmount,
+              rating: line.rating,
+              notes: line.notes,
             })),
           },
         },
         include: { lines: true, contract: true },
       });
 
-      // Re-create wallet deductions for the new lines (using new contract/month/year)
+      const affectedDrivers = new Set<string>([
+        ...existing.lines.map((line) => line.driverId),
+        ...previousWalletTransactions.map((line) => line.driverId),
+      ]);
+
       for (const line of data.lines) {
         if (line.walletDeducted > 0) {
           await tx.driverWalletTransaction.create({
@@ -133,9 +148,11 @@ export async function PATCH(request: NextRequest, { params }: Props) {
               descriptionAr: walletDeductionDesc(data.month, data.year),
             },
           });
+          affectedDrivers.add(line.driverId);
         }
       }
 
+      await recomputeDriverWalletStates(tx, affectedDrivers);
       return report;
     });
 
@@ -146,7 +163,6 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   }
 }
 
-// ── DELETE — remove report, reverse wallet deductions, cancel journal entry ──
 export async function DELETE(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -162,10 +178,13 @@ export async function DELETE(request: NextRequest, { params }: Props) {
         month: true,
         year: true,
         journalEntryId: true,
+        lines: { select: { driverId: true } },
         _count: { select: { payments: true } },
       },
     });
-    if (!report) return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+    if (!report) {
+      return NextResponse.json({ success: false, error: "التقرير غير موجود" }, { status: 404 });
+    }
 
     const err = assertCompanyAccess(session, report.companyId);
     if (err) return err;
@@ -174,19 +193,26 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: "يلزم صلاحية المشرف العام للحذف" }, { status: 403 });
     }
 
-    // A linked company payment is a separate financial record — block and ask to remove it first
     if (report._count.payments > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "لا يمكن حذف التقرير لوجود مدفوعة شركة مرتبطة به. احذف المدفوعة أولاً من صفحة مدفوعات الشركة ثم أعد المحاولة.",
+          error: "لا يمكن حذف التقرير لوجود دفعة شركة مرتبطة به. احذف الدفعة أولاً ثم أعد المحاولة.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     await prisma.$transaction(async (tx) => {
-      // Reverse the wallet deductions created when the report was created
+      const removedWalletTransactions = await tx.driverWalletTransaction.findMany({
+        where: {
+          contractId: report.contractId,
+          type: "DEDUCTION",
+          descriptionAr: walletDeductionDesc(report.month, report.year),
+        },
+        select: { driverId: true },
+      });
+
       await tx.driverWalletTransaction.deleteMany({
         where: {
           contractId: report.contractId,
@@ -195,16 +221,17 @@ export async function DELETE(request: NextRequest, { params }: Props) {
         },
       });
 
-      // Cancel the linked journal entry, if any
-      if (report.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: report.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف التقرير الشهري المرتبط" },
-        });
-      }
+      await discardLinkedJournalEntry(tx, report.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف التقرير الشهري المرتبط قبل ترحيل القيد",
+      });
 
-      // Delete the report (lines cascade-delete)
       await tx.deliveryMonthlyReport.delete({ where: { id: reportId } });
+
+      await recomputeDriverWalletStates(tx, [
+        ...report.lines.map((line) => line.driverId),
+        ...removedWalletTransactions.map((line) => line.driverId),
+      ]);
     });
 
     return NextResponse.json({ success: true });

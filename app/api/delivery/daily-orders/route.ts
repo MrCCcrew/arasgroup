@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { recomputeDriverWalletStates, syncDailyOrderWalletCharge } from "@/lib/delivery/wallet-state";
 
 const entrySchema = z.object({
   driverId: z.string(),
@@ -10,7 +11,7 @@ const entrySchema = z.object({
   walletDeducted: z.number().min(0).optional(),
   rating: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
-  walletAmount: z.number().min(0).optional(), // مبلغ التحصيل النقدي اليومي (للـ wallet transactions)
+  walletAmount: z.number().min(0).optional(),
 });
 
 const createSchema = z.object({
@@ -20,13 +21,14 @@ const createSchema = z.object({
   entries: z.array(entrySchema).min(1),
 });
 
-// Legacy support for single date
 const legacyCreateSchema = z.object({
   companyId: z.string(),
   contractId: z.string(),
   date: z.string().transform((s) => new Date(s)),
   entries: z.array(entrySchema).min(1),
 });
+
+const buildWalletDescription = (date: Date) => `تحصيل يومي — ${date.toISOString().slice(0, 10)}`;
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +38,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") ?? "1");
     const pageSize = parseInt(searchParams.get("pageSize") ?? "25");
 
-    if (!companyId) return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
+    if (!companyId) {
+      return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
+    }
 
     const where = {
       companyId,
@@ -51,11 +55,7 @@ export async function GET(request: NextRequest) {
           driver: { include: { employee: { select: { nameAr: true } } } },
           contract: { select: { nameAr: true, platform: true } },
         },
-        orderBy: [
-          { date: "desc" },
-          { createdAt: "desc" },
-          { id: "desc" },
-        ],
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Try new format first (dates array), fallback to legacy (single date)
     let dates: Date[];
     let companyId: string;
     let contractId: string;
@@ -84,71 +83,61 @@ export async function POST(request: NextRequest) {
     } else {
       const legacyParsed = legacyCreateSchema.safeParse(body);
       if (!legacyParsed.success) {
-        return NextResponse.json(
-          { success: false, error: newParsed.error.errors[0].message },
-          { status: 400 }
-        );
+        return NextResponse.json({ success: false, error: newParsed.error.errors[0].message }, { status: 400 });
       }
       ({ companyId, contractId, entries } = legacyParsed.data);
       dates = [legacyParsed.data.date];
     }
 
-    // حفظ الأوردرات + حركات المحفظة في transaction واحدة لجميع التواريخ
     const result = await prisma.$transaction(async (tx) => {
       let totalSaved = 0;
       let totalWalletSaved = 0;
+      const affectedDrivers = new Set<string>();
 
       for (const date of dates) {
-        // 1. upsert الأوردرات اليومية لهذا التاريخ
-        for (const e of entries) {
-          await tx.deliveryDailyOrder.upsert({
-            where: { driverId_contractId_date: { driverId: e.driverId, contractId, date } },
+        for (const entry of entries) {
+          const order = await tx.deliveryDailyOrder.upsert({
+            where: { driverId_contractId_date: { driverId: entry.driverId, contractId, date } },
             create: {
-              driverId: e.driverId,
+              driverId: entry.driverId,
               contractId,
               companyId,
               date,
-              ordersCount: e.ordersCount,
-              ratePerOrder: e.ratePerOrder ?? null,
-              grossAmount: e.grossAmount ?? null,
-              walletDeducted: e.walletDeducted ?? null,
-              rating: e.rating ?? null,
-              notes: e.notes ?? null,
+              ordersCount: entry.ordersCount,
+              ratePerOrder: entry.ratePerOrder ?? null,
+              grossAmount: entry.grossAmount ?? null,
+              walletDeducted: entry.walletDeducted ?? null,
+              rating: entry.rating ?? null,
+              notes: entry.notes ?? null,
             },
             update: {
-              ordersCount: e.ordersCount,
-              ratePerOrder: e.ratePerOrder ?? null,
-              grossAmount: e.grossAmount ?? null,
-              walletDeducted: e.walletDeducted ?? null,
-              rating: e.rating ?? null,
-              notes: e.notes ?? null,
+              ordersCount: entry.ordersCount,
+              ratePerOrder: entry.ratePerOrder ?? null,
+              grossAmount: entry.grossAmount ?? null,
+              walletDeducted: entry.walletDeducted ?? null,
+              rating: entry.rating ?? null,
+              notes: entry.notes ?? null,
             },
           });
+
+          await syncDailyOrderWalletCharge(tx, {
+            dailyOrderId: order.id,
+            driverId: entry.driverId,
+            contractId,
+            date,
+            amount: entry.walletAmount,
+            descriptionAr: buildWalletDescription(date),
+          });
+
+          affectedDrivers.add(entry.driverId);
           totalSaved++;
-        }
-
-        // 2. تسجيل حركات المحفظة (CHARGE) للسائقين اللي عندهم مبلغ تحصيل
-        const walletEntries = entries.filter((e) => e.walletAmount && e.walletAmount > 0);
-
-        for (const e of walletEntries) {
-          await tx.driverWalletTransaction.create({
-            data: {
-              driverId: e.driverId,
-              contractId,
-              type: "CHARGE",
-              amount: e.walletAmount!,
-              date,
-              descriptionAr: `تحصيل يومي — ${date.toISOString().slice(0, 10)}`,
-            },
-          });
-          // تحديث رصيد المحفظة (CHARGE يزيد ما على السائق)
-          await tx.driver.update({
-            where: { id: e.driverId },
-            data: { walletBalance: { increment: e.walletAmount! } },
-          });
-          totalWalletSaved++;
+          if ((entry.walletAmount ?? 0) > 0) {
+            totalWalletSaved++;
+          }
         }
       }
+
+      await recomputeDriverWalletStates(tx, affectedDrivers);
 
       return {
         saved: totalSaved,

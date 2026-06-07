@@ -13,6 +13,20 @@ interface Props {
   searchParams: Promise<{ categoryId?: string; page?: string; startDate?: string; endDate?: string }>;
 }
 
+function getJournalStatusLabel(status: string | null | undefined, locale: "ar" | "en") {
+  if (status === "POSTED") return locale === "en" ? "Posted" : "مرحل";
+  if (status === "APPROVED") return locale === "en" ? "Approved" : "معتمد";
+  if (status === "PENDING_APPROVAL") return locale === "en" ? "Pending approval" : "بانتظار الموافقة";
+  return locale === "en" ? "Draft" : "مسودة";
+}
+
+function getJournalStatusClass(status: string | null | undefined) {
+  if (status === "POSTED") return "bg-green-100 text-green-700";
+  if (status === "APPROVED") return "bg-blue-100 text-blue-700";
+  if (status === "PENDING_APPROVAL") return "bg-yellow-100 text-yellow-700";
+  return "bg-slate-100 text-slate-700";
+}
+
 export default async function ExpensesPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -40,7 +54,9 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
     prisma.expense.count({ where }),
     prisma.expense.findMany({
       where,
-      include: { category: { select: { nameAr: true, nameEn: true, type: true } } },
+      include: {
+        category: { select: { nameAr: true, nameEn: true, type: true } },
+      },
       orderBy: { date: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -61,6 +77,15 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
     }),
   ]);
 
+  const journalEntryIds = expenses.map((expense) => expense.journalEntryId).filter((value): value is string => Boolean(value));
+  const linkedJournalEntries = journalEntryIds.length
+    ? await prisma.journalEntry.findMany({
+        where: { id: { in: journalEntryIds } },
+        select: { id: true, status: true },
+      })
+    : [];
+  const journalStatusById = new Map(linkedJournalEntries.map((entry) => [entry.id, entry.status]));
+
   const totalAmount = Number(expensesTotal._sum.amount ?? 0);
   const totalPages = Math.ceil(total / pageSize);
 
@@ -72,11 +97,17 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
         companyId={companyId}
         actions={
           <div className="flex items-center gap-2">
-            <Link href={`/dashboard/companies/${companyId}/expenses/categories`} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+            <Link
+              href={`/dashboard/companies/${companyId}/expenses/categories`}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
               <Settings2 size={16} />
               {locale === "en" ? "Categories" : "الفئات"}
             </Link>
-            <Link href={`/dashboard/companies/${companyId}/expenses/new`} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <Link
+              href={`/dashboard/companies/${companyId}/expenses/new`}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
               <Plus size={16} />
               {locale === "en" ? "New expense" : "مصروف جديد"}
             </Link>
@@ -110,7 +141,7 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Category" : "الفئة"}</th>
                   <th>{locale === "en" ? "Amount" : "المبلغ"}</th>
                   <th>{locale === "en" ? "Payment method" : "طريقة الدفع"}</th>
-                  <th>{locale === "en" ? "Status" : "الحالة"}</th>
+                  <th>{locale === "en" ? "Journal status" : "حالة القيد"}</th>
                   <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
               </thead>
@@ -133,21 +164,29 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
                       </td>
                       <td className="number font-bold text-red-600">{formatKWD(Number(expense.amount), numberLocale)}</td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${expense.paymentMethod === "CASH" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            expense.paymentMethod === "CASH" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
                           {expense.paymentMethod === "CASH"
                             ? locale === "en"
                               ? "Cash"
                               : "نقدي"
                             : expense.paymentMethod === "BANK"
-                              ? locale === "en"
-                                ? "Bank"
-                                : "بنك"
-                              : expense.paymentMethod}
+                            ? locale === "en"
+                              ? "Bank"
+                              : "بنك"
+                            : expense.paymentMethod}
                         </span>
                       </td>
                       <td>
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                          {expense.status === "POSTED" ? (locale === "en" ? "Posted" : "مرحل") : locale === "en" ? "Draft" : "مسودة"}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${getJournalStatusClass(
+                            expense.journalEntryId ? journalStatusById.get(expense.journalEntryId) : null,
+                          )}`}
+                        >
+                          {getJournalStatusLabel(expense.journalEntryId ? journalStatusById.get(expense.journalEntryId) : null, locale)}
                         </span>
                       </td>
                       <td>
@@ -192,7 +231,9 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
               <Link
                 key={currentPage}
                 href={`/dashboard/companies/${companyId}/expenses?page=${currentPage}`}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors ${currentPage === page ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors ${
+                  currentPage === page ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                }`}
               >
                 {currentPage}
               </Link>

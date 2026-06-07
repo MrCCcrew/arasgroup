@@ -1,6 +1,6 @@
 import type { JournalEntry } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { createJournalEntry, getCurrentFiscalYear, postJournalEntry } from "./journal-engine";
+import { createJournalEntry, getCurrentFiscalYear } from "./journal-engine";
 
 async function getAccountId(companyId: string, code: string): Promise<string> {
   const account = await prisma.chartOfAccount.findUnique({
@@ -12,9 +12,8 @@ async function getAccountId(companyId: string, code: string): Promise<string> {
   return account.id;
 }
 
-async function createAndPostEntry(args: Parameters<typeof createJournalEntry>[0]): Promise<JournalEntry> {
-  const entry = await createJournalEntry(args);
-  return postJournalEntry(entry.id, args.createdById);
+async function createAutomaticEntry(args: Parameters<typeof createJournalEntry>[0]): Promise<JournalEntry> {
+  return createJournalEntry(args);
 }
 
 export async function createDeliveryPaymentJE(params: {
@@ -54,7 +53,7 @@ export async function createDeliveryPaymentJE(params: {
     { accountId: deliveryRevenueId, debit: 0, credit: params.grossAmount, descriptionAr: "إيراد توصيل" },
   ];
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -85,7 +84,7 @@ export async function createDriverWalletDepositJE(params: {
     getAccountId(params.companyId, "1030"),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -130,7 +129,7 @@ export async function createCarWashDailyJE(params: {
   }
   lines.push({ accountId: revenueId, debit: 0, credit: totalRevenue, carWashVehicleId: params.vehicleId, costCenterId: params.costCenterId });
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: params.date,
@@ -162,7 +161,7 @@ export async function createKnetSettlementJE(params: {
     getAccountId(params.companyId, "1020"),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: params.date,
@@ -220,7 +219,7 @@ export async function createInvestorClaimCollectionJE(params: {
     lines.push({ accountId: serviceRevenueId, debit: 0, credit: params.groupIncome, descriptionAr: "هامش ربح المجموعة" });
   }
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -249,7 +248,7 @@ export async function createInvestorSalaryCollectionJE(params: {
     getAccountId(params.companyId, "2010"),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -280,7 +279,7 @@ export async function createInvestorSalaryDisbursementJE(params: {
     getAccountId(params.companyId, "2010"),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -312,7 +311,7 @@ export async function createSalaryPaymentJE(params: {
     getAccountId(params.companyId, "5010"),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -347,7 +346,7 @@ export async function createExpenseJE(params: {
     getAccountId(params.companyId, params.expenseAccountCode),
   ]);
 
-  return createAndPostEntry({
+  return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),

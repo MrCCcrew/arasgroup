@@ -139,7 +139,7 @@ export default function WalletPage() {
         driverId: form.driverId,
         amount: Number(form.amount),
         date: form.date,
-        isBankDeposit: form.isBankDeposit,
+        paymentMethod: form.isBankDeposit ? "BANK" : "CASH",
         descriptionAr: form.descriptionAr || undefined,
       }),
     });
@@ -220,7 +220,7 @@ export default function WalletPage() {
                         <span className={`number text-sm font-bold ${balance < 0 ? "text-red-600" : balance > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
                           {balance.toLocaleString(numberLocale, { minimumFractionDigits: 3 })} {kwd}
                         </span>
-                        {balance !== 0 && (
+                        {balance > 0 && (
                           <button
                             onClick={() => settleBalance(d.id, d.employee.nameAr, balance)}
                             disabled={settlingId === d.id}

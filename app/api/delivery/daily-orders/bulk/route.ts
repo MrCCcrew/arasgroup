@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { recomputeDriverWalletStates, syncDailyOrderWalletCharge } from "@/lib/delivery/wallet-state";
 
 const bulkEntrySchema = z.object({
   date: z.string().transform((s) => new Date(s)),
@@ -20,16 +21,15 @@ const bulkCreateSchema = z.object({
   entries: z.array(bulkEntrySchema).min(1),
 });
 
+const buildWalletDescription = (date: Date) => `تحصيل يومي — ${date.toISOString().slice(0, 10)}`;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const parsed = bulkCreateSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.errors[0].message },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
     const { companyId, contractId, entries } = parsed.data;
@@ -38,10 +38,11 @@ export async function POST(request: NextRequest) {
       const saved: string[] = [];
       const failed: string[] = [];
       let totalWalletSaved = 0;
+      const affectedDrivers = new Set<string>();
 
       for (const entry of entries) {
         try {
-          await tx.deliveryDailyOrder.upsert({
+          const order = await tx.deliveryDailyOrder.upsert({
             where: {
               driverId_contractId_date: {
                 driverId: entry.driverId,
@@ -71,23 +72,17 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          if (entry.walletAmount && entry.walletAmount > 0) {
-            await tx.driverWalletTransaction.create({
-              data: {
-                driverId: entry.driverId,
-                contractId,
-                type: "CHARGE",
-                amount: entry.walletAmount,
-                date: entry.date,
-                descriptionAr: `تحصيل يومي — ${entry.date.toISOString().slice(0, 10)}`,
-              },
-            });
+          await syncDailyOrderWalletCharge(tx, {
+            dailyOrderId: order.id,
+            driverId: entry.driverId,
+            contractId,
+            date: entry.date,
+            amount: entry.walletAmount,
+            descriptionAr: buildWalletDescription(entry.date),
+          });
 
-            await tx.driver.update({
-              where: { id: entry.driverId },
-              data: { walletBalance: { increment: entry.walletAmount } },
-            });
-
+          affectedDrivers.add(entry.driverId);
+          if ((entry.walletAmount ?? 0) > 0) {
             totalWalletSaved++;
           }
 
@@ -97,6 +92,8 @@ export async function POST(request: NextRequest) {
           failed.push(entry.date.toISOString().slice(0, 10));
         }
       }
+
+      await recomputeDriverWalletStates(tx, affectedDrivers);
 
       return {
         saved: saved.length,
@@ -113,7 +110,7 @@ export async function POST(request: NextRequest) {
           error: `فشل في حفظ ${result.failed.length} من ${result.totalEntries} يوم`,
           data: result,
         },
-        { status: 207 }
+        { status: 207 },
       );
     }
 

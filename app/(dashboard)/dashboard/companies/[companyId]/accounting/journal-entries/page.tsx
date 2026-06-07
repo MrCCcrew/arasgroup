@@ -87,7 +87,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
     ...(statusFilter ? { status: statusFilter as JournalStatus } : {}),
   };
 
-  const [total, entries] = await Promise.all([
+  const [total, entries, unpostedCount] = await Promise.all([
     prisma.journalEntry.count({ where }),
     prisma.journalEntry.findMany({
       where,
@@ -99,10 +99,17 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    prisma.journalEntry.count({
+      where: {
+        companyId,
+        isDeleted: false,
+        status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED"] },
+      },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const filters = ["", "DRAFT", "POSTED", "PENDING_APPROVAL"] as const;
+  const filters = ["", "DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED"] as const;
 
   const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
 
@@ -124,6 +131,29 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
       />
 
       <div className="page-container space-y-4">
+        {unpostedCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold">
+                  {locale === "en" ? "Unposted entries need review before they affect the ledger." : "يوجد قيود غير مرحلة تحتاج مراجعة قبل أن تؤثر على الأستاذ."}
+                </p>
+                <p className="text-sm">
+                  {locale === "en"
+                    ? `${unpostedCount} entries are still draft, pending approval, or approved without posting.`
+                    : `${unpostedCount} قيدًا ما زال في حالة مسودة أو بانتظار اعتماد أو معتمد بدون ترحيل.`}
+                </p>
+              </div>
+              <Link
+                href={`/dashboard/companies/${companyId}/accounting/journal-entries?status=DRAFT`}
+                className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+              >
+                {locale === "en" ? "Open drafts" : "فتح المسودات"}
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3">
           {filters.map((status) => {
             const active = statusFilter === status || (!statusFilter && !status);

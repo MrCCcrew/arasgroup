@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ settlementId: string }>;
@@ -34,6 +35,16 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    if (settlement.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "لا يمكن تعديل تسوية KNET بعد إنشاء القيد المرتبط. احذف التسوية أولاً أو أنشئ تسوية جديدة بعد المراجعة.",
+        },
+        { status: 400 },
+      );
+    }
+
     const updated = await prisma.knetSettlement.update({ where: { id: settlementId }, data: parsed.data });
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
@@ -62,19 +73,17 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Unlink transactions first then delete
+      await discardLinkedJournalEntry(tx, settlement.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف تسوية KNET المرتبطة قبل ترحيل القيد",
+      });
+
       await tx.knetTransaction.updateMany({
         where: { settlementId },
-        data: { settlementId: null },
+        data: { settlementId: null, isSettled: false },
       });
-      await tx.knetSettlement.delete({ where: { id: settlementId } });
 
-      if (settlement.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: settlement.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف سجل التسوية المرتبط" },
-        });
-      }
+      await tx.knetSettlement.delete({ where: { id: settlementId } });
     });
 
     return NextResponse.json({ success: true });

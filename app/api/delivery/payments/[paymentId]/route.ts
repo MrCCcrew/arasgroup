@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ paymentId: string }>;
@@ -75,14 +76,12 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.companyPayment.delete({ where: { id: paymentId } });
+      await discardLinkedJournalEntry(tx, payment.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف سجل الدفعة قبل ترحيل القيد",
+      });
 
-      if (payment.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: payment.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف سجل الدفعة المرتبط" },
-        });
-      }
+      await tx.companyPayment.delete({ where: { id: paymentId } });
     });
 
     return NextResponse.json({ success: true });

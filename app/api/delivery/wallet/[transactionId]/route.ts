@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
+import { recomputeDriverWalletState } from "@/lib/delivery/wallet-state";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
-interface Ctx { params: Promise<{ transactionId: string }> }
+interface Ctx {
+  params: Promise<{ transactionId: string }>;
+}
 
 export async function DELETE(request: NextRequest, { params }: Ctx) {
   const session = await requireRequestSession(request);
@@ -18,15 +22,17 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
       where: { id: transactionId },
       include: { driver: { include: { employee: { select: { companyId: true } } } } },
     });
-    if (!tx) return NextResponse.json({ success: false, error: "الحركة غير موجودة" }, { status: 404 });
+    if (!tx) {
+      return NextResponse.json({ success: false, error: "الحركة غير موجودة" }, { status: 404 });
+    }
 
     await prisma.$transaction(async (trx) => {
-      // عكس المبلغ على رصيد المحفظة
-      await trx.driver.update({
-        where: { id: tx.driverId },
-        data: { walletBalance: { decrement: tx.amount } },
+      await discardLinkedJournalEntry(trx, tx.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف حركة محفظة السائق المرتبطة قبل ترحيل القيد",
       });
       await trx.driverWalletTransaction.delete({ where: { id: transactionId } });
+      await recomputeDriverWalletState(trx, tx.driverId);
     });
 
     return NextResponse.json({ success: true });

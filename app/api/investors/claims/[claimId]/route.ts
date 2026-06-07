@@ -87,6 +87,16 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: "المطالبة ليست في حالة تسمح بتسجيل التحصيل" }, { status: 400 });
     }
 
+    if (claim.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "تم تسجيل قيد تحصيل لهذه المطالبة بالفعل. اعكس القيد المرتبط أو ألغ المطالبة قبل إعادة التحصيل.",
+        },
+        { status: 400 },
+      );
+    }
+
     const { collectedLines } = parsed.data;
     if (!collectedLines || collectedLines.length === 0) {
       return NextResponse.json({ success: false, error: "يرجى إدخال المبالغ المحصلة" }, { status: 400 });
@@ -275,6 +285,12 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     }
 
     await prisma.$transaction(async (tx) => {
+      if (claim.journalEntryId) {
+        await tx.journalEntry.update({
+          where: { id: claim.journalEntryId },
+          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف المطالبة المرتبطة" },
+        });
+      }
       await tx.investorClaimLine.deleteMany({ where: { claimId } });
       await tx.investorClaim.delete({ where: { id: claimId } });
     });

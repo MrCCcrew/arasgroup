@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ calcId: string }>;
@@ -28,6 +29,16 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     const body = await request.json();
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+
+    if (record.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "لا يمكن تعديل نهاية الخدمة بعد إنشاء القيد المرتبط. احذف السجل أولاً أو أنشئ سجلًا جديدًا بعد المراجعة.",
+        },
+        { status: 400 },
+      );
+    }
 
     const updated = await prisma.endOfServiceCalc.update({ where: { id: calcId }, data: parsed.data });
     return NextResponse.json({ success: true, data: updated });
@@ -56,13 +67,11 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     if (record.status === "PAID") return NextResponse.json({ success: false, error: "لا يمكن حذف سجل مصروف" }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {
+      await discardLinkedJournalEntry(tx, record.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف سجل نهاية الخدمة قبل ترحيل القيد",
+      });
       await tx.endOfServiceCalc.delete({ where: { id: calcId } });
-      if (record.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: record.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف سجل نهاية الخدمة" },
-        });
-      }
     });
 
     return NextResponse.json({ success: true });

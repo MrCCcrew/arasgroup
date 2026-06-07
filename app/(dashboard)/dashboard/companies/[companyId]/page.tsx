@@ -94,7 +94,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
   const canViewAccountingForQuery = session.isSuperAdmin || hasPermission(session, "ACCOUNTING", "VIEW", { companyId });
 
   const [
-    pendingJEs,
+    unpostedJEs,
     mainLicensesCount,
     subLicensesCount,
     expiringResidencies,
@@ -103,7 +103,13 @@ export default async function CompanyDashboardPage({ params }: Props) {
   ] = await Promise.all([
     // قيود مسودة (فقط لمن يملك صلاحية المحاسبة)
     canViewAccountingForQuery
-      ? prisma.journalEntry.count({ where: { companyId, status: "DRAFT", isDeleted: false } })
+      ? prisma.journalEntry.count({
+          where: {
+            companyId,
+            status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED"] },
+            isDeleted: false,
+          },
+        })
       : Promise.resolve(0),
     // عدد التراخيص الرئيسية (بدون الملغاة)
     prisma.license.count({
@@ -237,6 +243,32 @@ export default async function CompanyDashboardPage({ params }: Props) {
         )}
 
         {/* ── الإحصائيات الرئيسية ── */}
+        {canViewAccounting && unpostedJEs > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={18} className="mt-0.5 text-amber-600" />
+                <div>
+                  <p className="text-sm font-bold">
+                    {locale === "en" ? "There are unposted journal entries that need review." : "يوجد قيود غير مرحلة تحتاج مراجعة."}
+                  </p>
+                  <p className="text-sm">
+                    {locale === "en"
+                      ? `${unpostedJEs} entries are still draft, pending approval, or approved without posting.`
+                      : `${unpostedJEs} قيدًا ما زال في حالة مسودة أو بانتظار اعتماد أو معتمد بدون ترحيل.`}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/dashboard/companies/${companyId}/accounting/journal-entries`}
+                className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+              >
+                {locale === "en" ? "Review entries" : "مراجعة القيود"}
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className={`grid grid-cols-2 gap-3 ${canViewAccounting ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
           <StatCard
             icon={<Users size={20} className="text-blue-600" />}
@@ -254,7 +286,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
             <StatCard
               icon={<Receipt size={20} className="text-yellow-600" />}
               iconBg="bg-yellow-50"
-              value={String(pendingJEs)}
+              value={String(unpostedJEs)}
               label={locale === "en" ? "Draft entries" : "قيد مسودة"}
             />
           )}

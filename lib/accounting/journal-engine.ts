@@ -1,7 +1,10 @@
-import type { JournalEntry, JournalStatus } from "@prisma/client";
+import type { JournalEntry, JournalStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CreateJournalEntryInput, JournalEntryLineInput } from "@/lib/types";
 import { generateNumber } from "@/lib/utils";
+import { recomputeDriverWalletState } from "@/lib/delivery/wallet-state";
+
+type JournalDbClient = Prisma.TransactionClient | typeof prisma;
 
 const TYPE_PREFIX: Record<string, string> = {
   PAYMENT: "PV",
@@ -290,6 +293,84 @@ export async function deleteJournalEntry(journalEntryId: string, userId: string)
   });
 }
 
+export async function getLinkedJournalEntry(db: JournalDbClient, journalEntryId: string) {
+  return db.journalEntry.findUnique({
+    where: { id: journalEntryId },
+    select: {
+      id: true,
+      status: true,
+      isDeleted: true,
+      descriptionAr: true,
+      descriptionEn: true,
+    },
+  });
+}
+
+export async function ensureLinkedJournalEntryIsMutable(
+  db: JournalDbClient,
+  journalEntryId: string | null | undefined,
+  actionLabel: string,
+) {
+  if (!journalEntryId) return null;
+
+  const entry = await getLinkedJournalEntry(db, journalEntryId);
+  if (!entry || entry.isDeleted) return null;
+
+  if (entry.status === "POSTED") {
+    throw new Error(`لا يمكن ${actionLabel} بعد ترحيل القيد المرتبط. اعكس القيد المرحل أولاً إذا أردت التراجع عن العملية.`);
+  }
+
+  return entry;
+}
+
+export async function discardLinkedJournalEntry(
+  db: JournalDbClient,
+  journalEntryId: string | null | undefined,
+  options: {
+    userId?: string;
+    reasonAr?: string;
+    reasonEn?: string;
+  } = {},
+) {
+  const entry = await ensureLinkedJournalEntryIsMutable(db, journalEntryId, "التراجع عن العملية");
+  if (!entry) return;
+
+  if (entry.status === "PENDING_APPROVAL" || entry.status === "APPROVED") {
+    await db.journalEntry.update({
+      where: { id: entry.id },
+      data: {
+        status: "CANCELLED",
+        descriptionAr: options.reasonAr ?? entry.descriptionAr,
+        descriptionEn: options.reasonEn ?? entry.descriptionEn ?? undefined,
+      },
+    });
+    return;
+  }
+
+  await db.journalEntry.update({
+    where: { id: entry.id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+      descriptionAr: options.reasonAr ?? entry.descriptionAr,
+      descriptionEn: options.reasonEn ?? entry.descriptionEn ?? undefined,
+    },
+  });
+
+  if (options.userId) {
+    await db.auditLog.create({
+      data: {
+        userId: options.userId,
+        action: "DELETE",
+        module: "accounting",
+        resourceId: entry.id,
+        resourceType: "JournalEntry",
+        journalEntryId: entry.id,
+      },
+    });
+  }
+}
+
 export async function getAccountBalance(
   accountId: string,
   companyId: string,
@@ -410,6 +491,25 @@ export async function reverseJournalEntry(journalEntryId: string, userId: string
         newValues: { reversalEntryId: reversalEntry.id },
       },
     });
+
+    if (entry.type === "DELIVERY_WALLET") {
+      const walletTransaction = await tx.driverWalletTransaction.findFirst({
+        where: entry.refId
+          ? {
+              OR: [
+                { journalEntryId },
+                { id: entry.refId },
+              ],
+            }
+          : { journalEntryId },
+        select: { id: true, driverId: true },
+      });
+
+      if (walletTransaction) {
+        await tx.driverWalletTransaction.delete({ where: { id: walletTransaction.id } });
+        await recomputeDriverWalletState(tx, walletTransaction.driverId);
+      }
+    }
 
     return reversalEntry;
   });

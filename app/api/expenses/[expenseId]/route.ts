@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ expenseId: string }>;
@@ -13,7 +14,7 @@ const patchSchema = z.object({
   amount: z.number().positive().optional(),
   descriptionAr: z.string().min(1).optional(),
   descriptionEn: z.string().optional().nullable(),
-  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CREDIT_CARD", "CHEQUE"]).optional(),
+  paymentMethod: z.enum(["CASH", "BANK", "CARD", "CHEQUE"]).optional(),
   bankAccountId: z.string().optional().nullable(),
   reference: z.string().optional().nullable(),
 });
@@ -24,7 +25,10 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
   try {
     const { expenseId } = await params;
-    const expense = await prisma.expense.findUnique({ where: { id: expenseId, isDeleted: false } });
+    const expense = await prisma.expense.findFirst({
+      where: { id: expenseId, isDeleted: false },
+      select: { id: true, companyId: true, journalEntryId: true },
+    });
     if (!expense) return NextResponse.json({ success: false, error: "المصروف غير موجود" }, { status: 404 });
 
     const companyAccessError = assertCompanyAccess(session, expense.companyId);
@@ -34,6 +38,16 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+    }
+
+    if (expense.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "لا يمكن تعديل المصروف بعد إنشاء القيد المرتبط. احذف المصروف أو ألغ العملية ثم سجله من جديد حتى لا يبقى القيد غير مطابق.",
+        },
+        { status: 400 },
+      );
     }
 
     const updated = await prisma.expense.update({ where: { id: expenseId }, data: parsed.data });
@@ -66,16 +80,15 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     }
 
     await prisma.$transaction(async (tx) => {
+      await discardLinkedJournalEntry(tx, expense.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف المصروف المرتبط قبل ترحيل القيد",
+      });
+
       await tx.expense.update({
         where: { id: expenseId },
         data: { isDeleted: true },
       });
-      if (expense.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: expense.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف المصروف المرتبط" },
-        });
-      }
     });
 
     return NextResponse.json({ success: true });

@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess, assertPermission } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
-interface Ctx { params: Promise<{ batchId: string }> }
+interface Ctx {
+  params: Promise<{ batchId: string }>;
+}
 
 export async function GET(request: NextRequest, { params }: Ctx) {
   const session = await requireRequestSession(request);
@@ -72,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     const batch = await prisma.salaryBatch.findUnique({
       where: { id: batchId },
-      select: { companyId: true, status: true },
+      select: { companyId: true, status: true, journalEntryId: true },
     });
     if (!batch) {
       return NextResponse.json({ success: false, error: "دفعة الرواتب غير موجودة" }, { status: 404 });
@@ -84,9 +87,18 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const permissionError = assertPermission(session, "SALARIES", "UPDATE", { companyId: batch.companyId });
     if (permissionError) return permissionError;
 
-    const updated = await prisma.salaryBatch.update({
-      where: { id: batchId },
-      data: parsed.data,
+    const updated = await prisma.$transaction(async (tx) => {
+      if (parsed.data.status === "CANCELLED" && batch.journalEntryId) {
+        await discardLinkedJournalEntry(tx, batch.journalEntryId, {
+          userId: session.id,
+          reasonAr: "تم إلغاء دفعة الرواتب قبل ترحيل القيد",
+        });
+      }
+
+      return tx.salaryBatch.update({
+        where: { id: batchId },
+        data: parsed.data,
+      });
     });
 
     return NextResponse.json({ success: true, data: updated });

@@ -195,13 +195,18 @@ export async function POST(request: NextRequest) {
       return createdBatch;
     });
 
-    await createSalaryPaymentJE({
+    const salaryJournalEntry = await createSalaryPaymentJE({
       companyId: data.companyId,
       userId: session.id,
       totalAmount: totalNet,
       month: data.month,
       year: data.year,
       refId: batch.id,
+    });
+
+    await prisma.salaryBatch.update({
+      where: { id: batch.id },
+      data: { journalEntryId: salaryJournalEntry.id },
     });
 
     return NextResponse.json({ success: true, data: batch }, { status: 201 });

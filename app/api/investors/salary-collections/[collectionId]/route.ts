@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ collectionId: string }>;
@@ -37,6 +38,16 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    if (collection.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "لا يمكن تعديل سجل التحصيل بعد إنشاء القيد المرتبط. احذف السجل أولاً أو أنشئ سجلًا جديدًا بعد المراجعة.",
+        },
+        { status: 400 },
+      );
+    }
+
     const updated = await prisma.investorSalaryCollection.update({
       where: { id: collectionId },
       data: parsed.data,
@@ -68,22 +79,16 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     if (companyAccessError) return companyAccessError;
 
     if (!session.isSuperAdmin) {
-      return NextResponse.json(
-        { success: false, error: "يلزم صلاحية المشرف العام للحذف" },
-        { status: 403 }
-      );
+      return NextResponse.json({ success: false, error: "يلزم صلاحية المشرف العام للحذف" }, { status: 403 });
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.investorSalaryCollection.delete({ where: { id: collectionId } });
+      await discardLinkedJournalEntry(tx, collection.journalEntryId, {
+        userId: session.id,
+        reasonAr: "تم حذف سجل تحصيل الرواتب قبل ترحيل القيد",
+      });
 
-      // Void the linked journal entry if it exists
-      if (collection.journalEntryId) {
-        await tx.journalEntry.update({
-          where: { id: collection.journalEntryId },
-          data: { status: "CANCELLED", descriptionAr: "ملغى — تم حذف سجل التحصيل المرتبط" },
-        });
-      }
+      await tx.investorSalaryCollection.delete({ where: { id: collectionId } });
     });
 
     return NextResponse.json({ success: true });
