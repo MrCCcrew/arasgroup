@@ -16,6 +16,7 @@ const updateSchema = z.object({
   currency: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  chartAccountId: z.string().optional().nullable(),
 });
 
 async function getBankAccountForAccess(accountId: string) {
@@ -54,9 +55,37 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       });
     }
 
+    if (parsed.data.chartAccountId) {
+      const chartAccount = await prisma.chartOfAccount.findFirst({
+        where: {
+          id: parsed.data.chartAccountId,
+          companyId: bankAccount.companyId,
+          isActive: true,
+          isHeader: false,
+          type: "ASSET",
+        },
+      });
+      if (!chartAccount) {
+        return NextResponse.json(
+          { success: false, error: "الحساب المرتبط يجب أن يكون حساب أصل نشط من دليل الحسابات" },
+          { status: 400 },
+        );
+      }
+    }
+
     const updatedAccount = await prisma.bankAccount.update({
       where: { id: accountId },
       data: parsed.data,
+      include: {
+        chartAccount: {
+          select: {
+            id: true,
+            code: true,
+            nameAr: true,
+            nameEn: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ success: true, data: updatedAccount });

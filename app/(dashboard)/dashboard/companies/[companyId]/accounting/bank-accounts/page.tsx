@@ -16,12 +16,34 @@ interface BankAccount {
   currency: string;
   isDefault: boolean;
   isActive: boolean;
+  chartAccountId?: string | null;
+  chartAccount?: {
+    id: string;
+    code: string;
+    nameAr: string;
+    nameEn?: string | null;
+  } | null;
+}
+
+interface AccountOption {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn?: string | null;
+  isHeader: boolean;
 }
 
 const EMPTY = {
-  nameAr: "", nameEn: "", bankName: "", accountNumber: "",
-  iban: "", currency: "KWD", isDefault: false,
+  nameAr: "",
+  nameEn: "",
+  bankName: "",
+  accountNumber: "",
+  iban: "",
+  currency: "KWD",
+  isDefault: false,
+  chartAccountId: "",
 };
+
 type Form = typeof EMPTY;
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -30,7 +52,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div className="w-full max-w-lg rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h2 className="font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X size={16} /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted">
+            <X size={16} />
+          </button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -51,13 +75,17 @@ export default function BankAccountsPage() {
     numberRequired: en ? "Account number is required" : "رقم الحساب مطلوب",
     genericError: en ? "An error occurred" : "حدث خطأ",
     deleteFailed: en ? "Delete failed" : "فشل الحذف",
-    loading: en ? "Loading..." : "جاري التحميل...",
+    loading: en ? "Loading..." : "جار التحميل...",
     accountName: en ? "Account name" : "اسم الحساب",
     bank: en ? "Bank" : "البنك",
     accountNumber: en ? "Account number" : "رقم الحساب",
     currency: en ? "Currency" : "العملة",
+    linkedAccount: en ? "Linked account" : "الحساب المرتبط",
+    linkedAccountLabel: en ? "Linked chart account" : "الحساب المرتبط من دليل الحسابات",
+    linkedHint: en ? "Choose the asset account representing this bank account in the ledger." : "اختر حساب الأصل الذي يمثل هذا الحساب البنكي في دليل الحسابات.",
+    notLinked: en ? "Not linked" : "غير مربوط",
     default: en ? "Default" : "الافتراضي",
-    empty: en ? "No bank accounts — click \"Add bank account\" to start" : "لا توجد حسابات بنكية — اضغط \"إضافة حساب بنكي\" للبدء",
+    empty: en ? 'No bank accounts. Click "Add bank account" to start.' : 'لا توجد حسابات بنكية. اضغط "إضافة حساب بنكي" للبدء.',
     isDefault: en ? "Default" : "افتراضي",
     setDefault: en ? "Set as default" : "تعيين كافتراضي",
     disable: en ? "Disable" : "تعطيل",
@@ -69,7 +97,7 @@ export default function BankAccountsPage() {
     accountNumberLabel: en ? "Account number *" : "رقم الحساب *",
     defaultAccount: en ? "Default account" : "حساب افتراضي",
     cancel: en ? "Cancel" : "إلغاء",
-    saving: en ? "Saving..." : "جاري الحفظ...",
+    saving: en ? "Saving..." : "جار الحفظ...",
     save: en ? "Save" : "حفظ",
     addBtn: en ? "Add" : "إضافة",
     confirmDisable: en ? "Confirm disable" : "تأكيد التعطيل",
@@ -79,7 +107,9 @@ export default function BankAccountsPage() {
     curEUR: en ? "Euro (EUR)" : "يورو (EUR)",
     curSAR: en ? "Saudi Riyal (SAR)" : "ريال سعودي (SAR)",
   };
+
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [chartAccounts, setChartAccounts] = useState<AccountOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -97,11 +127,20 @@ export default function BankAccountsPage() {
     setLoading(false);
   }, [companyId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    fetch(`/api/accounting/accounts?companyId=${companyId}&type=ASSET`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          setChartAccounts((data.data as AccountOption[]).filter((account) => !account.isHeader));
+        }
+      });
+  }, [companyId, load]);
 
   function f<K extends keyof Form>(key: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((p) => ({ ...p, [key]: e.target.value }));
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
   }
 
   function openAdd() {
@@ -114,24 +153,41 @@ export default function BankAccountsPage() {
   function openEdit(acc: BankAccount) {
     setEditId(acc.id);
     setForm({
-      nameAr: acc.nameAr, nameEn: acc.nameEn ?? "",
-      bankName: acc.bankName, accountNumber: acc.accountNumber,
-      iban: acc.iban ?? "", currency: acc.currency, isDefault: acc.isDefault,
+      nameAr: acc.nameAr,
+      nameEn: acc.nameEn ?? "",
+      bankName: acc.bankName,
+      accountNumber: acc.accountNumber,
+      iban: acc.iban ?? "",
+      currency: acc.currency,
+      isDefault: acc.isDefault,
+      chartAccountId: acc.chartAccountId ?? "",
     });
     setFormError("");
     setShowForm(true);
   }
 
   async function save() {
-    if (!form.nameAr.trim()) { setFormError(t.nameRequired); return; }
-    if (!form.bankName.trim()) { setFormError(t.bankRequired); return; }
-    if (!form.accountNumber.trim()) { setFormError(t.numberRequired); return; }
+    if (!form.nameAr.trim()) {
+      setFormError(t.nameRequired);
+      return;
+    }
+    if (!form.bankName.trim()) {
+      setFormError(t.bankRequired);
+      return;
+    }
+    if (!form.accountNumber.trim()) {
+      setFormError(t.numberRequired);
+      return;
+    }
+
     setSaving(true);
     setFormError("");
     const body = {
-      companyId, ...form,
+      companyId,
+      ...form,
       nameEn: form.nameEn || null,
       iban: form.iban || null,
+      chartAccountId: form.chartAccountId || null,
     };
     const res = await fetch(editId ? `/api/accounting/bank-accounts/${editId}` : "/api/accounting/bank-accounts", {
       method: editId ? "PATCH" : "POST",
@@ -140,7 +196,10 @@ export default function BankAccountsPage() {
     });
     const data = await res.json();
     setSaving(false);
-    if (!data.success) { setFormError(data.error ?? t.genericError); return; }
+    if (!data.success) {
+      setFormError(data.error ?? t.genericError);
+      return;
+    }
     setShowForm(false);
     load();
   }
@@ -159,7 +218,10 @@ export default function BankAccountsPage() {
     setDeleteError("");
     const res = await fetch(`/api/accounting/bank-accounts/${deleteId}`, { method: "DELETE" });
     const data = await res.json();
-    if (!data.success) { setDeleteError(data.error ?? t.deleteFailed); return; }
+    if (!data.success) {
+      setDeleteError(data.error ?? t.deleteFailed);
+      return;
+    }
     setDeleteId(null);
     load();
   }
@@ -176,6 +238,7 @@ export default function BankAccountsPage() {
           </button>
         }
       />
+
       <div className="page-container">
         <div className="section-card overflow-hidden">
           {loading ? (
@@ -190,6 +253,7 @@ export default function BankAccountsPage() {
                     <th>{t.accountNumber}</th>
                     <th>IBAN</th>
                     <th>{t.currency}</th>
+                    <th>{t.linkedAccount}</th>
                     <th>{t.default}</th>
                     <th></th>
                   </tr>
@@ -197,41 +261,52 @@ export default function BankAccountsPage() {
                 <tbody>
                   {accounts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-12 text-center text-muted-foreground">
                         {t.empty}
                       </td>
                     </tr>
-                  ) : accounts.map((acc) => (
-                    <tr key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => openEdit(acc)}>
-                      <td className="font-medium">{en ? acc.nameEn ?? acc.nameAr : acc.nameAr}</td>
-                      <td>{acc.bankName}</td>
-                      <td className="font-mono text-sm">{acc.accountNumber}</td>
-                      <td className="font-mono text-xs text-muted-foreground">{acc.iban ?? "—"}</td>
-                      <td>{acc.currency}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        {acc.isDefault ? (
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                            {t.isDefault}
-                          </span>
-                        ) : (
+                  ) : (
+                    accounts.map((acc) => (
+                      <tr key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => openEdit(acc)}>
+                        <td className="font-medium">{en ? acc.nameEn ?? acc.nameAr : acc.nameAr}</td>
+                        <td>{acc.bankName}</td>
+                        <td className="font-mono text-sm">{acc.accountNumber}</td>
+                        <td className="font-mono text-xs text-muted-foreground">{acc.iban ?? "-"}</td>
+                        <td>{acc.currency}</td>
+                        <td>
+                          {acc.chartAccount ? (
+                            <span className="text-sm">
+                              {acc.chartAccount.code} - {en ? acc.chartAccount.nameEn ?? acc.chartAccount.nameAr : acc.chartAccount.nameAr}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-red-600">{t.notLinked}</span>
+                          )}
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {acc.isDefault ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              {t.isDefault}
+                            </span>
+                          ) : (
+                            <button onClick={() => toggleDefault(acc)} className="text-xs text-muted-foreground hover:text-foreground underline">
+                              {t.setDefault}
+                            </button>
+                          )}
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => toggleDefault(acc)}
-                            className="text-xs text-muted-foreground hover:text-foreground underline"
+                            onClick={() => {
+                              setDeleteId(acc.id);
+                              setDeleteError("");
+                            }}
+                            className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
                           >
-                            {t.setDefault}
+                            {t.disable}
                           </button>
-                        )}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => { setDeleteId(acc.id); setDeleteError(""); }}
-                          className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
-                        >
-                          {t.disable}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -252,10 +327,12 @@ export default function BankAccountsPage() {
                 <input className="input-field" dir="ltr" value={form.nameEn} onChange={f("nameEn")} />
               </div>
             </div>
+
             <div>
               <label className="form-label">{t.bankNameLabel}</label>
               <input className="input-field" value={form.bankName} onChange={f("bankName")} />
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="form-label">{t.accountNumberLabel}</label>
@@ -271,23 +348,44 @@ export default function BankAccountsPage() {
                 </select>
               </div>
             </div>
+
             <div>
               <label className="form-label">IBAN</label>
               <input className="input-field" dir="ltr" value={form.iban} onChange={f("iban")} />
             </div>
+
+            <div>
+              <label className="form-label">{t.linkedAccountLabel}</label>
+              <select className="input-field" value={form.chartAccountId} onChange={f("chartAccountId")}>
+                <option value="">{en ? "Select account..." : "اختر الحساب..."}</option>
+                {chartAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.code} - {en ? account.nameEn ?? account.nameAr : account.nameAr}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">{t.linkedHint}</p>
+            </div>
+
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="isDefaultCheck"
                 checked={form.isDefault}
-                onChange={(e) => setForm((p) => ({ ...p, isDefault: e.target.checked }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, isDefault: e.target.checked }))}
                 className="h-4 w-4"
               />
-              <label htmlFor="isDefaultCheck" className="text-sm">{t.defaultAccount}</label>
+              <label htmlFor="isDefaultCheck" className="text-sm">
+                {t.defaultAccount}
+              </label>
             </div>
+
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
+
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
+              <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                {t.cancel}
+              </button>
               <button onClick={save} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
                 {saving ? t.saving : editId ? t.save : t.addBtn}
               </button>
@@ -301,11 +399,10 @@ export default function BankAccountsPage() {
           <p className="text-sm text-muted-foreground">{t.disableWarn}</p>
           {deleteError && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>}
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setDeleteId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
-            <button
-              onClick={confirmDelete}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
+            <button onClick={() => setDeleteId(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+              {t.cancel}
+            </button>
+            <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
               {t.disable}
             </button>
           </div>

@@ -18,7 +18,7 @@ export default async function NewBankTransferPage({ params }: Props) {
   const en = locale === "en";
 
   const banks = await prisma.bankAccount.findMany({
-    where: { companyId, isActive: true },
+    where: { companyId, isActive: true, chartAccountId: { not: null } },
     select: {
       id: true,
       nameAr: true,

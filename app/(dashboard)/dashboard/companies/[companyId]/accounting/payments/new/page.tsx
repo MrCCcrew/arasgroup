@@ -22,6 +22,7 @@ interface BankAccount {
   nameEn?: string;
   bankName: string;
   accountNumber: string;
+  chartAccountId?: string | null;
 }
 
 export default function NewPaymentPage() {
@@ -48,7 +49,7 @@ export default function NewPaymentPage() {
   useEffect(() => {
     Promise.all([
       fetch(`/api/accounting/accounts?companyId=${companyId}`).then((response) => response.json()),
-      fetch(`/api/accounting/bank-accounts?companyId=${companyId}`).then((response) => response.json()),
+      fetch(`/api/accounting/bank-accounts?companyId=${companyId}&linkedOnly=true`).then((response) => response.json()),
     ]).then(([accountPayload, bankPayload]) => {
       if (accountPayload.success) {
         setAccounts((accountPayload.data as Account[]).filter((account) => !account.isHeader));
@@ -263,6 +264,13 @@ export default function NewPaymentPage() {
                     </option>
                   ))}
                 </select>
+                {bankAccounts.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    {locale === "en"
+                      ? "No linked bank accounts found. Link one from Bank Accounts first."
+                      : "لا توجد حسابات بنكية مربوطة. اربط حسابًا بنكيًا من شاشة الحسابات البنكية أولًا."}
+                  </p>
+                )}
               </div>
             )}
 

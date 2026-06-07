@@ -38,7 +38,7 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
       return;
     }
     if (sourceBankId === destinationBankId) {
-      setError(en ? "Source and destination must be different" : "البنك المحول منه والمحول إليه يجب أن يكونا مختلفين");
+      setError(en ? "Source and destination must be different" : "الحساب المحول منه وإليه يجب أن يكونا مختلفين");
       return;
     }
     if (Number(amount) <= 0) {
@@ -84,9 +84,9 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
     notes: en ? "Notes" : "ملاحظات",
     cancel: en ? "Cancel" : "إلغاء",
     save: en ? "Save Transfer" : "حفظ التحويل",
-    saving: en ? "Saving..." : "جاري الحفظ...",
+    saving: en ? "Saving..." : "جار الحفظ...",
     required: "*",
-    needBanks: en ? "You need at least 2 active bank accounts" : "تحتاج إلى بنكين نشطين على الأقل",
+    needBanks: en ? "You need at least 2 active linked bank accounts" : "تحتاج إلى حسابين بنكيين نشطين ومربوطين على الأقل",
   };
 
   if (banks.length < 2) {
@@ -103,12 +103,7 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
         <label className="mb-2 block text-sm font-medium">
           {t.from} <span className="text-red-500">{t.required}</span>
         </label>
-        <select
-          value={sourceBankId}
-          onChange={(e) => setSourceBankId(e.target.value)}
-          className="input-field w-full"
-          required
-        >
+        <select value={sourceBankId} onChange={(e) => setSourceBankId(e.target.value)} className="input-field w-full" required>
           {banks.map((bank) => (
             <option key={bank.id} value={bank.id}>
               {bank.nameAr} - {bank.bankName} ({bank.accountNumber})
@@ -127,12 +122,7 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
         <label className="mb-2 block text-sm font-medium">
           {t.to} <span className="text-red-500">{t.required}</span>
         </label>
-        <select
-          value={destinationBankId}
-          onChange={(e) => setDestinationBankId(e.target.value)}
-          className="input-field w-full"
-          required
-        >
+        <select value={destinationBankId} onChange={(e) => setDestinationBankId(e.target.value)} className="input-field w-full" required>
           {banks.map((bank) => (
             <option key={bank.id} value={bank.id}>
               {bank.nameAr} - {bank.bankName} ({bank.accountNumber})
@@ -146,30 +136,14 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
           <label className="mb-2 block text-sm font-medium">
             {t.amount} <span className="text-red-500">{t.required}</span>
           </label>
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="input-field w-full"
-            dir="ltr"
-            required
-          />
+          <input type="number" step="0.001" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-field w-full" dir="ltr" required />
         </div>
 
         <div>
           <label className="mb-2 block text-sm font-medium">
             {t.date} <span className="text-red-500">{t.required}</span>
           </label>
-          <input
-            type="date"
-            value={transferDate}
-            onChange={(e) => setTransferDate(e.target.value)}
-            className="input-field w-full"
-            dir="ltr"
-            required
-          />
+          <input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className="input-field w-full" dir="ltr" required />
         </div>
       </div>
 
@@ -189,43 +163,21 @@ export function BankTransferForm({ companyId, banks, locale }: Props) {
 
       <div>
         <label className="mb-2 block text-sm font-medium">{t.reference}</label>
-        <input
-          type="text"
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
-          className="input-field w-full"
-          placeholder={en ? "Optional" : "اختياري"}
-        />
+        <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="input-field w-full" placeholder={en ? "Optional" : "اختياري"} />
       </div>
 
       <div>
         <label className="mb-2 block text-sm font-medium">{t.notes}</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="input-field w-full"
-          rows={3}
-          placeholder={en ? "Optional notes" : "ملاحظات اختيارية"}
-        />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field w-full" rows={3} placeholder={en ? "Optional notes" : "ملاحظات اختيارية"} />
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       <div className="flex justify-end gap-3 pt-4">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-lg border px-5 py-2.5 text-sm hover:bg-muted"
-        >
+        <button type="button" onClick={() => router.back()} className="rounded-lg border px-5 py-2.5 text-sm hover:bg-muted">
           {t.cancel}
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-        >
+        <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
           {saving ? (
             <>
               <Loader2 size={16} className="animate-spin" />
