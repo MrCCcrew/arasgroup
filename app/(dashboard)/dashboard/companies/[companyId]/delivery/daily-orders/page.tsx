@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
+import { DistributeOrders } from "./DistributeOrders";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -43,6 +44,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
       include: {
         driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
         contract: { select: { nameAr: true, nameEn: true, platform: true } },
+        allocations: {
+          include: { driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } } },
+        },
       },
       orderBy: [
         { date: "desc" },
@@ -53,6 +57,17 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
       take: pageSize,
     }),
   ]);
+
+  // قائمة السائقين لاختيارها في نافذة التوزيع
+  const driverRows = await prisma.driver.findMany({
+    where: { employee: { companyId, isActive: true, isDeleted: false } },
+    include: { employee: { select: { nameAr: true, nameEn: true } } },
+    orderBy: { employee: { nameAr: "asc" } },
+  });
+  const driverOptions = driverRows.map((d) => ({
+    id: d.id,
+    name: locale === "en" ? d.employee.nameEn ?? d.employee.nameAr : d.employee.nameAr,
+  }));
 
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
@@ -150,6 +165,15 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                         {locale === "en"
                           ? order.driver.employee.nameEn ?? order.driver.employee.nameAr
                           : order.driver.employee.nameAr}
+                        {order.allocations.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {order.allocations.map((a) => (
+                              <p key={a.id} className="text-xs font-normal text-emerald-600">
+                                ↳ {locale === "en" ? a.driver.employee.nameEn ?? a.driver.employee.nameAr : a.driver.employee.nameAr}: {a.allocatedOrders}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span
@@ -170,6 +194,16 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                       </td>
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {canUpdate && (
+                            <DistributeOrders
+                              orderId={order.id}
+                              ordersCount={order.ordersCount}
+                              originalDriverName={locale === "en" ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}
+                              drivers={driverOptions}
+                              initial={order.allocations.map((a) => ({ driverId: a.driverId, allocatedOrders: a.allocatedOrders, notes: a.notes }))}
+                              en={locale === "en"}
+                            />
+                          )}
                           {canUpdate && (
                             <Link
                               href={`/dashboard/companies/${companyId}/delivery/daily-orders/${order.id}/edit`}

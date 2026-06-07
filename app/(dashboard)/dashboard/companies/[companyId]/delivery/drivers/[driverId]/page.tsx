@@ -113,20 +113,26 @@ export default async function DriverDetailPage({ params }: Props) {
 
   const residencyDays = daysUntilExpiry(driver.employee.residencyExpiry);
 
-  const totalOrders = await prisma.deliveryDailyOrder.aggregate({
-    where: { driverId },
-    _sum: { ordersCount: true },
-    _count: { id: true },
-  });
-
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
   thisMonthStart.setHours(0, 0, 0, 0);
 
-  const monthOrders = await prisma.deliveryDailyOrder.aggregate({
-    where: { driverId, date: { gte: thisMonthStart } },
-    _sum: { ordersCount: true },
-  });
+  // الإجماليات تحتسب التوزيع: طلبات السائق غير الموزّعة + الطلبات الموزّعة له من سجلات أخرى
+  const [ownTotalAgg, ownMonthAgg, allocTotalAgg, allocMonthAgg, recordCount] = await Promise.all([
+    prisma.deliveryDailyOrder.aggregate({ where: { driverId, allocations: { none: {} } }, _sum: { ordersCount: true } }),
+    prisma.deliveryDailyOrder.aggregate({ where: { driverId, date: { gte: thisMonthStart }, allocations: { none: {} } }, _sum: { ordersCount: true } }),
+    prisma.deliveryDailyOrderAllocation.aggregate({ where: { driverId }, _sum: { allocatedOrders: true } }),
+    prisma.deliveryDailyOrderAllocation.aggregate({ where: { driverId, dailyOrder: { date: { gte: thisMonthStart } } }, _sum: { allocatedOrders: true } }),
+    prisma.deliveryDailyOrder.count({ where: { driverId } }),
+  ]);
+
+  const totalOrders = {
+    _sum: { ordersCount: (ownTotalAgg._sum.ordersCount ?? 0) + (allocTotalAgg._sum.allocatedOrders ?? 0) },
+    _count: { id: recordCount },
+  };
+  const monthOrders = {
+    _sum: { ordersCount: (ownMonthAgg._sum.ordersCount ?? 0) + (allocMonthAgg._sum.allocatedOrders ?? 0) },
+  };
 
   const driverName = locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr;
 

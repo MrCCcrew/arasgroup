@@ -1096,6 +1096,7 @@ model Driver {
   assignedVehicle    Vehicle?                    @relation("DriverAssignedVehicle", fields: [assignedVehicleId], references: [id], onDelete: Restrict)
   fuelCardLinkedVehicle Vehicle?                 @relation("DriverFuelCardVehicle", fields: [fuelCardLinkedVehicleId], references: [id], onDelete: Restrict)
   dailyOrders        DeliveryDailyOrder[]
+  dailyOrderAllocations DeliveryDailyOrderAllocation[] @relation("DailyOrderAllocationDriver")
   walletTransactions DriverWalletTransaction[]
   reportLines        DeliveryMonthlyReportLine[]
   walletSettlements  DriverWalletSettlement[]
@@ -1279,6 +1280,7 @@ model DeliveryDailyOrder {
 
   driver   Driver           @relation(fields: [driverId], references: [id], onDelete: Restrict)
   contract DeliveryContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  allocations DeliveryDailyOrderAllocation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1289,6 +1291,25 @@ model DeliveryDailyOrder {
   @@index([companyId])
   @@index([date])
   @@map("delivery_daily_orders")
+}
+
+// توزيع طلبات سجل يومي على السائق الفعلي (عند العمل بحساب سائق آخر).
+// السجل الأصلي يبقى كما هو؛ هذه طبقة توزيع منفصلة لا تحذف أي بيانات.
+model DeliveryDailyOrderAllocation {
+  id              String   @id @default(cuid())
+  dailyOrderId    String
+  driverId        String
+  allocatedOrders Int
+  notes           String?
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  dailyOrder DeliveryDailyOrder @relation(fields: [dailyOrderId], references: [id], onDelete: Cascade)
+  driver     Driver             @relation("DailyOrderAllocationDriver", fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([dailyOrderId])
+  @@index([driverId])
+  @@map("delivery_daily_order_allocations")
 }
 
 model DeliveryMonthlyReport {
