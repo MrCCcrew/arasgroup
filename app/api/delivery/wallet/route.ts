@@ -26,13 +26,22 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get("companyId");
 
     if (!driverId && companyId) {
-      const transactions = await prisma.driverWalletTransaction.findMany({
-        where: { driver: { employee: { companyId } } },
-        include: { driver: { include: { employee: { select: { nameAr: true } } } } },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
-      return NextResponse.json({ success: true, data: { transactions } });
+      const [transactions, summary] = await Promise.all([
+        prisma.driverWalletTransaction.findMany({
+          where: { driver: { employee: { companyId } } },
+          include: { driver: { include: { employee: { select: { nameAr: true } } } } },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        }),
+        // مجاميع لكل سائق حسب نوع الحركة (للتوفيق: محصّل/مودَع/المتبقّي)
+        prisma.driverWalletTransaction.groupBy({
+          by: ["driverId", "type"],
+          where: { driver: { employee: { companyId } } },
+          _sum: { amount: true },
+        }),
+      ]);
+      const summaryRows = summary.map((s) => ({ driverId: s.driverId, type: s.type, amount: Number(s._sum.amount ?? 0) }));
+      return NextResponse.json({ success: true, data: { transactions, summary: summaryRows } });
     }
 
     if (!driverId) {

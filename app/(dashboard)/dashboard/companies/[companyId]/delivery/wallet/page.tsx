@@ -101,16 +101,38 @@ export default function WalletPage() {
       : `تسوية وتصفير رصيد ${name} (${bal} د.ك)؟ سيتم تسجيل حركة تسوية موثّقة.`,
     settleFailed: en ? "Settlement failed" : "فشل في التسوية",
     genericError: en ? "An error occurred" : "حدث خطأ",
+    reconciliation: en ? "Wallet reconciliation" : "توفيق المحافظ",
+    showRecon: en ? "Reconciliation" : "التوفيق",
+    collected: en ? "Collected" : "المحصّل",
+    deposited: en ? "Deposited" : "المودَع",
+    otherAdj: en ? "Settlements/Other" : "تسويات/أخرى",
+    remaining: en ? "Remaining" : "المتبقّي",
+    reconNote: en
+      ? "Remaining = Collected − Deposited − Settlements/Other. The total should equal GL account 1030 (Driver wallet receivables)."
+      : "المتبقّي = المحصّل − المودَع − تسويات/أخرى. والإجمالي يجب أن يساوي رصيد حساب 1030 (ذمم محافظ السائقين).",
+    fixOldDeposits: en ? "Fix old deposits' bank" : "تصحيح بنك الإيداعات القديمة",
+    fixTitle: en ? "Reclassify old bank deposits" : "تصحيح بنك الإيداعات القديمة",
+    fixIntro: en
+      ? "Old bank deposits posted to the general bank (1010) will be moved to the selected bank account (amounts are unchanged)."
+      : "الإيداعات البنكية القديمة المرحّلة على البنك العام (1010) هتتنقل لحساب البنك المختار (المبالغ مش هتتغيّر).",
+    apply: en ? "Apply" : "تطبيق",
+    applying: en ? "Applying..." : "جاري التطبيق...",
   };
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [summary, setSummary] = useState<{ driverId: string; type: string; amount: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  const [showRecon, setShowRecon] = useState(false);
+  const [showReclass, setShowReclass] = useState(false);
+  const [reclassBank, setReclassBank] = useState("");
+  const [reclassMsg, setReclassMsg] = useState("");
+  const [reclassing, setReclassing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,9 +143,25 @@ export default function WalletPage() {
     ]);
     if (d.success) setDrivers(d.data);
     if (t.success && Array.isArray(t.data?.transactions)) setTransactions(t.data.transactions);
+    if (t.success && Array.isArray(t.data?.summary)) setSummary(t.data.summary);
     if (b.success && Array.isArray(b.data)) setBankAccounts(b.data);
     setLoading(false);
   }, [companyId]);
+
+  async function reclassifyOldDeposits() {
+    if (!reclassBank) return;
+    setReclassing(true); setReclassMsg("");
+    const res = await fetch("/api/delivery/wallet/reclassify-bank", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, bankAccountId: reclassBank }),
+    });
+    const data = await res.json();
+    setReclassing(false);
+    if (!data.success) { setReclassMsg(data.error ?? t.genericError); return; }
+    setReclassMsg(en ? `Reclassified ${data.reclassified} deposit(s).` : `تم تصحيح ${data.reclassified} إيداع.`);
+    load();
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -170,6 +208,27 @@ export default function WalletPage() {
   const totalBalance = drivers.reduce((s, d) => s + Number(d.walletBalance), 0);
   const negativeCount = drivers.filter((d) => Number(d.walletBalance) < 0).length;
 
+  // بيانات التوفيق: لكل سائق المحصّل (CHARGE) والمودَع (DEPOSIT)، والباقي يُحسب
+  const reconByDriver = new Map<string, { collected: number; deposited: number }>();
+  for (const s of summary) {
+    const e = reconByDriver.get(s.driverId) ?? { collected: 0, deposited: 0 };
+    if (s.type === "CHARGE") e.collected += s.amount;
+    if (s.type === "DEPOSIT") e.deposited += s.amount;
+    reconByDriver.set(s.driverId, e);
+  }
+  const reconTotals = drivers.reduce(
+    (acc, d) => {
+      const r = reconByDriver.get(d.id) ?? { collected: 0, deposited: 0 };
+      const bal = Number(d.walletBalance);
+      acc.collected += r.collected;
+      acc.deposited += r.deposited;
+      acc.balance += bal;
+      acc.other += r.collected - r.deposited - bal;
+      return acc;
+    },
+    { collected: 0, deposited: 0, other: 0, balance: 0 },
+  );
+
   // نرتّب الأرصدة: غير الصفرية أولاً (الأكثر سالبية في الأعلى) ثم الصفرية،
   // حتى يظهر صاحب الرصيد السالب مباشرةً بدل أن يكون مدفوناً أبجدياً.
   const sortedDrivers = [...drivers].sort((a, b) => {
@@ -188,12 +247,20 @@ export default function WalletPage() {
         subtitle={t.subtitle}
         companyId={companyId}
         actions={
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowRecon((v) => !v)}
+            className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+          >
+            {t.showRecon}
+          </button>
           <button
             onClick={() => { setForm(EMPTY); setFormError(""); setShowForm(true); }}
             className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
           >
             + {t.registerDeposit}
           </button>
+          </div>
         }
       />
       <div className="page-container space-y-6">
@@ -218,6 +285,59 @@ export default function WalletPage() {
             <p className="text-xs text-muted-foreground">{t.negativeBalance}</p>
           </div>
         </div>
+
+        {showRecon && !loading && (
+          <div className="section-card overflow-hidden">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold">{t.reconciliation}</h2>
+              <button
+                onClick={() => { setReclassBank(""); setReclassMsg(""); setShowReclass(true); }}
+                className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
+              >
+                {t.fixOldDeposits}
+              </button>
+            </div>
+            <p className="mb-3 rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">{t.reconNote}</p>
+            <div className="overflow-x-auto">
+              <table className="ar-table text-sm">
+                <thead>
+                  <tr>
+                    <th>{t.driver}</th>
+                    <th className="text-left">{t.collected}</th>
+                    <th className="text-left">{t.deposited}</th>
+                    <th className="text-left">{t.otherAdj}</th>
+                    <th className="text-left">{t.remaining}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedDrivers.map((d) => {
+                    const r = reconByDriver.get(d.id) ?? { collected: 0, deposited: 0 };
+                    const bal = Number(d.walletBalance);
+                    const other = r.collected - r.deposited - bal;
+                    return (
+                      <tr key={d.id} className="hover:bg-muted/20">
+                        <td className="font-medium">{d.employee.nameAr}</td>
+                        <td className="number text-left">{r.collected.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                        <td className="number text-left text-green-600">{r.deposited.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                        <td className="number text-left text-muted-foreground">{other.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                        <td className={`number text-left font-bold ${bal < 0 ? "text-red-600" : "text-blue-600"}`}>{bal.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="border-t-2 bg-muted/30 font-bold">
+                  <tr>
+                    <td>{t.totalBalances}</td>
+                    <td className="number text-left">{reconTotals.collected.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                    <td className="number text-left text-green-600">{reconTotals.deposited.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                    <td className="number text-left">{reconTotals.other.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
+                    <td className="number text-left">{reconTotals.balance.toLocaleString(numberLocale, { minimumFractionDigits: 3 })} {kwd}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">{t.loading}</div>
@@ -350,6 +470,32 @@ export default function WalletPage() {
               <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
               <button onClick={save} disabled={saving} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
                 {saving ? t.saving : t.saveDeposit}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showReclass && (
+        <Modal title={t.fixTitle} onClose={() => setShowReclass(false)}>
+          <div className="space-y-3">
+            <p className="rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">{t.fixIntro}</p>
+            <div>
+              <label className="form-label">{t.bankAccount}</label>
+              <select className="input-field" value={reclassBank} onChange={(e) => setReclassBank(e.target.value)}>
+                <option value="">{t.chooseBank}</option>
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {(en ? b.nameEn ?? b.nameAr : b.nameAr)}{b.bankName ? ` — ${b.bankName}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {reclassMsg && <p className="rounded-lg bg-blue-50 p-2 text-sm text-blue-700">{reclassMsg}</p>}
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowReclass(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
+              <button onClick={reclassifyOldDeposits} disabled={reclassing || !reclassBank} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
+                {reclassing ? t.applying : t.apply}
               </button>
             </div>
           </div>
