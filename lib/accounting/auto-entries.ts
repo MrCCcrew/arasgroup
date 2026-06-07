@@ -75,14 +75,23 @@ export async function createDriverWalletDepositJE(params: {
   isBankDeposit: boolean;
   refId: string;
   descriptionAr: string;
+  bankAccountId?: string | null;
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
-  const cashOrBankCode = params.isBankDeposit ? "1010" : "1000";
 
-  const [cashBankId, walletReceivableId] = await Promise.all([
-    getAccountId(params.companyId, cashOrBankCode),
-    getAccountId(params.companyId, "1030"),
-  ]);
+  // عند الإيداع البنكي مع اختيار حساب بنكي محدّد، نرحّل على حسابه في دليل الحسابات
+  // (حتى يظهر الإيداع في دفتر أستاذ ذلك البنك)، وإلا نرجع للكود الافتراضي 1010/1000.
+  const walletReceivableId = await getAccountId(params.companyId, "1030");
+  let cashBankId: string;
+  if (params.isBankDeposit && params.bankAccountId) {
+    const bank = await prisma.bankAccount.findFirst({
+      where: { id: params.bankAccountId, companyId: params.companyId, isActive: true },
+      select: { chartAccountId: true },
+    });
+    cashBankId = bank?.chartAccountId ?? (await getAccountId(params.companyId, "1010"));
+  } else {
+    cashBankId = await getAccountId(params.companyId, params.isBankDeposit ? "1010" : "1000");
+  }
 
   return createAutomaticEntry({
     companyId: params.companyId,

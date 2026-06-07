@@ -29,12 +29,20 @@ const TX_LABELS: Record<string, { ar: string; en: string }> = {
   DEDUCTION_PENALTY: { ar: "غرامة", en: "Penalty" },
 };
 
+interface BankAccount {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+  bankName: string;
+}
+
 const now = new Date();
 const EMPTY = {
   driverId: "",
   amount: "",
   date: now.toISOString().slice(0, 10),
   isBankDeposit: false,
+  bankAccountId: "",
   descriptionAr: "",
 };
 
@@ -82,6 +90,9 @@ export default function WalletPage() {
     dateLabel: en ? "Date *" : "التاريخ *",
     description: en ? "Description" : "الوصف",
     bankDeposit: en ? "Bank deposit" : "إيداع بنكي",
+    bankAccount: en ? "Bank account *" : "الحساب البنكي *",
+    chooseBank: en ? "— Select bank account —" : "— اختر الحساب البنكي —",
+    bankRequired: en ? "Select the bank account for the deposit" : "اختر الحساب البنكي للإيداع",
     cancel: en ? "Cancel" : "إلغاء",
     saving: en ? "Saving..." : "جاري الحفظ...",
     saveDeposit: en ? "Register deposit" : "تسجيل الإيداع",
@@ -93,6 +104,7 @@ export default function WalletPage() {
   };
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -102,12 +114,14 @@ export default function WalletPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [d, t] = await Promise.all([
+    const [d, t, b] = await Promise.all([
       fetch(`/api/delivery/drivers?companyId=${companyId}`).then((r) => r.json()),
       fetch(`/api/delivery/wallet?companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/accounting/bank-accounts?companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
     ]);
     if (d.success) setDrivers(d.data);
     if (t.success && Array.isArray(t.data?.transactions)) setTransactions(t.data.transactions);
+    if (b.success && Array.isArray(b.data)) setBankAccounts(b.data);
     setLoading(false);
   }, [companyId]);
 
@@ -130,6 +144,7 @@ export default function WalletPage() {
   async function save() {
     if (!form.driverId) { setFormError(t.driverRequired); return; }
     if (!form.amount || Number(form.amount) <= 0) { setFormError(t.amountInvalid); return; }
+    if (form.isBankDeposit && !form.bankAccountId) { setFormError(t.bankRequired); return; }
     setSaving(true); setFormError("");
     const res = await fetch("/api/delivery/wallet", {
       method: "POST",
@@ -139,7 +154,9 @@ export default function WalletPage() {
         driverId: form.driverId,
         amount: Number(form.amount),
         date: form.date,
+        isBankDeposit: form.isBankDeposit,
         paymentMethod: form.isBankDeposit ? "BANK" : "CASH",
+        bankAccountId: form.isBankDeposit ? form.bankAccountId : null,
         descriptionAr: form.descriptionAr || undefined,
       }),
     });
@@ -311,9 +328,23 @@ export default function WalletPage() {
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="isBankDep" checked={form.isBankDeposit}
-                onChange={(e) => setForm((p) => ({ ...p, isBankDeposit: e.target.checked }))} className="h-4 w-4" />
+                onChange={(e) => setForm((p) => ({ ...p, isBankDeposit: e.target.checked, bankAccountId: e.target.checked ? p.bankAccountId : "" }))} className="h-4 w-4" />
               <label htmlFor="isBankDep" className="text-sm">{t.bankDeposit}</label>
             </div>
+            {form.isBankDeposit && (
+              <div>
+                <label className="form-label">{t.bankAccount}</label>
+                <select className="input-field" value={form.bankAccountId}
+                  onChange={(e) => setForm((p) => ({ ...p, bankAccountId: e.target.value }))}>
+                  <option value="">{t.chooseBank}</option>
+                  {bankAccounts.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {(en ? b.nameEn ?? b.nameAr : b.nameAr)}{b.bankName ? ` — ${b.bankName}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowForm(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>

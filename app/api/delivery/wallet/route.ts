@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         driverId: data.driverId,
         amount: data.amount,
         isBankDeposit: paymentMethod === "BANK",
+        bankAccountId: paymentMethod === "BANK" ? data.bankAccountId : null,
         refId: walletTx.id,
         descriptionAr: data.descriptionAr ?? `إيداع محفظة سائق - ${data.amount.toFixed(3)} د.ك`,
       });
