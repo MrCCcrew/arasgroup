@@ -9,6 +9,7 @@ const schema = z.object({
   allocations: z.array(z.object({
     driverId: z.string().min(1),
     allocatedOrders: z.number().int().min(0),
+    walletAmount: z.number().min(0).optional(),
     notes: z.string().optional(),
   })).default([]),
 });
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
     const order = await prisma.deliveryDailyOrder.findUnique({
       where: { id: orderId },
-      select: { id: true, companyId: true, ordersCount: true },
+      select: { id: true, companyId: true, ordersCount: true, driverId: true, date: true },
     });
     if (!order) return NextResponse.json({ success: false, error: "السجل غير موجود" }, { status: 404 });
 
@@ -63,18 +64,58 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       }
     }
 
+    const dateStr = order.date.toISOString().slice(0, 10);
+
     await prisma.$transaction(async (tx) => {
+      // 1) عكس أثر التوزيع السابق على أرصدة المحافظ (idempotent):
+      //    نُعيد ما نُقل من الأصلي إلى البدلاء.
+      const prior = await tx.deliveryDailyOrderAllocation.findMany({
+        where: { dailyOrderId: orderId },
+        select: { driverId: true, walletAmount: true },
+      });
+      for (const p of prior) {
+        const w = Number(p.walletAmount ?? 0);
+        if (w > 0 && p.driverId !== order.driverId) {
+          await tx.driver.update({ where: { id: order.driverId }, data: { walletBalance: { increment: w } } });
+          await tx.driver.update({ where: { id: p.driverId }, data: { walletBalance: { decrement: w } } });
+        }
+      }
+      // 2) نحذف حركات المحفظة الناتجة عن التوزيع السابق لهذا السجل، وكذلك التوزيعات
+      await tx.driverWalletTransaction.deleteMany({ where: { dailyOrderId: orderId } });
       await tx.deliveryDailyOrderAllocation.deleteMany({ where: { dailyOrderId: orderId } });
-      if (lines.length > 0) {
-        await tx.deliveryDailyOrderAllocation.createMany({
-          data: lines.map((l) => ({
+
+      // 3) ننشئ التوزيع الجديد ونطبّق نقل المحفظة للبدلاء بحركات موثّقة
+      for (const l of lines) {
+        await tx.deliveryDailyOrderAllocation.create({
+          data: {
             dailyOrderId: orderId,
             driverId: l.driverId,
             allocatedOrders: l.allocatedOrders,
+            walletAmount: l.walletAmount && l.walletAmount > 0 ? l.walletAmount : null,
             notes: l.notes ?? null,
             createdById: session.id,
-          })),
+          },
         });
+
+        const w = l.walletAmount ?? 0;
+        if (w > 0 && l.driverId !== order.driverId) {
+          // ننقل التحصيل من رصيد السائق الأصلي إلى السائق البديل
+          await tx.driver.update({ where: { id: order.driverId }, data: { walletBalance: { decrement: w } } });
+          await tx.driver.update({ where: { id: l.driverId }, data: { walletBalance: { increment: w } } });
+          // حركة موثّقة على الطرفين
+          await tx.driverWalletTransaction.create({
+            data: {
+              driverId: order.driverId, type: "SETTLEMENT", amount: w, date: order.date,
+              dailyOrderId: orderId, descriptionAr: `نقل تحصيل إلى سائق بديل (توزيع طلبات ${dateStr})`,
+            },
+          });
+          await tx.driverWalletTransaction.create({
+            data: {
+              driverId: l.driverId, type: "CHARGE", amount: w, date: order.date,
+              dailyOrderId: orderId, descriptionAr: `تحصيل موزّع من حساب السائق الأصلي (${dateStr})`,
+            },
+          });
+        }
       }
     });
 

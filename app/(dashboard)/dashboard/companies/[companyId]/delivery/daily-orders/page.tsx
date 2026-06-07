@@ -170,6 +170,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                             {order.allocations.map((a) => (
                               <p key={a.id} className="text-xs font-normal text-emerald-600">
                                 ↳ {locale === "en" ? a.driver.employee.nameEn ?? a.driver.employee.nameAr : a.driver.employee.nameAr}: {a.allocatedOrders}
+                                {a.walletAmount != null && Number(a.walletAmount) > 0 && (
+                                  <span className="text-blue-600"> · {Number(a.walletAmount).toFixed(3)} {locale === "en" ? "KWD" : "د.ك"}</span>
+                                )}
                               </p>
                             ))}
                           </div>
@@ -200,7 +203,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                               ordersCount={order.ordersCount}
                               originalDriverName={locale === "en" ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}
                               drivers={driverOptions}
-                              initial={order.allocations.map((a) => ({ driverId: a.driverId, allocatedOrders: a.allocatedOrders, notes: a.notes }))}
+                              initial={order.allocations.map((a) => ({ driverId: a.driverId, allocatedOrders: a.allocatedOrders, walletAmount: a.walletAmount != null ? Number(a.walletAmount) : null, notes: a.notes }))}
                               en={locale === "en"}
                             />
                           )}

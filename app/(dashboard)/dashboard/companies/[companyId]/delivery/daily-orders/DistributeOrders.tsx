@@ -12,6 +12,7 @@ export interface DriverOption {
 export interface AllocationLine {
   driverId: string;
   allocatedOrders: number;
+  walletAmount?: number | null;
   notes?: string | null;
 }
 
@@ -41,6 +42,8 @@ export function DistributeOrders({ orderId, ordersCount, originalDriverName, dri
       : `إجمالي الطلبات: ${ordersCount}. مسجّلة باسم: ${originalDriverName}. وزّعها على السائق/السائقين الذين عملوا فعلاً. السجل الأصلي محفوظ كما هو.`,
     driver: en ? "Driver" : "السائق",
     orders: en ? "Orders" : "الطلبات",
+    wallet: en ? "Collection (KWD)" : "التحصيل (د.ك)",
+    walletHint: en ? "Enter the cash collected by each driver; it moves to their wallet balance with a documented movement." : "أدخل المبلغ الذي حصّله كل سائق؛ يُنقل إلى رصيد محفظته بحركة موثّقة.",
     chooseDriver: en ? "Select driver" : "اختر السائق",
     addLine: en ? "Add driver" : "إضافة سائق",
     remaining: en ? "Remaining" : "المتبقّي",
@@ -73,7 +76,7 @@ export function DistributeOrders({ orderId, ordersCount, originalDriverName, dri
     const res = await fetch(`/api/delivery/daily-orders/${orderId}/allocate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allocations: payload.map((l) => ({ driverId: l.driverId, allocatedOrders: Number(l.allocatedOrders), notes: l.notes || undefined })) }),
+      body: JSON.stringify({ allocations: payload.map((l) => ({ driverId: l.driverId, allocatedOrders: Number(l.allocatedOrders), walletAmount: l.walletAmount != null && Number(l.walletAmount) > 0 ? Number(l.walletAmount) : undefined, notes: l.notes || undefined })) }),
     });
     const data = await res.json();
     setSaving(false);
@@ -102,6 +105,12 @@ export function DistributeOrders({ orderId, ordersCount, originalDriverName, dri
             <div className="space-y-3 p-5">
               <p className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">{t.intro}</p>
 
+              <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+                <span className="flex-1">{t.driver}</span>
+                <span className="w-20 text-center">{t.orders}</span>
+                <span className="w-24 text-center">{t.wallet}</span>
+                {lines.length > 1 && <span className="w-7" />}
+              </div>
               {lines.map((line, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <select
@@ -117,8 +126,18 @@ export function DistributeOrders({ orderId, ordersCount, originalDriverName, dri
                     min="0"
                     value={line.allocatedOrders}
                     onChange={(e) => update(i, { allocatedOrders: parseInt(e.target.value, 10) || 0 })}
+                    className="input-field w-20 text-center"
+                    dir="ltr"
+                  />
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={line.walletAmount ?? ""}
+                    onChange={(e) => update(i, { walletAmount: e.target.value === "" ? null : parseFloat(e.target.value) })}
                     className="input-field w-24 text-center"
                     dir="ltr"
+                    placeholder="0.000"
                   />
                   {lines.length > 1 && (
                     <button onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600">
@@ -127,10 +146,11 @@ export function DistributeOrders({ orderId, ordersCount, originalDriverName, dri
                   )}
                 </div>
               ))}
+              <p className="text-[11px] text-muted-foreground">{t.walletHint}</p>
 
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => setLines((prev) => [...prev, { driverId: "", allocatedOrders: Math.max(0, remaining) }])}
+                  onClick={() => setLines((prev) => [...prev, { driverId: "", allocatedOrders: Math.max(0, remaining), walletAmount: null }])}
                   className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
                 >
                   <Plus size={13} /> {t.addLine}

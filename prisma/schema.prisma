@@ -1300,6 +1300,7 @@ model DeliveryDailyOrderAllocation {
   dailyOrderId    String
   driverId        String
   allocatedOrders Int
+  walletAmount    Decimal? @db.Decimal(18, 3)
   notes           String?
   createdById     String
   createdAt       DateTime @default(now())
@@ -1386,6 +1387,7 @@ model DriverWalletTransaction {
   descriptionAr  String?
   journalEntryId String?
   bankAccountId  String?
+  dailyOrderId   String?
   paymentMethod  String?               @default("CASH")
   isSettled      Boolean               @default(false)
   settledAt      DateTime?
