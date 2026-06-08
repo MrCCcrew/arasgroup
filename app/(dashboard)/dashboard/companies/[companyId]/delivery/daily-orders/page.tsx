@@ -12,7 +12,7 @@ import { DistributeOrders } from "./DistributeOrders";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ page?: string; contractId?: string }>;
+  searchParams: Promise<{ page?: string; contractId?: string; driverId?: string }>;
 }
 
 export default async function DailyOrdersPage({ params, searchParams }: Props) {
@@ -35,6 +35,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   const where = {
     companyId,
     ...(sp.contractId ? { contractId: sp.contractId } : {}),
+    ...(sp.driverId ? { driverId: sp.driverId } : {}),
   };
 
   const [total, orders] = await Promise.all([
@@ -111,9 +112,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
-            href={`/dashboard/companies/${companyId}/delivery/daily-orders`}
+            href={`/dashboard/companies/${companyId}/delivery/daily-orders${sp.driverId ? `?driverId=${sp.driverId}` : ""}`}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
               !sp.contractId
                 ? "border-primary bg-primary text-primary-foreground"
@@ -125,7 +126,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           {contracts.map((contract) => (
             <a
               key={contract.id}
-              href={`/dashboard/companies/${companyId}/delivery/daily-orders?contractId=${contract.id}`}
+              href={`/dashboard/companies/${companyId}/delivery/daily-orders?contractId=${contract.id}${sp.driverId ? `&driverId=${sp.driverId}` : ""}`}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                 sp.contractId === contract.id
                   ? "border-primary bg-primary text-primary-foreground"
@@ -136,6 +137,28 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             </a>
           ))}
         </div>
+
+        {/* فلتر بالسائق — يعرض إدخالات السائق المحدّد */}
+        <form method="GET" className="flex flex-wrap items-center gap-2">
+          {sp.contractId && <input type="hidden" name="contractId" value={sp.contractId} />}
+          <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-72">
+            <option value="">{locale === "en" ? "All drivers" : "كل السائقين"}</option>
+            {driverOptions.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            {locale === "en" ? "Filter" : "تصفية"}
+          </button>
+          {sp.driverId && (
+            <a
+              href={`/dashboard/companies/${companyId}/delivery/daily-orders${sp.contractId ? `?contractId=${sp.contractId}` : ""}`}
+              className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+            >
+              {locale === "en" ? "Clear" : "مسح"}
+            </a>
+          )}
+        </form>
 
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
@@ -238,7 +261,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                 key={currentPage}
                 href={`/dashboard/companies/${companyId}/delivery/daily-orders?page=${currentPage}${
                   sp.contractId ? `&contractId=${sp.contractId}` : ""
-                }`}
+                }${sp.driverId ? `&driverId=${sp.driverId}` : ""}`}
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors ${
                   currentPage === page ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                 }`}
