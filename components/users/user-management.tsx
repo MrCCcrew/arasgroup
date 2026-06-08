@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { CheckCircle, KeyRound, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, XCircle } from "lucide-react";
+import { Building2, CheckCircle, KeyRound, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, XCircle } from "lucide-react";
 import { useLocale } from "@/components/providers/locale-provider";
 
 interface RoleOption {
@@ -204,6 +204,7 @@ export function UserManagement({
   const [success, setSuccess] = useState("");
   const [activePasswordUserId, setActivePasswordUserId] = useState<string | null>(null);
   const [activePermissionsUserId, setActivePermissionsUserId] = useState<string | null>(null);
+  const [activeAccessUserId, setActiveAccessUserId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ password: "", confirmPassword: "" });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(false);
@@ -753,6 +754,7 @@ export function UserManagement({
               {usersState.map((user) => {
                 const isPasswordOpen = activePasswordUserId === user.id;
                 const isPermissionsOpen = activePermissionsUserId === user.id;
+                const isAccessOpen = activeAccessUserId === user.id;
                 return (
                   <Fragment key={user.id}>
                     <tr className="align-top transition-colors hover:bg-muted/30">
@@ -827,6 +829,16 @@ export function UserManagement({
                               {text("الصلاحيات الدقيقة غير مفعلة على الخادم بعد", "Granular permissions are not enabled on the server yet")}
                             </span>
                           )}
+                          {!user.isSuperAdmin ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveAccessUserId(isAccessOpen ? null : user.id)}
+                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                            >
+                              <Building2 size={14} />
+                              {text("تعديل الشركات والفروع", "Edit companies & branches")}
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                       {canManagePasswords ? (
@@ -1054,6 +1066,24 @@ export function UserManagement({
                       </tr>
                     ) : null}
 
+                    {isAccessOpen ? (
+                      <tr className="border-b border-border/50 bg-muted/20">
+                        <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
+                          <CompanyAccessEditor
+                            user={user}
+                            companies={companies}
+                            locale={locale}
+                            onCancel={() => setActiveAccessUserId(null)}
+                            onSaved={(updated) => {
+                              setUsersState((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated } : u)));
+                              setActiveAccessUserId(null);
+                              setSuccess(text("تم تحديث صلاحيات الشركات والفروع.", "Company and branch access updated."));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+
                     {isPasswordOpen ? (
                       <tr className="border-b border-border/50 bg-muted/20">
                         <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
@@ -1151,6 +1181,170 @@ function AccessFlagEditor({
           <span>{item.label}</span>
         </label>
       ))}
+    </div>
+  );
+}
+
+function CompanyAccessEditor({
+  user,
+  companies,
+  locale,
+  onCancel,
+  onSaved,
+}: {
+  user: ExistingUser;
+  companies: CompanyOption[];
+  locale: "ar" | "en";
+  onCancel: () => void;
+  onSaved: (updated: Pick<ExistingUser, "companyAccess" | "branchAccess">) => void;
+}) {
+  const text = (ar: string, en: string) => (locale === "en" ? en : ar);
+
+  const [selectedCompanies, setSelectedCompanies] = useState<Record<string, AccessFlags>>(() =>
+    Object.fromEntries(
+      user.companyAccess.map((c) => [
+        c.companyId,
+        { canView: c.canView, canCreate: c.canCreate, canUpdate: c.canUpdate, canDelete: c.canDelete, canApprove: c.canApprove },
+      ]),
+    ),
+  );
+  const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>(() =>
+    Object.fromEntries(
+      user.branchAccess.map((b) => [
+        b.branchId,
+        { companyId: b.companyId, canView: b.canView, canCreate: b.canCreate, canUpdate: b.canUpdate, canDelete: b.canDelete, canApprove: b.canApprove },
+      ]),
+    ),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function toggleCompany(companyId: string) {
+    setSelectedCompanies((prev) => {
+      if (prev[companyId]) {
+        const next = { ...prev };
+        delete next[companyId];
+        setSelectedBranches((bp) => Object.fromEntries(Object.entries(bp).filter(([, v]) => v.companyId !== companyId)));
+        return next;
+      }
+      return { ...prev, [companyId]: { ...defaultFlags } };
+    });
+  }
+
+  function toggleBranch(branchId: string, companyId: string) {
+    setSelectedBranches((prev) => {
+      if (prev[branchId]) {
+        const next = { ...prev };
+        delete next[branchId];
+        return next;
+      }
+      return { ...prev, [branchId]: { companyId, ...defaultFlags } };
+    });
+  }
+
+  function updateCompanyFlag(companyId: string, field: keyof AccessFlags, checked: boolean) {
+    setSelectedCompanies((prev) => ({ ...prev, [companyId]: { ...prev[companyId], [field]: checked } }));
+  }
+
+  function updateBranchFlag(branchId: string, field: keyof AccessFlags, checked: boolean) {
+    setSelectedBranches((prev) => ({ ...prev, [branchId]: { ...prev[branchId], [field]: checked } }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError("");
+    try {
+      const companyAccess = Object.entries(selectedCompanies).map(([companyId, flags]) => ({ companyId, ...flags }));
+      const branchAccess = Object.entries(selectedBranches).map(([branchId, value]) => ({
+        branchId,
+        companyId: value.companyId,
+        canView: value.canView,
+        canCreate: value.canCreate,
+        canUpdate: value.canUpdate,
+        canDelete: value.canDelete,
+        canApprove: value.canApprove,
+      }));
+
+      const response = await fetch(`/api/users/${user.id}/access`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyAccess, branchAccess }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? text("فشل في حفظ الصلاحيات", "Failed to save access"));
+      }
+
+      const companyNameById = new Map(companies.map((c) => [c.id, c.nameAr]));
+      const branchNameById = new Map(companies.flatMap((c) => c.branches).map((b) => [b.id, b.nameAr]));
+      onSaved({
+        companyAccess: companyAccess.map((c) => ({ ...c, company: { nameAr: companyNameById.get(c.companyId) ?? "" } })),
+        branchAccess: branchAccess.map((b) => ({ ...b, branch: { nameAr: branchNameById.get(b.branchId) ?? "" } })),
+      });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : text("فشل في حفظ الصلاحيات", "Failed to save access"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-medium">{text("تعديل الشركات والفروع المصرّح بها", "Edit allowed companies & branches")}</h3>
+        <p className="text-sm text-muted-foreground">{text("حدّد الشركات (والفروع داخلها) التي يديرها هذا المستخدم.", "Select the companies (and branches within them) this user manages.")}</p>
+      </div>
+
+      {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p> : null}
+
+      <div className="space-y-4">
+        {companies.map((company) => {
+          const isSelected = Boolean(selectedCompanies[company.id]);
+          return (
+            <div key={company.id} className="space-y-4 rounded-xl border bg-card p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleCompany(company.id)} />
+                  <div>
+                    <p className="font-medium">{company.nameAr}</p>
+                    <p className="text-xs text-muted-foreground">{company.type}</p>
+                  </div>
+                </label>
+                {isSelected ? <AccessFlagEditor value={selectedCompanies[company.id]} onChange={(field, checked) => updateCompanyFlag(company.id, field, checked)} /> : null}
+              </div>
+
+              {isSelected && company.branches.length > 0 ? (
+                <div className="border-t pt-4">
+                  <p className="mb-2 text-sm font-medium">{text("الفروع المسموح بها", "Allowed branches")}</p>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {company.branches.map((branch) => {
+                      const branchEntry = selectedBranches[branch.id];
+                      return (
+                        <div key={branch.id} className="space-y-3 rounded-lg border p-3">
+                          <label className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={Boolean(branchEntry)} onChange={() => toggleBranch(branch.id, company.id)} />
+                            <span>{branch.nameAr}</span>
+                          </label>
+                          {branchEntry ? <AccessFlagEditor value={branchEntry} onChange={(field, checked) => updateBranchFlag(branch.id, field, checked)} /> : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={handleSave} disabled={saving} className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {saving ? text("جارٍ الحفظ...", "Saving...") : text("حفظ الصلاحيات", "Save access")}
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+          {text("إلغاء", "Cancel")}
+        </button>
+      </div>
     </div>
   );
 }
