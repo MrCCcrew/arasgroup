@@ -70,6 +70,31 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     name: locale === "en" ? d.employee.nameEn ?? d.employee.nameAr : d.employee.nameAr,
   }));
 
+  // مبالغ التحصيل (حركة CHARGE) لكل سجل من السجلات المعروضة — لعرض الفلوس اللي حصلها السائق
+  const pageDriverIds = [...new Set(orders.map((o) => o.driverId))];
+  const charges = pageDriverIds.length > 0
+    ? await prisma.driverWalletTransaction.findMany({
+        where: { type: "CHARGE", driverId: { in: pageDriverIds } },
+        select: { dailyOrderId: true, driverId: true, contractId: true, date: true, amount: true },
+      })
+    : [];
+  const chargeByOrder = new Map<string, number>();
+  const chargeByKey = new Map<string, number>();
+  for (const c of charges) {
+    const amt = Number(c.amount);
+    if (c.dailyOrderId) chargeByOrder.set(c.dailyOrderId, (chargeByOrder.get(c.dailyOrderId) ?? 0) + amt);
+    const key = `${c.driverId}|${c.contractId ?? ""}|${c.date.toISOString().slice(0, 10)}`;
+    chargeByKey.set(key, (chargeByKey.get(key) ?? 0) + amt);
+  }
+  const orderCollection = (o: (typeof orders)[number]) =>
+    chargeByOrder.get(o.id) ?? chargeByKey.get(`${o.driverId}|${o.contractId}|${o.date.toISOString().slice(0, 10)}`) ?? null;
+
+  // عند التصفية بسائق: رصيد محفظته + إجمالي التحصيل المعروض
+  const selectedDriver = sp.driverId ? driverRows.find((d) => d.id === sp.driverId) : null;
+  const selectedDriverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
+  const shownCollectionTotal = orders.reduce((s, o) => s + (orderCollection(o) ?? 0), 0);
+  const kwd = locale === "en" ? "KWD" : "د.ك";
+
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
 
@@ -160,6 +185,28 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           )}
         </form>
 
+        {selectedDriver && (
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-blue-50/60 p-4">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Driver's current wallet balance" : "الرصيد الحالي في محفظة السائق"}
+              </p>
+              <p className={`number text-2xl font-bold ${(selectedDriverBalance ?? 0) > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                {(selectedDriverBalance ?? 0).toFixed(3)} {kwd}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {locale === "en" ? "Outstanding amount the driver still owes" : "المبلغ المتبقّي على السائق (لم يُودع بعد)"}
+              </p>
+            </div>
+            <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Collected in shown records" : "إجمالي المُحصّل في السجلات المعروضة"}
+              </p>
+              <p className="number text-2xl font-bold text-blue-600">{shownCollectionTotal.toFixed(3)} {kwd}</p>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
             <table className="ar-table">
@@ -169,6 +216,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Driver" : "السائق"}</th>
                   <th>{locale === "en" ? "Contract" : "العقد"}</th>
                   <th>{locale === "en" ? "Orders count" : "عدد الطلبات"}</th>
+                  <th>{locale === "en" ? "Collected" : "المُحصّل"}</th>
                   <th>{locale === "en" ? "Rating" : "التقييم"}</th>
                   <th></th>
                 </tr>
@@ -176,7 +224,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
               <tbody>
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
                       {locale === "en" ? "No records found" : "لا توجد سجلات"}
                     </td>
                   </tr>
@@ -215,6 +263,16 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                         </span>
                       </td>
                       <td className="number text-center font-bold">{order.ordersCount}</td>
+                      <td className="number text-center text-sm">
+                        {(() => {
+                          const c = orderCollection(order);
+                          return c != null ? (
+                            <span className="font-medium text-blue-600">{c.toFixed(3)} {kwd}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          );
+                        })()}
+                      </td>
                       <td className="text-center text-sm">
                         {order.rating ? Number(order.rating).toFixed(1) : "-"}
                       </td>
