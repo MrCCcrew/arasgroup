@@ -110,6 +110,16 @@ export default function WalletPage() {
     reconNote: en
       ? "Remaining = Collected − Deposited − Settlements/Other. The total should equal GL account 1030 (Driver wallet receivables)."
       : "المتبقّي = المحصّل − المودَع − تسويات/أخرى. والإجمالي يجب أن يساوي رصيد حساب 1030 (ذمم محافظ السائقين).",
+    dedupe: en ? "Remove duplicate charges" : "إزالة الحركات المكرّرة",
+    dedupeTitle: en ? "Remove duplicate collection charges" : "إزالة حركات التحصيل المكرّرة",
+    dedupeIntro: en
+      ? "Duplicate collection (CHARGE) movements caused by re-saving daily orders will be removed, then balances are recomputed to match the daily orders. Distributions and deposits are not touched."
+      : "هتتشال حركات التحصيل (CHARGE) المكرّرة الناتجة عن إعادة حفظ الطلبات اليومية، وبعدها تتعاد الأرصدة لتطابق الطلبات اليومية. التوزيعات والإيداعات مش بتتمس.",
+    dedupePreview: (n: number, amt: string, drv: number) => en
+      ? `Found ${n} duplicate charge(s) totaling ${amt} KWD across ${drv} driver(s).`
+      : `تم العثور على ${n} حركة مكرّرة بإجمالي ${amt} د.ك لدى ${drv} سائق.`,
+    dedupeNone: en ? "No duplicate charges found." : "لا توجد حركات مكرّرة.",
+    dedupeDone: (n: number) => en ? `Removed ${n} duplicate charge(s) and recomputed balances.` : `تم حذف ${n} حركة مكرّرة وإعادة حساب الأرصدة.`,
     fixOldDeposits: en ? "Fix old deposits' bank" : "تصحيح بنك الإيداعات القديمة",
     fixTitle: en ? "Reclassify old bank deposits" : "تصحيح بنك الإيداعات القديمة",
     fixIntro: en
@@ -133,6 +143,10 @@ export default function WalletPage() {
   const [reclassBank, setReclassBank] = useState("");
   const [reclassMsg, setReclassMsg] = useState("");
   const [reclassing, setReclassing] = useState(false);
+  const [showDedupe, setShowDedupe] = useState(false);
+  const [dedupeMsg, setDedupeMsg] = useState("");
+  const [dedupeBusy, setDedupeBusy] = useState(false);
+  const [dedupeCount, setDedupeCount] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,6 +174,37 @@ export default function WalletPage() {
     setReclassing(false);
     if (!data.success) { setReclassMsg(data.error ?? t.genericError); return; }
     setReclassMsg(en ? `Reclassified ${data.reclassified} deposit(s).` : `تم تصحيح ${data.reclassified} إيداع.`);
+    load();
+  }
+
+  async function previewDedupe() {
+    setShowDedupe(true); setDedupeBusy(true); setDedupeMsg(""); setDedupeCount(null);
+    const res = await fetch("/api/delivery/wallet/dedupe-charges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, apply: false }),
+    });
+    const data = await res.json();
+    setDedupeBusy(false);
+    if (!data.success) { setDedupeMsg(data.error ?? t.genericError); return; }
+    setDedupeCount(data.duplicates);
+    setDedupeMsg(data.duplicates > 0
+      ? t.dedupePreview(data.duplicates, Number(data.duplicateAmount).toLocaleString(numberLocale, { minimumFractionDigits: 3 }), data.affectedDrivers)
+      : t.dedupeNone);
+  }
+
+  async function applyDedupe() {
+    setDedupeBusy(true); setDedupeMsg("");
+    const res = await fetch("/api/delivery/wallet/dedupe-charges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, apply: true }),
+    });
+    const data = await res.json();
+    setDedupeBusy(false);
+    if (!data.success) { setDedupeMsg(data.error ?? t.genericError); return; }
+    setDedupeCount(0);
+    setDedupeMsg(t.dedupeDone(data.removed));
     load();
   }
 
@@ -290,12 +335,20 @@ export default function WalletPage() {
           <div className="section-card overflow-hidden">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-base font-bold">{t.reconciliation}</h2>
-              <button
-                onClick={() => { setReclassBank(""); setReclassMsg(""); setShowReclass(true); }}
-                className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
-              >
-                {t.fixOldDeposits}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={previewDedupe}
+                  className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50"
+                >
+                  {t.dedupe}
+                </button>
+                <button
+                  onClick={() => { setReclassBank(""); setReclassMsg(""); setShowReclass(true); }}
+                  className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted"
+                >
+                  {t.fixOldDeposits}
+                </button>
+              </div>
             </div>
             <p className="mb-3 rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">{t.reconNote}</p>
             <div className="overflow-x-auto">
@@ -497,6 +550,27 @@ export default function WalletPage() {
               <button onClick={reclassifyOldDeposits} disabled={reclassing || !reclassBank} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
                 {reclassing ? t.applying : t.apply}
               </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showDedupe && (
+        <Modal title={t.dedupeTitle} onClose={() => setShowDedupe(false)}>
+          <div className="space-y-3">
+            <p className="rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">{t.dedupeIntro}</p>
+            {dedupeBusy ? (
+              <p className="text-sm text-muted-foreground">{t.applying}</p>
+            ) : (
+              dedupeMsg && <p className={`rounded-lg p-2 text-sm ${dedupeCount === 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{dedupeMsg}</p>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowDedupe(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t.cancel}</button>
+              {dedupeCount != null && dedupeCount > 0 && (
+                <button onClick={applyDedupe} disabled={dedupeBusy} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                  {dedupeBusy ? t.applying : t.apply}
+                </button>
+              )}
             </div>
           </div>
         </Modal>
