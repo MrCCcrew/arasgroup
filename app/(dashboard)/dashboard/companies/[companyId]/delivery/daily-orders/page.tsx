@@ -15,14 +15,48 @@ interface Props {
   searchParams: Promise<{ page?: string; contractId?: string; driverId?: string; workStatus?: string }>;
 }
 
+const AR = {
+  worked: "\u0639\u0645\u0644",
+  onLeave: "\u0625\u062c\u0627\u0632\u0629",
+  vehicleBreakdown: "\u0639\u0637\u0644 \u0633\u064a\u0627\u0631\u0629",
+  noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
+  missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
+  lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  kwd: "\u062f.\u0643",
+  title: "\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
+  subtitle: "\u0633\u062c\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
+  printReport: "\u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u062a\u0642\u0631\u064a\u0631",
+  newEntry: "\u062a\u0633\u062c\u064a\u0644 \u064a\u0648\u0645\u064a",
+  totalRecords: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
+  totalOrders: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  all: "\u0627\u0644\u0643\u0644",
+  allDrivers: "\u0643\u0644 \u0627\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
+  inactive: "\u063a\u064a\u0631 \u0646\u0634\u0637",
+  filter: "\u062a\u0635\u0641\u064a\u0629",
+  clear: "\u0645\u0633\u062d",
+  allStatuses: "\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a",
+  walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u064a \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0633\u0627\u0626\u0642",
+  shownCollected: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u062d\u0635\u0644 \u0641\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629",
+  date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
+  driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
+  status: "\u0627\u0644\u062d\u0627\u0644\u0629",
+  contract: "\u0627\u0644\u0639\u0642\u062f",
+  ordersCount: "\u0639\u062f\u062f \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  collected: "\u0627\u0644\u0645\u062d\u0635\u0644",
+  rating: "\u0627\u0644\u062a\u0642\u064a\u064a\u0645",
+  noRecords: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0633\u062c\u0644\u0627\u062a",
+  workedUnder: "\u0639\u0645\u0644 \u0628\u0627\u0633\u0645:",
+  deleteFor: "\u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u0633\u0627\u0626\u0642",
+} as const;
+
 const WORK_STATUS_LABELS = {
   ar: {
-    WORKED: "عمل",
-    ON_LEAVE: "إجازة",
-    VEHICLE_BREAKDOWN: "عطل سيارة",
-    NO_SHIFTS: "بدون شيفتات",
-    MISSED_SHIFT: "عنده شيفت ولم يعمل",
-    LATE_LOGIN: "تأخر في تسجيل الدخول",
+    WORKED: AR.worked,
+    ON_LEAVE: AR.onLeave,
+    VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
+    NO_SHIFTS: AR.noShifts,
+    MISSED_SHIFT: AR.missedShift,
+    LATE_LOGIN: AR.lateLogin,
   },
   en: {
     WORKED: "Worked",
@@ -126,7 +160,14 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   const shownCollectionTotal = orders.reduce((sum, order) => sum + (orderCollection(order) ?? 0), 0);
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
-  const kwd = locale === "en" ? "KWD" : "د.ك";
+  const kwd = locale === "en" ? "KWD" : AR.kwd;
+
+  const printQuery = new URLSearchParams({
+    ...(sp.contractId ? { contractId: sp.contractId } : {}),
+    ...(sp.driverId ? { driverId: sp.driverId } : {}),
+    ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
+  }).toString();
+  const printHref = `/dashboard/companies/${companyId}/delivery/daily-orders/print${printQuery ? `?${printQuery}` : ""}`;
 
   const canUpdate = hasPermission(session, "DELIVERY_OPERATIONS", "UPDATE", { companyId });
   const canDelete = hasPermission(session, "DELIVERY_OPERATIONS", "DELETE", { companyId });
@@ -134,17 +175,22 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   return (
     <div>
       <Header
-        title={locale === "en" ? "Daily Orders" : "الطلبات اليومية"}
-        subtitle={locale === "en" ? "Daily order log for drivers" : "سجل الطلبات اليومية للسائقين"}
+        title={locale === "en" ? "Daily Orders" : AR.title}
+        subtitle={locale === "en" ? "Daily order log for drivers" : AR.subtitle}
         companyId={companyId}
         actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/delivery/daily-orders/new`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            <Plus size={16} />
-            {locale === "en" ? "New daily entry" : "تسجيل يومي"}
-          </Link>
+          <>
+            <Link href={printHref} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+              {locale === "en" ? "Print report" : AR.printReport}
+            </Link>
+            <Link
+              href={`/dashboard/companies/${companyId}/delivery/daily-orders/new`}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              {locale === "en" ? "New daily entry" : AR.newEntry}
+            </Link>
+          </>
         }
       />
 
@@ -153,13 +199,13 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           <div className="stat-card">
             <div>
               <p className="text-2xl font-bold">{total}</p>
-              <p className="text-xs text-muted-foreground">{locale === "en" ? "Total records" : "إجمالي السجلات"}</p>
+              <p className="text-xs text-muted-foreground">{locale === "en" ? "Total records" : AR.totalRecords}</p>
             </div>
           </div>
           <div className="stat-card">
             <div>
               <p className="number text-2xl font-bold">{totalOrders._sum.ordersCount ?? 0}</p>
-              <p className="text-xs text-muted-foreground">{locale === "en" ? "Total orders" : "إجمالي الطلبات"}</p>
+              <p className="text-xs text-muted-foreground">{locale === "en" ? "Total orders" : AR.totalOrders}</p>
             </div>
           </div>
         </div>
@@ -171,7 +217,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
               !sp.contractId ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"
             }`}
           >
-            {locale === "en" ? "All" : "الكل"}
+            {locale === "en" ? "All" : AR.all}
           </Link>
           {contracts.map((contract) => (
             <Link
@@ -190,19 +236,20 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           {sp.contractId && <input type="hidden" name="contractId" value={sp.contractId} />}
           {sp.workStatus && <input type="hidden" name="workStatus" value={sp.workStatus} />}
           <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-80">
-            <option value="">{locale === "en" ? "All drivers" : "كل السائقين"}</option>
+            <option value="">{locale === "en" ? "All drivers" : AR.allDrivers}</option>
             {driverOptions.map((driver) => (
               <option key={driver.id} value={driver.id}>
-                {driver.name}{driver.isActive ? "" : locale === "en" ? " (Inactive)" : " (غير نشط)"}
+                {driver.name}
+                {driver.isActive ? "" : locale === "en" ? " (Inactive)" : ` (${AR.inactive})`}
               </option>
             ))}
           </select>
           <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            {locale === "en" ? "Filter" : "تصفية"}
+            {locale === "en" ? "Filter" : AR.filter}
           </button>
           {(sp.driverId || sp.contractId || sp.workStatus) && (
             <Link href={buildHref(companyId, {})} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
-              {locale === "en" ? "Clear" : "مسح"}
+              {locale === "en" ? "Clear" : AR.clear}
             </Link>
           )}
         </form>
@@ -216,7 +263,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                 (sp.workStatus ?? "") === status ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"
               }`}
             >
-              {status ? WORK_STATUS_LABELS[locale][status] : locale === "en" ? "All statuses" : "كل الحالات"}
+              {status ? WORK_STATUS_LABELS[locale][status] : locale === "en" ? "All statuses" : AR.allStatuses}
             </Link>
           ))}
         </div>
@@ -225,7 +272,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-blue-50/60 p-4">
             <div>
               <p className="text-xs text-muted-foreground">
-                {locale === "en" ? "Driver's current wallet balance" : "الرصيد الحالي في محفظة السائق"}
+                {locale === "en" ? "Driver's current wallet balance" : AR.walletBalance}
               </p>
               <p className={`number text-2xl font-bold ${(selectedDriverBalance ?? 0) > 0 ? "text-red-600" : "text-emerald-600"}`}>
                 {(selectedDriverBalance ?? 0).toFixed(3)} {kwd}
@@ -233,7 +280,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             </div>
             <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
               <p className="text-xs text-muted-foreground">
-                {locale === "en" ? "Collected in shown records" : "إجمالي المحصل في السجلات المعروضة"}
+                {locale === "en" ? "Collected in shown records" : AR.shownCollected}
               </p>
               <p className="number text-2xl font-bold text-blue-600">{shownCollectionTotal.toFixed(3)} {kwd}</p>
             </div>
@@ -245,13 +292,13 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             <table className="ar-table">
               <thead>
                 <tr>
-                  <th>{locale === "en" ? "Date" : "التاريخ"}</th>
-                  <th>{locale === "en" ? "Driver" : "السائق"}</th>
-                  <th>{locale === "en" ? "Status" : "الحالة"}</th>
-                  <th>{locale === "en" ? "Contract" : "العقد"}</th>
-                  <th>{locale === "en" ? "Orders count" : "عدد الطلبات"}</th>
-                  <th>{locale === "en" ? "Collected" : "المحصل"}</th>
-                  <th>{locale === "en" ? "Rating" : "التقييم"}</th>
+                  <th>{locale === "en" ? "Date" : AR.date}</th>
+                  <th>{locale === "en" ? "Driver" : AR.driver}</th>
+                  <th>{locale === "en" ? "Status" : AR.status}</th>
+                  <th>{locale === "en" ? "Contract" : AR.contract}</th>
+                  <th>{locale === "en" ? "Orders count" : AR.ordersCount}</th>
+                  <th>{locale === "en" ? "Collected" : AR.collected}</th>
+                  <th>{locale === "en" ? "Rating" : AR.rating}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -259,7 +306,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                 {orders.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                      {locale === "en" ? "No records found" : "لا توجد سجلات"}
+                      {locale === "en" ? "No records found" : AR.noRecords}
                     </td>
                   </tr>
                 ) : (
@@ -270,13 +317,13 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                         {locale === "en" ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}
                         {order.operatedAsDriver && (
                           <p className="mt-1 text-xs font-normal text-amber-700">
-                            {locale === "en" ? "Worked under:" : "عمل باسم:"}{" "}
+                            {locale === "en" ? "Worked under:" : AR.workedUnder}{" "}
                             {locale === "en"
                               ? order.operatedAsDriver.employee.nameEn ?? order.operatedAsDriver.employee.nameAr
                               : order.operatedAsDriver.employee.nameAr}
                             {!order.operatedAsDriver.employee.isActive && (
                               <span className="mr-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">
-                                {locale === "en" ? "Inactive" : "غير نشط"}
+                                {locale === "en" ? "Inactive" : AR.inactive}
                               </span>
                             )}
                           </p>
@@ -285,9 +332,10 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                           <div className="mt-1 space-y-0.5">
                             {order.allocations.map((allocation) => (
                               <p key={allocation.id} className="text-xs font-normal text-emerald-600">
-                                ↳ {locale === "en" ? allocation.driver.employee.nameEn ?? allocation.driver.employee.nameAr : allocation.driver.employee.nameAr}: {allocation.allocatedOrders}
+                                {"\u21b3"} {locale === "en" ? allocation.driver.employee.nameEn ?? allocation.driver.employee.nameAr : allocation.driver.employee.nameAr}:{" "}
+                                {allocation.allocatedOrders}
                                 {allocation.walletAmount != null && Number(allocation.walletAmount) > 0 && (
-                                  <span className="text-blue-600"> · {Number(allocation.walletAmount).toFixed(3)} {kwd}</span>
+                                  <span className="text-blue-600"> {"\u2022"} {Number(allocation.walletAmount).toFixed(3)} {kwd}</span>
                                 )}
                               </p>
                             ))}
@@ -352,7 +400,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                           {canDelete && (
                             <DeleteConfirmButton
                               apiUrl={`/api/delivery/daily-orders/${order.id}`}
-                              confirmMessage={`${locale === "en" ? "Delete daily order for" : "حذف الطلبات اليومية للسائق"} ${order.driver.employee.nameAr} ${formatDate(order.date, numberLocale)}?`}
+                              confirmMessage={`${locale === "en" ? "Delete daily order for" : AR.deleteFor} ${order.driver.employee.nameAr} ${formatDate(order.date, numberLocale)}?`}
                             />
                           )}
                         </div>

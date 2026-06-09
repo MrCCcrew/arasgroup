@@ -46,19 +46,65 @@ interface DailyEntry {
   workStatus: WorkStatus;
 }
 
+const AR = {
+  talabat: "\u0637\u0644\u0628\u0627\u062a",
+  worked: "\u0639\u0645\u0644",
+  onLeave: "\u0625\u062c\u0627\u0632\u0629",
+  vehicleBreakdown: "\u0639\u0637\u0644 \u0633\u064a\u0627\u0631\u0629",
+  noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
+  missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
+  lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  inactive: "(\u063a\u064a\u0631 \u0646\u0634\u0637)",
+  enterOneLine: "\u0623\u062f\u062e\u0644 \u0633\u0637\u0631\u064b\u0627 \u0648\u0627\u062d\u062f\u064b\u0627 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644",
+  saveFailed: "\u0641\u0634\u0644 \u0641\u064a \u0627\u0644\u062d\u0641\u0638",
+  chooseDriver: "\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0633\u0627\u0626\u0642",
+  enterOneDay: "\u0623\u062f\u062e\u0644 \u064a\u0648\u0645\u064b\u0627 \u0648\u0627\u062d\u062f\u064b\u0627 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644",
+  pageTitle: "\u062a\u0633\u062c\u064a\u0644 \u0637\u0644\u0628\u0627\u062a \u064a\u0648\u0645\u064a\u0629",
+  pageSubtitle: "\u0625\u062f\u062e\u0627\u0644 \u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0633\u0627\u0626\u0642\u064a\u0646 \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
+  back: "\u0627\u0644\u0639\u0648\u062f\u0629",
+  sessionDetails: "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u062c\u0644\u0633\u0629",
+  contract: "\u0627\u0644\u0639\u0642\u062f",
+  selectContract: "\u0627\u062e\u062a\u0631 \u0627\u0644\u0639\u0642\u062f...",
+  dateMode: "\u0648\u0636\u0639 \u0627\u0644\u062a\u0627\u0631\u064a\u062e",
+  singleDay: "\u064a\u0648\u0645 \u0648\u0627\u062d\u062f",
+  multipleDays: "\u0639\u062f\u0629 \u0623\u064a\u0627\u0645",
+  date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
+  from: "\u0645\u0646",
+  to: "\u0625\u0644\u0649",
+  additionalDates: "\u062a\u0648\u0627\u0631\u064a\u062e \u0625\u0636\u0627\u0641\u064a\u0629",
+  driverOrders: "\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
+  driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
+  status: "\u0627\u0644\u062d\u0627\u0644\u0629",
+  workedUnder: "\u0639\u0645\u0644 \u0628\u0627\u0633\u0645",
+  orders: "\u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  rate: "\u0627\u0644\u0633\u0639\u0631",
+  gross: "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a",
+  wallet: "\u0627\u0644\u0645\u062d\u0641\u0638\u0629",
+  rating: "\u0627\u0644\u062a\u0642\u064a\u064a\u0645",
+  cash: "\u062a\u062d\u0635\u064a\u0644",
+  ownName: "\u0628\u0627\u0633\u0645\u0647",
+  worksUnderLabel: "\u064a\u0639\u0645\u0644 \u0628\u0627\u0633\u0645:",
+  selectDriver: "\u0627\u062e\u062a\u0631 \u0627\u0644\u0633\u0627\u0626\u0642",
+  chooseDriverOption: "\u0627\u062e\u062a\u0631 \u0627\u0644\u0633\u0627\u0626\u0642...",
+  dailyEntries: "\u0627\u0644\u062a\u0633\u062c\u064a\u0644\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
+  saving: "\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0641\u0638...",
+  saveOrders: "\u062d\u0641\u0638 \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  cancel: "\u0625\u0644\u063a\u0627\u0621",
+} as const;
+
 const PLATFORM_LABELS = {
-  ar: { TALABAT: "طلبات", RO_POPS: "Ro Pops" },
+  ar: { TALABAT: AR.talabat, RO_POPS: "Ro Pops" },
   en: { TALABAT: "Talabat", RO_POPS: "Ro Pops" },
 } as const;
 
 const WORK_STATUS_LABELS = {
   ar: {
-    WORKED: "عمل",
-    ON_LEAVE: "إجازة",
-    VEHICLE_BREAKDOWN: "عطل سيارة",
-    NO_SHIFTS: "بدون شيفتات",
-    MISSED_SHIFT: "عنده شيفت ولم يعمل",
-    LATE_LOGIN: "تأخر في تسجيل الدخول",
+    WORKED: AR.worked,
+    ON_LEAVE: AR.onLeave,
+    VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
+    NO_SHIFTS: AR.noShifts,
+    MISSED_SHIFT: AR.missedShift,
+    LATE_LOGIN: AR.lateLogin,
   },
   en: {
     WORKED: "Worked",
@@ -137,20 +183,18 @@ export default function NewDailyOrdersPage() {
     });
   }, [companyId]);
 
-  const inactiveDriverOptions = useMemo(
+  const aliasDriverOptions = useMemo(
     () =>
-      drivers
-        .filter((driver) => !driver.employee.isActive)
-        .map((driver) => ({
-          id: driver.id,
-          name: locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr,
-        })),
+      drivers.map((driver) => ({
+        id: driver.id,
+        name: getDriverName(driver),
+      })),
     [drivers, locale],
   );
 
   function getDriverName(driver: Driver) {
     const base = locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr;
-    return driver.employee.isActive ? base : `${base} ${locale === "en" ? "(Inactive)" : "(غير نشط)"}`;
+    return driver.employee.isActive ? base : `${base} ${locale === "en" ? "(Inactive)" : AR.inactive}`;
   }
 
   function getSelectedDates() {
@@ -172,7 +216,9 @@ export default function NewDailyOrdersPage() {
   useEffect(() => {
     if (dateMode !== "multiple") return;
     const dates = getSelectedDates();
-    setDailyEntries((prev) => dates.map((currentDate) => prev.find((entry) => entry.date === currentDate) ?? emptyDailyEntry(currentDate)));
+    setDailyEntries((prev) =>
+      dates.map((currentDate) => prev.find((entry) => entry.date === currentDate) ?? emptyDailyEntry(currentDate)),
+    );
   }, [dateMode, fromDate, toDate, additionalDates]);
 
   function toggleAdditionalDate(dateStr: string) {
@@ -220,7 +266,7 @@ export default function NewDailyOrdersPage() {
         }));
 
       if (entries.length === 0) {
-        setError(locale === "en" ? "Enter at least one line" : "أدخل سطرًا واحدًا على الأقل");
+        setError(locale === "en" ? "Enter at least one line" : AR.enterOneLine);
         return;
       }
 
@@ -232,10 +278,10 @@ export default function NewDailyOrdersPage() {
           body: JSON.stringify({ companyId, contractId, dates: [date], entries }),
         });
         const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error ?? "فشل في الحفظ");
+        if (!res.ok) throw new Error(payload.error ?? AR.saveFailed);
         router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "فشل في الحفظ");
+        setError(err instanceof Error ? err.message : AR.saveFailed);
       } finally {
         setLoading(false);
       }
@@ -243,7 +289,7 @@ export default function NewDailyOrdersPage() {
     }
 
     if (!selectedDriverId) {
-      setError(locale === "en" ? "Please select a driver" : "يرجى اختيار سائق");
+      setError(locale === "en" ? "Please select a driver" : AR.chooseDriver);
       return;
     }
 
@@ -263,7 +309,7 @@ export default function NewDailyOrdersPage() {
       }));
 
     if (entries.length === 0) {
-      setError(locale === "en" ? "Enter at least one day" : "أدخل يومًا واحدًا على الأقل");
+      setError(locale === "en" ? "Enter at least one day" : AR.enterOneDay);
       return;
     }
 
@@ -275,10 +321,10 @@ export default function NewDailyOrdersPage() {
         body: JSON.stringify({ companyId, contractId, entries }),
       });
       const payload = await res.json();
-      if (!res.ok && res.status !== 207) throw new Error(payload.error ?? "فشل في الحفظ");
+      if (!res.ok && res.status !== 207) throw new Error(payload.error ?? AR.saveFailed);
       router.push(`/dashboard/companies/${companyId}/delivery/daily-orders`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل في الحفظ");
+      setError(err instanceof Error ? err.message : AR.saveFailed);
     } finally {
       setLoading(false);
     }
@@ -289,8 +335,8 @@ export default function NewDailyOrdersPage() {
   return (
     <div>
       <Header
-        title={locale === "en" ? "New Daily Orders" : "تسجيل طلبات يومية"}
-        subtitle={locale === "en" ? "Enter driver daily orders" : "إدخال طلبات السائقين اليومية"}
+        title={locale === "en" ? "New Daily Orders" : AR.pageTitle}
+        subtitle={locale === "en" ? "Enter driver daily orders" : AR.pageSubtitle}
         companyId={companyId}
       />
 
@@ -300,7 +346,7 @@ export default function NewDailyOrdersPage() {
           className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowRight size={14} />
-          {locale === "en" ? "Back to daily orders" : "العودة"}
+          {locale === "en" ? "Back to daily orders" : AR.back}
         </Link>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -308,15 +354,15 @@ export default function NewDailyOrdersPage() {
 
           <div className="section-card space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              {locale === "en" ? "Session details" : "بيانات الجلسة"}
+              {locale === "en" ? "Session details" : AR.sessionDetails}
             </h3>
 
             <div>
               <label className="mb-1.5 block text-sm font-medium">
-                {locale === "en" ? "Contract" : "العقد"} <span className="text-red-500">*</span>
+                {locale === "en" ? "Contract" : AR.contract} <span className="text-red-500">*</span>
               </label>
               <select required value={contractId} onChange={(event) => setContractId(event.target.value)} className="input-field w-full">
-                <option value="">{locale === "en" ? "Select contract..." : "اختر العقد..."}</option>
+                <option value="">{locale === "en" ? "Select contract..." : AR.selectContract}</option>
                 {contracts.map((contract) => (
                   <option key={contract.id} value={contract.id}>
                     {locale === "en" ? contract.nameEn ?? contract.nameAr : contract.nameAr}
@@ -328,7 +374,7 @@ export default function NewDailyOrdersPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Date mode" : "وضع التاريخ"}</label>
+              <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Date mode" : AR.dateMode}</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -337,7 +383,7 @@ export default function NewDailyOrdersPage() {
                     dateMode === "single" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted"
                   }`}
                 >
-                  {locale === "en" ? "Single day" : "يوم واحد"}
+                  {locale === "en" ? "Single day" : AR.singleDay}
                 </button>
                 <button
                   type="button"
@@ -346,31 +392,31 @@ export default function NewDailyOrdersPage() {
                     dateMode === "multiple" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted"
                   }`}
                 >
-                  {locale === "en" ? "Multiple days" : "عدة أيام"}
+                  {locale === "en" ? "Multiple days" : AR.multipleDays}
                 </button>
               </div>
             </div>
 
             {dateMode === "single" ? (
               <div>
-                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Date" : "التاريخ"}</label>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Date" : AR.date}</label>
                 <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="input-field w-full" dir="ltr" />
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "From" : "من"}</label>
+                    <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "From" : AR.from}</label>
                     <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="input-field w-full" dir="ltr" />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "To" : "إلى"}</label>
+                    <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "To" : AR.to}</label>
                     <input type="date" value={toDate} min={fromDate} onChange={(event) => setToDate(event.target.value)} className="input-field w-full" dir="ltr" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Additional dates" : "تواريخ إضافية"}</label>
+                  <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Additional dates" : AR.additionalDates}</label>
                   <div className="flex flex-wrap gap-2">
                     {Array.from({ length: 10 }, (_, offset) => {
                       const value = new Date();
@@ -397,23 +443,28 @@ export default function NewDailyOrdersPage() {
           {dateMode === "single" ? (
             <div className="section-card">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                {locale === "en" ? "Driver orders" : "طلبات السائقين"}
-                {selectedContract && <span className="mr-2 font-normal normal-case text-primary"> - {locale === "en" ? selectedContract.nameEn ?? selectedContract.nameAr : selectedContract.nameAr}</span>}
+                {locale === "en" ? "Driver orders" : AR.driverOrders}
+                {selectedContract && (
+                  <span className="mr-2 font-normal normal-case text-primary">
+                    {" - "}
+                    {locale === "en" ? selectedContract.nameEn ?? selectedContract.nameAr : selectedContract.nameAr}
+                  </span>
+                )}
               </h3>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Driver" : "السائق"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : "الحالة"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : "عمل باسم"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : "الطلبات"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : "السعر"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : "الإجمالي"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : "المحفظة"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : "التقييم"}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : "تحصيل"}</th>
+                      <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Driver" : AR.driver}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
+                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
@@ -430,17 +481,27 @@ export default function NewDailyOrdersPage() {
                           <td className="py-1.5">
                             <select value={line.workStatus} onChange={(event) => updateLine(index, "workStatus", event.target.value)} className="input-field w-44 text-center">
                               {(Object.keys(WORK_STATUS_LABELS.ar) as WorkStatus[]).map((status) => (
-                                <option key={status} value={status}>{WORK_STATUS_LABELS[locale][status]}</option>
+                                <option key={status} value={status}>
+                                  {WORK_STATUS_LABELS[locale][status]}
+                                </option>
                               ))}
                             </select>
                           </td>
                           <td className="py-1.5">
                             <select value={line.operatedAsDriverId} onChange={(event) => updateLine(index, "operatedAsDriverId", event.target.value)} className="input-field w-44 text-center">
-                              <option value="">{locale === "en" ? "Own name" : "باسمه"}</option>
-                              {inactiveDriverOptions.map((option) => (
-                                <option key={option.id} value={option.id}>{option.name}</option>
+                              <option value="">{locale === "en" ? "Own name" : AR.ownName}</option>
+                              {aliasDriverOptions.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.name}
+                                </option>
                               ))}
                             </select>
+                            {line.operatedAsDriverId && (
+                              <div className="mt-1 text-xs text-amber-700">
+                                {locale === "en" ? "Works under:" : AR.worksUnderLabel}{" "}
+                                {aliasDriverOptions.find((option) => option.id === line.operatedAsDriverId)?.name}
+                              </div>
+                            )}
                           </td>
                           <td className="py-1.5"><input type="number" min="0" value={line.ordersCount} onChange={(event) => updateLine(index, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
                           <td className="py-1.5"><input type="number" min="0" step="0.001" value={line.ratePerOrder} onChange={(event) => updateLine(index, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
@@ -458,31 +519,33 @@ export default function NewDailyOrdersPage() {
           ) : (
             <>
               <div className="section-card">
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{locale === "en" ? "Select driver" : "اختر السائق"}</h3>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{locale === "en" ? "Select driver" : AR.selectDriver}</h3>
                 <select value={selectedDriverId} onChange={(event) => setSelectedDriverId(event.target.value)} className="input-field w-full">
-                  <option value="">{locale === "en" ? "Choose driver..." : "اختر السائق..."}</option>
-                  {drivers.filter((driver) => driver.employee.isActive).map((driver) => (
-                    <option key={driver.id} value={driver.id}>{getDriverName(driver)}</option>
+                  <option value="">{locale === "en" ? "Choose driver..." : AR.chooseDriverOption}</option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {getDriverName(driver)}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {selectedDriverId && (
                 <div className="section-card">
-                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{locale === "en" ? "Daily entries" : "التسجيلات اليومية"}</h3>
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{locale === "en" ? "Daily entries" : AR.dailyEntries}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Date" : "التاريخ"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : "الحالة"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : "عمل باسم"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : "الطلبات"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : "السعر"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : "الإجمالي"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : "المحفظة"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : "التقييم"}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : "تحصيل"}</th>
+                          <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Date" : AR.date}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
+                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
@@ -496,17 +559,27 @@ export default function NewDailyOrdersPage() {
                               <td className="py-1.5">
                                 <select value={entry.workStatus} onChange={(event) => updateDailyEntry(entry.date, "workStatus", event.target.value)} className="input-field w-44 text-center">
                                   {(Object.keys(WORK_STATUS_LABELS.ar) as WorkStatus[]).map((status) => (
-                                    <option key={status} value={status}>{WORK_STATUS_LABELS[locale][status]}</option>
+                                    <option key={status} value={status}>
+                                      {WORK_STATUS_LABELS[locale][status]}
+                                    </option>
                                   ))}
                                 </select>
                               </td>
                               <td className="py-1.5">
                                 <select value={entry.operatedAsDriverId} onChange={(event) => updateDailyEntry(entry.date, "operatedAsDriverId", event.target.value)} className="input-field w-44 text-center">
-                                  <option value="">{locale === "en" ? "Own name" : "باسمه"}</option>
-                                  {inactiveDriverOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>{option.name}</option>
+                                  <option value="">{locale === "en" ? "Own name" : AR.ownName}</option>
+                                  {aliasDriverOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.name}
+                                    </option>
                                   ))}
                                 </select>
+                                {entry.operatedAsDriverId && (
+                                  <div className="mt-1 text-xs text-amber-700">
+                                    {locale === "en" ? "Works under:" : AR.worksUnderLabel}{" "}
+                                    {aliasDriverOptions.find((option) => option.id === entry.operatedAsDriverId)?.name}
+                                  </div>
+                                )}
                               </td>
                               <td className="py-1.5"><input type="number" min="0" value={entry.ordersCount} onChange={(event) => updateDailyEntry(entry.date, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
                               <td className="py-1.5"><input type="number" min="0" step="0.001" value={entry.ratePerOrder} onChange={(event) => updateDailyEntry(entry.date, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
@@ -532,10 +605,10 @@ export default function NewDailyOrdersPage() {
               className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               <Save size={16} />
-              {loading ? (locale === "en" ? "Saving..." : "جارٍ الحفظ...") : locale === "en" ? "Save orders" : "حفظ الطلبات"}
+              {loading ? (locale === "en" ? "Saving..." : AR.saving) : locale === "en" ? "Save orders" : AR.saveOrders}
             </button>
             <Link href={`/dashboard/companies/${companyId}/delivery/daily-orders`} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium hover:bg-muted">
-              {locale === "en" ? "Cancel" : "إلغاء"}
+              {locale === "en" ? "Cancel" : AR.cancel}
             </Link>
           </div>
         </form>
