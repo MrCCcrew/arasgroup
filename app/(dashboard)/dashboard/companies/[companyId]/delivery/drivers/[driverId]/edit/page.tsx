@@ -39,6 +39,7 @@ interface DriverData {
     licenseNumber: string | null;
     licenseExpiry: string | null;
     residentialAddress: string | null;
+    isActive: boolean;
   };
 }
 
@@ -77,6 +78,7 @@ export default function EditDriverPage() {
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [residentialAddress, setResidentialAddress] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [talabatId, setTalabatId] = useState("");
@@ -113,6 +115,7 @@ export default function EditDriverPage() {
         setLicenseNumber(d.employee.licenseNumber ?? "");
         setLicenseExpiry(d.employee.licenseExpiry ? d.employee.licenseExpiry.slice(0, 10) : "");
         setResidentialAddress(d.employee.residentialAddress ?? "");
+        setIsActive(d.employee.isActive ?? true);
         setDateOfBirth(d.employee.dateOfBirth ? d.employee.dateOfBirth.slice(0, 10) : "");
         setTalabatId(d.talabatId ?? "");
         setRoPopsId(d.roPopsId ?? "");
@@ -175,6 +178,7 @@ export default function EditDriverPage() {
       licenseNumber: licenseNumber || null,
       licenseExpiry: licenseExpiry || null,
       residentialAddress: residentialAddress || null,
+      isActive,
       talabatId: talabatId || null,
       roPopsId: roPopsId || null,
       isRegisteredTalabat,
@@ -286,6 +290,17 @@ export default function EditDriverPage() {
                 <label className="mb-1.5 block text-sm font-medium">تارجيت الطلبات</label>
                 <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" disabled={isOfficeStaff} />
                 <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب الحافز/الخصم تلقائياً في الرواتب.</p>
+              </div>
+              <div className="col-span-2 flex items-center gap-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  موظف نشط
+                </label>
               </div>
               <label className="col-span-2 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
                 <input

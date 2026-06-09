@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { DeliveryDailyOrderWorkStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { recomputeDriverWalletStates, syncDailyOrderWalletCharge } from "@/lib/delivery/wallet-state";
 
 const entrySchema = z.object({
   driverId: z.string(),
   ordersCount: z.number().int().min(0),
+  operatedAsDriverId: z.string().optional().nullable(),
+  workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN"]).optional(),
   ratePerOrder: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   walletDeducted: z.number().min(0).optional(),
@@ -35,6 +38,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
     const contractId = searchParams.get("contractId");
+    const workStatus = searchParams.get("workStatus");
     const page = parseInt(searchParams.get("page") ?? "1");
     const pageSize = parseInt(searchParams.get("pageSize") ?? "25");
 
@@ -45,6 +49,7 @@ export async function GET(request: NextRequest) {
     const where = {
       companyId,
       ...(contractId ? { contractId } : {}),
+      ...(workStatus ? { workStatus: workStatus as DeliveryDailyOrderWorkStatus } : {}),
     };
 
     const [total, items] = await Promise.all([
@@ -53,6 +58,7 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           driver: { include: { employee: { select: { nameAr: true } } } },
+          operatedAsDriver: { include: { employee: { select: { nameAr: true } } } },
           contract: { select: { nameAr: true, platform: true } },
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
@@ -100,10 +106,12 @@ export async function POST(request: NextRequest) {
             where: { driverId_contractId_date: { driverId: entry.driverId, contractId, date } },
             create: {
               driverId: entry.driverId,
+              operatedAsDriverId: entry.operatedAsDriverId ?? null,
               contractId,
               companyId,
               date,
               ordersCount: entry.ordersCount,
+              workStatus: entry.workStatus ?? "WORKED",
               ratePerOrder: entry.ratePerOrder ?? null,
               grossAmount: entry.grossAmount ?? null,
               walletDeducted: entry.walletDeducted ?? null,
@@ -112,6 +120,8 @@ export async function POST(request: NextRequest) {
             },
             update: {
               ordersCount: entry.ordersCount,
+              operatedAsDriverId: entry.operatedAsDriverId ?? null,
+              workStatus: entry.workStatus ?? "WORKED",
               ratePerOrder: entry.ratePerOrder ?? null,
               grossAmount: entry.grossAmount ?? null,
               walletDeducted: entry.walletDeducted ?? null,

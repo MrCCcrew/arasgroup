@@ -5,6 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Save, Loader2, AlertCircle } from "lucide-react";
 
+type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "MISSED_SHIFT" | "LATE_LOGIN";
+
 interface Order {
   id: string;
   date: string;
@@ -12,9 +14,26 @@ interface Order {
   rating: string | number | null;
   notes: string | null;
   walletAmount: number | null;
+  workStatus: WorkStatus;
+  operatedAsDriverId: string | null;
   driver: { employee: { nameAr: string } };
+  operatedAsDriver: { employee: { nameAr: string } } | null;
   contract: { nameAr: string; platform: string };
 }
+
+interface DriverOption {
+  id: string;
+  employee: { nameAr: string; isActive: boolean };
+}
+
+const WORK_STATUS_LABELS: Record<WorkStatus, string> = {
+  WORKED: "عمل",
+  ON_LEAVE: "إجازة",
+  VEHICLE_BREAKDOWN: "عطل سيارة",
+  NO_SHIFTS: "بدون شيفتات",
+  MISSED_SHIFT: "عنده شيفت ولم يعمل",
+  LATE_LOGIN: "تأخر في تسجيل الدخول",
+};
 
 export default function EditDailyOrderPage() {
   const router = useRouter();
@@ -27,40 +46,48 @@ export default function EditDailyOrderPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
+  const [inactiveDrivers, setInactiveDrivers] = useState<DriverOption[]>([]);
 
   const [ordersCount, setOrdersCount] = useState("");
   const [rating, setRating] = useState("");
   const [notes, setNotes] = useState("");
   const [walletAmount, setWalletAmount] = useState("");
+  const [workStatus, setWorkStatus] = useState<WorkStatus>("WORKED");
+  const [operatedAsDriverId, setOperatedAsDriverId] = useState("");
 
   useEffect(() => {
     if (!orderId) return;
     setLoading(true);
     setFetchError(null);
 
-    fetch(`/api/delivery/daily-orders/${orderId}`)
-      .then(async (r) => {
-        const json = await r.json();
-        if (!json.success) throw new Error(json.error ?? "فشل في تحميل البيانات");
-        return json.data as Order;
-      })
-      .then((o) => {
-        setOrder(o);
-        setOrdersCount(String(o.ordersCount ?? 0));
-        setRating(o.rating != null ? String(Number(o.rating)) : "");
-        setNotes(o.notes ?? "");
-        setWalletAmount(o.walletAmount != null ? String(o.walletAmount) : "");
-      })
-      .catch((err) => {
-        setFetchError(err instanceof Error ? err.message : "فشل في تحميل البيانات");
-      })
-      .finally(() => setLoading(false));
-  }, [orderId]);
+    Promise.all([
+      fetch(`/api/delivery/daily-orders/${orderId}`).then((r) => r.json()),
+      fetch(`/api/delivery/drivers?companyId=${companyId}&includeInactive=true`).then((r) => r.json()),
+    ])
+      .then(([orderPayload, driversPayload]) => {
+        if (!orderPayload.success) throw new Error(orderPayload.error ?? "فشل في تحميل البيانات");
+        const currentOrder = orderPayload.data as Order;
+        setOrder(currentOrder);
+        setOrdersCount(String(currentOrder.ordersCount ?? 0));
+        setRating(currentOrder.rating != null ? String(Number(currentOrder.rating)) : "");
+        setNotes(currentOrder.notes ?? "");
+        setWalletAmount(currentOrder.walletAmount != null ? String(currentOrder.walletAmount) : "");
+        setWorkStatus(currentOrder.workStatus ?? "WORKED");
+        setOperatedAsDriverId(currentOrder.operatedAsDriverId ?? "");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+        if (driversPayload.success) {
+          setInactiveDrivers((driversPayload.data as DriverOption[]).filter((driver) => !driver.employee.isActive));
+        }
+      })
+      .catch((err) => setFetchError(err instanceof Error ? err.message : "فشل في تحميل البيانات"))
+      .finally(() => setLoading(false));
+  }, [companyId, orderId]);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setSaving(true);
     setSaveError(null);
+
     try {
       const res = await fetch(`/api/delivery/daily-orders/${orderId}`, {
         method: "PATCH",
@@ -70,6 +97,8 @@ export default function EditDailyOrderPage() {
           rating: rating ? Number(rating) : null,
           notes: notes || null,
           walletAmount: walletAmount ? Number(walletAmount) : null,
+          workStatus,
+          operatedAsDriverId: operatedAsDriverId || null,
         }),
       });
       const json = await res.json();
@@ -81,131 +110,95 @@ export default function EditDailyOrderPage() {
     }
   }
 
-  // ── حالة التحميل ──
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center gap-3 text-muted-foreground">
         <Loader2 size={24} className="animate-spin" />
-        <span className="text-sm">جاري تحميل البيانات...</span>
+        <span className="text-sm">جارٍ تحميل البيانات...</span>
       </div>
     );
   }
 
-  // ── حالة الخطأ في التحميل ──
   if (fetchError || !order) {
     return (
       <div className="page-container max-w-lg">
         <div className="mt-12 flex flex-col items-center gap-4 text-center">
           <AlertCircle size={40} className="text-red-400" />
           <p className="text-base font-medium text-red-600">{fetchError ?? "لم يتم العثور على السجل"}</p>
-          <Link
-            href={`/dashboard/companies/${companyId}/delivery/daily-orders`}
-            className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
-          >
-            العودة للأوردرات اليومية
+          <Link href={`/dashboard/companies/${companyId}/delivery/daily-orders`} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+            العودة للطلبات اليومية
           </Link>
         </div>
       </div>
     );
   }
 
-  // ── الـ form ──
   return (
     <div>
       <div className="border-b bg-card px-6 py-4">
         <h1 className="text-lg font-bold">تعديل تسجيل يومي</h1>
         <p className="text-sm text-muted-foreground">
-          {order.driver.employee.nameAr} — {order.contract.nameAr} —{" "}
-          {new Date(order.date).toLocaleDateString("ar-KW")}
+          {order.driver.employee.nameAr} - {order.contract.nameAr} - {new Date(order.date).toLocaleDateString("ar-KW")}
         </p>
       </div>
 
       <div className="page-container max-w-lg space-y-6">
-        <Link
-          href={`/dashboard/companies/${companyId}/delivery/daily-orders`}
-          className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Link href={`/dashboard/companies/${companyId}/delivery/daily-orders`} className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowRight size={14} />
-          العودة للأوردرات اليومية
+          العودة للطلبات اليومية
         </Link>
 
-        {saveError && (
-          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
-        )}
+        {saveError && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>}
 
         <form onSubmit={handleSubmit} className="section-card space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">الحالة</label>
+            <select value={workStatus} onChange={(event) => setWorkStatus(event.target.value as WorkStatus)} className="input-field w-full">
+              {(Object.keys(WORK_STATUS_LABELS) as WorkStatus[]).map((status) => (
+                <option key={status} value={status}>{WORK_STATUS_LABELS[status]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">عمل باسم</label>
+            <select value={operatedAsDriverId} onChange={(event) => setOperatedAsDriverId(event.target.value)} className="input-field w-full">
+              <option value="">باسمه</option>
+              {inactiveDrivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.employee.nameAr}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-sm font-medium">
               عدد الطلبات <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              min="0"
-              required
-              value={ordersCount}
-              onChange={(e) => setOrdersCount(e.target.value)}
-              className="input-field w-full"
-              dir="ltr"
-            />
+            <input type="number" min="0" required value={ordersCount} onChange={(event) => setOrdersCount(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">التقييم (1–5)</label>
-            <input
-              type="number"
-              min="1"
-              max="5"
-              step="0.1"
-              value={rating}
-              onChange={(e) => setRating(e.target.value)}
-              className="input-field w-full"
-              dir="ltr"
-              placeholder="اختياري"
-            />
+            <label className="mb-1.5 block text-sm font-medium">التقييم (1-5)</label>
+            <input type="number" min="1" max="5" step="0.1" value={rating} onChange={(event) => setRating(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              تحصيل اليوم (د.ك)
-              <span className="mr-1 text-xs font-normal text-muted-foreground">— النقد اللي جمعه السائق</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.001"
-              value={walletAmount}
-              onChange={(e) => setWalletAmount(e.target.value)}
-              className="input-field w-full"
-              dir="ltr"
-              placeholder="0.000"
-            />
+            <label className="mb-1.5 block text-sm font-medium">تحصيل اليوم (د.ك)</label>
+            <input type="number" min="0" step="0.001" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">ملاحظات</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="input-field w-full"
-              rows={3}
-              placeholder="اختياري..."
-            />
+            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="input-field w-full" rows={3} />
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Link
-              href={`/dashboard/companies/${companyId}/delivery/daily-orders`}
-              className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
-            >
+            <Link href={`/dashboard/companies/${companyId}/delivery/daily-orders`} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">
               إلغاء
             </Link>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            >
+            <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              {saving ? "جاري الحفظ..." : "حفظ التعديلات"}
+              {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
             </button>
           </div>
         </form>

@@ -1095,7 +1095,8 @@ model Driver {
   employee           Employee                    @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   assignedVehicle    Vehicle?                    @relation("DriverAssignedVehicle", fields: [assignedVehicleId], references: [id], onDelete: Restrict)
   fuelCardLinkedVehicle Vehicle?                 @relation("DriverFuelCardVehicle", fields: [fuelCardLinkedVehicleId], references: [id], onDelete: Restrict)
-  dailyOrders        DeliveryDailyOrder[]
+  dailyOrders        DeliveryDailyOrder[]        @relation("DriverDailyOrders")
+  operatedDailyOrders DeliveryDailyOrder[]       @relation("DailyOrderOperatedAsDriver")
   dailyOrderAllocations DeliveryDailyOrderAllocation[] @relation("DailyOrderAllocationDriver")
   walletTransactions DriverWalletTransaction[]
   reportLines        DeliveryMonthlyReportLine[]
@@ -1264,22 +1265,33 @@ model DeliveryContract {
   @@map("delivery_contracts")
 }
 
+enum DeliveryDailyOrderWorkStatus {
+  WORKED
+  ON_LEAVE
+  VEHICLE_BREAKDOWN
+  NO_SHIFTS
+  MISSED_SHIFT
+  LATE_LOGIN
+}
 
 model DeliveryDailyOrder {
-  id             String   @id @default(cuid())
-  driverId       String
-  contractId     String
-  companyId      String
-  date           DateTime
-  ordersCount    Int      @default(0)
-  ratePerOrder   Decimal? @db.Decimal(18, 3)
-  grossAmount    Decimal? @db.Decimal(18, 3)
-  walletDeducted Decimal? @db.Decimal(18, 3)
-  rating         Decimal? @db.Decimal(5, 2)
-  notes          String?
+  id                String                       @id @default(cuid())
+  driverId          String
+  operatedAsDriverId String?
+  contractId        String
+  companyId         String
+  date              DateTime
+  ordersCount       Int                          @default(0)
+  ratePerOrder      Decimal?                     @db.Decimal(18, 3)
+  grossAmount       Decimal?                     @db.Decimal(18, 3)
+  walletDeducted    Decimal?                     @db.Decimal(18, 3)
+  rating            Decimal?                     @db.Decimal(5, 2)
+  workStatus        DeliveryDailyOrderWorkStatus @default(WORKED)
+  notes             String?
 
-  driver   Driver           @relation(fields: [driverId], references: [id], onDelete: Restrict)
-  contract DeliveryContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  driver          Driver                @relation("DriverDailyOrders", fields: [driverId], references: [id], onDelete: Restrict)
+  operatedAsDriver Driver?              @relation("DailyOrderOperatedAsDriver", fields: [operatedAsDriverId], references: [id], onDelete: SetNull)
+  contract        DeliveryContract      @relation(fields: [contractId], references: [id], onDelete: Restrict)
   allocations DeliveryDailyOrderAllocation[]
 
   createdAt DateTime @default(now())
@@ -1287,9 +1299,11 @@ model DeliveryDailyOrder {
 
   @@unique([driverId, contractId, date])
   @@index([driverId])
+  @@index([operatedAsDriverId])
   @@index([contractId])
   @@index([companyId])
   @@index([date])
+  @@index([workStatus])
   @@map("delivery_daily_orders")
 }
 

@@ -14,6 +14,8 @@ interface Ctx {
 
 const patchSchema = z.object({
   ordersCount: z.number().int().min(0).optional(),
+  operatedAsDriverId: z.string().nullable().optional(),
+  workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN"]).optional(),
   rating: z.number().min(1).max(5).nullable().optional(),
   notes: z.string().nullable().optional(),
   walletAmount: z.number().min(0).nullable().optional(),
@@ -30,6 +32,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     where: { id: orderId },
     include: {
       driver: { include: { employee: { select: { nameAr: true } } } },
+      operatedAsDriver: { include: { employee: { select: { nameAr: true } } } },
       contract: { select: { nameAr: true, platform: true } },
     },
   });
@@ -68,6 +71,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   const { walletAmount, ...orderFields } = parsed.data;
   const orderData: Record<string, unknown> = {};
   if (orderFields.ordersCount !== undefined) orderData.ordersCount = orderFields.ordersCount;
+  if (orderFields.operatedAsDriverId !== undefined) orderData.operatedAsDriverId = orderFields.operatedAsDriverId;
+  if (orderFields.workStatus !== undefined) orderData.workStatus = orderFields.workStatus;
   if (orderFields.rating !== undefined) orderData.rating = orderFields.rating;
   if (orderFields.notes !== undefined) orderData.notes = orderFields.notes;
 

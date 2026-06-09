@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
     const platform = searchParams.get("platform");
     const search = searchParams.get("search");
     const status = searchParams.get("status");
+    const includeInactive = searchParams.get("includeInactive") === "true";
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
@@ -93,8 +94,8 @@ export async function GET(request: NextRequest) {
       where: {
         employee: {
           companyId,
-          isActive: true,
           isDeleted: false,
+          ...(includeInactive ? {} : { isActive: true }),
           ...(branchIds.length ? { branchId: { in: branchIds } } : {}),
           ...(search ? { nameAr: { contains: search } } : {}),
           ...(status ? { employmentStatus: status as "ACTIVE" | "ON_LEAVE" | "SUSPENDED" | "TERMINATED" | "EXITED" } : {}),
