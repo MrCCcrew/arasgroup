@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // الفلتر المطبَّق (نوع القيد + الطرف مدين/دائن) — يحدّد ما سيُنقل فعلاً
     const where = {
       accountId: sourceAccountId,
-      journalEntry: { companyId, ...(journalType ? { type: journalType as never } : {}) },
+      journalEntry: { companyId, isDeleted: false, ...(journalType ? { type: journalType as never } : {}) },
       ...(side === "DEBIT" ? { debit: { gt: 0 } } : side === "CREDIT" ? { credit: { gt: 0 } } : {}),
     };
     const agg = await prisma.journalEntryLine.aggregate({
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       // تفصيل كل حركات حساب المصدر حسب نوع القيد + الطرف (بغضّ النظر عن الفلتر)
       // عشان المستخدم يشوف كل اللي على الحساب ويحدّد اللي يرجّعه بدقّة.
       const allLines = await prisma.journalEntryLine.findMany({
-        where: { accountId: sourceAccountId, journalEntry: { companyId } },
+        where: { accountId: sourceAccountId, journalEntry: { companyId, isDeleted: false } },
         select: { debit: true, credit: true, journalEntry: { select: { type: true } } },
       });
       const map = new Map<string, { type: string; side: "DEBIT" | "CREDIT"; lines: number; amount: number }>();
