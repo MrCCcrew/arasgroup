@@ -79,6 +79,23 @@ export async function POST(request: NextRequest) {
       if (parent) level = parent.level + 1;
     }
 
+    // لو كان فيه حساب بنفس الكود لكنه متوقف (محذوف soft-delete)، نعيد تفعيله
+    // ونحدّث بياناته بدل رفض الإنشاء — لأن الكود يظل محجوزاً رغم الحذف.
+    const existing = await prisma.chartOfAccount.findUnique({
+      where: { companyId_code: { companyId: parsed.data.companyId, code: parsed.data.code } },
+      select: { id: true, isActive: true },
+    });
+    if (existing) {
+      if (existing.isActive) {
+        return NextResponse.json({ success: false, error: "رمز الحساب موجود بالفعل" }, { status: 400 });
+      }
+      const reactivated = await prisma.chartOfAccount.update({
+        where: { id: existing.id },
+        data: { ...parsed.data, level, isActive: true },
+      });
+      return NextResponse.json({ success: true, data: reactivated, reactivated: true }, { status: 200 });
+    }
+
     const account = await prisma.chartOfAccount.create({
       data: { ...parsed.data, level },
     });
