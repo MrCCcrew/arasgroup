@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
@@ -8,8 +9,13 @@ interface Ctx {
 }
 
 const updateSchema = z.object({
+  code: z.string().min(1).optional(),
   nameAr: z.string().min(2).optional(),
   nameEn: z.string().optional(),
+  type: z.enum(["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"]).optional(),
+  parentId: z.string().nullable().optional(),
+  isHeader: z.boolean().optional(),
+  normalBalance: z.enum(["DEBIT", "CREDIT"]).optional(),
   notes: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -19,6 +25,30 @@ async function getAccountForAccess(accountId: string) {
     where: { id: accountId },
     select: { id: true, companyId: true },
   });
+}
+
+// يعيد حساب المستوى (level) للحساب وكل فروعه بعد تغيير الأب
+async function recomputeLevels(tx: Prisma.TransactionClient, accountId: string, level: number) {
+  await tx.chartOfAccount.update({ where: { id: accountId }, data: { level } });
+  const children = await tx.chartOfAccount.findMany({ where: { parentId: accountId }, select: { id: true } });
+  for (const child of children) {
+    await recomputeLevels(tx, child.id, level + 1);
+  }
+}
+
+// يجمع كل معرّفات الفروع (لمنع جعل الأب فرعًا من فروعه = حلقة)
+async function collectDescendantIds(accountId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const queue = [accountId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const children = await prisma.chartOfAccount.findMany({ where: { parentId: current }, select: { id: true } });
+    for (const child of children) {
+      ids.add(child.id);
+      queue.push(child.id);
+    }
+  }
+  return ids;
 }
 
 export async function GET(request: NextRequest, { params }: Ctx) {
@@ -63,12 +93,60 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const updatedAccount = await prisma.chartOfAccount.update({
+    const current = await prisma.chartOfAccount.findUnique({
       where: { id: accountId },
-      data: parsed.data,
+      select: { level: true, parentId: true },
     });
+    if (!current) {
+      return NextResponse.json({ success: false, error: "الحساب غير موجود" }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true, data: updatedAccount });
+    const { parentId, ...rest } = parsed.data;
+    const parentChanged = parentId !== undefined && parentId !== current.parentId;
+
+    // تحقق من الأب الجديد: لا يكون نفس الحساب ولا أحد فروعه (منع الحلقات)
+    let newLevel = current.level;
+    if (parentChanged) {
+      if (parentId) {
+        if (parentId === accountId) {
+          return NextResponse.json({ success: false, error: "لا يمكن جعل الحساب أبًا لنفسه" }, { status: 400 });
+        }
+        const descendants = await collectDescendantIds(accountId);
+        if (descendants.has(parentId)) {
+          return NextResponse.json({ success: false, error: "لا يمكن نقل الحساب تحت أحد فروعه" }, { status: 400 });
+        }
+        const parent = await prisma.chartOfAccount.findFirst({
+          where: { id: parentId, companyId: account.companyId },
+          select: { level: true },
+        });
+        if (!parent) {
+          return NextResponse.json({ success: false, error: "الحساب الأب غير موجود" }, { status: 400 });
+        }
+        newLevel = parent.level + 1;
+      } else {
+        newLevel = 1;
+      }
+    }
+
+    try {
+      const updatedAccount = await prisma.$transaction(async (tx) => {
+        const updated = await tx.chartOfAccount.update({
+          where: { id: accountId },
+          data: { ...rest, ...(parentChanged ? { parentId: parentId ?? null } : {}) },
+        });
+        if (parentChanged) {
+          await recomputeLevels(tx, accountId, newLevel);
+        }
+        return updated;
+      });
+
+      return NextResponse.json({ success: true, data: updatedAccount });
+    } catch (txError: unknown) {
+      if (typeof txError === "object" && txError && "code" in txError && (txError as { code?: string }).code === "P2002") {
+        return NextResponse.json({ success: false, error: "رمز الحساب موجود بالفعل" }, { status: 400 });
+      }
+      throw txError;
+    }
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, error: "فشل في التحديث" }, { status: 500 });

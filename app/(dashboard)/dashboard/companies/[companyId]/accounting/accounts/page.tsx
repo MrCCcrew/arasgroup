@@ -82,8 +82,6 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editNameAr, setEditNameAr] = useState("");
-  const [editNotes, setEditNotes] = useState("");
   const [form, setForm] = useState({ ...BLANK_FORM });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -106,36 +104,72 @@ export default function AccountsPage() {
     return accumulator;
   }, {});
 
-  async function handleAdd(event: React.FormEvent) {
+  function openAdd() {
+    setEditId(null);
+    setForm({ ...BLANK_FORM });
+    setError("");
+    setShowAdd(true);
+  }
+
+  function openEdit(account: Account) {
+    setEditId(account.id);
+    setForm({
+      code: account.code,
+      nameAr: account.nameAr,
+      nameEn: account.nameEn ?? "",
+      type: account.type,
+      parentId: account.parentId ?? "",
+      isHeader: account.isHeader,
+      normalBalance: account.normalBalance,
+      notes: account.notes ?? "",
+    });
+    setError("");
+    setShowAdd(true);
+  }
+
+  function closeForm() {
+    setShowAdd(false);
+    setEditId(null);
+    setError("");
+    setForm({ ...BLANK_FORM });
+  }
+
+  async function handleSave(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setSaving(true);
     try {
-      const response = await fetch("/api/accounting/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, companyId, isHeader: form.isHeader }),
-      });
+      const isEdit = Boolean(editId);
+      const response = await fetch(
+        isEdit ? `/api/accounting/accounts/${editId}` : "/api/accounting/accounts",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            isEdit
+              ? {
+                  code: form.code,
+                  nameAr: form.nameAr,
+                  nameEn: form.nameEn || undefined,
+                  type: form.type,
+                  parentId: form.parentId || null,
+                  isHeader: form.isHeader,
+                  normalBalance: form.normalBalance,
+                  notes: form.notes || undefined,
+                }
+              : { ...form, companyId, isHeader: form.isHeader },
+          ),
+        },
+      );
       const payload = await response.json();
       if (!payload.success) throw new Error(payload.error);
-      setShowAdd(false);
-      setForm({ ...BLANK_FORM });
+      closeForm();
       await load();
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : locale === "en" ? "Failed to save" : "فشل في الحفظ");
     } finally {
       setSaving(false);
     }
-  }
-
-  async function handleEdit(id: string) {
-    await fetch(`/api/accounting/accounts/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nameAr: editNameAr, notes: editNotes }),
-    });
-    setEditId(null);
-    await load();
   }
 
   async function handleDelete(account: Account) {
@@ -162,10 +196,7 @@ export default function AccountsPage() {
           <div className="flex gap-2">
             <PrintButton />
             <button
-              onClick={() => {
-                setShowAdd(true);
-                setError("");
-              }}
+              onClick={openAdd}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
             >
               <Plus size={16} />
@@ -236,9 +267,13 @@ export default function AccountsPage() {
 
         {showAdd && (
           <div className="section-card space-y-4">
-            <h3 className="text-sm font-bold">{locale === "en" ? "Add new account" : "إضافة حساب جديد"}</h3>
+            <h3 className="text-sm font-bold">
+              {editId
+                ? locale === "en" ? "Edit account" : "تعديل الحساب"
+                : locale === "en" ? "Add new account" : "إضافة حساب جديد"}
+            </h3>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <form onSubmit={handleAdd}>
+            <form onSubmit={handleSave}>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div>
                   <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Account code *" : "كود الحساب *"}</label>
@@ -263,7 +298,7 @@ export default function AccountsPage() {
                   <select value={form.parentId} onChange={(event) => setForm((previous) => ({ ...previous, parentId: event.target.value }))} className="input-field w-full text-sm">
                     <option value="">{locale === "en" ? "None" : "بدون"}</option>
                     {accounts
-                      .filter((account) => account.isHeader && account.type === form.type)
+                      .filter((account) => account.isHeader && account.type === form.type && account.id !== editId)
                       .map((account) => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {locale === "en" ? account.nameEn ?? account.nameAr : account.nameAr}
@@ -278,7 +313,15 @@ export default function AccountsPage() {
                     <option value="CREDIT">{locale === "en" ? "Credit" : "دائن"}</option>
                   </select>
                 </div>
-                <div className="flex items-end gap-2 md:col-span-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium">{locale === "en" ? "English name" : "اسم الحساب بالإنجليزي"}</label>
+                  <input type="text" value={form.nameEn} onChange={(event) => setForm((previous) => ({ ...previous, nameEn: event.target.value }))} className="input-field w-full text-sm" dir="ltr" />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Notes" : "ملاحظات"}</label>
+                  <input type="text" value={form.notes} onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))} className="input-field w-full text-sm" />
+                </div>
+                <div className="flex items-end gap-2 md:col-span-4">
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
                     <input type="checkbox" checked={form.isHeader} onChange={(event) => setForm((previous) => ({ ...previous, isHeader: event.target.checked }))} className="h-4 w-4 accent-primary" />
                     {locale === "en" ? "Header account (no direct entries)" : "حساب رئيسي لا يقبل قيوداً مباشرة"}
@@ -288,15 +331,11 @@ export default function AccountsPage() {
               <div className="mt-3 flex gap-2">
                 <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                   <Check size={15} />
-                  {saving ? (locale === "en" ? "Saving..." : "جاري الحفظ...") : locale === "en" ? "Add" : "إضافة"}
+                  {saving ? (locale === "en" ? "Saving..." : "جاري الحفظ...") : editId ? (locale === "en" ? "Save" : "حفظ") : locale === "en" ? "Add" : "إضافة"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAdd(false);
-                    setError("");
-                    setForm({ ...BLANK_FORM });
-                  }}
+                  onClick={closeForm}
                   className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
                 >
                   {locale === "en" ? "Cancel" : "إلغاء"}
@@ -332,19 +371,7 @@ export default function AccountsPage() {
                     <tr key={account.id} className={`transition-colors hover:bg-muted/20 ${account.isHeader ? "bg-muted/10 font-semibold" : ""}`}>
                       <td className="font-mono text-xs">{account.code}</td>
                       <td style={{ paddingRight: `${(account.level - 1) * 16 + 16}px` }}>
-                        {editId === account.id ? (
-                          <div className="flex items-center gap-2">
-                            <input autoFocus value={editNameAr} onChange={(event) => setEditNameAr(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") handleEdit(account.id); if (event.key === "Escape") setEditId(null); }} className="input-field flex-1 py-1 text-sm" />
-                            <button onClick={() => handleEdit(account.id)} className="rounded bg-primary p-1.5 text-primary-foreground">
-                              <Check size={13} />
-                            </button>
-                            <button onClick={() => setEditId(null)} className="rounded border p-1.5 hover:bg-muted">
-                              <X size={13} />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-sm">{locale === "en" ? account.nameEn ?? account.nameAr : account.nameAr}</span>
-                        )}
+                        <span className="text-sm">{locale === "en" ? account.nameEn ?? account.nameAr : account.nameAr}</span>
                       </td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs ${TYPE_COLORS[account.type]}`}>
@@ -365,11 +392,7 @@ export default function AccountsPage() {
                       <td>
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => {
-                              setEditId(account.id);
-                              setEditNameAr(account.nameAr);
-                              setEditNotes(account.notes ?? "");
-                            }}
+                            onClick={() => openEdit(account)}
                             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                             title={locale === "en" ? "Edit" : "تعديل"}
                           >
