@@ -79,9 +79,14 @@ export async function createDriverWalletDepositJE(params: {
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
-  // عند الإيداع البنكي مع اختيار حساب بنكي محدّد، نرحّل على حسابه في دليل الحسابات
-  // (حتى يظهر الإيداع في دفتر أستاذ ذلك البنك)، وإلا نرجع للكود الافتراضي 1010/1000.
-  const walletReceivableId = await getAccountId(params.companyId, "1030");
+  // الطرف الدائن للإيداع: لو الشركة عاملة حساب "أمانات لشركة طلبات" (كود 2031، التزامات)
+  // نرحّل الإيداع عليه مباشرةً — لأن الكاش المودَع يبقى أمانة عندنا لطلبات. وإلا نرجع
+  // للسلوك القديم (ذمم محافظ السائقين 1030). هذا يجعل التغيير اختيارياً لكل شركة.
+  const custodyAccount = await prisma.chartOfAccount.findFirst({
+    where: { companyId: params.companyId, code: "2031", type: "LIABILITY", isActive: true },
+    select: { id: true },
+  });
+  const walletReceivableId = custodyAccount?.id ?? (await getAccountId(params.companyId, "1030"));
   let cashBankId: string;
   if (params.isBankDeposit && params.bankAccountId) {
     const bank = await prisma.bankAccount.findFirst({
