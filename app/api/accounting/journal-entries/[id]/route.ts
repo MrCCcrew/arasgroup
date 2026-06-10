@@ -10,6 +10,7 @@ import {
   revertJournalEntryToDraft,
   submitJournalEntryForApproval,
 } from "@/lib/accounting/journal-engine";
+import { recomputeDriverWalletStates } from "@/lib/delivery/wallet-state";
 
 async function getEntryForAccess(id: string) {
   return prisma.journalEntry.findFirst({
@@ -129,6 +130,44 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const permissionError = assertPermission(session, "ACCOUNTING", "DELETE", { companyId: entry.companyId });
     if (permissionError) return permissionError;
+
+    // حذف نهائي (للمدير الأعلى فقط): يحذف القيد مهما كانت حالته (حتى المُرحّل/المعكوس)
+    // ويمسح حركة المحفظة المرتبطة ويعيد حساب رصيد السائق. لتنظيف البيانات التجريبية.
+    const force = new URL(request.url).searchParams.get("force") === "true";
+    if (force) {
+      if (!session.isSuperAdmin) {
+        return NextResponse.json({ success: false, error: "الحذف النهائي للمدير الأعلى فقط" }, { status: 403 });
+      }
+      await prisma.$transaction(async (tx) => {
+        const walletTxs = await tx.driverWalletTransaction.findMany({
+          where: { journalEntryId: id },
+          select: { id: true, driverId: true },
+        });
+        const driverIds = new Set<string>();
+        for (const w of walletTxs) {
+          await tx.driverWalletTransaction.delete({ where: { id: w.id } });
+          driverIds.add(w.driverId);
+        }
+        await tx.journalEntry.update({
+          where: { id },
+          data: { isDeleted: true, deletedAt: new Date() },
+        });
+        if (driverIds.size > 0) {
+          await recomputeDriverWalletStates(tx, driverIds);
+        }
+        await tx.auditLog.create({
+          data: {
+            userId: session.id,
+            action: "FORCE_DELETE",
+            module: "accounting",
+            resourceId: id,
+            resourceType: "JournalEntry",
+            journalEntryId: id,
+          },
+        });
+      });
+      return NextResponse.json({ success: true });
+    }
 
     await deleteJournalEntry(id, session.id);
     return NextResponse.json({ success: true });

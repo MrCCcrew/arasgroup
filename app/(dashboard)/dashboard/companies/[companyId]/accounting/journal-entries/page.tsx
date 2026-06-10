@@ -238,6 +238,15 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
                               warningMessage="سيتم عكس القيد وحذفه من السجلات المحاسبية نهائياً"
                             />
                           )}
+                          {session?.isSuperAdmin && (
+                            <DeleteConfirmButton
+                              apiUrl={`/api/accounting/journal-entries/${entry.id}?force=true`}
+                              size="md"
+                              label={locale === "en" ? "Permanent delete" : "حذف نهائي"}
+                              confirmMessage={`حذف نهائي للقيد رقم ${entry.number}؟`}
+                              warningMessage="حذف نهائي يزيل القيد من كل التقارير والأرصدة + يمسح حركة المحفظة المرتبطة. للبيانات التجريبية فقط. للأزواج المعكوسة (إيداع + عكس القيد) احذف الاثنين معاً للحفاظ على الرصيد."
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>
