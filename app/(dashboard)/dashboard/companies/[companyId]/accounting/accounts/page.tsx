@@ -42,6 +42,26 @@ const TYPE_COLORS: Record<string, string> = {
   EXPENSE: "bg-orange-50 text-orange-700",
 };
 
+const JE_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
+  GENERAL: { ar: "قيد عام", en: "General" },
+  RECEIPT: { ar: "سند قبض", en: "Receipt" },
+  PAYMENT: { ar: "سند صرف", en: "Payment" },
+  TRANSFER: { ar: "تحويل", en: "Transfer" },
+  SALARY: { ar: "رواتب", en: "Salary" },
+  OPENING_BALANCE: { ar: "رصيد افتتاحي", en: "Opening balance" },
+  DEPRECIATION: { ar: "إهلاك", en: "Depreciation" },
+  ADJUSTMENT: { ar: "تسوية", en: "Adjustment" },
+  DELIVERY_INCOME: { ar: "تحصيل/تقرير توصيل شهري", en: "Delivery income" },
+  DELIVERY_WALLET: { ar: "محفظة سائق (إيداع)", en: "Driver wallet" },
+  CAR_WASH_REVENUE: { ar: "إيراد غسيل", en: "Car wash revenue" },
+  KNET_SETTLEMENT: { ar: "تسوية كي نت", en: "KNET settlement" },
+  INVESTOR_COLLECTION: { ar: "تحصيل مستثمر", en: "Investor collection" },
+  INVESTOR_SALARY_COLLECTION: { ar: "تحصيل راتب مستثمر", en: "Investor salary collection" },
+  INVESTOR_SALARY_DISBURSEMENT: { ar: "صرف راتب مستثمر", en: "Investor salary disbursement" },
+  EXPENSE: { ar: "مصروف", en: "Expense" },
+  REVERSAL: { ar: "عكس قيد", en: "Reversal" },
+};
+
 interface Account {
   id: string;
   code: string;
@@ -89,9 +109,13 @@ export default function AccountsPage() {
   const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
 
   // نقل/إعادة تصنيف حركات حساب
+  type Breakdown = { type: string; side: "DEBIT" | "CREDIT"; lines: number; amount: number };
   const [reclassSource, setReclassSource] = useState<Account | null>(null);
   const [reclassDestId, setReclassDestId] = useState("");
+  const [reclassType, setReclassType] = useState("");
+  const [reclassSide, setReclassSide] = useState("");
   const [reclassPreview, setReclassPreview] = useState<{ lines: number; totalDebit: number; totalCredit: number } | null>(null);
+  const [reclassBreakdown, setReclassBreakdown] = useState<Breakdown[] | null>(null);
   const [reclassBusy, setReclassBusy] = useState(false);
   const [reclassError, setReclassError] = useState("");
   const [reclassDone, setReclassDone] = useState("");
@@ -99,7 +123,10 @@ export default function AccountsPage() {
   function openReclassify(account: Account) {
     setReclassSource(account);
     setReclassDestId("");
+    setReclassType("");
+    setReclassSide("");
     setReclassPreview(null);
+    setReclassBreakdown(null);
     setReclassError("");
     setReclassDone("");
   }
@@ -115,7 +142,14 @@ export default function AccountsPage() {
       const response = await fetch("/api/accounting/accounts/reclassify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, sourceAccountId: reclassSource.id, destinationAccountId: reclassDestId, apply }),
+        body: JSON.stringify({
+          companyId,
+          sourceAccountId: reclassSource.id,
+          destinationAccountId: reclassDestId,
+          journalType: reclassType || undefined,
+          side: reclassSide || undefined,
+          apply,
+        }),
       });
       const payload = await response.json();
       if (!payload.success) throw new Error(payload.error);
@@ -129,6 +163,7 @@ export default function AccountsPage() {
         await load();
       } else {
         setReclassPreview({ lines: payload.lines, totalDebit: payload.totalDebit, totalCredit: payload.totalCredit });
+        setReclassBreakdown(payload.breakdown ?? null);
       }
     } catch (reclassErr) {
       setReclassError(reclassErr instanceof Error ? reclassErr.message : locale === "en" ? "Failed" : "فشل في النقل");
@@ -494,32 +529,93 @@ export default function AccountsPage() {
               <span className="font-mono">{reclassSource.code}</span> — {locale === "en" ? reclassSource.nameEn ?? reclassSource.nameAr : reclassSource.nameAr}
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Destination account *" : "حساب الوجهة *"}</label>
-              <select
-                value={reclassDestId}
-                onChange={(e) => { setReclassDestId(e.target.value); setReclassPreview(null); setReclassDone(""); }}
-                className="input-field w-full text-sm"
-              >
-                <option value="">{locale === "en" ? "Select..." : "اختر..."}</option>
-                {accounts
-                  .filter((a) => a.id !== reclassSource.id && !a.isHeader)
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.code} - {locale === "en" ? a.nameEn ?? a.nameAr : a.nameAr}
-                    </option>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Destination account *" : "حساب الوجهة *"}</label>
+                <select
+                  value={reclassDestId}
+                  onChange={(e) => { setReclassDestId(e.target.value); setReclassPreview(null); setReclassDone(""); }}
+                  className="input-field w-full text-sm"
+                >
+                  <option value="">{locale === "en" ? "Select..." : "اختر..."}</option>
+                  {accounts
+                    .filter((a) => a.id !== reclassSource.id && !a.isHeader)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.code} - {locale === "en" ? a.nameEn ?? a.nameAr : a.nameAr}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Journal type (optional)" : "نوع القيد (اختياري)"}</label>
+                <select
+                  value={reclassType}
+                  onChange={(e) => { setReclassType(e.target.value); setReclassPreview(null); setReclassDone(""); }}
+                  className="input-field w-full text-sm"
+                >
+                  <option value="">{locale === "en" ? "All types" : "كل الأنواع"}</option>
+                  {(reclassBreakdown ? [...new Set(reclassBreakdown.map((b) => b.type))] : []).map((t) => (
+                    <option key={t} value={t}>{JE_TYPE_LABELS[t]?.[locale] ?? t}</option>
                   ))}
-              </select>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Side (optional)" : "الطرف (اختياري)"}</label>
+                <select
+                  value={reclassSide}
+                  onChange={(e) => { setReclassSide(e.target.value); setReclassPreview(null); setReclassDone(""); }}
+                  className="input-field w-full text-sm"
+                >
+                  <option value="">{locale === "en" ? "Both" : "الاتنين"}</option>
+                  <option value="DEBIT">{locale === "en" ? "Debit only" : "مدين فقط"}</option>
+                  <option value="CREDIT">{locale === "en" ? "Credit only" : "دائن فقط"}</option>
+                </select>
+              </div>
             </div>
 
             {reclassError && <p className="text-sm text-red-600">{reclassError}</p>}
             {reclassDone && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{reclassDone}</p>}
 
+            {reclassBreakdown && reclassBreakdown.length > 0 && (
+              <div className="rounded-lg border">
+                <p className="border-b bg-muted/40 px-3 py-1.5 text-xs font-medium">
+                  {locale === "en" ? "All movements on this account (by type / side)" : "كل حركات الحساب (حسب النوع / الطرف)"}
+                </p>
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="p-2 text-start">{locale === "en" ? "Type" : "النوع"}</th>
+                        <th className="p-2 text-center">{locale === "en" ? "Side" : "الطرف"}</th>
+                        <th className="p-2 text-center">{locale === "en" ? "Lines" : "حركات"}</th>
+                        <th className="p-2 text-end">{locale === "en" ? "Amount" : "المبلغ"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reclassBreakdown.map((b) => (
+                        <tr key={`${b.type}|${b.side}`} className="border-t">
+                          <td className="p-2">{JE_TYPE_LABELS[b.type]?.[locale] ?? b.type}</td>
+                          <td className="p-2 text-center">
+                            <span className={`rounded-full px-2 py-0.5 ${b.side === "DEBIT" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>
+                              {b.side === "DEBIT" ? (locale === "en" ? "Debit" : "مدين") : locale === "en" ? "Credit" : "دائن"}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">{b.lines}</td>
+                          <td className="p-2 text-end font-medium">{b.amount.toLocaleString(locale === "en" ? "en-US" : "ar-KW", { minimumFractionDigits: 3 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {reclassPreview && (
-              <div className="grid grid-cols-3 gap-2 rounded-lg border p-3 text-center text-sm">
+              <div className="grid grid-cols-3 gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3 text-center text-sm">
                 <div>
                   <p className="text-lg font-bold">{reclassPreview.lines}</p>
-                  <p className="text-xs text-muted-foreground">{locale === "en" ? "Lines" : "حركات"}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "en" ? "To move" : "هيتنقل"}</p>
                 </div>
                 <div>
                   <p className="text-lg font-bold">{reclassPreview.totalDebit.toLocaleString(locale === "en" ? "en-US" : "ar-KW", { minimumFractionDigits: 3 })}</p>

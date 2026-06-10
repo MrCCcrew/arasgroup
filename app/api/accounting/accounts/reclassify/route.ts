@@ -7,6 +7,8 @@ const schema = z.object({
   companyId: z.string().min(1),
   sourceAccountId: z.string().min(1),
   destinationAccountId: z.string().min(1),
+  journalType: z.string().optional(),
+  side: z.enum(["DEBIT", "CREDIT"]).optional(),
   apply: z.boolean().default(false),
 });
 
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
-    const { companyId, sourceAccountId, destinationAccountId, apply } = parsed.data;
+    const { companyId, sourceAccountId, destinationAccountId, journalType, side, apply } = parsed.data;
 
     const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
@@ -50,7 +52,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "لا يمكن النقل إلى حساب رئيسي — اختر حساباً فرعياً يقبل القيود" }, { status: 400 });
     }
 
-    const where = { accountId: sourceAccountId, journalEntry: { companyId } };
+    // الفلتر المطبَّق (نوع القيد + الطرف مدين/دائن) — يحدّد ما سيُنقل فعلاً
+    const where = {
+      accountId: sourceAccountId,
+      journalEntry: { companyId, ...(journalType ? { type: journalType as never } : {}) },
+      ...(side === "DEBIT" ? { debit: { gt: 0 } } : side === "CREDIT" ? { credit: { gt: 0 } } : {}),
+    };
     const agg = await prisma.journalEntryLine.aggregate({
       where,
       _count: true,
@@ -66,7 +73,25 @@ export async function POST(request: NextRequest) {
     };
 
     if (!apply) {
-      return NextResponse.json({ success: true, preview: true, ...summary });
+      // تفصيل كل حركات حساب المصدر حسب نوع القيد + الطرف (بغضّ النظر عن الفلتر)
+      // عشان المستخدم يشوف كل اللي على الحساب ويحدّد اللي يرجّعه بدقّة.
+      const allLines = await prisma.journalEntryLine.findMany({
+        where: { accountId: sourceAccountId, journalEntry: { companyId } },
+        select: { debit: true, credit: true, journalEntry: { select: { type: true } } },
+      });
+      const map = new Map<string, { type: string; side: "DEBIT" | "CREDIT"; lines: number; amount: number }>();
+      for (const line of allLines) {
+        const isDebit = Number(line.debit) > 0;
+        const lineSide: "DEBIT" | "CREDIT" = isDebit ? "DEBIT" : "CREDIT";
+        const type = line.journalEntry.type ?? "GENERAL";
+        const key = `${type}|${lineSide}`;
+        const entry = map.get(key) ?? { type, side: lineSide, lines: 0, amount: 0 };
+        entry.lines += 1;
+        entry.amount += isDebit ? Number(line.debit) : Number(line.credit);
+        map.set(key, entry);
+      }
+      const breakdown = [...map.values()].sort((a, b) => (a.type === b.type ? a.side.localeCompare(b.side) : a.type.localeCompare(b.type)));
+      return NextResponse.json({ success: true, preview: true, ...summary, breakdown });
     }
 
     if (agg._count === 0) {
@@ -88,7 +113,7 @@ export async function POST(request: NextRequest) {
           module: "accounting",
           resourceId: sourceAccountId,
           resourceType: "ChartOfAccount",
-          oldValues: { accountId: sourceAccountId, code: source.code },
+          oldValues: { accountId: sourceAccountId, code: source.code, journalType: journalType ?? null, side: side ?? null },
           newValues: { accountId: destinationAccountId, code: destination.code, movedLines: moved },
           ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
           userAgent: request.headers.get("user-agent") ?? "",
