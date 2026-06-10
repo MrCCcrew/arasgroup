@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { getLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
 import { JournalEntryActions } from "./journal-entry-actions";
+import { MoveLineButton } from "./move-line-button";
 
 interface Props {
   params: Promise<{ companyId: string; id: string }>;
@@ -230,6 +231,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                   <th>{t.statement}</th>
                   <th>{t.debit}</th>
                   <th>{t.credit}</th>
+                  {canUpdate && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -245,6 +247,11 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                     <td className={`number font-bold ${Number(line.credit) > 0 ? "text-green-600" : "text-muted-foreground/40"}`}>
                       {Number(line.credit) > 0 ? Number(line.credit).toFixed(3) : "—"}
                     </td>
+                    {canUpdate && (
+                      <td className="text-center">
+                        <MoveLineButton entryId={entry.id} lineId={line.id} companyId={companyId} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -253,6 +260,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                   <td colSpan={4} className="px-4 py-2 text-center">{t.total}</td>
                   <td className="number px-4 py-2 text-blue-600">{totalDebit.toFixed(3)}</td>
                   <td className="number px-4 py-2 text-green-600">{totalCredit.toFixed(3)}</td>
+                  {canUpdate && <td></td>}
                 </tr>
               </tfoot>
             </table>
