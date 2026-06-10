@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Check,
   ExternalLink,
   Pencil,
@@ -86,6 +87,55 @@ export default function AccountsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
+
+  // نقل/إعادة تصنيف حركات حساب
+  const [reclassSource, setReclassSource] = useState<Account | null>(null);
+  const [reclassDestId, setReclassDestId] = useState("");
+  const [reclassPreview, setReclassPreview] = useState<{ lines: number; totalDebit: number; totalCredit: number } | null>(null);
+  const [reclassBusy, setReclassBusy] = useState(false);
+  const [reclassError, setReclassError] = useState("");
+  const [reclassDone, setReclassDone] = useState("");
+
+  function openReclassify(account: Account) {
+    setReclassSource(account);
+    setReclassDestId("");
+    setReclassPreview(null);
+    setReclassError("");
+    setReclassDone("");
+  }
+
+  async function runReclassify(apply: boolean) {
+    if (!reclassSource || !reclassDestId) {
+      setReclassError(locale === "en" ? "Select a destination account" : "اختر حساب الوجهة");
+      return;
+    }
+    setReclassBusy(true);
+    setReclassError("");
+    try {
+      const response = await fetch("/api/accounting/accounts/reclassify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, sourceAccountId: reclassSource.id, destinationAccountId: reclassDestId, apply }),
+      });
+      const payload = await response.json();
+      if (!payload.success) throw new Error(payload.error);
+      if (apply) {
+        setReclassDone(
+          locale === "en"
+            ? `Moved ${payload.moved} line(s) successfully.`
+            : `تم نقل ${payload.moved} حركة بنجاح.`,
+        );
+        setReclassPreview(null);
+        await load();
+      } else {
+        setReclassPreview({ lines: payload.lines, totalDebit: payload.totalDebit, totalCredit: payload.totalCredit });
+      }
+    } catch (reclassErr) {
+      setReclassError(reclassErr instanceof Error ? reclassErr.message : locale === "en" ? "Failed" : "فشل في النقل");
+    } finally {
+      setReclassBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -392,6 +442,13 @@ export default function AccountsPage() {
                       <td>
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            onClick={() => openReclassify(account)}
+                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title={locale === "en" ? "Move movements to another account" : "نقل الحركات لحساب آخر"}
+                          >
+                            <ArrowLeftRight size={13} />
+                          </button>
+                          <button
                             onClick={() => openEdit(account)}
                             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                             title={locale === "en" ? "Edit" : "تعديل"}
@@ -415,6 +472,89 @@ export default function AccountsPage() {
           </div>
         </div>
       </div>
+
+      {reclassSource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setReclassSource(null)}>
+          <div className="w-full max-w-lg space-y-4 rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold">{locale === "en" ? "Move account movements" : "نقل حركات الحساب"}</h3>
+              <button onClick={() => setReclassSource(null)} className="rounded p-1 hover:bg-muted">
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {locale === "en"
+                ? "Moves all journal lines from the source account to the destination account (amounts unchanged). Preview first."
+                : "بينقل كل أسطر القيود من الحساب المصدر إلى حساب الوجهة (المبالغ ما بتتغيّرش). راجع المعاينة الأول."}
+            </p>
+
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <span className="text-muted-foreground">{locale === "en" ? "Source: " : "من: "}</span>
+              <span className="font-mono">{reclassSource.code}</span> — {locale === "en" ? reclassSource.nameEn ?? reclassSource.nameAr : reclassSource.nameAr}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Destination account *" : "حساب الوجهة *"}</label>
+              <select
+                value={reclassDestId}
+                onChange={(e) => { setReclassDestId(e.target.value); setReclassPreview(null); setReclassDone(""); }}
+                className="input-field w-full text-sm"
+              >
+                <option value="">{locale === "en" ? "Select..." : "اختر..."}</option>
+                {accounts
+                  .filter((a) => a.id !== reclassSource.id && !a.isHeader)
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.code} - {locale === "en" ? a.nameEn ?? a.nameAr : a.nameAr}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {reclassError && <p className="text-sm text-red-600">{reclassError}</p>}
+            {reclassDone && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{reclassDone}</p>}
+
+            {reclassPreview && (
+              <div className="grid grid-cols-3 gap-2 rounded-lg border p-3 text-center text-sm">
+                <div>
+                  <p className="text-lg font-bold">{reclassPreview.lines}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "en" ? "Lines" : "حركات"}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold">{reclassPreview.totalDebit.toLocaleString(locale === "en" ? "en-US" : "ar-KW", { minimumFractionDigits: 3 })}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "en" ? "Total debit" : "إجمالي مدين"}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold">{reclassPreview.totalCredit.toLocaleString(locale === "en" ? "en-US" : "ar-KW", { minimumFractionDigits: 3 })}</p>
+                  <p className="text-xs text-muted-foreground">{locale === "en" ? "Total credit" : "إجمالي دائن"}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => runReclassify(false)}
+                disabled={reclassBusy || !reclassDestId}
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
+              >
+                {reclassBusy ? (locale === "en" ? "..." : "...") : locale === "en" ? "Preview" : "معاينة"}
+              </button>
+              <button
+                onClick={() => runReclassify(true)}
+                disabled={reclassBusy || !reclassPreview || reclassPreview.lines === 0}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Check size={15} />
+                {locale === "en" ? "Confirm move" : "تأكيد النقل"}
+              </button>
+              <button onClick={() => setReclassSource(null)} className="ms-auto rounded-lg border px-4 py-2 text-sm hover:bg-muted">
+                {locale === "en" ? "Close" : "إغلاق"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
