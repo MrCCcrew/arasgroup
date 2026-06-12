@@ -1,6 +1,6 @@
 import type { JournalEntry } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { createJournalEntry, getCurrentFiscalYear } from "./journal-engine";
+import { createJournalEntry, getCurrentFiscalYear, postJournalEntry } from "./journal-engine";
 
 async function getAccountId(companyId: string, code: string): Promise<string> {
   const account = await prisma.chartOfAccount.findUnique({
@@ -14,6 +14,13 @@ async function getAccountId(companyId: string, code: string): Promise<string> {
 
 async function createAutomaticEntry(args: Parameters<typeof createJournalEntry>[0]): Promise<JournalEntry> {
   return createJournalEntry(args);
+}
+
+// ينشئ القيد ويرحّله فورًا (POSTED) — للقيود التلقائية اللي لازم تظهر في الأرصدة
+// مباشرةً (التقارير بتقرأ POSTED فقط). يُستخدم لتدفّق محافظ السائقين (إيداع/تحصيل).
+async function createAndPostAutomaticEntry(args: Parameters<typeof createJournalEntry>[0]): Promise<JournalEntry> {
+  const entry = await createJournalEntry(args);
+  return postJournalEntry(entry.id, args.createdById ?? "");
 }
 
 export async function createDeliveryPaymentJE(params: {
@@ -79,14 +86,9 @@ export async function createDriverWalletDepositJE(params: {
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
-  // الطرف الدائن للإيداع: لو الشركة عاملة حساب "أمانات لشركة طلبات" (كود 2031، التزامات)
-  // نرحّل الإيداع عليه مباشرةً — لأن الكاش المودَع يبقى أمانة عندنا لطلبات. وإلا نرجع
-  // للسلوك القديم (ذمم محافظ السائقين 1030). هذا يجعل التغيير اختيارياً لكل شركة.
-  const custodyAccount = await prisma.chartOfAccount.findFirst({
-    where: { companyId: params.companyId, code: "2031", type: "LIABILITY", isActive: true },
-    select: { id: true },
-  });
-  const walletReceivableId = custodyAccount?.id ?? (await getAccountId(params.companyId, "1030"));
+  // الإيداع يقفل ذمم محافظ السائقين (1030): الكاش وصل للبنك والسائق سدّد ما عليه.
+  // (الالتزام لطلبات يُسجَّل عند التحصيل عبر قيد التحصيل Dr 1030 / Cr 2031 — النموذج ب.)
+  const walletReceivableId = await getAccountId(params.companyId, "1030");
   let cashBankId: string;
   if (params.isBankDeposit && params.bankAccountId) {
     const bank = await prisma.bankAccount.findFirst({
@@ -98,7 +100,7 @@ export async function createDriverWalletDepositJE(params: {
     cashBankId = await getAccountId(params.companyId, params.isBankDeposit ? "1010" : "1000");
   }
 
-  return createAutomaticEntry({
+  return createAndPostAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
     date: new Date(),
@@ -110,6 +112,47 @@ export async function createDriverWalletDepositJE(params: {
     lines: [
       { accountId: cashBankId, debit: params.amount, credit: 0, driverId: params.driverId },
       { accountId: walletReceivableId, debit: 0, credit: params.amount, driverId: params.driverId },
+    ],
+    createdById: params.userId,
+  });
+}
+
+/**
+ * قيد التحصيل (COD) — النموذج (ب): عند تسجيل تحصيل للسائق، يُسجَّل التزام لشركة طلبات:
+ *   مدين  1030 ذمم محافظ السائقين (السائق ماسك فلوس لطلبات)
+ *     دائن  2031 أمانات لشركة طلبات (إحنا مديونين لطلبات)
+ * يُرحَّل فورًا. يتطلّب وجود حساب 2031 (التزامات). لو مش موجود، يرجّع null (لا يُسجَّل قيد).
+ */
+export async function createDriverWalletChargeJE(params: {
+  companyId: string;
+  userId: string;
+  driverId: string;
+  amount: number;
+  date: Date;
+  refId: string;
+  descriptionAr: string;
+}): Promise<JournalEntry | null> {
+  const custody = await prisma.chartOfAccount.findFirst({
+    where: { companyId: params.companyId, code: "2031", type: "LIABILITY", isActive: true },
+    select: { id: true },
+  });
+  if (!custody) return null;
+
+  const fiscalYearId = await getCurrentFiscalYear(params.companyId);
+  const walletReceivableId = await getAccountId(params.companyId, "1030");
+
+  return createAndPostAutomaticEntry({
+    companyId: params.companyId,
+    fiscalYearId,
+    date: params.date,
+    descriptionAr: params.descriptionAr,
+    type: "DELIVERY_WALLET",
+    refModule: "delivery_charge",
+    refId: params.refId,
+    isAutomatic: true,
+    lines: [
+      { accountId: walletReceivableId, debit: params.amount, credit: 0, driverId: params.driverId },
+      { accountId: custody.id, debit: 0, credit: params.amount, driverId: params.driverId },
     ],
     createdById: params.userId,
   });
