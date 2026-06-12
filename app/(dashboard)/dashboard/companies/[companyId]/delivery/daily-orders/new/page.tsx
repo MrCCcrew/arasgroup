@@ -457,14 +457,14 @@ export default function NewDailyOrdersPage() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Driver" : AR.driver}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
-                      <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
@@ -478,7 +478,7 @@ export default function NewDailyOrdersPage() {
                       return (
                         <tr key={line.driverId} className="hover:bg-muted/20">
                           <td className="py-2 pr-2 font-medium">{getDriverName(driver)}</td>
-                          <td className="py-1.5">
+                          <td className="px-2 py-1.5 text-center">
                             <select value={line.workStatus} onChange={(event) => updateLine(index, "workStatus", event.target.value)} className="input-field w-44 text-center">
                               {(Object.keys(WORK_STATUS_LABELS.ar) as WorkStatus[]).map((status) => (
                                 <option key={status} value={status}>
@@ -487,7 +487,7 @@ export default function NewDailyOrdersPage() {
                               ))}
                             </select>
                           </td>
-                          <td className="py-1.5">
+                          <td className="px-2 py-1.5 text-center">
                             <select value={line.operatedAsDriverId} onChange={(event) => updateLine(index, "operatedAsDriverId", event.target.value)} className="input-field w-44 text-center">
                               <option value="">{locale === "en" ? "Own name" : AR.ownName}</option>
                               {aliasDriverOptions.map((option) => (
@@ -503,12 +503,12 @@ export default function NewDailyOrdersPage() {
                               </div>
                             )}
                           </td>
-                          <td className="py-1.5"><input type="number" min="0" value={line.ordersCount} onChange={(event) => updateLine(index, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
-                          <td className="py-1.5"><input type="number" min="0" step="0.001" value={line.ratePerOrder} onChange={(event) => updateLine(index, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                          <td className="py-1.5"><input type="number" min="0" step="0.001" value={line.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")} onChange={(event) => updateLine(index, "grossAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                          <td className="py-1.5"><input type="number" min="0" step="0.001" value={line.walletDeducted} onChange={(event) => updateLine(index, "walletDeducted", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                          <td className="py-1.5"><input type="number" min="1" max="5" step="0.1" value={line.rating} onChange={(event) => updateLine(index, "rating", event.target.value)} className="input-field w-20 text-center" dir="ltr" /></td>
-                          <td className="py-1.5"><input type="number" min="0" step="0.001" value={line.walletAmount} onChange={(event) => updateLine(index, "walletAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="0" value={line.ordersCount} onChange={(event) => updateLine(index, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={line.ratePerOrder} onChange={(event) => updateLine(index, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={line.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")} onChange={(event) => updateLine(index, "grossAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={line.walletDeducted} onChange={(event) => updateLine(index, "walletDeducted", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="1" max="5" step="0.1" value={line.rating} onChange={(event) => updateLine(index, "rating", event.target.value)} className="input-field w-20 text-center" dir="ltr" /></td>
+                          <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={line.walletAmount} onChange={(event) => updateLine(index, "walletAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
                         </tr>
                       );
                     })}
@@ -538,14 +538,14 @@ export default function NewDailyOrdersPage() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="py-2 pr-2 text-right font-medium text-muted-foreground">{locale === "en" ? "Date" : AR.date}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
-                          <th className="py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Status" : AR.status}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Worked under" : AR.workedUnder}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Orders" : AR.orders}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.rating}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
@@ -556,7 +556,7 @@ export default function NewDailyOrdersPage() {
                           return (
                             <tr key={entry.date} className="hover:bg-muted/20">
                               <td className="py-2 pr-2 font-medium">{new Date(`${entry.date}T12:00:00`).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US")}</td>
-                              <td className="py-1.5">
+                              <td className="px-2 py-1.5 text-center">
                                 <select value={entry.workStatus} onChange={(event) => updateDailyEntry(entry.date, "workStatus", event.target.value)} className="input-field w-44 text-center">
                                   {(Object.keys(WORK_STATUS_LABELS.ar) as WorkStatus[]).map((status) => (
                                     <option key={status} value={status}>
@@ -565,7 +565,7 @@ export default function NewDailyOrdersPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="py-1.5">
+                              <td className="px-2 py-1.5 text-center">
                                 <select value={entry.operatedAsDriverId} onChange={(event) => updateDailyEntry(entry.date, "operatedAsDriverId", event.target.value)} className="input-field w-44 text-center">
                                   <option value="">{locale === "en" ? "Own name" : AR.ownName}</option>
                                   {aliasDriverOptions.map((option) => (
@@ -581,12 +581,12 @@ export default function NewDailyOrdersPage() {
                                   </div>
                                 )}
                               </td>
-                              <td className="py-1.5"><input type="number" min="0" value={entry.ordersCount} onChange={(event) => updateDailyEntry(entry.date, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
-                              <td className="py-1.5"><input type="number" min="0" step="0.001" value={entry.ratePerOrder} onChange={(event) => updateDailyEntry(entry.date, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                              <td className="py-1.5"><input type="number" min="0" step="0.001" value={entry.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")} onChange={(event) => updateDailyEntry(entry.date, "grossAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                              <td className="py-1.5"><input type="number" min="0" step="0.001" value={entry.walletDeducted} onChange={(event) => updateDailyEntry(entry.date, "walletDeducted", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
-                              <td className="py-1.5"><input type="number" min="1" max="5" step="0.1" value={entry.rating} onChange={(event) => updateDailyEntry(entry.date, "rating", event.target.value)} className="input-field w-20 text-center" dir="ltr" /></td>
-                              <td className="py-1.5"><input type="number" min="0" step="0.001" value={entry.walletAmount} onChange={(event) => updateDailyEntry(entry.date, "walletAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="0" value={entry.ordersCount} onChange={(event) => updateDailyEntry(entry.date, "ordersCount", event.target.value)} className="input-field w-24 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={entry.ratePerOrder} onChange={(event) => updateDailyEntry(entry.date, "ratePerOrder", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={entry.grossAmount || (autoGross > 0 ? autoGross.toFixed(3) : "")} onChange={(event) => updateDailyEntry(entry.date, "grossAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={entry.walletDeducted} onChange={(event) => updateDailyEntry(entry.date, "walletDeducted", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="1" max="5" step="0.1" value={entry.rating} onChange={(event) => updateDailyEntry(entry.date, "rating", event.target.value)} className="input-field w-20 text-center" dir="ltr" /></td>
+                              <td className="px-2 py-1.5 text-center"><input type="number" min="0" step="0.001" value={entry.walletAmount} onChange={(event) => updateDailyEntry(entry.date, "walletAmount", event.target.value)} className="input-field w-28 text-center" dir="ltr" /></td>
                             </tr>
                           );
                         })}
