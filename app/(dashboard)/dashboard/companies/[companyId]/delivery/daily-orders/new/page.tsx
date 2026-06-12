@@ -6,12 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { LocationOrderEntry } from "@/components/delivery/location-order-entry";
 
 interface Contract {
   id: string;
   nameAr: string;
   nameEn?: string;
   platform: string;
+  usesLocationPricing?: boolean;
 }
 
 interface Driver {
@@ -331,6 +333,7 @@ export default function NewDailyOrdersPage() {
   }
 
   const selectedContract = contracts.find((contract) => contract.id === contractId);
+  const isLocationPricing = !!selectedContract?.usesLocationPricing;
 
   return (
     <div>
@@ -373,6 +376,7 @@ export default function NewDailyOrdersPage() {
               </select>
             </div>
 
+            {!isLocationPricing && (
             <div>
               <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Date mode" : AR.dateMode}</label>
               <div className="flex gap-2">
@@ -396,8 +400,9 @@ export default function NewDailyOrdersPage() {
                 </button>
               </div>
             </div>
+            )}
 
-            {dateMode === "single" ? (
+            {(isLocationPricing || dateMode === "single") ? (
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Date" : AR.date}</label>
                 <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="input-field w-full" dir="ltr" />
@@ -440,7 +445,11 @@ export default function NewDailyOrdersPage() {
             )}
           </div>
 
-          {dateMode === "single" ? (
+          {isLocationPricing && (
+            <LocationOrderEntry companyId={companyId} contractId={contractId} date={date} drivers={aliasDriverOptions} />
+          )}
+
+          {!isLocationPricing && (dateMode === "single" ? (
             <div className="section-card">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
                 {locale === "en" ? "Driver orders" : AR.driverOrders}
@@ -596,8 +605,9 @@ export default function NewDailyOrdersPage() {
                 </div>
               )}
             </>
-          )}
+          ))}
 
+          {!isLocationPricing && (
           <div className="flex items-center gap-3">
             <button
               type="submit"
@@ -611,6 +621,7 @@ export default function NewDailyOrdersPage() {
               {locale === "en" ? "Cancel" : AR.cancel}
             </Link>
           </div>
+          )}
         </form>
       </div>
     </div>
