@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Printer } from "lucide-react";
+import { FileDown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -16,7 +16,7 @@ const AR = {
   title: "\u062a\u0642\u0631\u064a\u0631 \u0627\u0644\u062a\u0648\u0635\u064a\u0644\u0627\u062a \u0627\u0644\u0645\u0633\u062c\u0651\u0644\u0629",
   subtitle:
     "\u062a\u0648\u0635\u064a\u0644\u0627\u062a \u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0623\u0645\u0627\u0643\u0646 \u2014 \u0645\u0631\u062c\u0639 \u0644\u0644\u062a\u062d\u0627\u0633\u0628 \u0645\u0639 \u0627\u0644\u0639\u0642\u062f",
-  print: "\u0637\u0628\u0627\u0639\u0629",
+  pdf: "PDF",
   noContracts:
     "\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0642\u0648\u062f \u0645\u0641\u0639\u0651\u0644 \u0639\u0644\u064a\u0647\u0627 \u0646\u0638\u0627\u0645 \u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0623\u0645\u0627\u0643\u0646 \u0628\u0639\u062f.",
   contract: "\u0627\u0644\u0639\u0642\u062f",
@@ -130,10 +130,10 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
               href={`/dashboard/companies/${companyId}/delivery/deliveries-report/print?${qs({})}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
             >
-              <Printer size={16} />
-              {en ? "Print" : AR.print}
+              <FileDown size={16} />
+              {AR.pdf}
             </a>
           ) : null
         }
