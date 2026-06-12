@@ -147,6 +147,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/delivery/drivers`,            labelKey: "nav.deliveryDrivers",    icon: <Users size={14} />,          iconColor: "indigo" },
         { href: `${base}/delivery/daily-orders`,       labelKey: "nav.dailyOrders",        icon: <Receipt size={14} />,        iconColor: "indigo" },
         { href: `${base}/delivery/monthly-reports`,    labelKey: "nav.monthlyReports",     icon: <FileText size={14} />,       iconColor: "indigo" },
+        { href: `${base}/delivery/deliveries-report`,  labelKey: "nav.deliveriesReport",   icon: <FileText size={14} />,       iconColor: "emerald" },
         { href: `${base}/delivery/wallet`,             labelKey: "nav.driverWallets",      icon: <Wallet size={14} />,         iconColor: "indigo" },
         { href: `${base}/delivery/deposits`,           labelKey: "nav.driverDeposits",     icon: <Wallet size={14} />,         iconColor: "emerald" },
         { href: `${base}/delivery/payments`,           labelKey: "nav.companyPayments",    icon: <BarChart3 size={14} />,      iconColor: "indigo" },

@@ -102,12 +102,20 @@ export default function ContractPricingSettingsPage() {
         companyId={companyId}
       />
       <div className="page-container max-w-5xl space-y-4">
-        <Link
-          href={`/dashboard/companies/${companyId}/delivery/contracts`}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowRight size={16} /> {en ? "Back to contracts" : "العودة للعقود"}
-        </Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href={`/dashboard/companies/${companyId}/delivery/contracts`}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowRight size={16} /> {en ? "Back to contracts" : "العودة للعقود"}
+          </Link>
+          <Link
+            href={`/dashboard/companies/${companyId}/delivery/deliveries-report?contractId=${contractId}`}
+            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            {en ? "Recorded deliveries report" : "تقرير التوصيلات المسجّلة"}
+          </Link>
+        </div>
 
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
