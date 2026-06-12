@@ -110,6 +110,7 @@ export default function WalletPage() {
     reconNote: en
       ? "Remaining = Collected − Deposited − Settlements/Other. The total should equal GL account 1030 (Driver wallet receivables)."
       : "المتبقّي = المحصّل − المودَع − تسويات/أخرى. والإجمالي يجب أن يساوي رصيد حساب 1030 (ذمم محافظ السائقين).",
+    postCharges: en ? "Post collections to ledger (2031)" : "ترحيل التحصيلات للأستاذ (2031)",
     dedupe: en ? "Remove duplicate charges" : "إزالة الحركات المكرّرة",
     dedupeTitle: en ? "Remove duplicate collection charges" : "إزالة حركات التحصيل المكرّرة",
     dedupeIntro: en
@@ -147,6 +148,8 @@ export default function WalletPage() {
   const [dedupeMsg, setDedupeMsg] = useState("");
   const [dedupeBusy, setDedupeBusy] = useState(false);
   const [dedupeCount, setDedupeCount] = useState<number | null>(null);
+  const [postBusy, setPostBusy] = useState(false);
+  const [postMsg, setPostMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,6 +209,34 @@ export default function WalletPage() {
     setDedupeCount(0);
     setDedupeMsg(t.dedupeDone(data.removed));
     load();
+  }
+
+  async function postCharges() {
+    setPostBusy(true); setPostMsg("");
+    try {
+      const pre = await fetch("/api/delivery/wallet/post-charges", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, apply: false }),
+      });
+      const p = await pre.json();
+      if (!p.success) { setPostMsg(p.error ?? t.genericError); return; }
+      const ok = window.confirm(en
+        ? `Create ${p.created}, update ${p.updated}, remove ${p.removed} ledger entries for collections. Continue?`
+        : `إنشاء ${p.created} قيد، تحديث ${p.updated}، حذف ${p.removed} — لترحيل التحصيلات لأمانات طلبات (2031). متابعة؟`);
+      if (!ok) { setPostMsg(""); return; }
+      const res = await fetch("/api/delivery/wallet/post-charges", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, apply: true }),
+      });
+      const data = await res.json();
+      if (!data.success) { setPostMsg(data.error ?? t.genericError); return; }
+      setPostMsg(en
+        ? `Done: ${data.created} created, ${data.updated} updated, ${data.removed} removed.`
+        : `تم: ${data.created} إنشاء، ${data.updated} تحديث، ${data.removed} حذف.`);
+      load();
+    } finally {
+      setPostBusy(false);
+    }
   }
 
   useEffect(() => { load(); }, [load]);
@@ -337,6 +368,13 @@ export default function WalletPage() {
               <h2 className="text-base font-bold">{t.reconciliation}</h2>
               <div className="flex flex-wrap gap-2">
                 <button
+                  onClick={postCharges}
+                  disabled={postBusy}
+                  className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                >
+                  {t.postCharges}
+                </button>
+                <button
                   onClick={previewDedupe}
                   className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50"
                 >
@@ -351,6 +389,7 @@ export default function WalletPage() {
               </div>
             </div>
             <p className="mb-3 rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">{t.reconNote}</p>
+            {postMsg && <p className="mb-3 rounded-lg bg-emerald-50 p-2 text-xs text-emerald-700">{postMsg}</p>}
             <div className="overflow-x-auto">
               <table className="ar-table text-sm">
                 <thead>
