@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { X, FileText } from "lucide-react";
@@ -15,6 +16,7 @@ interface Contract {
   endDate: string | null;
   notes: string | null;
   isActive: boolean;
+  usesLocationPricing?: boolean;
 }
 
 const KNOWN_PLATFORMS: Record<string, { ar: string; en: string; color: string }> = {
@@ -44,6 +46,7 @@ const EMPTY = {
   startDate: now.toISOString().slice(0, 10),
   endDate: "",
   notes: "",
+  usesLocationPricing: false,
 };
 
 type Form = typeof EMPTY;
@@ -159,6 +162,7 @@ export default function ContractsPage() {
       startDate: c.startDate.slice(0, 10),
       endDate: c.endDate?.slice(0, 10) ?? "",
       notes: c.notes ?? "",
+      usesLocationPricing: c.usesLocationPricing ?? false,
     });
     setFormError("");
     setShowForm(true);
@@ -177,6 +181,7 @@ export default function ContractsPage() {
       startDate: form.startDate,
       endDate: form.endDate || null,
       notes: form.notes || null,
+      usesLocationPricing: form.usesLocationPricing,
       ...(!editId ? { companyId } : {}),
     };
     const res = await fetch(
@@ -280,6 +285,14 @@ export default function ContractsPage() {
                       </td>
                       <td className="max-w-xs truncate text-sm text-muted-foreground">{c.notes ?? "—"}</td>
                       <td className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {c.usesLocationPricing && (
+                          <Link
+                            href={`/dashboard/companies/${companyId}/delivery/contracts/${c.id}/settings`}
+                            className="rounded px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50"
+                          >
+                            {en ? "Restaurants/locations" : "المطاعم والأماكن"}
+                          </Link>
+                        )}
                         <button onClick={() => openEdit(c)} className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">{t.edit}</button>
                         <button onClick={() => { setDeleteId(c.id); setDeleteError(""); }} className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50">{t.delete}</button>
                       </td>
@@ -336,6 +349,22 @@ export default function ContractsPage() {
             <div>
               <label className="form-label">{t.notes}</label>
               <textarea className="input-field w-full" rows={2} value={form.notes} onChange={f("notes")} />
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={form.usesLocationPricing}
+                  onChange={(e) => setForm((p) => ({ ...p, usesLocationPricing: e.target.checked }))}
+                  className="h-4 w-4 accent-primary"
+                />
+                {en ? "Restaurants & locations model (e.g. RoPops)" : "نظام المطاعم والأماكن (مثل RoPops)"}
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {en
+                  ? "Different daily-orders entry: per-delivery restaurant + location pricing. Reference only — does not affect accounting."
+                  : "تسجيل طلبات مختلف: كل توصيلة لها مطعم + مكان بسعر. مرجعي فقط — لا يؤثر على الحسابات."}
+              </p>
             </div>
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">

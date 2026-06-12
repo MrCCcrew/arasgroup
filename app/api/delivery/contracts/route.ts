@@ -10,6 +10,7 @@ const createSchema = z.object({
   startDate: z.string().transform((s) => new Date(s)),
   endDate: z.string().optional().transform((s) => s ? new Date(s) : undefined),
   notes: z.string().optional(),
+  usesLocationPricing: z.boolean().optional(),
 });
 
 export async function GET(request: NextRequest) {

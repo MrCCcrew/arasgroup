@@ -15,6 +15,7 @@ const updateSchema = z.object({
   endDate: z.string().optional().nullable().transform((s) => s ? new Date(s) : s === null ? null : undefined),
   notes: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  usesLocationPricing: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: Props) {
