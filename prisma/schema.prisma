@@ -1105,6 +1105,7 @@ model Driver {
   platformProfiles   DeliveryPlatformProfile[]
   absences           DeliveryAbsence[]
   evaluations        DriverEvaluation[]
+  orderDeliveries    DeliveryOrderDelivery[]
   violations              DriverViolation[]
   accidents               DriverAccident[]
   vehicleIncidents        VehicleIncident[]           @relation("DriverVehicleIncidents")
@@ -1252,17 +1253,106 @@ model DeliveryContract {
   isActive  Boolean          @default(true)
   notes     String?
 
+  // نظام تسجيل الطلبات: false = العادي (طلبات/تحصيل)، true = نظام المطاعم والأماكن
+  // (كل توصيلة = مطعم + مكان بسعر، مرجعي فقط بعيد عن الحسابات) — لعقود مثل RoPops
+  usesLocationPricing Boolean @default(false)
+
   company         Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
   monthlyReports  DeliveryMonthlyReport[]
   dailyOrders     DeliveryDailyOrder[]
   companyPayments CompanyPayment[]
   talabatImports  TalabatReportImport[]
+  restaurants     DeliveryRestaurant[]
+  locations       DeliveryLocation[]
+  deliveryPrices  DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
 
   createdAt DateTime @default(now())
 
   @@index([companyId])
   @@index([isActive])
   @@map("delivery_contracts")
+}
+
+// مطعم ضمن عقد (نظام المطاعم والأماكن)
+model DeliveryRestaurant {
+  id         String   @id @default(cuid())
+  contractId String
+  nameAr     String
+  isActive   Boolean  @default(true)
+
+  contract        DeliveryContract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  prices          DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+  @@map("delivery_restaurants")
+}
+
+// مكان توصيل ضمن عقد
+model DeliveryLocation {
+  id         String   @id @default(cuid())
+  contractId String
+  nameAr     String
+  isActive   Boolean  @default(true)
+
+  contract        DeliveryContract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  prices          DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+  @@map("delivery_locations")
+}
+
+// سعر التوصيل لكل (مطعم + مكان)
+model DeliveryDeliveryPrice {
+  id           String  @id @default(cuid())
+  contractId   String
+  restaurantId String
+  locationId   String
+  price        Decimal @db.Decimal(18, 3)
+
+  contract   DeliveryContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  restaurant DeliveryRestaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  location   DeliveryLocation   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([restaurantId, locationId])
+  @@index([contractId])
+  @@map("delivery_delivery_prices")
+}
+
+// توصيلة مسجّلة لسائق (مرجعي فقط — لا يؤثر على الحسابات/المحافظ)
+model DeliveryOrderDelivery {
+  id           String   @id @default(cuid())
+  companyId    String
+  contractId   String
+  driverId     String
+  date         DateTime
+  restaurantId String
+  locationId   String
+  price        Decimal  @db.Decimal(18, 3)
+  notes        String?
+  createdById  String?
+
+  contract   DeliveryContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  driver     Driver             @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  restaurant DeliveryRestaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  location   DeliveryLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([contractId])
+  @@index([driverId])
+  @@index([date])
+  @@map("delivery_order_deliveries")
 }
 
 enum DeliveryDailyOrderWorkStatus {
