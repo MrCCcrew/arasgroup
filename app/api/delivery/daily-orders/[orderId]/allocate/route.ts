@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 import { recomputeDriverWalletStates } from "@/lib/delivery/wallet-state";
+import { reconcileDriverChargeJEs } from "@/lib/delivery/charge-gl";
 
 interface Ctx {
   params: Promise<{ orderId: string }>;
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
     const dateStr = order.date.toISOString().slice(0, 10);
 
-    await prisma.$transaction(async (tx) => {
+    const affectedDriverIds = await prisma.$transaction(async (tx) => {
       const priorAllocations = await tx.deliveryDailyOrderAllocation.findMany({
         where: { dailyOrderId: orderId },
         select: { driverId: true },
@@ -116,12 +117,20 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         }
       }
 
-      await recomputeDriverWalletStates(tx, [
+      const affected = [
         order.driverId,
         ...priorAllocations.map((allocation) => allocation.driverId),
         ...driverIds,
-      ]);
+      ];
+      await recomputeDriverWalletStates(tx, affected);
+      return [...new Set(affected)];
     });
+
+    try {
+      await reconcileDriverChargeJEs({ companyId: order.companyId, userId: session.id, driverIds: affectedDriverIds });
+    } catch (glError) {
+      console.error("charge GL reconcile failed:", glError);
+    }
 
     return NextResponse.json({ success: true, allocated: lines.length });
   } catch (error) {

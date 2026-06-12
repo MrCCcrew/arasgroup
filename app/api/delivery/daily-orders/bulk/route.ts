@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { recomputeDriverWalletStates, syncDailyOrderWalletCharge } from "@/lib/delivery/wallet-state";
+import { reconcileDriverChargeJEs } from "@/lib/delivery/charge-gl";
+import { requireRequestSession } from "@/lib/auth/access";
 
 const bulkEntrySchema = z.object({
   date: z.string().transform((s) => new Date(s)),
@@ -26,6 +28,8 @@ const bulkCreateSchema = z.object({
 const buildWalletDescription = (date: Date) => `تحصيل يومي — ${date.toISOString().slice(0, 10)}`;
 
 export async function POST(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
   try {
     const body = await request.json();
     const parsed = bulkCreateSchema.safeParse(body);
@@ -106,8 +110,15 @@ export async function POST(request: NextRequest) {
         failed,
         walletSaved: totalWalletSaved,
         totalEntries: entries.length,
+        affectedDriverIds: [...affectedDrivers],
       };
     });
+
+    try {
+      await reconcileDriverChargeJEs({ companyId, userId: session.id, driverIds: result.affectedDriverIds });
+    } catch (glError) {
+      console.error("charge GL reconcile failed:", glError);
+    }
 
     if (result.failed.length > 0) {
       return NextResponse.json(

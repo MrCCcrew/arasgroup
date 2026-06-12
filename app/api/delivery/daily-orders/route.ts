@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { DeliveryDailyOrderWorkStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { recomputeDriverWalletStates, syncDailyOrderWalletCharge } from "@/lib/delivery/wallet-state";
+import { reconcileDriverChargeJEs } from "@/lib/delivery/charge-gl";
+import { requireRequestSession } from "@/lib/auth/access";
 
 const entrySchema = z.object({
   driverId: z.string(),
@@ -75,6 +77,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
   try {
     const body = await request.json();
 
@@ -153,8 +157,17 @@ export async function POST(request: NextRequest) {
         saved: totalSaved,
         walletSaved: totalWalletSaved,
         datesCount: dates.length,
+        affectedDriverIds: [...affectedDrivers],
       };
     });
+
+    // ترحيل تلقائي للتحصيلات لحساب أمانات طلبات (2031) للسواقين المتأثرين — النموذج (ب).
+    // بعد المعاملة (post-commit)؛ فشله لا يُفشِل الحفظ.
+    try {
+      await reconcileDriverChargeJEs({ companyId, userId: session.id, driverIds: result.affectedDriverIds });
+    } catch (glError) {
+      console.error("charge GL reconcile failed:", glError);
+    }
 
     return NextResponse.json({ success: true, data: result });
   } catch (error) {

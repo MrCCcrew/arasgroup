@@ -7,6 +7,7 @@ import {
   recomputeDriverWalletStates,
   syncDailyOrderWalletCharge,
 } from "@/lib/delivery/wallet-state";
+import { reconcileDriverChargeJEs } from "@/lib/delivery/charge-gl";
 
 interface Ctx {
   params: Promise<{ orderId: string }>;
@@ -98,6 +99,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     return order;
   });
 
+  try {
+    await reconcileDriverChargeJEs({ companyId: result.companyId, userId: session.id, driverIds: [result.driverId] });
+  } catch (glError) {
+    console.error("charge GL reconcile failed:", glError);
+  }
+
   return NextResponse.json({ success: true, data: result });
 }
 
@@ -107,10 +114,10 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
 
   const { orderId } = await params;
 
-  await prisma.$transaction(async (tx) => {
+  const deleted = await prisma.$transaction(async (tx) => {
     const order = await tx.deliveryDailyOrder.findUnique({
       where: { id: orderId },
-      select: { id: true, driverId: true, contractId: true, date: true },
+      select: { id: true, driverId: true, contractId: true, date: true, companyId: true },
     });
     if (!order) {
       throw new Error("السجل غير موجود");
@@ -129,7 +136,15 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
 
     await tx.deliveryDailyOrder.delete({ where: { id: orderId } });
     await recomputeDriverWalletStates(tx, [order.driverId]);
+    return { driverId: order.driverId, companyId: order.companyId };
   });
+
+  // تنظيف قيد التحصيل اليتيم بعد حذف السجل
+  try {
+    await reconcileDriverChargeJEs({ companyId: deleted.companyId, userId: session.id, driverIds: [deleted.driverId] });
+  } catch (glError) {
+    console.error("charge GL reconcile failed:", glError);
+  }
 
   return NextResponse.json({ success: true });
 }
