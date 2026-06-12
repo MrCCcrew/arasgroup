@@ -3,6 +3,54 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 
+/**
+ * يرجّع الحركات الفردية (أسطر القيود) على حساب معيّن — لاختيار حركة واحدة لنقلها
+ * بدل النقل الجماعي. يستثني القيود المحذوفة.
+ */
+export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  const { searchParams } = new URL(request.url);
+  const companyId = searchParams.get("companyId");
+  const accountId = searchParams.get("accountId");
+  if (!companyId || !accountId) {
+    return NextResponse.json({ success: false, error: "companyId و accountId مطلوبان" }, { status: 400 });
+  }
+
+  const companyAccessError = assertCompanyAccess(session, companyId);
+  if (companyAccessError) return companyAccessError;
+  const permissionError = assertPermission(session, "ACCOUNTING", "VIEW", { companyId });
+  if (permissionError) return permissionError;
+
+  const lines = await prisma.journalEntryLine.findMany({
+    where: { accountId, journalEntry: { companyId, isDeleted: false } },
+    select: {
+      id: true,
+      debit: true,
+      credit: true,
+      descriptionAr: true,
+      journalEntry: { select: { id: true, number: true, date: true, descriptionAr: true, type: true } },
+    },
+    orderBy: { journalEntry: { date: "desc" } },
+    take: 500,
+  });
+
+  return NextResponse.json({
+    success: true,
+    lines: lines.map((l) => ({
+      id: l.id,
+      journalEntryId: l.journalEntry.id,
+      number: l.journalEntry.number,
+      date: l.journalEntry.date,
+      descriptionAr: l.descriptionAr ?? l.journalEntry.descriptionAr,
+      type: l.journalEntry.type,
+      debit: Number(l.debit),
+      credit: Number(l.credit),
+    })),
+  });
+}
+
 const schema = z.object({
   companyId: z.string().min(1),
   sourceAccountId: z.string().min(1),

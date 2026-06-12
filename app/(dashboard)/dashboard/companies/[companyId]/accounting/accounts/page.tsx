@@ -119,6 +119,8 @@ export default function AccountsPage() {
   const [reclassBusy, setReclassBusy] = useState(false);
   const [reclassError, setReclassError] = useState("");
   const [reclassDone, setReclassDone] = useState("");
+  type AccountLine = { id: string; journalEntryId: string; number: string; date: string; descriptionAr: string | null; type: string; debit: number; credit: number };
+  const [reclassLines, setReclassLines] = useState<AccountLine[] | null>(null);
 
   function openReclassify(account: Account) {
     setReclassSource(account);
@@ -129,6 +131,48 @@ export default function AccountsPage() {
     setReclassBreakdown(null);
     setReclassError("");
     setReclassDone("");
+    setReclassLines(null);
+  }
+
+  async function loadReclassLines() {
+    if (!reclassSource) return;
+    setReclassBusy(true);
+    setReclassError("");
+    try {
+      const res = await fetch(`/api/accounting/accounts/reclassify?companyId=${companyId}&accountId=${reclassSource.id}`);
+      const payload = await res.json();
+      if (!payload.success) throw new Error(payload.error);
+      setReclassLines(payload.lines);
+    } catch (e) {
+      setReclassError(e instanceof Error ? e.message : "خطأ");
+    } finally {
+      setReclassBusy(false);
+    }
+  }
+
+  async function moveOneLine(line: AccountLine) {
+    if (!reclassDestId) {
+      setReclassError(locale === "en" ? "Select a destination account first" : "اختر حساب الوجهة الأول");
+      return;
+    }
+    setReclassBusy(true);
+    setReclassError("");
+    try {
+      const res = await fetch(`/api/accounting/journal-entries/${line.journalEntryId}/reclassify-line`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineId: line.id, destinationAccountId: reclassDestId }),
+      });
+      const payload = await res.json();
+      if (!payload.success) throw new Error(payload.error);
+      setReclassLines((prev) => (prev ? prev.filter((l) => l.id !== line.id) : prev));
+      setReclassDone(locale === "en" ? `Moved entry ${line.number}.` : `تم نقل حركة القيد ${line.number}.`);
+      await load();
+    } catch (e) {
+      setReclassError(e instanceof Error ? e.message : "فشل النقل");
+    } finally {
+      setReclassBusy(false);
+    }
   }
 
   async function runReclassify(apply: boolean) {
@@ -607,6 +651,57 @@ export default function AccountsPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* نقل حركة واحدة بدل النقل الجماعي */}
+            <div>
+              <button
+                onClick={loadReclassLines}
+                disabled={reclassBusy}
+                className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                {locale === "en" ? "Pick a single movement to move" : "اختيار حركة واحدة للنقل"}
+              </button>
+            </div>
+
+            {reclassLines && (
+              <div className="rounded-lg border">
+                <p className="border-b bg-muted/40 px-3 py-1.5 text-xs font-medium">
+                  {locale === "en"
+                    ? `Movements (${reclassLines.length}) — choose a destination above, then move individual lines`
+                    : `الحركات (${reclassLines.length}) — اختر حساب الوجهة فوق، وبعدين انقل أي حركة لوحدها`}
+                </p>
+                <div className="max-h-56 overflow-y-auto">
+                  {reclassLines.length === 0 ? (
+                    <p className="p-3 text-center text-xs text-muted-foreground">{locale === "en" ? "No movements" : "لا توجد حركات"}</p>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {reclassLines.map((l) => (
+                          <tr key={l.id} className="border-t">
+                            <td className="p-2 font-mono text-muted-foreground">{l.number}</td>
+                            <td className="p-2">{new Date(l.date).toLocaleDateString(locale === "en" ? "en-US" : "ar-KW")}</td>
+                            <td className="p-2 max-w-32 truncate">{l.descriptionAr ?? "—"}</td>
+                            <td className="p-2 text-end font-medium">
+                              {(l.debit > 0 ? l.debit : l.credit).toLocaleString(locale === "en" ? "en-US" : "ar-KW", { minimumFractionDigits: 3 })}
+                              <span className="ms-1 text-[10px] text-muted-foreground">{l.debit > 0 ? (locale === "en" ? "Dr" : "مدين") : locale === "en" ? "Cr" : "دائن"}</span>
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                onClick={() => moveOneLine(l)}
+                                disabled={reclassBusy || !reclassDestId}
+                                className="rounded border border-primary/40 px-2 py-1 text-[11px] text-primary hover:bg-primary/10 disabled:opacity-40"
+                              >
+                                {locale === "en" ? "Move" : "نقل"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             )}
