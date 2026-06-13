@@ -304,7 +304,7 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
       : currentCompany.nameAr
     : locale === "en"
       ? "Access is filtered by company and group"
-      : "\u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u062d\u0633\u0628 \u0627\u0644\u0634\u0631\u0643\u0629 \u0648\u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629";
+      : "\u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u062d\u0633\u0628 \u0627\u0644\u0634ر\u0643\u0629 \u0648\u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629";
 
   return (
     <>
@@ -321,12 +321,12 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
             <button
               onClick={close}
               className="md:hidden shrink-0 rounded-lg p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              aria-label="\u0625\u063a\u0644\u0627\u0642"
+              aria-label="إغلاق"
             >
               <X size={18} />
             </button>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-              <span className="text-lg font-bold text-white">\u0631</span>
+              <span className="text-lg font-bold text-white">ر</span>
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-sidebar-foreground">{t("system.name")}</p>
