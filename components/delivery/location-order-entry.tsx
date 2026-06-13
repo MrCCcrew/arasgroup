@@ -20,6 +20,7 @@ interface DriverOpt {
 interface Row {
   restaurantId: string;
   locationId: string;
+  count: number;
 }
 
 /**
@@ -73,7 +74,7 @@ export function LocationOrderEntry({
       const res = await fetch(`/api/delivery/order-deliveries?contractId=${contractId}&driverId=${dId}&date=${date}`);
       const p = await res.json();
       if (p.success) {
-        setRows(p.data.map((d: { restaurantId: string; locationId: string }) => ({ restaurantId: d.restaurantId, locationId: d.locationId })));
+        setRows(p.data.map((d: { restaurantId: string; locationId: string; count?: number }) => ({ restaurantId: d.restaurantId, locationId: d.locationId, count: d.count ?? 1 })));
       }
     },
     [contractId, date],
@@ -85,12 +86,14 @@ export function LocationOrderEntry({
   }, [driverId, date, loadDriverDeliveries]);
 
   const priceOf = (rId: string, lId: string) => prices.find((p) => p.restaurantId === rId && p.locationId === lId)?.price ?? 0;
-  const total = rows.reduce((sum, r) => sum + (r.restaurantId && r.locationId ? priceOf(r.restaurantId, r.locationId) : 0), 0);
+  const lineTotal = (r: Row) => (r.restaurantId && r.locationId ? priceOf(r.restaurantId, r.locationId) * (r.count || 0) : 0);
+  const total = rows.reduce((sum, r) => sum + lineTotal(r), 0);
+  const totalOrders = rows.reduce((sum, r) => sum + (r.restaurantId && r.locationId ? r.count || 0 : 0), 0);
 
   function addRow() {
-    setRows((prev) => [...prev, { restaurantId: "", locationId: "" }]);
+    setRows((prev) => [...prev, { restaurantId: "", locationId: "", count: 1 }]);
   }
-  function updateRow(index: number, key: keyof Row, value: string) {
+  function updateRow<K extends keyof Row>(index: number, key: K, value: Row[K]) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
   }
   function removeRow(index: number) {
@@ -114,7 +117,7 @@ export function LocationOrderEntry({
           contractId,
           driverId,
           date,
-          deliveries: valid.map((r) => ({ restaurantId: r.restaurantId, locationId: r.locationId, price: priceOf(r.restaurantId, r.locationId) })),
+          deliveries: valid.map((r) => ({ restaurantId: r.restaurantId, locationId: r.locationId, price: priceOf(r.restaurantId, r.locationId), count: r.count || 1 })),
         }),
       });
       const p = await res.json();
@@ -168,21 +171,23 @@ export function LocationOrderEntry({
                       <th className="px-2 py-2 text-start font-medium text-muted-foreground">#</th>
                       <th className="px-2 py-2 text-start font-medium text-muted-foreground">{en ? "Restaurant" : "المطعم"}</th>
                       <th className="px-2 py-2 text-start font-medium text-muted-foreground">{en ? "Location" : "المكان"}</th>
-                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{en ? "Price" : "السعر"}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{en ? "Orders" : "عدد الطلبات"}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{en ? "Unit price" : "سعر الوحدة"}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{en ? "Line total" : "الإجمالي"}</th>
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                        <td colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
                           {en ? "No deliveries. Add a row." : "لا توجد توصيلات. أضف سطراً."}
                         </td>
                       </tr>
                     ) : (
                       rows.map((row, index) => {
-                        const price = row.restaurantId && row.locationId ? priceOf(row.restaurantId, row.locationId) : null;
-                        const noPrice = row.restaurantId && row.locationId && price === 0;
+                        const unit = row.restaurantId && row.locationId ? priceOf(row.restaurantId, row.locationId) : null;
+                        const noPrice = row.restaurantId && row.locationId && unit === 0;
                         return (
                           <tr key={index} className="hover:bg-muted/20">
                             <td className="px-2 py-1.5 text-muted-foreground">{index + 1}</td>
@@ -202,13 +207,30 @@ export function LocationOrderEntry({
                                 ))}
                               </select>
                             </td>
-                            <td className="px-2 py-1.5 text-center font-medium">
-                              {price === null ? (
+                            <td className="px-2 py-1.5 text-center">
+                              <input
+                                type="number"
+                                min="1"
+                                value={row.count}
+                                onChange={(e) => updateRow(index, "count", Math.max(1, Number(e.target.value) || 1))}
+                                className="input-field w-20 text-center"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-center">
+                              {unit === null ? (
                                 <span className="text-muted-foreground">—</span>
                               ) : noPrice ? (
                                 <span className="text-xs text-amber-600">{en ? "no price set" : "بدون سعر"}</span>
                               ) : (
-                                <span className="number text-blue-600">{price.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</span>
+                                <span className="number">{unit.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 text-center font-medium">
+                              {unit === null || noPrice ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <span className="number text-blue-600">{lineTotal(row).toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</span>
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-center">
@@ -224,6 +246,8 @@ export function LocationOrderEntry({
                   <tfoot>
                     <tr className="border-t-2 bg-muted/30 font-bold">
                       <td colSpan={3} className="px-2 py-2 text-start">{en ? "Total" : "الإجمالي"}</td>
+                      <td className="number px-2 py-2 text-center">{totalOrders}</td>
+                      <td></td>
                       <td className="number px-2 py-2 text-center text-blue-600">{total.toLocaleString(numberLocale, { minimumFractionDigits: 3 })}</td>
                       <td></td>
                     </tr>

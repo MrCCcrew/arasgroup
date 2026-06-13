@@ -66,13 +66,14 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
       : [],
   ]);
 
-  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price), 0);
+  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price) * delivery.count, 0);
+  const totalOrders = deliveries.reduce((sum, delivery) => sum + delivery.count, 0);
 
   const byDriver = new Map<string, { name: string; count: number; total: number }>();
   for (const delivery of deliveries) {
     const row = byDriver.get(delivery.driverId) ?? { name: delivery.driver.employee.nameAr, count: 0, total: 0 };
-    row.count += 1;
-    row.total += Number(delivery.price);
+    row.count += delivery.count;
+    row.total += Number(delivery.price) * delivery.count;
     byDriver.set(delivery.driverId, row);
   }
 
@@ -123,7 +124,7 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
         </div>
 
         <div className="meta">
-          <div className="card"><div className="label">{AR.deliveriesCount}</div><div>{deliveries.length}</div></div>
+          <div className="card"><div className="label">عدد الطلبات</div><div>{totalOrders}</div></div>
           <div className="card"><div className="label">{AR.driversCount}</div><div>{byDriver.size}</div></div>
           <div className="card"><div className="label">{AR.total}</div><div>{fmt(grandTotal)}</div></div>
         </div>
@@ -149,7 +150,7 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
           <tfoot>
             <tr>
               <td>{AR.grandTotal}</td>
-              <td>{deliveries.length}</td>
+              <td>{totalOrders}</td>
               <td>{fmt(grandTotal)}</td>
             </tr>
           </tfoot>
@@ -163,7 +164,9 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
               <th>{AR.driver}</th>
               <th>{AR.restaurant}</th>
               <th>{AR.location}</th>
-              <th>{AR.price}</th>
+              <th>عدد الطلبات</th>
+              <th>سعر الوحدة</th>
+              <th>{AR.total}</th>
             </tr>
           </thead>
           <tbody>
@@ -173,7 +176,9 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
                 <td>{delivery.driver.employee.nameAr}</td>
                 <td>{delivery.restaurant.nameAr}</td>
                 <td>{delivery.location.nameAr}</td>
+                <td>{delivery.count}</td>
                 <td>{fmt(Number(delivery.price))}</td>
+                <td>{fmt(Number(delivery.price) * delivery.count)}</td>
               </tr>
             ))}
           </tbody>

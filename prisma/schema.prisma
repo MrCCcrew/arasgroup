@@ -1337,7 +1337,8 @@ model DeliveryOrderDelivery {
   date         DateTime
   restaurantId String
   locationId   String
-  price        Decimal  @db.Decimal(18, 3)
+  price        Decimal  @db.Decimal(18, 3) // سعر الوحدة (لكل طلب) المسجّل للمطعم+المكان
+  count        Int      @default(1) // عدد الطلبات؛ إجمالي السطر = count × price
   notes        String?
   createdById  String?
 

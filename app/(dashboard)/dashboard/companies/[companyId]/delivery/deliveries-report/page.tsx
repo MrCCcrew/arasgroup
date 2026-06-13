@@ -89,21 +89,23 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
       })
     : [];
 
-  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price), 0);
+  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price) * delivery.count, 0);
+  const totalOrders = deliveries.reduce((sum, delivery) => sum + delivery.count, 0);
 
+  // count = عدد الطلبات (مجموع counts)، total = العدد × السعر
   const byDriver = new Map<string, { name: string; count: number; total: number }>();
   const byRestaurant = new Map<string, { name: string; count: number; total: number }>();
   for (const delivery of deliveries) {
-    const price = Number(delivery.price);
+    const lineTotal = Number(delivery.price) * delivery.count;
     const deliveryDriverName = en ? delivery.driver.employee.nameEn ?? delivery.driver.employee.nameAr : delivery.driver.employee.nameAr;
     const driverRow = byDriver.get(delivery.driverId) ?? { name: deliveryDriverName, count: 0, total: 0 };
-    driverRow.count += 1;
-    driverRow.total += price;
+    driverRow.count += delivery.count;
+    driverRow.total += lineTotal;
     byDriver.set(delivery.driverId, driverRow);
 
     const restaurantRow = byRestaurant.get(delivery.restaurantId) ?? { name: delivery.restaurant.nameAr, count: 0, total: 0 };
-    restaurantRow.count += 1;
-    restaurantRow.total += price;
+    restaurantRow.count += delivery.count;
+    restaurantRow.total += lineTotal;
     byRestaurant.set(delivery.restaurantId, restaurantRow);
   }
 
@@ -197,8 +199,8 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
             <div className="grid grid-cols-2 gap-4">
               <div className="stat-card">
                 <div>
-                  <p className="number text-2xl font-bold">{deliveries.length}</p>
-                  <p className="text-xs text-muted-foreground">{en ? "Deliveries" : AR.deliveriesCount}</p>
+                  <p className="number text-2xl font-bold">{totalOrders}</p>
+                  <p className="text-xs text-muted-foreground">{en ? "Orders" : "عدد الطلبات"}</p>
                 </div>
               </div>
               <div className="stat-card">
@@ -277,13 +279,15 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                       <th>{en ? "Driver" : AR.driver}</th>
                       <th>{en ? "Restaurant" : AR.restaurant}</th>
                       <th>{en ? "Location" : AR.location}</th>
-                      <th className="text-end">{en ? "Price" : AR.price}</th>
+                      <th className="text-center">{en ? "Orders" : "عدد الطلبات"}</th>
+                      <th className="text-center">{en ? "Unit price" : "سعر الوحدة"}</th>
+                      <th className="text-end">{en ? "Total" : AR.total}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {deliveries.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
                           {en ? "No deliveries found" : AR.noDeliveries}
                         </td>
                       </tr>
@@ -294,7 +298,9 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                           <td className="font-medium">{en ? delivery.driver.employee.nameEn ?? delivery.driver.employee.nameAr : delivery.driver.employee.nameAr}</td>
                           <td>{delivery.restaurant.nameAr}</td>
                           <td>{delivery.location.nameAr}</td>
-                          <td className="number text-end font-bold text-blue-600">{money(Number(delivery.price))}</td>
+                          <td className="number text-center">{delivery.count}</td>
+                          <td className="number text-center">{money(Number(delivery.price))}</td>
+                          <td className="number text-end font-bold text-blue-600">{money(Number(delivery.price) * delivery.count)}</td>
                         </tr>
                       ))
                     )}
@@ -303,6 +309,8 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                     <tfoot>
                       <tr className="border-t-2 bg-muted/30 font-bold">
                         <td colSpan={4} className="text-end">{en ? "Grand total" : AR.grandTotal}</td>
+                        <td className="number text-center">{totalOrders}</td>
+                        <td></td>
                         <td className="number text-end text-blue-600">{money(grandTotal)}</td>
                       </tr>
                     </tfoot>

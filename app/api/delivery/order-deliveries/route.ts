@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       locationName: d.location.nameAr,
       driverName: d.driver.employee.nameAr,
       price: Number(d.price),
+      count: d.count,
     })),
     date: date.toISOString(),
   });
@@ -65,6 +66,7 @@ const postSchema = z.object({
         restaurantId: z.string().min(1),
         locationId: z.string().min(1),
         price: z.number().min(0),
+        count: z.number().int().min(1).default(1),
       }),
     )
     .default([]),
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
             restaurantId: d.restaurantId,
             locationId: d.locationId,
             price: d.price,
+            count: d.count,
             createdById: session.id,
           })),
         });
