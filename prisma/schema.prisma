@@ -817,6 +817,7 @@ model Employee {
   licenseAssignments     EmployeeLicenseAssignment[]
   claimBeneficiaries     InvestorClaimBeneficiary[]
   investorAccountAgreements InvestorAccountAgreement[]
+  managerSalaryLines     ManagerSalaryLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1936,11 +1937,121 @@ model Investor {
   vehicles          Vehicle[]
   licenses          License[]
   notifications     Notification[]
+  managerCharges       ManagerCharge[]
+  managerSalaryBatches ManagerSalaryBatch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("investors")
+}
+
+// ===== قسم إدارة المسئولين والمديرين (مرجعي بالكامل — لا يؤثر على الحسابات) =====
+
+enum ManagerChargeType {
+  RENT // إيجار
+  EXPENSE // مصروف
+  REVENUE // إيراد
+}
+
+// مستحق (إيجار/مصروف/إيراد) لمسئول عن فترة محددة + تحصيلاته. مرجعي فقط.
+model ManagerCharge {
+  id          String            @id @default(cuid())
+  companyId   String
+  investorId  String
+  type        ManagerChargeType
+  title       String // البيان (اسم المقر / وصف المصروف / مصدر الإيراد)
+  month       Int? // 1-12 (null = سنوي/مرة واحدة)
+  year        Int
+  amount      Decimal           @db.Decimal(18, 3)
+  dueDate     DateTime?
+  notes       String?
+  createdById String?
+
+  investor Investor               @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  payments ManagerChargePayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([type])
+  @@index([year])
+  @@map("manager_charges")
+}
+
+// تحصيل دفعة من مستحق
+model ManagerChargePayment {
+  id          String   @id @default(cuid())
+  chargeId    String
+  amount      Decimal  @db.Decimal(18, 3)
+  paidDate    DateTime
+  notes       String?
+  createdById String?
+
+  charge ManagerCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([chargeId])
+  @@map("manager_charge_payments")
+}
+
+// دفعة تحصيل رواتب لمسئول عن شهر (موظفين مختارين + عمولة بنك ثابتة). مرجعي فقط.
+model ManagerSalaryBatch {
+  id             String   @id @default(cuid())
+  companyId      String
+  investorId     String
+  month          Int // 1-12
+  year           Int
+  bankCommission Decimal  @db.Decimal(18, 3) @default(0)
+  notes          String?
+  createdById    String?
+
+  investor Investor               @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  lines    ManagerSalaryLine[]
+  payments ManagerSalaryPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([year])
+  @@map("manager_salary_batches")
+}
+
+// سطر موظف ضمن دفعة الرواتب (لقطة من الراتب وقت الإنشاء)
+model ManagerSalaryLine {
+  id         String  @id @default(cuid())
+  batchId    String
+  employeeId String
+  amount     Decimal @db.Decimal(18, 3)
+
+  batch    ManagerSalaryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employee Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@index([employeeId])
+  @@map("manager_salary_lines")
+}
+
+// تحصيل دفعة من دفعة الرواتب
+model ManagerSalaryPayment {
+  id          String   @id @default(cuid())
+  batchId     String
+  amount      Decimal  @db.Decimal(18, 3)
+  paidDate    DateTime
+  notes       String?
+  createdById String?
+
+  batch ManagerSalaryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([batchId])
+  @@map("manager_salary_payments")
 }
 
 model InvestorBranch {
