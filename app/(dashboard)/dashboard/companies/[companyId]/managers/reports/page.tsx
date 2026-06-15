@@ -8,7 +8,7 @@ import { getLocale } from "@/lib/i18n";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ investorId?: string; year?: string }>;
+  searchParams: Promise<{ investorId?: string; year?: string; view?: string }>;
 }
 
 type Row = { id: string; name: string; due: number; paid: number; remaining: number };
@@ -24,6 +24,8 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
   const money = (n: number) => `${n.toLocaleString(nl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${en ? "KWD" : "د.ك"}`;
   const year = sp.year ? Number(sp.year) : undefined;
   const investorId = sp.investorId || undefined;
+  const view = sp.view || "";
+  const show = (v: string) => !view || view === v;
 
   const [investors, charges, batches] = await Promise.all([
     prisma.investor.findMany({ where: { companies: { some: { id: companyId } } }, select: { id: true, nameAr: true }, orderBy: { nameAr: "asc" } }),
@@ -130,13 +132,14 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
         </form>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {sectionTable("كشف الإيجارات", "Rents statement", rent)}
-          {sectionTable("كشف المصاريف", "Expenses statement", expense)}
-          {sectionTable("كشف الإيرادات", "Revenue statement", revenue)}
-          {sectionTable("كشف الرواتب", "Salaries statement", { rows: salaryRows, totals: { id: "", name: "", ...salaryTotals } })}
+          {show("rents") && sectionTable("كشف الإيجارات", "Rents statement", rent)}
+          {show("expenses") && sectionTable("كشف المصاريف", "Expenses statement", expense)}
+          {show("revenue") && sectionTable("كشف الإيرادات", "Revenue statement", revenue)}
+          {show("salaries") && sectionTable("كشف الرواتب", "Salaries statement", { rows: salaryRows, totals: { id: "", name: "", ...salaryTotals } })}
         </div>
 
         {/* كشف لكل موظف */}
+        {show("employees") && (
         <div className="overflow-hidden rounded-xl border bg-card">
           <p className="border-b bg-muted/40 px-3 py-2 text-sm font-bold">{en ? "By employee (recorded salaries)" : "كشف لكل موظف (الرواتب المسجّلة)"}</p>
           <table className="ar-table text-sm">
@@ -150,6 +153,7 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

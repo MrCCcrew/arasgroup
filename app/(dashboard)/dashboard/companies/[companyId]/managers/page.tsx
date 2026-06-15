@@ -210,7 +210,7 @@ function ReportsLinks({ companyId, en }: { companyId: string; en: boolean }) {
       {links.map((l) => (
         <Link
           key={l.href}
-          href={`/dashboard/companies/${companyId}/managers/reports/${l.href}`}
+          href={`/dashboard/companies/${companyId}/managers/reports?view=${l.href}`}
           className="rounded-xl border bg-card p-4 text-sm font-medium hover:bg-muted"
         >
           {l.label}
