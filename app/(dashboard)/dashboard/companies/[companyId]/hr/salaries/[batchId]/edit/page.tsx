@@ -47,6 +47,7 @@ const arText = {
   targetDeduction: "\u062e\u0635\u0645 \u062a\u0627\u0631\u062c\u064a\u062a",
   companyDeduction: "\u062e\u0635\u0645 \u0634\u0631\u0643\u0629",
   net: "\u0627\u0644\u0635\u0627\u0641\u064a",
+  netWithoutIncentive: "\u0627\u0644\u0635\u0627\u0641\u064a \u0628\u062f\u0648\u0646 \u062d\u0627\u0641\u0632",
   otherEmployees: "\u0645\u0648\u0638\u0641\u0648\u0646 \u0622\u062e\u0631\u0648\u0646",
   employee: "\u0627\u0644\u0645\u0648\u0638\u0641",
   type: "\u0627\u0644\u0646\u0648\u0639",
@@ -345,15 +346,20 @@ export default function EditSalaryBatchPage() {
     return round3(n(line.baseAmount) + n(line.incentive) + n(line.additionalEarnings) - n(line.deductions));
   }
 
-  function lineNet(line: PaymentLine) {
-    return line.isDriver ? driverNet(line) : otherNet(line);
-  }
+function lineNet(line: PaymentLine) {
+  return line.isDriver ? driverNet(line) : otherNet(line);
+}
+
+function lineNetWithoutIncentive(line: PaymentLine) {
+  return round3(lineNet(line) - n(line.incentive));
+}
 
   const includedLines = lines.filter((line) => line.included);
   const removedLines = lines.filter((line) => !line.included);
   const driverLines = includedLines.filter((line) => line.isDriver);
   const otherLines = includedLines.filter((line) => !line.isDriver);
-  const totalNet = includedLines.reduce((sum, line) => sum + lineNet(line), 0);
+  const totalNet = includedLines.reduce((sum, line) => sum + lineNetWithoutIncentive(line), 0);
+  const totalIncentive = includedLines.reduce((sum, line) => sum + n(line.incentive), 0);
 
   function employeeFor(employeeId: string) {
     return employees.find((employee) => employee.id === employeeId);
@@ -511,7 +517,7 @@ export default function EditSalaryBatchPage() {
                       <th className="w-24 px-2 py-2 text-right font-bold text-blue-700">{ar ? arText.fuel : "Fuel/tire"}</th>
                       <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? arText.targetDeduction : "Target ded."}</th>
                       <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? arText.companyDeduction : "Company ded."}</th>
-                      <th className="w-24 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.net : "Net"}</th>
+                      <th className="w-36 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.netWithoutIncentive : "Net without incentive"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -541,7 +547,14 @@ export default function EditSalaryBatchPage() {
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.fuelAddition} onChange={(e) => setLineField(line.employeeId, "fuelAddition", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.targetDeduction} onChange={(e) => setLineField(line.employeeId, "targetDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.companyDeduction} onChange={(e) => setLineField(line.employeeId, "companyDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-2 py-2 text-left"><span className="number font-bold text-emerald-600">{driverNet(line).toFixed(3)}</span></td>
+                          <td className="px-2 py-2 text-left">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="number font-bold text-emerald-600">{lineNetWithoutIncentive(line).toFixed(3)}</span>
+                              <span className="number rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                +{n(line.incentive).toFixed(3)}
+                              </span>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -570,7 +583,7 @@ export default function EditSalaryBatchPage() {
                       <th className="w-28 px-3 py-2 text-right font-bold text-green-700">{ar ? arText.incentives : "Incentives"}</th>
                       <th className="w-28 px-3 py-2 text-right font-bold text-blue-700">{ar ? arText.additions : "Additions"}</th>
                       <th className="w-28 px-3 py-2 text-right font-bold text-red-700">{ar ? arText.deductions : "Deductions"}</th>
-                      <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.net : "Net"}</th>
+                      <th className="w-40 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.netWithoutIncentive : "Net without incentive"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -597,7 +610,14 @@ export default function EditSalaryBatchPage() {
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.incentive} onChange={(e) => setLineField(line.employeeId, "incentive", e.target.value)} className={`${numInput} text-green-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.additionalEarnings} onChange={(e) => setLineField(line.employeeId, "additionalEarnings", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.deductions} onChange={(e) => setLineField(line.employeeId, "deductions", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-3 py-2 text-left"><span className="number font-bold text-emerald-600">{otherNet(line).toFixed(3)}</span></td>
+                          <td className="px-3 py-2 text-left">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="number font-bold text-emerald-600">{lineNetWithoutIncentive(line).toFixed(3)}</span>
+                              <span className="number rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                +{n(line.incentive).toFixed(3)}
+                              </span>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -661,6 +681,9 @@ export default function EditSalaryBatchPage() {
             <div className="text-sm">
               <span className="text-muted-foreground">{ar ? arText.totalNet : "Total net:"}</span>{" "}
               <span className="number text-lg font-bold text-emerald-600">{totalNet.toFixed(3)}</span>{" "}
+              <span className="number rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                +{totalIncentive.toFixed(3)}
+              </span>{" "}
               <span className="text-muted-foreground">{ar ? arText.kwd : "KWD"}</span>
             </div>
           </div>
