@@ -23,6 +23,17 @@ const AR = {
   amount: "\u0627\u0644\u0645\u0628\u0644\u063a (\u062f.\u0643)",
   netSalary: "\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0627\u062a\u0628",
   generated: "\u0648\u062b\u064a\u0642\u0629 \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a\u0629. \u0644\u0627 \u062d\u0627\u062c\u0629 \u0644\u0644\u062a\u0648\u0642\u064a\u0639.",
+  baseSalary: "\u0627\u0644\u0631\u0627\u062a\u0628 \u0627\u0644\u0623\u0633\u0627\u0633\u064a",
+  incentivesAndAdditions: "\u0627\u0644\u062d\u0648\u0627\u0641\u0632 \u0648\u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a",
+  totalDeductions: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u062e\u0635\u0648\u0645\u0627\u062a",
+  additionalDetails: "\u062a\u0641\u0627\u0635\u064a\u0644 \u0625\u0636\u0627\u0641\u064a\u0629",
+  attendanceDays: "\u0623\u064a\u0627\u0645 \u0627\u0644\u062d\u0636\u0648\u0631",
+  evaluation: "\u0627\u0644\u062a\u0642\u064a\u064a\u0645",
+  targetOrders: "\u0627\u0644\u062a\u0627\u0631\u062c\u062a",
+  actualOrders: "\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0641\u0639\u0644\u064a\u0629",
+  walletAmount: "\u0627\u0644\u0645\u062d\u0641\u0638\u0629",
+  deliveredAmount: "\u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0633\u0644\u0645",
+  notes: "\u0645\u0644\u0627\u062d\u0638\u0627\u062a",
 } as const;
 
 const MONTHS_AR = [
@@ -97,6 +108,30 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
   const employeeName = locale === "en" ? payment.employee.nameEn || payment.employee.nameAr : payment.employee.nameAr;
   const companyName = locale === "en" ? company?.nameEn || company?.nameAr : company?.nameAr;
   const backHref = `/dashboard/companies/${companyId}/hr/salaries/${batchId}`;
+  const details = [
+    payment.attendanceDays != null
+      ? { label: locale === "en" ? "Attendance days:" : `${AR.attendanceDays}:`, value: Number(payment.attendanceDays).toFixed(1) }
+      : null,
+    payment.evaluationScore != null
+      ? { label: locale === "en" ? "Evaluation:" : `${AR.evaluation}:`, value: Number(payment.evaluationScore).toFixed(1) }
+      : null,
+    payment.targetOrders != null
+      ? { label: locale === "en" ? "Target orders:" : `${AR.targetOrders}:`, value: String(payment.targetOrders) }
+      : null,
+    payment.actualOrders != null
+      ? { label: locale === "en" ? "Actual orders:" : `${AR.actualOrders}:`, value: String(payment.actualOrders) }
+      : null,
+    payment.walletAmount != null
+      ? { label: locale === "en" ? "Wallet amount:" : `${AR.walletAmount}:`, value: formatKWD(Number(payment.walletAmount), numberLocale) }
+      : null,
+    payment.amountDeliveredByDriver != null
+      ? {
+          label: locale === "en" ? "Delivered amount:" : `${AR.deliveredAmount}:`,
+          value: formatKWD(Number(payment.amountDeliveredByDriver), numberLocale),
+        }
+      : null,
+    payment.notes ? { label: locale === "en" ? "Notes:" : `${AR.notes}:`, value: payment.notes } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
     <>
@@ -234,7 +269,35 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
             <span className="label">{locale === "en" ? "Date:" : `${AR.date}:`}</span>
             <span className="value">{new Date().toLocaleDateString(numberLocale)}</span>
           </div>
+          <div className="info-row">
+            <span className="label">{locale === "en" ? "Base salary:" : `${AR.baseSalary}:`}</span>
+            <span className="value">{formatKWD(Number(payment.baseAmount), numberLocale)}</span>
+          </div>
+          <div className="info-row">
+            <span className="label">{locale === "en" ? "Incentives & additions:" : `${AR.incentivesAndAdditions}:`}</span>
+            <span className="value">
+              {formatKWD(Number(payment.incentives) + Number(payment.additionalEarnings ?? 0), numberLocale)}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="label">{locale === "en" ? "Total deductions:" : `${AR.totalDeductions}:`}</span>
+            <span className="value">{formatKWD(Number(payment.deductions), numberLocale)}</span>
+          </div>
         </div>
+
+        {details.length > 0 && (
+          <>
+            <div className="section">{locale === "en" ? "Additional details" : AR.additionalDetails}</div>
+            <div className="info">
+              {details.map((detail) => (
+                <div key={detail.label} className="info-row">
+                  <span className="label">{detail.label}</span>
+                  <span className="value">{detail.value}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="section">{locale === "en" ? "Earnings" : AR.earnings}</div>
         <table>

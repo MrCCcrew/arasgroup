@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
       employeeNumber: payment.employee.employeeNumber,
       month: payment.batch.month,
       year: payment.batch.year,
+      baseAmount: Number(payment.baseAmount),
+      incentivesAmount: Number(payment.incentives) + Number(payment.additionalEarnings ?? 0),
+      totalDeductionsAmount: Number(payment.deductions),
       earnings: items
         .filter((item) => item.category === "EARNING")
         .map((item) => ({
@@ -93,6 +96,14 @@ export async function GET(request: NextRequest) {
           amount: Number(item.amount),
         })),
       netAmount: Number(payment.netAmount),
+      attendanceDays: payment.attendanceDays != null ? Number(payment.attendanceDays) : null,
+      evaluationScore: payment.evaluationScore != null ? Number(payment.evaluationScore) : null,
+      targetOrders: payment.targetOrders,
+      actualOrders: payment.actualOrders,
+      walletAmount: payment.walletAmount != null ? Number(payment.walletAmount) : null,
+      amountDeliveredByDriver:
+        payment.amountDeliveredByDriver != null ? Number(payment.amountDeliveredByDriver) : null,
+      notes: payment.notes,
     });
 
     const key = `salary-slips/${payment.batch.companyId}/${payment.batch.id}/${payment.id}-${locale}.pdf`;
