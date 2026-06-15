@@ -154,7 +154,7 @@ export default function SalaryBatchDetailPage() {
     <div>
       <Header
         title={locale === "en" ? "Salary Batch" : "دفعة الرواتب"}
-        subtitle={`${title} — ${cycleLabel}`}
+        subtitle={`${title} - ${cycleLabel}`}
         companyId={companyId}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -286,24 +286,31 @@ export default function SalaryBatchDetailPage() {
                       >
                         <td>
                           <div>
-                            <p className="font-medium">{name}{canExpand && <span className="ml-1 text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>}</p>
+                            <p className="font-medium">
+                              {name}
+                              {canExpand && (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  {isExpanded ? "-" : "+"}
+                                </span>
+                              )}
+                            </p>
                             {payment.employee.employeeNumber && (
                               <p className="text-xs text-muted-foreground">{payment.employee.employeeNumber}</p>
                             )}
                           </div>
                         </td>
                         <td className="text-center text-sm">
-                          {payment.attendanceDays != null ? Number(payment.attendanceDays).toFixed(1) : "—"}
+                          {payment.attendanceDays != null ? Number(payment.attendanceDays).toFixed(1) : "-"}
                         </td>
                         <td className="number font-medium">{formatKWD(Number(payment.baseAmount), numLocale)}</td>
                         <td className={`number ${hasIncentive ? "text-blue-600 font-medium" : "text-muted-foreground"}`}>
-                          {hasIncentive ? formatKWD(Number(payment.incentives), numLocale) : "—"}
+                          {hasIncentive ? formatKWD(Number(payment.incentives), numLocale) : "-"}
                         </td>
                         <td className={`number ${hasAdditions ? "text-green-600" : "text-muted-foreground"}`}>
-                          {hasAdditions ? formatKWD(Number(payment.additionalEarnings), numLocale) : "—"}
+                          {hasAdditions ? formatKWD(Number(payment.additionalEarnings), numLocale) : "-"}
                         </td>
                         <td className={`number ${hasDeductions ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                          {hasDeductions ? formatKWD(Number(payment.deductions), numLocale) : "—"}
+                          {hasDeductions ? formatKWD(Number(payment.deductions), numLocale) : "-"}
                         </td>
                         <td className="number font-bold text-green-700">
                           {formatKWD(Number(payment.netAmount), numLocale)}
@@ -338,7 +345,7 @@ export default function SalaryBatchDetailPage() {
                                   {locale === "en" ? "Additions" : "الإضافات"}
                                 </p>
                                 {earningItems.length === 0 ? (
-                                  <p className="text-muted-foreground">—</p>
+                                  <p className="text-muted-foreground">-</p>
                                 ) : (
                                   <ul className="space-y-0.5">
                                     {earningItems.map((it) => (
@@ -355,7 +362,7 @@ export default function SalaryBatchDetailPage() {
                                   {locale === "en" ? "Deductions" : "الخصومات"}
                                 </p>
                                 {deductionItems.length === 0 ? (
-                                  <p className="text-muted-foreground">—</p>
+                                  <p className="text-muted-foreground">-</p>
                                 ) : (
                                   <ul className="space-y-0.5">
                                     {deductionItems.map((it) => (

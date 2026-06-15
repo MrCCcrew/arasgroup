@@ -3,6 +3,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createSalaryPaymentJE } from "@/lib/accounting/auto-entries";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
+import { buildSalaryBatchDraft } from "@/lib/hr/salary-batch-builder";
+
+const AR = {
+  companyRequired: "\u0645\u0639\u0631\u0641 \u0627\u0644\u0634\u0631\u0643\u0629 \u0645\u0637\u0644\u0648\u0628",
+  fetchFailed: "\u0641\u0634\u0644 \u0641\u064a \u062c\u0644\u0628 \u062f\u0641\u0639\u0627\u062a \u0627\u0644\u0631\u0648\u0627\u062a\u0628",
+  createFailed: "\u0641\u0634\u0644 \u0641\u064a \u0625\u0646\u0634\u0627\u0621 \u062f\u0641\u0639\u0629 \u0627\u0644\u0631\u0648\u0627\u062a\u0628",
+};
 
 const paymentLineSchema = z.object({
   employeeId: z.string(),
@@ -10,7 +17,6 @@ const paymentLineSchema = z.object({
   incentives: z.number().min(0).default(0),
   deductions: z.number().min(0).default(0),
   additionalEarnings: z.number().min(0).default(0),
-  // تفصيل الإضافات/الخصومات للسائقين
   foodAllowance: z.number().min(0).default(0),
   companyAddition: z.number().min(0).default(0),
   fuelAddition: z.number().min(0).default(0),
@@ -53,11 +59,12 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get("companyId");
 
     if (!companyId) {
-      return NextResponse.json({ success: false, error: "معرف الشركة مطلوب" }, { status: 400 });
+      return NextResponse.json({ success: false, error: AR.companyRequired }, { status: 400 });
     }
 
     const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
+
     const permissionError = assertPermission(session, "SALARIES", "VIEW", { companyId });
     if (permissionError) return permissionError;
 
@@ -73,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: batches });
   } catch {
-    return NextResponse.json({ success: false, error: "فشل في جلب دفعات الرواتب" }, { status: 500 });
+    return NextResponse.json({ success: false, error: AR.fetchFailed }, { status: 500 });
   }
 }
 
@@ -82,8 +89,7 @@ export async function POST(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   try {
-    const body = await request.json();
-    const parsed = createBatchSchema.safeParse(body);
+    const parsed = createBatchSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
@@ -91,36 +97,17 @@ export async function POST(request: NextRequest) {
     const data = parsed.data;
     const companyAccessError = assertCompanyAccess(session, data.companyId);
     if (companyAccessError) return companyAccessError;
+
     const permissionError = assertPermission(session, "SALARIES", "CREATE", {
       companyId: data.companyId,
       branchId: data.branchId,
     });
     if (permissionError) return permissionError;
 
-    const round3 = (value: number) => Math.round(value * 1000) / 1000;
+    const draft = buildSalaryBatchDraft(data.payments);
 
-    // الإضافات الإجمالية = إضافة عامة + بدل طعام + إضافة شركة + بنزين وبنشر
-    // الخصومات الإجمالية = خصم عام + خصم تارجيت + خصم شركة
-    const payments = data.payments.map((payment) => {
-      // نحتفظ بالقيم العامة الأصلية (للموظفين غير السائقين) لترقيم البنود
-      const additionalEarningsRaw = payment.additionalEarnings;
-      const deductionsRaw = payment.deductions;
-      const additionalEarnings = round3(
-        additionalEarningsRaw + payment.foodAllowance + payment.companyAddition + payment.fuelAddition,
-      );
-      const deductions = round3(deductionsRaw + payment.targetDeduction + payment.companyDeduction);
-      const netAmount = round3(payment.baseAmount + payment.incentives + additionalEarnings - deductions);
-      return { ...payment, additionalEarnings, deductions, netAmount, additionalEarningsRaw, deductionsRaw };
-    });
-
-    const totalGross = payments.reduce(
-      (sum, payment) => sum + payment.baseAmount + payment.incentives + payment.additionalEarnings,
-      0,
-    );
-    const totalNet = payments.reduce((sum, payment) => sum + payment.netAmount, 0);
-
-    const batch = await prisma.$transaction(async (tx) => {
-      const createdBatch = await tx.salaryBatch.create({
+    const batch = await prisma.$transaction(async (tx) => (
+      tx.salaryBatch.create({
         data: {
           companyId: data.companyId,
           branchId: data.branchId,
@@ -130,12 +117,12 @@ export async function POST(request: NextRequest) {
           year: data.year,
           periodStart: data.periodStart,
           periodEnd: data.periodEnd,
-          totalGross,
-          totalNet,
+          totalGross: draft.totalGross,
+          totalNet: draft.totalNet,
           status: "DRAFT",
           notes: data.notes,
           payments: {
-            create: payments.map((payment) => ({
+            create: draft.payments.map((payment) => ({
               employeeId: payment.employeeId,
               attendanceDays: payment.attendanceDays,
               evaluationScore: payment.evaluationScore,
@@ -152,53 +139,17 @@ export async function POST(request: NextRequest) {
             })),
           },
           items: {
-            create: payments.flatMap((payment) => {
-              const items: Array<{
-                employeeId: string; type: string; category: string;
-                titleAr: string; titleEn: string; amount: number;
-              }> = [
-                {
-                  employeeId: payment.employeeId,
-                  type: "BASE_SALARY",
-                  category: "EARNING",
-                  titleAr: "راتب أساسي",
-                  titleEn: "Base Salary",
-                  amount: payment.baseAmount,
-                },
-              ];
-
-              const add = (cond: boolean, type: string, category: string, titleAr: string, titleEn: string, amount: number) => {
-                if (cond && amount > 0) {
-                  items.push({ employeeId: payment.employeeId, type, category, titleAr, titleEn, amount });
-                }
-              };
-
-              // الإضافات (EARNING)
-              add(true, "INCENTIVE", "EARNING", "حافز", "Incentive", payment.incentives);
-              add(true, "FOOD_ALLOWANCE", "EARNING", "بدل طعام", "Food Allowance", payment.foodAllowance);
-              add(true, "COMPANY_ADDITION", "EARNING", "إضافة شركة", "Company Addition", payment.companyAddition);
-              add(true, "FUEL_ADDITION", "EARNING", "إضافة بنزين وبنشر", "Fuel & Tire Addition", payment.fuelAddition);
-              add(true, "ADDITIONAL_EARNING", "EARNING", "إضافة أخرى", "Additional Earning", payment.additionalEarningsRaw);
-
-              // الخصومات (DEDUCTION)
-              add(true, "TARGET_DEDUCTION", "DEDUCTION", "خصم تارجيت", "Target Deduction", payment.targetDeduction);
-              add(true, "COMPANY_DEDUCTION", "DEDUCTION", "خصم شركة", "Company Deduction", payment.companyDeduction);
-              add(true, "DEDUCTION", "DEDUCTION", "خصم", "Deduction", payment.deductionsRaw);
-
-              return items;
-            }),
+            create: draft.items,
           },
         },
         include: { payments: true },
-      });
-
-      return createdBatch;
-    });
+      })
+    ));
 
     const salaryJournalEntry = await createSalaryPaymentJE({
       companyId: data.companyId,
       userId: session.id,
-      totalAmount: totalNet,
+      totalAmount: draft.totalNet,
       month: data.month,
       year: data.year,
       refId: batch.id,
@@ -211,7 +162,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: batch }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في إنشاء دفعة الرواتب";
+    const message = error instanceof Error ? error.message : AR.createFailed;
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }
