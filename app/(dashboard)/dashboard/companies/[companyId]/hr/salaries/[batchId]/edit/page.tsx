@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Save, Truck, Users } from "lucide-react";
+import { ArrowRight, RotateCcw, Save, Trash2, Truck, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
@@ -59,6 +59,10 @@ const arText = {
   cancel: "\u0625\u0644\u063a\u0627\u0621",
   totalNet: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0635\u0627\u0641\u064a:",
   kwd: "\u062f.\u0643",
+  removeFromBatch: "\u062d\u0630\u0641 \u0645\u0646 \u0627\u0644\u062f\u0641\u0639\u0629",
+  restoreToBatch: "\u0625\u0639\u0627\u062f\u0629 \u0644\u0644\u062f\u0641\u0639\u0629",
+  removedEmployees: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0629 \u0645\u0646 \u0647\u0630\u0647 \u0627\u0644\u062f\u0641\u0639\u0629",
+  removeHint: "\u0627\u0644\u062d\u0630\u0641 \u0645\u0646 \u0647\u0630\u0647 \u0627\u0644\u0634\u0627\u0634\u0629 \u064a\u0624\u062b\u0631 \u0639\u0644\u0649 \u0627\u0644\u062f\u0641\u0639\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629 \u0641\u0642\u0637.",
 };
 
 interface DriverInfo {
@@ -117,6 +121,7 @@ interface BatchResponse {
 
 interface PaymentLine {
   employeeId: string;
+  included: boolean;
   isDriver: boolean;
   driverId: string | null;
   baseAmount: string;
@@ -228,6 +233,7 @@ export default function EditSalaryBatchPage() {
             if (!payment) {
               return {
                 employeeId: employee.id,
+                included: true,
                 isDriver,
                 driverId: employee.driver?.id ?? null,
                 baseAmount: (employee.actualSalary ?? employee.baseSalary) != null ? String(employee.actualSalary ?? employee.baseSalary) : "",
@@ -251,6 +257,7 @@ export default function EditSalaryBatchPage() {
 
             return {
               employeeId: employee.id,
+              included: true,
               isDriver,
               driverId: employee.driver?.id ?? null,
               baseAmount: String(payment.baseAmount ?? ""),
@@ -321,6 +328,12 @@ export default function EditSalaryBatchPage() {
     );
   }
 
+  function setLineIncluded(employeeId: string, included: boolean) {
+    setLines((prev) =>
+      prev.map((line) => (line.employeeId === employeeId ? { ...line, included } : line)),
+    );
+  }
+
   function driverNet(line: PaymentLine) {
     return round3(
       n(line.baseAmount) + n(line.incentive) + n(line.foodAllowance) + n(line.companyAddition) +
@@ -336,9 +349,11 @@ export default function EditSalaryBatchPage() {
     return line.isDriver ? driverNet(line) : otherNet(line);
   }
 
-  const driverLines = lines.filter((line) => line.isDriver);
-  const otherLines = lines.filter((line) => !line.isDriver);
-  const totalNet = lines.reduce((sum, line) => sum + lineNet(line), 0);
+  const includedLines = lines.filter((line) => line.included);
+  const removedLines = lines.filter((line) => !line.included);
+  const driverLines = includedLines.filter((line) => line.isDriver);
+  const otherLines = includedLines.filter((line) => !line.isDriver);
+  const totalNet = includedLines.reduce((sum, line) => sum + lineNet(line), 0);
 
   function employeeFor(employeeId: string) {
     return employees.find((employee) => employee.id === employeeId);
@@ -348,7 +363,7 @@ export default function EditSalaryBatchPage() {
     event.preventDefault();
     setError("");
 
-    const activeLines = lines.filter((line) => n(line.baseAmount) > 0 || lineNet(line) !== 0);
+    const activeLines = includedLines.filter((line) => n(line.baseAmount) > 0 || lineNet(line) !== 0);
     if (activeLines.length === 0) {
       setError(ar ? arText.atLeastOne : "At least one employee salary is required");
       return;
@@ -486,6 +501,7 @@ export default function EditSalaryBatchPage() {
                   <thead>
                     <tr className="bg-muted/50 text-xs">
                       <th className="px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.driver : "Driver"}</th>
+                      <th className="w-28 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? "إجراء" : "Action"}</th>
                       <th className="w-24 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.baseSalary : "Base"}</th>
                       <th className="w-20 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.target : "Target"}</th>
                       <th className="w-20 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.orders : "Orders"}</th>
@@ -505,6 +521,17 @@ export default function EditSalaryBatchPage() {
                       return (
                         <tr key={line.employeeId} className="border-b border-border">
                           <td className="px-2 py-2 font-medium">{employee.nameAr}</td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setLineIncluded(line.employeeId, false)}
+                              className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                              disabled={!canEdit}
+                            >
+                              <Trash2 size={12} />
+                              {ar ? arText.removeFromBatch : "Remove"}
+                            </button>
+                          </td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.baseAmount} onChange={(e) => setLineField(line.employeeId, "baseAmount", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="1" min="0" value={line.targetOrders} onChange={(e) => setLineField(line.employeeId, "targetOrders", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="1" min="0" value={line.actualOrders} onChange={(e) => setLineField(line.employeeId, "actualOrders", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
@@ -537,6 +564,7 @@ export default function EditSalaryBatchPage() {
                   <thead>
                     <tr className="bg-muted/50">
                       <th className="px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.employee : "Employee"}</th>
+                      <th className="w-28 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? "إجراء" : "Action"}</th>
                       <th className="px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.type : "Type"}</th>
                       <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.baseSalary : "Base salary"}</th>
                       <th className="w-28 px-3 py-2 text-right font-bold text-green-700">{ar ? arText.incentives : "Incentives"}</th>
@@ -553,6 +581,17 @@ export default function EditSalaryBatchPage() {
                       return (
                         <tr key={line.employeeId} className="border-b border-border">
                           <td className="px-3 py-2 font-medium">{employee.nameAr}</td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setLineIncluded(line.employeeId, false)}
+                              className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                              disabled={!canEdit}
+                            >
+                              <Trash2 size={12} />
+                              {ar ? arText.removeFromBatch : "Remove"}
+                            </button>
+                          </td>
                           <td className="px-3 py-2 text-xs text-muted-foreground">{typeLabel}</td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.baseAmount} onChange={(e) => setLineField(line.employeeId, "baseAmount", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.incentive} onChange={(e) => setLineField(line.employeeId, "incentive", e.target.value)} className={`${numInput} text-green-600`} dir="ltr" disabled={!canEdit} /></td>
@@ -564,6 +603,40 @@ export default function EditSalaryBatchPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {removedLines.length > 0 && (
+            <div className="section-card">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                  {ar ? arText.removedEmployees : "Removed from this batch"}
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {ar ? arText.removeHint : "Removing here only affects the current batch."}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {removedLines.map((line) => {
+                  const employee = employeeFor(line.employeeId);
+                  if (!employee) return null;
+                  return (
+                    <button
+                      key={line.employeeId}
+                      type="button"
+                      onClick={() => setLineIncluded(line.employeeId, true)}
+                      className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                      disabled={!canEdit}
+                    >
+                      <RotateCcw size={14} />
+                      <span>{employee.nameAr}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {ar ? arText.restoreToBatch : "Restore"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
