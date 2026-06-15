@@ -182,6 +182,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/investors/claims`, labelKey: "nav.investorClaims", icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/statements`, labelKey: "nav.investorStatements", icon: <FileText size={14} />, iconColor: "teal" },
         { href: `${base}/investors/salaries`, labelKey: "nav.investorSalaries", icon: <Wallet size={14} />, iconColor: "teal" },
+        { href: `${base}/managers`, labelKey: "nav.managersBilling", icon: <Wallet size={14} />, iconColor: "emerald" },
       ],
     },
     { href: `${base}/expenses`, labelKey: "nav.expenses", icon: <Receipt size={16} />, iconColor: "red", module: "EXPENSES" },
