@@ -14,26 +14,39 @@ export function buildSalaryWhatsAppMessage(input: {
   incentives: number;
   deductions: number;
   netAmount: number;
+  pdfUrl?: string;
 }) {
   if (input.locale === "en") {
-    return [
+    const lines = [
       `Salary details for ${input.employeeName}`,
       `Period: ${input.month}/${input.year}`,
       `Base salary: ${formatKWD(input.baseAmount, "en-US")}`,
       `Incentives: ${formatKWD(input.incentives, "en-US")}`,
       `Deductions: ${formatKWD(input.deductions, "en-US")}`,
       `Net salary: ${formatKWD(input.netAmount, "en-US")}`,
-    ].join("\n");
+    ];
+
+    if (input.pdfUrl) {
+      lines.push(`PDF: ${input.pdfUrl}`);
+    }
+
+    return lines.join("\n");
   }
 
-  return [
+  const lines = [
     `تفاصيل راتب ${input.employeeName}`,
     `الفترة: ${input.month}/${input.year}`,
-    `الراتب الأساسي: ${formatKWD(input.baseAmount)}`,
-    `الحوافز: ${formatKWD(input.incentives)}`,
-    `الخصومات: ${formatKWD(input.deductions)}`,
-    `صافي الراتب: ${formatKWD(input.netAmount)}`,
-  ].join("\n");
+    `الراتب الأساسي: ${formatKWD(input.baseAmount, "ar-KW")}`,
+    `الحوافز: ${formatKWD(input.incentives, "ar-KW")}`,
+    `الخصومات: ${formatKWD(input.deductions, "ar-KW")}`,
+    `صافي الراتب: ${formatKWD(input.netAmount, "ar-KW")}`,
+  ];
+
+  if (input.pdfUrl) {
+    lines.push(`رابط القسيمة PDF: ${input.pdfUrl}`);
+  }
+
+  return lines.join("\n");
 }
 
 export function buildInvestorSalaryFundingReminder(input: {

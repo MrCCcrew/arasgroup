@@ -3,29 +3,42 @@ import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import { buildSalaryWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
+const AR = {
+  paymentIdRequired: "\u0645\u0639\u0631\u0641 \u062f\u0641\u0639\u0629 \u0627\u0644\u0631\u0627\u062a\u0628 \u0645\u0637\u0644\u0648\u0628",
+  paymentNotFound: "\u062f\u0641\u0639\u0629 \u0627\u0644\u0631\u0627\u062a\u0628 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f\u0629",
+} as const;
+
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const paymentId = searchParams.get("paymentId");
   const locale = searchParams.get("locale") === "en" ? "en" : "ar";
 
   if (!paymentId) {
-    return NextResponse.json({ success: false, error: "معرف دفعة الراتب مطلوب" }, { status: 400 });
+    return NextResponse.json({ success: false, error: AR.paymentIdRequired }, { status: 400 });
   }
 
   const payment = await prisma.salaryPayment.findUnique({
     where: { id: paymentId },
     include: {
-      employee: { select: { nameAr: true, nameEn: true, phone: true } },
-      batch: { select: { month: true, year: true, companyId: true } },
+      employee: {
+        select: { nameAr: true, nameEn: true, phone: true },
+      },
+      batch: {
+        select: { id: true, month: true, year: true, companyId: true },
+      },
     },
   });
 
   if (!payment) {
-    return NextResponse.json({ success: false, error: "دفعة الراتب غير موجودة" }, { status: 404 });
+    return NextResponse.json({ success: false, error: AR.paymentNotFound }, { status: 404 });
   }
+
+  const pdfUrl =
+    `${origin}/dashboard/companies/${payment.batch.companyId}` +
+    `/hr/salaries/${payment.batch.id}/${payment.id}/pdf?locale=${locale}`;
 
   const message = buildSalaryWhatsAppMessage({
     locale,
@@ -36,6 +49,7 @@ export async function GET(request: NextRequest) {
     incentives: Number(payment.incentives) + Number(payment.additionalEarnings ?? 0),
     deductions: Number(payment.deductions),
     netAmount: Number(payment.netAmount),
+    pdfUrl,
   });
 
   return NextResponse.json({
@@ -43,6 +57,7 @@ export async function GET(request: NextRequest) {
     data: {
       phone: payment.employee.phone,
       message,
+      pdfUrl,
       url: payment.employee.phone ? buildWhatsAppUrl(payment.employee.phone, message) : null,
     },
   });
