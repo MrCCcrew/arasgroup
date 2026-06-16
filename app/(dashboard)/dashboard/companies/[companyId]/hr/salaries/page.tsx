@@ -138,6 +138,9 @@ export default async function SalariesPage({ params }: Props) {
                     const canMutate =
                       (batch.status === "DRAFT" || batch.status === "APPROVED") &&
                       (journalEntry == null || journalEntry.isDeleted || journalEntry.status !== "POSTED");
+                    const canDelete =
+                      (batch.status === "DRAFT" || batch.status === "APPROVED" || batch.status === "CANCELLED") &&
+                      (journalEntry == null || journalEntry.isDeleted || journalEntry.status !== "POSTED");
 
                     return (
                       <tr key={batch.id} className="hover:bg-muted/30">
@@ -167,6 +170,7 @@ export default async function SalariesPage({ params }: Props) {
                             batchId={batch.id}
                             locale={locale}
                             canMutate={canMutate}
+                            canDelete={canDelete}
                           />
                         </td>
                       </tr>

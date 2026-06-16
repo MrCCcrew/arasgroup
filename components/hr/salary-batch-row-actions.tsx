@@ -9,6 +9,7 @@ interface Props {
   batchId: string;
   locale: "ar" | "en";
   canMutate: boolean;
+  canDelete: boolean;
 }
 
 const ar = {
@@ -19,7 +20,7 @@ const ar = {
   delete: "\u062d\u0630\u0641",
 };
 
-export function SalaryBatchRowActions({ companyId, batchId, locale, canMutate }: Props) {
+export function SalaryBatchRowActions({ companyId, batchId, locale, canMutate, canDelete }: Props) {
   const router = useRouter();
 
   async function handleDelete() {
@@ -56,6 +57,10 @@ export function SalaryBatchRowActions({ companyId, batchId, locale, canMutate }:
             <Pencil size={12} />
             {locale === "en" ? "Edit" : ar.edit}
           </Link>
+        </>
+      )}
+      {canDelete && (
+        <>
           <button
             type="button"
             onClick={handleDelete}

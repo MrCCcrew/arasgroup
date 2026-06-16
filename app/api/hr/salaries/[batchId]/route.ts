@@ -77,6 +77,12 @@ function ensureBatchIsEditable(status: string) {
   }
 }
 
+function ensureBatchIsDeletable(status: string) {
+  if (status !== "DRAFT" && status !== "APPROVED" && status !== "CANCELLED") {
+    throw new Error(AR.immutableBatch);
+  }
+}
+
 export async function GET(request: NextRequest, { params }: Ctx) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -284,7 +290,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
     const permissionError = assertPermission(session, "SALARIES", "UPDATE", { companyId: batch.companyId });
     if (permissionError) return permissionError;
 
-    ensureBatchIsEditable(batch.status);
+    ensureBatchIsDeletable(batch.status);
     await ensureLinkedJournalEntryIsMutable(prisma, batch.journalEntryId, AR.deleteAction);
 
     await prisma.$transaction(async (tx) => {
