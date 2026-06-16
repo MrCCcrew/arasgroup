@@ -1,4 +1,5 @@
 import React from "react";
+import path from "path";
 import {
   Document,
   Page,
@@ -6,7 +7,22 @@ import {
   Text,
   View,
   renderToBuffer,
+  Font,
 } from "@react-pdf/renderer";
+
+// تسجيل خط عربي (Amiri) — Helvetica الافتراضي لا يدعم العربية فتظهر رموزاً مشوّهة.
+const FONT_DIR = path.join(process.cwd(), "public", "fonts");
+Font.register({
+  family: "Amiri",
+  fonts: [
+    { src: path.join(FONT_DIR, "Amiri-Regular.ttf"), fontWeight: 400 },
+    { src: path.join(FONT_DIR, "Amiri-Regular.ttf"), fontWeight: 500 },
+    { src: path.join(FONT_DIR, "Amiri-Bold.ttf"), fontWeight: 600 },
+    { src: path.join(FONT_DIR, "Amiri-Bold.ttf"), fontWeight: 700 },
+  ],
+});
+// منع تقطيع الكلمات العربية
+Font.registerHyphenationCallback((word) => [word]);
 
 type SalarySlipLocale = "ar" | "en";
 
@@ -72,7 +88,7 @@ const styles = StyleSheet.create({
   page: {
     padding: 32,
     fontSize: 11,
-    fontFamily: "Helvetica",
+    fontFamily: "Amiri",
     color: "#111827",
   },
   header: {
