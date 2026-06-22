@@ -1,18 +1,65 @@
-// استخراج قيمة الفاتورة وتاريخها من نص OCR — مرن يدعم العربي/الإنجليزي.
-// دالة نقية (تُستخدم في المتصفح بعد تشغيل tesseract).
+// Extract invoice amount/date from OCR text.
+// Pure utility used in the browser after tesseract runs.
 
 const TOTAL_KEYWORDS = [
-  "total", "amount", "net", "grand total", "balance", "due", "paid",
-  "الإجمالي", "الاجمالي", "المجموع", "الصافي", "صافي", "اجمالي", "مجموع", "المبلغ", "القيمة", "قيمة",
+  "grand total",
+  "total amount",
+  "total",
+  "الإجمالي",
+  "الاجمالي",
+  "اجمالي",
+  "المجموع",
 ];
 
-// تحويل الأرقام العربية/الفارسية والفواصل العربية إلى لاتينية
+const AMOUNT_KEYWORDS = [
+  "amount",
+  "net",
+  "مبلغ",
+  "قيمة",
+  "الصافي",
+];
+
+const CURRENCY_KEYWORDS = [
+  "kwd",
+  "kd",
+  "د.ك",
+  "دك",
+];
+
+const IGNORE_AMOUNT_KEYWORDS = [
+  "date",
+  "time",
+  "shift",
+  "site",
+  "pump",
+  "price",
+  "qty",
+  "quantity",
+  "no",
+  "station",
+  "محطة",
+  "مضخة",
+  "الكمية",
+  "سعر اللتر",
+  "رقم",
+];
+
+const DATE_HINT_KEYWORDS = ["date", "التاريخ"];
+const TIME_RE = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
+const ISO_DATE_RE = /\b(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/g;
+const DMY_DATE_RE = /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/g;
+const NUMBER_RE = /\b\d+(?:[.,]\d{1,3})?\b/g;
+
 function normalizeDigits(input: string): string {
   return (input || "")
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/٫/g, ".") // الفاصلة العشرية العربية
-    .replace(/٬/g, ","); // فاصلة الآلاف العربية
+    .replace(/٫/g, ".")
+    .replace(/٬/g, ",");
+}
+
+function normalizeText(input: string): string {
+  return normalizeDigits(input).replace(/\s+/g, " ").trim();
 }
 
 function toIso(y: string, mo: string, d: string): string | null {
@@ -23,55 +70,167 @@ function toIso(y: string, mo: string, d: string): string | null {
   return `${Y}-${String(M).padStart(2, "0")}-${String(D).padStart(2, "0")}`;
 }
 
-export function extractDate(raw: string): string | null {
-  const text = normalizeDigits(raw);
-  // yyyy-mm-dd أو yyyy/mm/dd أو yyyy.mm.dd
-  let m = text.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
-  if (m) {
-    const iso = toIso(m[1], m[2], m[3]);
-    if (iso) return iso;
-  }
-  // dd/mm/yyyy أو dd-mm-yyyy أو dd.mm.yyyy (اليوم أولاً — الكويت)
-  m = text.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
-  if (m) {
-    const iso = toIso(m[3], m[2], m[1]);
-    if (iso) return iso;
-  }
-  return null;
+function containsAny(text: string, keywords: string[]): boolean {
+  return keywords.some((keyword) => text.includes(keyword));
 }
 
-const AMOUNT_RE = /(\d{1,3}(?:,\d{3})+(?:\.\d{1,3})?|\d+(?:\.\d{1,3})?)/g;
+function isTimeToken(token: string): boolean {
+  return token.includes(":");
+}
 
-function amountsIn(text: string): number[] {
-  const out: number[] = [];
-  let m: RegExpExecArray | null;
-  const re = new RegExp(AMOUNT_RE);
-  while ((m = re.exec(text))) {
-    const v = parseFloat(m[1].replace(/,/g, ""));
-    if (!isNaN(v) && v > 0) out.push(v);
+function isDateToken(token: string): boolean {
+  return /\d[\/.\-]\d/.test(token) && (token.match(/[\/.\-]/g)?.length ?? 0) >= 2;
+}
+
+function parseAmountToken(token: string): number | null {
+  if (!token || isTimeToken(token) || isDateToken(token)) return null;
+
+  let normalized = token.trim();
+  if (normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/,/g, "");
+  } else if (/^\d+,\d{1,3}$/.test(normalized)) {
+    normalized = normalized.replace(",", ".");
+  } else {
+    normalized = normalized.replace(/,/g, "");
   }
+
+  const value = Number.parseFloat(normalized);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getLineCandidates(line: string): number[] {
+  const cleaned = line.replace(TIME_RE, " ");
+  const out: number[] = [];
+  let match: RegExpExecArray | null;
+  const re = new RegExp(NUMBER_RE);
+
+  while ((match = re.exec(cleaned))) {
+    const token = match[0];
+    const value = parseAmountToken(token);
+    if (value != null) out.push(value);
+  }
+
   return out;
 }
 
-export function extractAmount(raw: string): number | null {
-  const text = normalizeDigits(raw);
-  const lines = text.split(/\r?\n+/);
+function pickBestFromLine(line: string): number | null {
+  const candidates = getLineCandidates(line);
+  if (candidates.length === 0) return null;
+  return candidates[candidates.length - 1] ?? null;
+}
 
-  // أولاً: مبلغ بجانب كلمة دالة على الإجمالي
-  for (const line of lines) {
+function getFallbackCandidates(lines: string[]): number[] {
+  const out: number[] = [];
+
+  for (const rawLine of lines) {
+    const line = normalizeText(rawLine);
     const lower = line.toLowerCase();
-    if (TOTAL_KEYWORDS.some((k) => lower.includes(k))) {
-      const found = amountsIn(line);
-      if (found.length > 0) return Math.max(...found);
+    if (!line) continue;
+    if (containsAny(lower, IGNORE_AMOUNT_KEYWORDS)) continue;
+    out.push(...getLineCandidates(line));
+  }
+
+  return out;
+}
+
+export function extractDate(raw: string): string | null {
+  const text = normalizeDigits(raw);
+  const withoutTimes = text.replace(TIME_RE, " ");
+  const lines = withoutTimes.split(/\r?\n+/);
+
+  for (const rawLine of lines) {
+    const line = normalizeText(rawLine);
+    const lower = line.toLowerCase();
+    if (!line) continue;
+    if (!containsAny(lower, DATE_HINT_KEYWORDS)) continue;
+
+    let match: RegExpExecArray | null;
+    const isoRe = new RegExp(ISO_DATE_RE);
+    while ((match = isoRe.exec(line))) {
+      const iso = toIso(match[1], match[2], match[3]);
+      if (iso) return iso;
+    }
+
+    const dmyRe = new RegExp(DMY_DATE_RE);
+    while ((match = dmyRe.exec(line))) {
+      const iso = toIso(match[3], match[2], match[1]);
+      if (iso) return iso;
     }
   }
 
-  // وإلا: أكبر مبلغ في النص كله
-  const all = amountsIn(text);
-  if (all.length > 0) return Math.max(...all);
+  let match: RegExpExecArray | null;
+  const isoRe = new RegExp(ISO_DATE_RE);
+  while ((match = isoRe.exec(withoutTimes))) {
+    const iso = toIso(match[1], match[2], match[3]);
+    if (iso) return iso;
+  }
+
+  const dmyRe = new RegExp(DMY_DATE_RE);
+  while ((match = dmyRe.exec(withoutTimes))) {
+    const iso = toIso(match[3], match[2], match[1]);
+    if (iso) return iso;
+  }
+
   return null;
+}
+
+export function extractAmount(raw: string): number | null {
+  const lines = normalizeDigits(raw).split(/\r?\n+/);
+  const totalMatches: number[] = [];
+  const amountMatches: number[] = [];
+  const currencyMatches: number[] = [];
+
+  for (const rawLine of lines) {
+    const line = normalizeText(rawLine);
+    const lower = line.toLowerCase();
+    if (!line) continue;
+
+    const candidate = pickBestFromLine(line);
+    if (candidate == null) continue;
+
+    if (containsAny(lower, TOTAL_KEYWORDS)) {
+      totalMatches.push(candidate);
+      continue;
+    }
+
+    if (containsAny(lower, AMOUNT_KEYWORDS)) {
+      amountMatches.push(candidate);
+      continue;
+    }
+
+    if (containsAny(lower, CURRENCY_KEYWORDS) && !containsAny(lower, IGNORE_AMOUNT_KEYWORDS)) {
+      currencyMatches.push(candidate);
+    }
+  }
+
+  if (totalMatches.length > 0) return totalMatches[totalMatches.length - 1];
+  if (amountMatches.length > 0) return amountMatches[amountMatches.length - 1];
+  if (currencyMatches.length > 0) return currencyMatches[currencyMatches.length - 1];
+
+  const fallback = getFallbackCandidates(lines);
+  if (fallback.length === 0) return null;
+  return Math.max(...fallback);
 }
 
 export function parseInvoiceText(raw: string): { amount: number | null; date: string | null } {
   return { amount: extractAmount(raw), date: extractDate(raw) };
 }
+
+/*
+Examples:
+
+parseInvoiceText(`
+ALFA FUEL STATION
+RECEIPT
+PAYMENT TYPE: Cash Payment
+DATE 15:56:51 21-06-2026
+SHIFT 1
+Pump: 7
+PRODUCT : Pr
+Price 0.085
+QTY 29.39
+AMOUNT 2.500
+TOTAL : 2.500 KWD
+`)
+=> { amount: 2.5, date: "2026-06-21" }
+*/
