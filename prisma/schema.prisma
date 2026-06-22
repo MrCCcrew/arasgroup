@@ -818,6 +818,7 @@ model Employee {
   claimBeneficiaries     InvestorClaimBeneficiary[]
   investorAccountAgreements InvestorAccountAgreement[]
   managerSalaryLines     ManagerSalaryLine[]
+  deliveryInvoices       DeliveryInvoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1107,6 +1108,7 @@ model Driver {
   absences           DeliveryAbsence[]
   evaluations        DriverEvaluation[]
   orderDeliveries    DeliveryOrderDelivery[]
+  deliveryInvoices   DeliveryInvoice[]
   violations              DriverViolation[]
   accidents               DriverAccident[]
   vehicleIncidents        VehicleIncident[]           @relation("DriverVehicleIncidents")
@@ -1355,6 +1357,49 @@ model DeliveryOrderDelivery {
   @@index([driverId])
   @@index([date])
   @@map("delivery_order_deliveries")
+}
+
+// ===== فواتير السائقين/الموظفين (أرشفة ومتابعة فقط — لا يؤثر على الحسابات) =====
+
+enum DeliveryInvoiceTargetType {
+  DRIVER
+  EMPLOYEE
+}
+
+model DeliveryInvoice {
+  id               String                    @id @default(cuid())
+  companyId        String
+  targetType       DeliveryInvoiceTargetType
+  driverId         String?
+  employeeId       String?
+  invoiceDate      DateTime
+  amount           Decimal                   @db.Decimal(18, 3)
+  currency         String                    @default("KWD")
+  imagePath        String // رابط الصورة على R2
+  storageKey       String? // مفتاح R2 (للحذف من التخزين)
+  originalFileName String?
+  mimeType         String?
+  fileSize         Int?
+  ocrText          String?                   @db.Text
+  ocrAmount        Decimal?                  @db.Decimal(18, 3)
+  ocrDate          DateTime?
+  notes            String?
+  createdById      String?
+  deletedAt        DateTime?
+
+  driver   Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([employeeId])
+  @@index([invoiceDate])
+  @@index([targetType])
+  @@index([deletedAt])
+  @@map("delivery_invoices")
 }
 
 enum DeliveryDailyOrderWorkStatus {
