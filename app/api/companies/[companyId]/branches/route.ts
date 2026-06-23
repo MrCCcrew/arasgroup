@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     const { companyId } = await params;
 
     const branches = await prisma.branch.findMany({
-      where: { companyId, isActive: true },
+      where: { companyId },
       include: {
         investorBranches: {
           where: { isActive: true },
