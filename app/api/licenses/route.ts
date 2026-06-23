@@ -56,6 +56,37 @@ const licenseSchema = z.object({
   }).optional(),
 });
 
+async function resolveLicenseBranchForCreate(input: z.infer<typeof licenseSchema>) {
+  if (input.isMainLicense) {
+    return {
+      branchId: input.branchId ?? null,
+      mainLicenseId: null as string | null,
+    };
+  }
+
+  if (!input.mainLicenseId) {
+    throw new Error("يجب اختيار الترخيص الرئيسي");
+  }
+
+  const parentLicense = await prisma.license.findFirst({
+    where: {
+      id: input.mainLicenseId,
+      companyId: input.companyId,
+      isMainLicense: true,
+    },
+    select: { id: true, branchId: true },
+  });
+
+  if (!parentLicense) {
+    throw new Error("الترخيص الرئيسي غير صالح");
+  }
+
+  return {
+    branchId: parentLicense.branchId ?? null,
+    mainLicenseId: parentLicense.id,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -136,13 +167,37 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data;
+  let derivedBranchId: string | null = data.branchId ?? null;
+  let derivedMainLicenseId: string | null = data.isMainLicense ? null : (data.mainLicenseId ?? null);
+
+  try {
+    const resolved = await resolveLicenseBranchForCreate(data);
+    derivedBranchId = resolved.branchId;
+    derivedMainLicenseId = resolved.mainLicenseId;
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "بيانات الترخيص غير صالحة" },
+      { status: 400 },
+    );
+  }
+
   const companyAccessError = assertCompanyAccess(session, data.companyId);
   if (companyAccessError) return companyAccessError;
   const permissionError = assertPermission(session, "LICENSES", "CREATE", {
     companyId: data.companyId,
-    branchId: data.branchId,
+    branchId: derivedBranchId ?? undefined,
   });
   if (permissionError) return permissionError;
+
+  if (data.isMainLicense && derivedBranchId) {
+    const branch = await prisma.branch.findFirst({
+      where: { id: derivedBranchId, companyId: data.companyId, isActive: true },
+      select: { id: true },
+    });
+    if (!branch) {
+      return NextResponse.json({ success: false, error: "الفرع المحدد غير صالح" }, { status: 400 });
+    }
+  }
 
   const duplicate = await prisma.license.findFirst({
     where: {
@@ -161,7 +216,7 @@ export async function POST(request: NextRequest) {
     return tx.license.create({
       data: {
         companyId: data.companyId,
-        branchId: data.branchId,
+        branchId: derivedBranchId,
         investorId: data.investorId,
         licenseAddressId: address?.id,
         licenseNumber: data.licenseNumber,
@@ -173,7 +228,7 @@ export async function POST(request: NextRequest) {
         commercialNameAr: data.commercialNameAr,
         commercialNameEn: data.commercialNameEn,
         isMainLicense: data.isMainLicense,
-        mainLicenseId: data.mainLicenseId,
+        mainLicenseId: derivedMainLicenseId,
         ownerOrInvestorNameAr: data.ownerOrInvestorNameAr,
         ownerOrInvestorNameEn: data.ownerOrInvestorNameEn,
         ownerOrInvestorPhone: data.ownerOrInvestorPhone,

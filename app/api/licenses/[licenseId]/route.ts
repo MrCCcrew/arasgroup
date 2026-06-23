@@ -99,7 +99,10 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   try {
     const { licenseId } = await params;
 
-    const existing = await prisma.license.findUnique({ where: { id: licenseId }, select: { companyId: true, branchId: true } });
+    const existing = await prisma.license.findUnique({
+      where: { id: licenseId },
+      select: { companyId: true, branchId: true, isMainLicense: true, mainLicenseId: true },
+    });
     if (!existing) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
 
     const companyError = assertCompanyAccess(session, existing.companyId);
@@ -112,16 +115,55 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
 
     const d = parsed.data;
+    let nextBranchId = existing.branchId;
+    let nextMainLicenseId = existing.mainLicenseId;
+
+    if (existing.isMainLicense) {
+      if (d.branchId !== undefined && d.branchId) {
+        const branch = await prisma.branch.findFirst({
+          where: { id: d.branchId, companyId: existing.companyId, isActive: true },
+          select: { id: true },
+        });
+        if (!branch) {
+          return NextResponse.json({ success: false, error: "الفرع المحدد غير صالح" }, { status: 400 });
+        }
+      }
+      if (d.branchId !== undefined) nextBranchId = d.branchId;
+      nextMainLicenseId = null;
+    } else {
+      const requestedParentLicenseId = d.mainLicenseId !== undefined ? d.mainLicenseId : existing.mainLicenseId;
+      if (!requestedParentLicenseId) {
+        return NextResponse.json({ success: false, error: "يجب اختيار الترخيص الرئيسي" }, { status: 400 });
+      }
+
+      const parentLicense = await prisma.license.findFirst({
+        where: {
+          id: requestedParentLicenseId,
+          companyId: existing.companyId,
+          isMainLicense: true,
+          NOT: { id: licenseId },
+        },
+        select: { id: true, branchId: true },
+      });
+
+      if (!parentLicense) {
+        return NextResponse.json({ success: false, error: "الترخيص الرئيسي غير صالح" }, { status: 400 });
+      }
+
+      nextMainLicenseId = parentLicense.id;
+      nextBranchId = parentLicense.branchId ?? null;
+    }
+
     const license = await prisma.license.update({
       where: { id: licenseId },
       data: {
-        ...(d.branchId !== undefined ? { branchId: d.branchId } : {}),
+        ...(d.branchId !== undefined || !existing.isMainLicense ? { branchId: nextBranchId } : {}),
         ...(d.investorId !== undefined ? { investorId: d.investorId } : {}),
         ...(d.licenseNumber ? { licenseNumber: d.licenseNumber } : {}),
         ...(d.commercialNameAr ? { commercialNameAr: d.commercialNameAr } : {}),
         ...(d.commercialNameEn !== undefined ? { commercialNameEn: d.commercialNameEn } : {}),
         ...(d.isMainLicense !== undefined ? { isMainLicense: d.isMainLicense } : {}),
-        ...(d.mainLicenseId !== undefined ? { mainLicenseId: d.mainLicenseId } : {}),
+        ...(d.mainLicenseId !== undefined || !existing.isMainLicense ? { mainLicenseId: nextMainLicenseId } : {}),
         ...(d.status ? { status: d.status } : {}),
         ...(d.notes !== undefined ? { notes: d.notes } : {}),
         ...(d.unifiedEntityNumber !== undefined ? { unifiedEntityNumber: d.unifiedEntityNumber } : {}),

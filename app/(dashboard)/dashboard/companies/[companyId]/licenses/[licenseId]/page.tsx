@@ -23,6 +23,7 @@ interface LicenseBase {
   issueDate: string | null; unifiedEntityNumber: string | null;
   civilEntityNumber: string | null; fileNumber: string | null;
   managerName: string | null; managerPhone: string | null; notes: string | null;
+  branch: { nameAr: string } | null;
   investor: { nameAr: string } | null;
   mainLicense: { id: string; commercialNameAr: string; licenseNumber: string } | null;
   address: {
@@ -276,6 +277,7 @@ export default function LicenseDetailPage() {
   const [error, setError] = useState("");
   const [branches,  setBranches]  = useState<{ id: string; nameAr: string }[]>([]);
   const [investors, setInvestors] = useState<{ id: string; nameAr: string }[]>([]);
+  const [mainLicenses, setMainLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; branch?: { nameAr: string } | null }[]>([]);
 
   // Active modal
   type ModalType = "basic_info" | "establishment" | "lease" | "employer_cert" | "import_license" |
@@ -308,9 +310,16 @@ export default function LicenseDetailPage() {
     Promise.all([
       fetch(`/api/companies/${companyId}/branches`).then((r) => r.json()).catch(() => null),
       fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
-    ]).then(([b, i]) => {
+      fetch(`/api/licenses?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
+    ]).then(([b, i, l]) => {
       if (b?.success) setBranches(b.data);
       if (i?.success) setInvestors(i.data);
+      if (l?.success) setMainLicenses((l.data as LicenseBase[]).filter((item) => item.isMainLicense).map((item) => ({
+        id: item.id,
+        commercialNameAr: item.commercialNameAr,
+        licenseNumber: item.licenseNumber,
+        branch: item.branch ?? null,
+      })));
     });
   }, [companyId]);
 
@@ -332,6 +341,8 @@ export default function LicenseDetailPage() {
     setForm((p) => ({ ...p, fileUrl: url }));
   }
 
+  const selectedMainLicense = mainLicenses.find((item) => item.id === ((form.mainLicenseId as string | undefined) ?? "")) ?? null;
+
   async function save(url: string, method: string, body: Record<string, unknown>) {
     setSaving(true); setSaveError("");
     try {
@@ -349,7 +360,8 @@ export default function LicenseDetailPage() {
 
   async function saveBasicInfo() {
     await save(`/api/licenses/${licenseId}`, "PATCH", {
-      branchId:         form.branchId   || null,
+      branchId:         license?.isMainLicense ? (form.branchId || null) : undefined,
+      mainLicenseId:    license?.isMainLicense ? undefined : (form.mainLicenseId || null),
       investorId:       form.investorId || null,
       commercialNameAr: form.commercialNameAr || undefined,
       commercialNameEn: form.commercialNameEn || null,
@@ -583,6 +595,7 @@ export default function LicenseDetailPage() {
           <SectionCard icon={FileCheck} title="الترخيص التجاري" status={expiryStatus(license.licenseExpiryDate)}
             subtitle={license.licenseExpiryDate ? `ينتهي ${fmt(license.licenseExpiryDate)}` : "لم يُدخل تاريخ الانتهاء"}
             onEdit={() => openModal("basic_info", {
+              mainLicenseId:         license.mainLicense?.id ?? "",
               branchId:            license.branchId   ?? "",
               investorId:          license.investorId ?? "",
               commercialNameAr:    license.commercialNameAr,
@@ -1226,13 +1239,30 @@ export default function LicenseDetailPage() {
                   <option value="CANCELLED">ملغاة</option>
                 </select>
               </div>
-              <div>
-                <label className="form-label">الفرع</label>
-                <select className="input-field w-full" value={form.branchId as string ?? ""} onChange={f("branchId")}>
-                  <option value="">— بدون فرع —</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-                </select>
-              </div>
+              {license.isMainLicense ? (
+                <div>
+                  <label className="form-label">الفرع</label>
+                  <select className="input-field w-full" value={form.branchId as string ?? ""} onChange={f("branchId")}>
+                    <option value="">— بدون فرع —</option>
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="form-label">الترخيص الرئيسي</label>
+                  <select className="input-field w-full" value={form.mainLicenseId as string ?? ""} onChange={f("mainLicenseId")}>
+                    <option value="">— اختر الترخيص الرئيسي —</option>
+                    {mainLicenses.filter((item) => item.id !== license.id).map((item) => (
+                      <option key={item.id} value={item.id}>{item.commercialNameAr} ({item.licenseNumber})</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selectedMainLicense?.branch?.nameAr
+                      ? `الفرع يتبع الترخيص الرئيسي تلقائيًا: ${selectedMainLicense.branch.nameAr}`
+                      : "الفرع يتبع الترخيص الرئيسي تلقائيًا"}
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="form-label">المسئول والمدير</label>
                 <select className="input-field w-full" value={form.investorId as string ?? ""} onChange={f("investorId")}>

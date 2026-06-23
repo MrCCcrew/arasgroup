@@ -195,6 +195,7 @@ export default function LicensesPage() {
   });
 
   const mainLicensesForForm = licenses.filter((l) => l.isMainLicense);
+  const selectedMainLicenseForForm = mainLicensesForForm.find((l) => l.id === form.mainLicenseId) ?? null;
   const hasFilters = !!(search || filterStatus || filterType || filterBranch || filterInvestor || filterExpiry);
 
   function clearFilters() {
@@ -227,7 +228,7 @@ export default function LicensesPage() {
     setSaving(true); setFormError("");
     const body = {
       companyId, ...form,
-      branchId:   form.branchId   || null,
+      branchId:   form.isMainLicense ? (form.branchId || null) : null,
       investorId: form.investorId || null,
       mainLicenseId: form.isMainLicense ? null : (form.mainLicenseId || null),
       issueDate:                    form.issueDate                    || null,
@@ -542,7 +543,7 @@ export default function LicensesPage() {
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >ترخيص رئيسي</button>
               <button type="button"
-                onClick={() => setForm((p) => ({ ...p, isMainLicense: false }))}
+                onClick={() => setForm((p) => ({ ...p, isMainLicense: false, branchId: "" }))}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground shadow-sm"}`}
               >ترخيص فرعي</button>
             </div>
@@ -572,11 +573,19 @@ export default function LicensesPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div><label className="form-label">رقم الترخيص *</label>
                   <input className="input-field" dir="ltr" placeholder="123456" value={form.licenseNumber} onChange={f("licenseNumber")} /></div>
-                <div><label className="form-label">الفرع</label>
-                  <select className="input-field" value={form.branchId} onChange={f("branchId")}>
-                    <option value="">— بدون فرع —</option>
-                    {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-                  </select></div>
+                {form.isMainLicense ? (
+                  <div><label className="form-label">الفرع</label>
+                    <select className="input-field" value={form.branchId} onChange={f("branchId")}>
+                      <option value="">— بدون فرع —</option>
+                      {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
+                    </select></div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                    {selectedMainLicenseForForm
+                      ? `الفرع سيتبع الترخيص الرئيسي تلقائيًا${selectedMainLicenseForForm.branch?.nameAr ? `: ${selectedMainLicenseForForm.branch.nameAr}` : ""}`
+                      : "الفرع سيتبع الترخيص الرئيسي تلقائيًا"}
+                  </div>
+                )}
                 <div><label className="form-label">المسئول والمدير</label>
                   <select className="input-field" value={form.investorId} onChange={f("investorId")}>
                     <option value="">— بدون مسئول —</option>
