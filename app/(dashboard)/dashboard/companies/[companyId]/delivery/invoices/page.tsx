@@ -3,23 +3,72 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, FileBarChart, Image as ImageIcon, Plus, Trash2, X } from "lucide-react";
+import { Eye, FileBarChart, Image as ImageIcon, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 import { parseInvoiceText } from "@/lib/delivery/invoice-parse";
 
-interface Person { id: string; nameAr: string; nameEn?: string | null }
-interface Invoice {
-  id: string; targetType: string; name: string; invoiceDate: string; amount: number;
-  currency: string; imagePath: string; notes: string | null;
-}
-interface Row {
-  file: File | null; preview: string; date: string; amount: string; notes: string;
-  ocrText: string; ocrAmount: number | null; ocrDate: string | null; ocrBusy: boolean;
+interface Person {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-const emptyRow = (): Row => ({ file: null, preview: "", date: "", amount: "", notes: "", ocrText: "", ocrAmount: null, ocrDate: null, ocrBusy: false });
+interface Invoice {
+  id: string;
+  targetType: "DRIVER" | "EMPLOYEE";
+  driverId?: string | null;
+  employeeId?: string | null;
+  name: string;
+  invoiceDate: string;
+  amount: number;
+  currency: string;
+  imagePath: string;
+  originalFileName?: string | null;
+  notes: string | null;
+}
+
+interface Row {
+  file: File | null;
+  preview: string;
+  date: string;
+  amount: string;
+  notes: string;
+  ocrText: string;
+  ocrAmount: number | null;
+  ocrDate: string | null;
+  ocrBusy: boolean;
+}
+
+const emptyRow = (): Row => ({
+  file: null,
+  preview: "",
+  date: "",
+  amount: "",
+  notes: "",
+  ocrText: "",
+  ocrAmount: null,
+  ocrDate: null,
+  ocrBusy: false,
+});
+
+async function runOcr(file: File): Promise<string> {
+  try {
+    const mod = await import("tesseract.js");
+    const Tesseract = (mod as { default?: { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> } }).default
+      ?? (mod as unknown as { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> });
+    const result = await Tesseract.recognize(file, "ara+eng");
+    return result.data.text || "";
+  } catch {
+    return "";
+  }
+}
+
+async function loadPeople(companyId: string, type: "DRIVER" | "EMPLOYEE"): Promise<Person[]> {
+  const response = await fetch(`/api/delivery/invoices/people?companyId=${companyId}&type=${type}`);
+  const payload = await response.json();
+  return payload.success ? payload.data : [];
+}
 
 export default function DeliveryInvoicesPage() {
   const { companyId } = useParams<{ companyId: string }>();
@@ -35,44 +84,68 @@ export default function DeliveryInvoicesPage() {
   const [fType, setFType] = useState("");
   const [search, setSearch] = useState("");
   const [viewImg, setViewImg] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ companyId, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(fType ? { targetType: fType } : {}), ...(search ? { search } : {}) });
+    const qs = new URLSearchParams({
+      companyId,
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(fType ? { targetType: fType } : {}),
+      ...(search ? { search } : {}),
+    });
     const res = await fetch(`/api/delivery/invoices?${qs}`);
     const p = await res.json();
     if (p.success) setInvoices(p.data);
     setLoading(false);
   }, [companyId, from, to, fType, search]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const stats = useMemo(() => ({
     count: invoices.length,
-    total: invoices.reduce((s, i) => s + i.amount, 0),
-    people: new Set(invoices.map((i) => i.name)).size,
+    total: invoices.reduce((sum, invoice) => sum + invoice.amount, 0),
+    people: new Set(invoices.map((invoice) => invoice.name)).size,
   }), [invoices]);
 
   return (
     <div>
       <Header
         title={en ? "Invoices" : "الفواتير"}
-        subtitle={en ? "Driver & employee invoices archive — reference only" : "أرشيف فواتير السائقين والموظفين — مرجعي فقط"}
+        subtitle={en ? "Driver & employee invoices archive - reference only" : "أرشيف فواتير السائقين والموظفين - مرجعي فقط"}
         companyId={companyId}
-        actions={
+        actions={(
           <div className="flex flex-wrap gap-2">
             <Link href={`/dashboard/companies/${companyId}/delivery/invoices/reports`} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted">
               <FileBarChart size={16} /> {en ? "Report" : "تقرير الفواتير"}
             </Link>
           </div>
-        }
+        )}
       />
+
       <div className="page-container space-y-4">
         <div className="rounded-lg bg-amber-50 px-4 py-2 text-xs text-amber-700">
-          {en ? "Archive only — does not affect accounting." : "أرشفة ومتابعة فقط — لا يؤثر على الحسابات."}
+          {en ? "Archive only - does not affect accounting." : "أرشفة ومتابعة فقط - لا يؤثر على الحسابات."}
         </div>
 
-        <AddInvoices companyId={companyId} en={en} onSaved={load} />
+        {message && (
+          <div className="rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+            {message}
+          </div>
+        )}
+
+        <AddInvoices
+          companyId={companyId}
+          en={en}
+          onSaved={() => {
+            setMessage("");
+            load();
+          }}
+        />
 
         <div className="grid grid-cols-3 gap-3">
           <div className="stat-card"><div><p className="number text-2xl font-bold">{stats.count}</p><p className="text-xs text-muted-foreground">{en ? "Invoices" : "عدد الفواتير"}</p></div></div>
@@ -83,21 +156,40 @@ export default function DeliveryInvoicesPage() {
         <div className="flex flex-wrap items-end gap-2">
           <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "From" : "من"}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input-field" dir="ltr" /></div>
           <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "To" : "إلى"}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input-field" dir="ltr" /></div>
-          <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "Type" : "النوع"}</label>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Type" : "النوع"}</label>
             <select value={fType} onChange={(e) => setFType(e.target.value)} className="input-field w-36">
               <option value="">{en ? "All" : "الكل"}</option>
               <option value="DRIVER">{en ? "Driver" : "سائق"}</option>
               <option value="EMPLOYEE">{en ? "Employee" : "موظف"}</option>
             </select>
           </div>
-          <div className="flex-1 min-w-40"><label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" /></div>
-          {(from || to || fType || search) && <button onClick={() => { setFrom(""); setTo(""); setFType(""); setSearch(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">{en ? "Clear" : "مسح"}</button>}
+          <div className="min-w-40 flex-1">
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
+          </div>
+          {(from || to || fType || search) && (
+            <button onClick={() => { setFrom(""); setTo(""); setFType(""); setSearch(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+              {en ? "Clear" : "مسح"}
+            </button>
+          )}
         </div>
 
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
             <table className="ar-table text-sm">
-              <thead><tr><th>{en ? "Date" : "التاريخ"}</th><th>{en ? "Type" : "النوع"}</th><th>{en ? "Name" : "الاسم"}</th><th className="text-end">{en ? "Amount" : "القيمة"}</th><th>{en ? "Currency" : "العملة"}</th><th className="text-center">{en ? "Image" : "الصورة"}</th><th>{en ? "Notes" : "ملاحظات"}</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>{en ? "Date" : "التاريخ"}</th>
+                  <th>{en ? "Type" : "النوع"}</th>
+                  <th>{en ? "Name" : "الاسم"}</th>
+                  <th className="text-end">{en ? "Amount" : "القيمة"}</th>
+                  <th>{en ? "Currency" : "العملة"}</th>
+                  <th className="text-center">{en ? "Image" : "الصورة"}</th>
+                  <th>{en ? "Notes" : "ملاحظات"}</th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{en ? "Loading..." : "جاري التحميل..."}</td></tr>
@@ -110,9 +202,21 @@ export default function DeliveryInvoicesPage() {
                     <td className="font-medium">{inv.name}</td>
                     <td className="number text-end font-bold text-blue-600">{money(inv.amount)}</td>
                     <td className="text-xs">{inv.currency}</td>
-                    <td className="text-center"><button onClick={() => setViewImg(inv.imagePath)} className="inline-flex items-center gap-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Eye size={14} /></button></td>
-                    <td className="max-w-40 truncate text-xs text-muted-foreground">{inv.notes ?? "—"}</td>
-                    <td className="text-center"><DeleteBtn id={inv.id} en={en} onDone={load} /></td>
+                    <td className="text-center">
+                      <button onClick={() => setViewImg(inv.imagePath)} className="inline-flex items-center gap-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <Eye size={14} />
+                      </button>
+                    </td>
+                    <td className="max-w-40 truncate text-xs text-muted-foreground">{inv.notes ?? "-"}</td>
+                    <td className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => { setMessage(""); setEditingInvoice(inv); }} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-blue-50 hover:text-blue-600" title={en ? "Edit" : "تعديل"}>
+                          <Pencil size={12} />
+                          <span>{en ? "Edit" : "تعديل"}</span>
+                        </button>
+                        <DeleteBtn id={inv.id} en={en} onDone={load} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -120,6 +224,21 @@ export default function DeliveryInvoicesPage() {
           </div>
         </div>
       </div>
+
+      {editingInvoice && (
+        <EditInvoiceModal
+          companyId={companyId}
+          invoice={editingInvoice}
+          en={en}
+          onClose={() => setEditingInvoice(null)}
+          onSaved={() => {
+            setEditingInvoice(null);
+            setMessage(en ? "Invoice updated successfully" : "تم تعديل الفاتورة بنجاح");
+            load();
+          }}
+          onViewImage={setViewImg}
+        />
+      )}
 
       {viewImg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setViewImg(null)}>
@@ -140,18 +259,12 @@ function DeleteBtn({ id, en, onDone }: { id: string; en: boolean; onDone: () => 
     const r = await fetch(`/api/delivery/invoices/${id}`, { method: "DELETE" });
     if ((await r.json()).success) onDone();
   }
-  return <button onClick={del} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button>;
-}
 
-async function runOcr(file: File): Promise<string> {
-  try {
-    const mod = await import("tesseract.js");
-    const Tesseract = (mod as { default?: { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> } }).default ?? (mod as unknown as { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> });
-    const result = await Tesseract.recognize(file, "ara+eng");
-    return result.data.text || "";
-  } catch {
-    return "";
-  }
+  return (
+    <button onClick={del} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600" title={en ? "Delete" : "حذف"}>
+      <Trash2 size={13} />
+    </button>
+  );
 }
 
 function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolean; onSaved: () => void }) {
@@ -166,54 +279,94 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
   useEffect(() => {
     if (!open) return;
     setPersonId("");
-    fetch(`/api/delivery/invoices/people?companyId=${companyId}&type=${type}`).then((r) => r.json()).then((p) => { if (p.success) setPeople(p.data); });
+    loadPeople(companyId, type).then(setPeople);
   }, [open, type, companyId]);
 
   function openModal(multi: boolean) {
-    setType("DRIVER"); setRows(multi ? [emptyRow(), emptyRow()] : [emptyRow()]); setError(""); setOpen(true);
+    setType("DRIVER");
+    setRows(multi ? [emptyRow(), emptyRow()] : [emptyRow()]);
+    setError("");
+    setOpen(true);
   }
 
   async function pickFile(index: number, file: File | null) {
     if (!file) return;
     const preview = URL.createObjectURL(file);
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, file, preview, ocrBusy: true } : r)));
+    setRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, file, preview, ocrBusy: true } : row)));
     const text = await runOcr(file);
     const { amount, date } = parseInvoiceText(text);
-    setRows((prev) => prev.map((r, i) => i === index
-      ? { ...r, ocrBusy: false, ocrText: text, ocrAmount: amount, ocrDate: date, amount: r.amount || (amount != null ? String(amount) : ""), date: r.date || date || "" }
-      : r));
+    setRows((prev) => prev.map((row, rowIndex) => rowIndex === index
+      ? {
+          ...row,
+          ocrBusy: false,
+          ocrText: text,
+          ocrAmount: amount,
+          ocrDate: date,
+          amount: row.amount || (amount != null ? String(amount) : ""),
+          date: row.date || date || "",
+        }
+      : row));
   }
 
-  function updateRow(index: number, patch: Partial<Row>) { setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r))); }
-  function addRow() { setRows((prev) => [...prev, emptyRow()]); }
-  function removeRow(index: number) { setRows((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev)); }
+  function updateRow(index: number, patch: Partial<Row>) {
+    setRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, emptyRow()]);
+  }
+
+  function removeRow(index: number) {
+    setRows((prev) => (prev.length > 1 ? prev.filter((_, rowIndex) => rowIndex !== index) : prev));
+  }
 
   async function save() {
-    if (!personId) { setError(en ? "Select a person" : "اختر السائق/الموظف"); return; }
-    const valid = rows.filter((r) => r.file);
-    if (valid.length === 0) { setError(en ? "Add at least one invoice image" : "أضف صورة فاتورة واحدة على الأقل"); return; }
-    for (const r of valid) {
-      if (!r.date || !r.amount) { setError(en ? "Each invoice needs a date and amount" : "كل فاتورة تحتاج تاريخ وقيمة"); return; }
+    if (!personId) {
+      setError(en ? "Select a person" : "اختر السائق/الموظف");
+      return;
     }
-    setSaving(true); setError("");
+
+    const valid = rows.filter((row) => row.file);
+    if (valid.length === 0) {
+      setError(en ? "Add at least one invoice image" : "أضف صورة فاتورة واحدة على الأقل");
+      return;
+    }
+
+    for (const row of valid) {
+      if (!row.date || !row.amount) {
+        setError(en ? "Each invoice needs a date and amount" : "كل فاتورة تحتاج تاريخ وقيمة");
+        return;
+      }
+    }
+
+    setSaving(true);
+    setError("");
+
     try {
-      for (const r of valid) {
+      for (const row of valid) {
         const fd = new FormData();
-        fd.append("file", r.file!);
+        fd.append("file", row.file!);
         fd.append("companyId", companyId);
         fd.append("targetType", type);
         fd.append(type === "DRIVER" ? "driverId" : "employeeId", personId);
-        fd.append("invoiceDate", r.date);
-        fd.append("amount", r.amount);
-        if (r.notes) fd.append("notes", r.notes);
-        if (r.ocrText) fd.append("ocrText", r.ocrText);
-        if (r.ocrAmount != null) fd.append("ocrAmount", String(r.ocrAmount));
-        if (r.ocrDate) fd.append("ocrDate", r.ocrDate);
+        fd.append("invoiceDate", row.date);
+        fd.append("amount", row.amount);
+        if (row.notes) fd.append("notes", row.notes);
+        if (row.ocrText) fd.append("ocrText", row.ocrText);
+        if (row.ocrAmount != null) fd.append("ocrAmount", String(row.ocrAmount));
+        if (row.ocrDate) fd.append("ocrDate", row.ocrDate);
+
         const res = await fetch("/api/delivery/invoices", { method: "POST", body: fd });
-        const p = await res.json();
-        if (!p.success) { setError(p.error); setSaving(false); return; }
+        const payload = await res.json();
+        if (!payload.success) {
+          setError(payload.error);
+          setSaving(false);
+          return;
+        }
       }
-      setOpen(false); onSaved();
+
+      setOpen(false);
+      onSaved();
     } finally {
       setSaving(false);
     }
@@ -246,22 +399,22 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
                 <label className="mb-1 block text-xs font-medium">{type === "DRIVER" ? (en ? "Driver" : "السائق") : en ? "Employee" : "الموظف"} *</label>
                 <select value={personId} onChange={(e) => setPersonId(e.target.value)} className="input-field w-full text-sm">
                   <option value="">{en ? "Select..." : "اختر..."}</option>
-                  {people.map((p) => (<option key={p.id} value={p.id}>{en ? p.nameEn ?? p.nameAr : p.nameAr}</option>))}
+                  {people.map((person) => <option key={person.id} value={person.id}>{en ? person.nameEn ?? person.nameAr : person.nameAr}</option>)}
                 </select>
               </div>
             </div>
 
             <div className="space-y-3">
-              {rows.map((row, i) => (
-                <div key={i} className="rounded-lg border p-3">
+              {rows.map((row, index) => (
+                <div key={index} className="rounded-lg border p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-muted-foreground">{en ? `Invoice ${i + 1}` : `فاتورة ${i + 1}`}</span>
-                    {rows.length > 1 && <button onClick={() => removeRow(i)} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button>}
+                    <span className="text-xs font-bold text-muted-foreground">{en ? `Invoice ${index + 1}` : `فاتورة ${index + 1}`}</span>
+                    {rows.length > 1 && <button onClick={() => removeRow(index)} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button>}
                   </div>
                   <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs text-muted-foreground">{en ? "Invoice image *" : "صورة الفاتورة *"}</label>
-                      <input type="file" accept="image/*" onChange={(e) => pickFile(i, e.target.files?.[0] ?? null)} className="block w-full text-xs" />
+                      <input type="file" accept="image/*" onChange={(e) => pickFile(index, e.target.files?.[0] ?? null)} className="block w-full text-xs" />
                       {row.preview && (
                         <div className="mt-2 flex items-center gap-2">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -272,9 +425,9 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "Date *" : "التاريخ *"}</label><input type="date" value={row.date} onChange={(e) => updateRow(i, { date: e.target.value })} className="input-field w-full text-sm" dir="ltr" /></div>
-                      <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "Amount *" : "القيمة *"}</label><input type="number" step="0.001" value={row.amount} onChange={(e) => updateRow(i, { amount: e.target.value })} className="input-field w-full text-sm" dir="ltr" /></div>
-                      <div className="col-span-2"><label className="mb-1 block text-xs text-muted-foreground">{en ? "Notes" : "ملاحظات"}</label><input value={row.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} className="input-field w-full text-sm" /></div>
+                      <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "Date *" : "التاريخ *"}</label><input type="date" value={row.date} onChange={(e) => updateRow(index, { date: e.target.value })} className="input-field w-full text-sm" dir="ltr" /></div>
+                      <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "Amount *" : "القيمة *"}</label><input type="number" step="0.001" value={row.amount} onChange={(e) => updateRow(index, { amount: e.target.value })} className="input-field w-full text-sm" dir="ltr" /></div>
+                      <div className="col-span-2"><label className="mb-1 block text-xs text-muted-foreground">{en ? "Notes" : "ملاحظات"}</label><input value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} className="input-field w-full text-sm" /></div>
                     </div>
                   </div>
                 </div>
@@ -283,13 +436,192 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
             </div>
 
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
             <div className="flex gap-2">
-              <button onClick={save} disabled={saving} className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{saving ? (en ? "Saving..." : "جارٍ الحفظ...") : en ? "Save" : "حفظ"}</button>
+              <button onClick={save} disabled={saving} className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{saving ? (en ? "Saving..." : "جاري الحفظ...") : en ? "Save" : "حفظ"}</button>
               <button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{en ? "Cancel" : "إلغاء"}</button>
             </div>
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function EditInvoiceModal({
+  companyId,
+  invoice,
+  en,
+  onClose,
+  onSaved,
+  onViewImage,
+}: {
+  companyId: string;
+  invoice: Invoice;
+  en: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  onViewImage: (value: string) => void;
+}) {
+  const [type, setType] = useState<"DRIVER" | "EMPLOYEE">(invoice.targetType);
+  const [personId, setPersonId] = useState(invoice.targetType === "DRIVER" ? (invoice.driverId ?? "") : (invoice.employeeId ?? ""));
+  const [people, setPeople] = useState<Person[]>([]);
+  const [date, setDate] = useState(invoice.invoiceDate.slice(0, 10));
+  const [amount, setAmount] = useState(String(invoice.amount));
+  const [currency, setCurrency] = useState(invoice.currency || "KWD");
+  const [notes, setNotes] = useState(invoice.notes ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState(invoice.imagePath);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrAmount, setOcrAmount] = useState<number | null>(null);
+  const [ocrDate, setOcrDate] = useState<string | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadPeople(companyId, type).then(setPeople);
+  }, [companyId, type]);
+
+  async function onFileChange(nextFile: File | null) {
+    if (!nextFile) return;
+    setFile(nextFile);
+    setPreview(URL.createObjectURL(nextFile));
+    setOcrBusy(true);
+    const text = await runOcr(nextFile);
+    const parsed = parseInvoiceText(text);
+    setOcrBusy(false);
+    setOcrText(text);
+    setOcrAmount(parsed.amount);
+    setOcrDate(parsed.date);
+    if (parsed.amount != null) setAmount(String(parsed.amount));
+    if (parsed.date) setDate(parsed.date);
+  }
+
+  async function save() {
+    if (!personId) {
+      setError(en ? "Select a person" : "اختر السائق/الموظف");
+      return;
+    }
+    if (!date) {
+      setError(en ? "Date is required" : "تاريخ الفاتورة مطلوب");
+      return;
+    }
+    if (amount === "" || Number.isNaN(Number(amount)) || Number(amount) < 0) {
+      setError(en ? "Enter a valid amount" : "أدخل قيمة صحيحة");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const fd = new FormData();
+      fd.append("targetType", type);
+      fd.append("driverId", type === "DRIVER" ? personId : "");
+      fd.append("employeeId", type === "EMPLOYEE" ? personId : "");
+      fd.append("invoiceDate", date);
+      fd.append("amount", amount);
+      fd.append("currency", currency);
+      fd.append("notes", notes);
+      if (file) {
+        fd.append("file", file);
+        if (ocrText) fd.append("ocrText", ocrText);
+        if (ocrAmount != null) fd.append("ocrAmount", String(ocrAmount));
+        if (ocrDate) fd.append("ocrDate", ocrDate);
+      }
+
+      const response = await fetch(`/api/delivery/invoices/${invoice.id}`, { method: "PATCH", body: fd });
+      const payload = await response.json();
+      if (!payload.success) {
+        setError(payload.error ?? (en ? "Failed to update invoice" : "فشل تعديل الفاتورة"));
+        setSaving(false);
+        return;
+      }
+
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+      <div className="my-6 w-full max-w-2xl space-y-4 rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold">{en ? "Edit invoice" : "تعديل الفاتورة"}</h3>
+          <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X size={16} /></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium">{en ? "Type" : "النوع"}</label>
+            <select
+              value={type}
+              onChange={(e) => {
+                const nextType = e.target.value as "DRIVER" | "EMPLOYEE";
+                setType(nextType);
+                setPersonId("");
+              }}
+              className="input-field w-full text-sm"
+            >
+              <option value="DRIVER">{en ? "Driver" : "سائق"}</option>
+              <option value="EMPLOYEE">{en ? "Employee" : "موظف"}</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">{type === "DRIVER" ? (en ? "Driver" : "السائق") : en ? "Employee" : "الموظف"}</label>
+            <select value={personId} onChange={(e) => setPersonId(e.target.value)} className="input-field w-full text-sm">
+              <option value="">{en ? "Select..." : "اختر..."}</option>
+              {people.map((person) => <option key={person.id} value={person.id}>{en ? person.nameEn ?? person.nameAr : person.nameAr}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Date" : "تاريخ الفاتورة"}</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-field w-full text-sm" dir="ltr" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Amount" : "قيمة الفاتورة"}</label>
+            <input type="number" step="0.001" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-field w-full text-sm" dir="ltr" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Currency" : "العملة"}</label>
+            <input value={currency} onChange={(e) => setCurrency(e.target.value)} className="input-field w-full text-sm" dir="ltr" />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Notes" : "الملاحظات"}</label>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field w-full text-sm" />
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">{en ? "Current invoice image" : "صورة الفاتورة الحالية"}</span>
+            <button onClick={() => onViewImage(preview)} className="rounded-lg border px-3 py-1 text-xs hover:bg-muted">{en ? "View" : "عرض"}</button>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="invoice-preview" className="h-20 w-20 rounded border object-cover" />
+            <div className="flex-1 space-y-2">
+              <input type="file" accept="image/*" onChange={(e) => onFileChange(e.target.files?.[0] ?? null)} className="block w-full text-xs" />
+              <p className="text-xs text-muted-foreground">
+                {en ? "Optional: upload a new image to replace the current one after successful save." : "اختياري: ارفع صورة جديدة ليتم اعتمادها بعد نجاح الحفظ."}
+              </p>
+              {ocrBusy && <p className="text-xs text-amber-600">{en ? "Extracting OCR suggestions..." : "جاري استخراج اقتراحات OCR..."}</p>}
+              {!ocrBusy && file && <p className="text-xs text-emerald-600">{en ? "OCR suggestions loaded. Review before saving." : "تم تحميل اقتراحات OCR. راجعها قبل الحفظ."}</p>}
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={save} disabled={saving} className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {saving ? (en ? "Saving..." : "جاري الحفظ...") : en ? "Save changes" : "حفظ التعديل"}
+          </button>
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{en ? "Cancel" : "إلغاء"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
