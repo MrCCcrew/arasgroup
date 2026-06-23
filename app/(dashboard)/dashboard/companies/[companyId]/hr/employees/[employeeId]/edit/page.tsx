@@ -286,7 +286,7 @@ export default function EditEmployeePage() {
           branchId: form.branchId || null,
           licenseId: form.licenseId || null,
           investorId: form.investorId || null,
-          additionalLicenseIds: showAdditionalLicenses ? additionalLicenseIds : [],
+          additionalLicenseIds: showAdditionalLicenses && additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
           nationality: form.nationality || undefined,
           civilId: form.civilId || undefined,
           passportNumber: form.passportNumber || undefined,
