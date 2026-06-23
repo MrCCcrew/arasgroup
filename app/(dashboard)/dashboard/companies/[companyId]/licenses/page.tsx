@@ -7,7 +7,6 @@ import { Header } from "@/components/layout/header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Branch    { id: string; nameAr: string }
 interface Investor  { id: string; nameAr: string }
 interface License {
   id: string;
@@ -22,28 +21,15 @@ interface License {
   fireLicenseExpiryDate?: string | null;
   healthLicenseExpiryDate?: string | null;
   advertisingLicenseExpiryDate?: string | null;
-  branchId?: string | null;
   investorId?: string | null;
   managerName?: string | null;
   managerPhone?: string | null;
   unifiedEntityNumber?: string | null;
   civilEntityNumber?: string | null;
   notes?: string | null;
-  branch?: { nameAr: string } | null;
   investor?: { nameAr: string } | null;
   mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null;
   _count: { employees: number; branchLicenses: number };
-}
-
-function deriveBranchesFromLicenses(licenses: License[]): Branch[] {
-  const branchMap = new Map<string, Branch>();
-  for (const license of licenses) {
-    if (!license.branchId || !license.branch?.nameAr) continue;
-    if (!branchMap.has(license.branchId)) {
-      branchMap.set(license.branchId, { id: license.branchId, nameAr: license.branch.nameAr });
-    }
-  }
-  return Array.from(branchMap.values()).sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar"));
 }
 
 const EMPTY = {
@@ -52,7 +38,7 @@ const EMPTY = {
   status: "ACTIVE",
   issueDate: "", licenseExpiryDate: "",
   fireLicenseExpiryDate: "", healthLicenseExpiryDate: "", advertisingLicenseExpiryDate: "",
-  branchId: "", investorId: "",
+  investorId: "",
   managerName: "", managerPhone: "",
   unifiedEntityNumber: "", civilEntityNumber: "",
   legalEntity: "", capital: "", commercialRegNo: "",
@@ -127,7 +113,6 @@ export default function LicensesPage() {
   const router = useRouter();
 
   const [licenses,  setLicenses]  = useState<License[]>([]);
-  const [branches,  setBranches]  = useState<Branch[]>([]);
   const [investors, setInvestors] = useState<Investor[]>([]);
   const [loading,   setLoading]   = useState(true);
 
@@ -149,24 +134,17 @@ export default function LicensesPage() {
   const [search,         setSearch]         = useState("");
   const [filterStatus,   setFilterStatus]   = useState("");
   const [filterType,     setFilterType]     = useState("");   // "" | "main" | "branch"
-  const [filterBranch,   setFilterBranch]   = useState("");
   const [filterInvestor, setFilterInvestor] = useState("");
   const [filterExpiry,   setFilterExpiry]   = useState("");   // "" | "expired" | "30" | "60" | "90"
 
   // ── Load ─────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
-    const [a, b, c] = await Promise.all([
+    const [a, c] = await Promise.all([
       fetch(`/api/licenses?companyId=${companyId}`).then((r) => r.json()),
-      fetch(`/api/companies/${companyId}/branches`).then((r) => r.json()),
       fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()),
     ]);
     if (a.success) setLicenses(a.data);
-    if (b.success && Array.isArray(b.data) && b.data.length > 0) {
-      setBranches(b.data);
-    } else if (a.success) {
-      setBranches(deriveBranchesFromLicenses(a.data as License[]));
-    }
     if (c.success) setInvestors(c.data);
     setLoading(false);
   }, [companyId]);
@@ -196,7 +174,6 @@ export default function LicensesPage() {
     if (filterStatus   && l.status    !== filterStatus)  return false;
     if (filterType === "main"   && !l.isMainLicense)     return false;
     if (filterType === "branch" &&  l.isMainLicense)     return false;
-    if (filterBranch   && l.branchId   !== filterBranch)   return false;
     if (filterInvestor && l.investorId !== filterInvestor) return false;
     if (filterExpiry) {
       const allDates = [l.licenseExpiryDate, l.fireLicenseExpiryDate, l.healthLicenseExpiryDate, l.advertisingLicenseExpiryDate];
@@ -210,12 +187,11 @@ export default function LicensesPage() {
   });
 
   const mainLicensesForForm = licenses.filter((l) => l.isMainLicense);
-  const selectedMainLicenseForForm = mainLicensesForForm.find((l) => l.id === form.mainLicenseId) ?? null;
-  const hasFilters = !!(search || filterStatus || filterType || filterBranch || filterInvestor || filterExpiry);
+  const hasFilters = !!(search || filterStatus || filterType || filterInvestor || filterExpiry);
 
   function clearFilters() {
     setSearch(""); setFilterStatus(""); setFilterType("");
-    setFilterBranch(""); setFilterInvestor(""); setFilterExpiry("");
+    setFilterInvestor(""); setFilterExpiry("");
   }
 
   // ── Filter summary for print header ──────────────────────────────────────
@@ -224,7 +200,6 @@ export default function LicensesPage() {
   if (filterStatus)   filterParts.push(`الحالة: ${STATUS_LABELS[filterStatus] ?? filterStatus}`);
   if (filterType === "main")   filterParts.push("النوع: رئيسية فقط");
   if (filterType === "branch") filterParts.push("النوع: فرعية فقط");
-  if (filterBranch)   filterParts.push(`الفرع: ${branches.find((b) => b.id === filterBranch)?.nameAr ?? ""}`);
   if (filterInvestor) filterParts.push(`المسئول: ${investors.find((i) => i.id === filterInvestor)?.nameAr ?? ""}`);
   if (filterExpiry === "expired")    filterParts.push("منتهية الصلاحية");
   else if (filterExpiry)             filterParts.push(`تنتهي خلال ${filterExpiry} يوم`);
@@ -243,7 +218,6 @@ export default function LicensesPage() {
     setSaving(true); setFormError("");
     const body = {
       companyId, ...form,
-      branchId:   form.isMainLicense ? (form.branchId || null) : null,
       investorId: form.investorId || null,
       mainLicenseId: form.isMainLicense ? null : (form.mainLicenseId || null),
       issueDate:                    form.issueDate                    || null,
@@ -385,14 +359,6 @@ export default function LicensesPage() {
               <option value="branch">فرعية فقط</option>
             </select>
 
-            {/* Branch */}
-            {branches.length > 0 && (
-              <select className="input-field text-sm" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
-                <option value="">كل الفروع</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-              </select>
-            )}
-
             {/* Investor */}
             {investors.length > 0 && (
               <select className="input-field text-sm" value={filterInvestor} onChange={(e) => setFilterInvestor(e.target.value)}>
@@ -441,8 +407,8 @@ export default function LicensesPage() {
                     <th className="no-print">#</th>
                     <th>الاسم التجاري</th>
                     <th>رقم الترخيص</th>
+                    <th>النوع</th>
                     <th>الترخيص الرئيسي</th>
-                    <th>الفرع</th>
                     <th>المسئول والمدير</th>
                     <th>انتهاء الترخيص</th>
                     <th>انتهاء الإطفاء</th>
@@ -477,12 +443,18 @@ export default function LicensesPage() {
                         )}
                       </td>
                       <td className="font-mono text-sm">{lic.licenseNumber}</td>
+                      <td>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          lic.isMainLicense ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {lic.isMainLicense ? "رئيسي" : "فرعي"}
+                        </span>
+                      </td>
                       <td className="text-sm">
                         {lic.mainLicense
                           ? <span className="text-blue-600">{lic.mainLicense.commercialNameAr}</span>
                           : <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td>{lic.branch?.nameAr    ?? <span className="text-muted-foreground">—</span>}</td>
                       <td>{lic.investor?.nameAr   ?? <span className="text-muted-foreground">—</span>}</td>
                       <td><ExpiryCell date={lic.licenseExpiryDate} /></td>
                       <td><ExpiryCell date={lic.fireLicenseExpiryDate} /></td>
@@ -558,7 +530,7 @@ export default function LicensesPage() {
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >ترخيص رئيسي</button>
               <button type="button"
-                onClick={() => setForm((p) => ({ ...p, isMainLicense: false, branchId: "" }))}
+                onClick={() => setForm((p) => ({ ...p, isMainLicense: false }))}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${form.isMainLicense ? "text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground shadow-sm"}`}
               >ترخيص فرعي</button>
             </div>
@@ -588,19 +560,6 @@ export default function LicensesPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div><label className="form-label">رقم الترخيص *</label>
                   <input className="input-field" dir="ltr" placeholder="123456" value={form.licenseNumber} onChange={f("licenseNumber")} /></div>
-                {form.isMainLicense ? (
-                  <div><label className="form-label">الفرع</label>
-                    <select className="input-field" value={form.branchId} onChange={f("branchId")}>
-                      <option value="">— بدون فرع —</option>
-                      {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-                    </select></div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                    {selectedMainLicenseForForm
-                      ? `الفرع سيتبع الترخيص الرئيسي تلقائيًا${selectedMainLicenseForForm.branch?.nameAr ? `: ${selectedMainLicenseForForm.branch.nameAr}` : ""}`
-                      : "الفرع سيتبع الترخيص الرئيسي تلقائيًا"}
-                  </div>
-                )}
                 <div><label className="form-label">المسئول والمدير</label>
                   <select className="input-field" value={form.investorId} onChange={f("investorId")}>
                     <option value="">— بدون مسئول —</option>

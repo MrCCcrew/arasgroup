@@ -36,19 +36,6 @@ interface LicenseBase {
   _count: { employees: number; branchLicenses: number };
 }
 
-function deriveBranchesFromLicenses(
-  licenses: Array<Pick<LicenseBase, "branchId" | "branch">>,
-): { id: string; nameAr: string }[] {
-  const branchMap = new Map<string, { id: string; nameAr: string }>();
-  for (const license of licenses) {
-    if (!license.branchId || !license.branch?.nameAr) continue;
-    if (!branchMap.has(license.branchId)) {
-      branchMap.set(license.branchId, { id: license.branchId, nameAr: license.branch.nameAr });
-    }
-  }
-  return Array.from(branchMap.values()).sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar"));
-}
-
 interface Sections {
   establishmentContracts: {
     id: string; version: number; isActive: boolean; contractDate: string | null;
@@ -288,9 +275,8 @@ export default function LicenseDetailPage() {
   const [sections, setSections] = useState<Sections | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [branches,  setBranches]  = useState<{ id: string; nameAr: string }[]>([]);
   const [investors, setInvestors] = useState<{ id: string; nameAr: string }[]>([]);
-  const [mainLicenses, setMainLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; branch?: { nameAr: string } | null }[]>([]);
+  const [mainLicenses, setMainLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string }[]>([]);
 
   // Active modal
   type ModalType = "basic_info" | "establishment" | "lease" | "employer_cert" | "import_license" |
@@ -321,21 +307,14 @@ export default function LicenseDetailPage() {
   useEffect(() => {
     if (!companyId) return;
     Promise.all([
-      fetch(`/api/companies/${companyId}/branches`).then((r) => r.json()).catch(() => null),
       fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/licenses?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
-    ]).then(([b, i, l]) => {
-      if (b?.success && Array.isArray(b.data) && b.data.length > 0) {
-        setBranches(b.data);
-      } else if (l?.success) {
-        setBranches(deriveBranchesFromLicenses(l.data as LicenseBase[]));
-      }
+    ]).then(([i, l]) => {
       if (i?.success) setInvestors(i.data);
       if (l?.success) setMainLicenses((l.data as LicenseBase[]).filter((item) => item.isMainLicense).map((item) => ({
         id: item.id,
         commercialNameAr: item.commercialNameAr,
         licenseNumber: item.licenseNumber,
-        branch: item.branch ?? null,
       })));
     });
   }, [companyId]);
@@ -358,8 +337,6 @@ export default function LicenseDetailPage() {
     setForm((p) => ({ ...p, fileUrl: url }));
   }
 
-  const selectedMainLicense = mainLicenses.find((item) => item.id === ((form.mainLicenseId as string | undefined) ?? "")) ?? null;
-
   async function save(url: string, method: string, body: Record<string, unknown>) {
     setSaving(true); setSaveError("");
     try {
@@ -377,7 +354,6 @@ export default function LicenseDetailPage() {
 
   async function saveBasicInfo() {
     await save(`/api/licenses/${licenseId}`, "PATCH", {
-      branchId:         license?.isMainLicense ? (form.branchId || null) : undefined,
       mainLicenseId:    license?.isMainLicense ? undefined : (form.mainLicenseId || null),
       investorId:       form.investorId || null,
       commercialNameAr: form.commercialNameAr || undefined,
@@ -613,7 +589,6 @@ export default function LicenseDetailPage() {
             subtitle={license.licenseExpiryDate ? `ينتهي ${fmt(license.licenseExpiryDate)}` : "لم يُدخل تاريخ الانتهاء"}
             onEdit={() => openModal("basic_info", {
               mainLicenseId:         license.mainLicense?.id ?? "",
-              branchId:            license.branchId   ?? "",
               investorId:          license.investorId ?? "",
               commercialNameAr:    license.commercialNameAr,
               licenseNumber:       license.licenseNumber,
@@ -1256,15 +1231,7 @@ export default function LicenseDetailPage() {
                   <option value="CANCELLED">ملغاة</option>
                 </select>
               </div>
-              {license.isMainLicense ? (
-                <div>
-                  <label className="form-label">الفرع</label>
-                  <select className="input-field w-full" value={form.branchId as string ?? ""} onChange={f("branchId")}>
-                    <option value="">— بدون فرع —</option>
-                    {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
-                  </select>
-                </div>
-              ) : (
+{license.isMainLicense ? null : (
                 <div>
                   <label className="form-label">الترخيص الرئيسي</label>
                   <select className="input-field w-full" value={form.mainLicenseId as string ?? ""} onChange={f("mainLicenseId")}>
@@ -1273,11 +1240,6 @@ export default function LicenseDetailPage() {
                       <option key={item.id} value={item.id}>{item.commercialNameAr} ({item.licenseNumber})</option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {selectedMainLicense?.branch?.nameAr
-                      ? `الفرع يتبع الترخيص الرئيسي تلقائيًا: ${selectedMainLicense.branch.nameAr}`
-                      : "الفرع يتبع الترخيص الرئيسي تلقائيًا"}
-                  </p>
                 </div>
               )}
               <div>

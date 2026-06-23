@@ -59,7 +59,7 @@ const licenseSchema = z.object({
 async function resolveLicenseBranchForCreate(input: z.infer<typeof licenseSchema>) {
   if (input.isMainLicense) {
     return {
-      branchId: input.branchId ?? null,
+      branchId: null as string | null,
       mainLicenseId: null as string | null,
     };
   }
@@ -74,7 +74,7 @@ async function resolveLicenseBranchForCreate(input: z.infer<typeof licenseSchema
       companyId: input.companyId,
       isMainLicense: true,
     },
-    select: { id: true, branchId: true },
+    select: { id: true },
   });
 
   if (!parentLicense) {
@@ -82,7 +82,7 @@ async function resolveLicenseBranchForCreate(input: z.infer<typeof licenseSchema
   }
 
   return {
-    branchId: parentLicense.branchId ?? null,
+    branchId: null as string | null,
     mainLicenseId: parentLicense.id,
   };
 }
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data;
-  let derivedBranchId: string | null = data.branchId ?? null;
+  let derivedBranchId: string | null = null;
   let derivedMainLicenseId: string | null = data.isMainLicense ? null : (data.mainLicenseId ?? null);
 
   try {
@@ -188,16 +188,6 @@ export async function POST(request: NextRequest) {
     branchId: derivedBranchId ?? undefined,
   });
   if (permissionError) return permissionError;
-
-  if (data.isMainLicense && derivedBranchId) {
-    const branch = await prisma.branch.findFirst({
-      where: { id: derivedBranchId, companyId: data.companyId, isActive: true },
-      select: { id: true },
-    });
-    if (!branch) {
-      return NextResponse.json({ success: false, error: "الفرع المحدد غير صالح" }, { status: 400 });
-    }
-  }
 
   const duplicate = await prisma.license.findFirst({
     where: {

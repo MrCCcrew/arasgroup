@@ -115,20 +115,9 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
 
     const d = parsed.data;
-    let nextBranchId = existing.branchId;
     let nextMainLicenseId = existing.mainLicenseId;
 
     if (existing.isMainLicense) {
-      if (d.branchId !== undefined && d.branchId) {
-        const branch = await prisma.branch.findFirst({
-          where: { id: d.branchId, companyId: existing.companyId, isActive: true },
-          select: { id: true },
-        });
-        if (!branch) {
-          return NextResponse.json({ success: false, error: "الفرع المحدد غير صالح" }, { status: 400 });
-        }
-      }
-      if (d.branchId !== undefined) nextBranchId = d.branchId;
       nextMainLicenseId = null;
     } else {
       const requestedParentLicenseId = d.mainLicenseId !== undefined ? d.mainLicenseId : existing.mainLicenseId;
@@ -143,7 +132,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
           isMainLicense: true,
           NOT: { id: licenseId },
         },
-        select: { id: true, branchId: true },
+        select: { id: true },
       });
 
       if (!parentLicense) {
@@ -151,13 +140,11 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       }
 
       nextMainLicenseId = parentLicense.id;
-      nextBranchId = parentLicense.branchId ?? null;
     }
 
     const license = await prisma.license.update({
       where: { id: licenseId },
       data: {
-        ...(d.branchId !== undefined || !existing.isMainLicense ? { branchId: nextBranchId } : {}),
         ...(d.investorId !== undefined ? { investorId: d.investorId } : {}),
         ...(d.licenseNumber ? { licenseNumber: d.licenseNumber } : {}),
         ...(d.commercialNameAr ? { commercialNameAr: d.commercialNameAr } : {}),
