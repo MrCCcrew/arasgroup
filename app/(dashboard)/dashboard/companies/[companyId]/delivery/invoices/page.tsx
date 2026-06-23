@@ -38,6 +38,7 @@ interface Row {
   ocrAmount: number | null;
   ocrDate: string | null;
   ocrBusy: boolean;
+  ocrFailed: boolean;
 }
 
 const emptyRow = (): Row => ({
@@ -50,7 +51,12 @@ const emptyRow = (): Row => ({
   ocrAmount: null,
   ocrDate: null,
   ocrBusy: false,
+  ocrFailed: false,
 });
+
+function fileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
 
 async function runOcr(file: File): Promise<string> {
   try {
@@ -289,23 +295,56 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
     setOpen(true);
   }
 
-  async function pickFile(index: number, file: File | null) {
-    if (!file) return;
-    const preview = URL.createObjectURL(file);
-    setRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, file, preview, ocrBusy: true } : row)));
+  async function processRowFile(targetKey: string, file: File) {
     const text = await runOcr(file);
     const { amount, date } = parseInvoiceText(text);
-    setRows((prev) => prev.map((row, rowIndex) => rowIndex === index
-      ? {
-          ...row,
-          ocrBusy: false,
-          ocrText: text,
-          ocrAmount: amount,
-          ocrDate: date,
-          amount: row.amount || (amount != null ? String(amount) : ""),
-          date: row.date || date || "",
-        }
-      : row));
+    setRows((prev) => prev.map((row) => {
+      if (!row.file || fileKey(row.file) !== targetKey) return row;
+      return {
+        ...row,
+        ocrBusy: false,
+        ocrText: text,
+        ocrAmount: amount,
+        ocrDate: date,
+        ocrFailed: !text || (amount == null && !date),
+        amount: row.amount || (amount != null ? String(amount) : ""),
+        date: row.date || date || "",
+      };
+    }));
+  }
+
+  function pickFiles(index: number, files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    const selected = Array.from(files);
+    const existing = new Set(rows.filter((row) => row.file).map((row) => fileKey(row.file!)));
+    const freshFiles = selected.filter((file) => !existing.has(fileKey(file)));
+    if (freshFiles.length === 0) return;
+
+    const preparedRows = freshFiles.map((file) => ({
+      ...emptyRow(),
+      file,
+      preview: URL.createObjectURL(file),
+      ocrBusy: true,
+    }));
+
+    setRows((prev) => {
+      const next = [...prev];
+      const targetRow = next[index];
+      const targetEmpty = targetRow && !targetRow.file && !targetRow.preview && !targetRow.date && !targetRow.amount && !targetRow.notes;
+
+      if (targetEmpty) {
+        next[index] = preparedRows[0];
+        if (preparedRows.length > 1) next.splice(index + 1, 0, ...preparedRows.slice(1));
+        return next;
+      }
+
+      return [...next, ...preparedRows];
+    });
+
+    for (const file of freshFiles) {
+      void processRowFile(fileKey(file), file);
+    }
   }
 
   function updateRow(index: number, patch: Partial<Row>) {
@@ -326,24 +365,33 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
       return;
     }
 
-    const valid = rows.filter((row) => row.file);
-    if (valid.length === 0) {
+    const rowsWithFiles = rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => row.file);
+
+    if (rowsWithFiles.length === 0) {
       setError(en ? "Add at least one invoice image" : "أضف صورة فاتورة واحدة على الأقل");
       return;
     }
 
-    for (const row of valid) {
-      if (!row.date || !row.amount) {
-        setError(en ? "Each invoice needs a date and amount" : "كل فاتورة تحتاج تاريخ وقيمة");
-        return;
-      }
+    const incomplete = rowsWithFiles
+      .filter(({ row }) => !row.date || !row.amount)
+      .map(({ index }) => index + 1);
+
+    if (incomplete.length > 0) {
+      setError(
+        en
+          ? `Complete invoices: ${incomplete.join(", ")}`
+          : `أكمل بيانات الفواتير: ${incomplete.join("، ")}`
+      );
+      return;
     }
 
     setSaving(true);
     setError("");
 
     try {
-      for (const row of valid) {
+      for (const { row, index } of rowsWithFiles) {
         const fd = new FormData();
         fd.append("file", row.file!);
         fd.append("companyId", companyId);
@@ -359,7 +407,11 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
         const res = await fetch("/api/delivery/invoices", { method: "POST", body: fd });
         const payload = await res.json();
         if (!payload.success) {
-          setError(payload.error);
+          setError(
+            en
+              ? `Invoice ${index + 1}: ${payload.error ?? "Failed to save"}`
+              : `فاتورة ${index + 1}: ${payload.error ?? "فشل الحفظ"}`
+          );
           setSaving(false);
           return;
         }
@@ -380,7 +432,7 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
           <div className="my-6 w-full max-w-2xl space-y-4 rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold">{en ? "Add invoices" : "إضافة فواتير"}</h3>
@@ -414,13 +466,14 @@ function AddInvoices({ companyId, en, onSaved }: { companyId: string; en: boolea
                   <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs text-muted-foreground">{en ? "Invoice image *" : "صورة الفاتورة *"}</label>
-                      <input type="file" accept="image/*" onChange={(e) => pickFile(index, e.target.files?.[0] ?? null)} className="block w-full text-xs" />
+                      <input type="file" accept="image/*" multiple onChange={(e) => pickFiles(index, e.target.files)} className="block w-full text-xs" />
                       {row.preview && (
                         <div className="mt-2 flex items-center gap-2">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={row.preview} alt="preview" className="h-14 w-14 rounded border object-cover" />
                           {row.ocrBusy && <span className="text-xs text-amber-600">{en ? "Extracting..." : "جاري الاستخراج..."}</span>}
-                          {!row.ocrBusy && row.ocrText && <span className="text-xs text-emerald-600">{en ? "Extracted (review)" : "تم الاستخراج (راجع)"}</span>}
+                          {!row.ocrBusy && !row.ocrFailed && row.ocrText && <span className="text-xs text-emerald-600">{en ? "Extracted (review)" : "تم الاستخراج (راجع)"}</span>}
+                          {!row.ocrBusy && row.ocrFailed && <span className="text-xs text-amber-600">{en ? "Could not extract, enter manually" : "لم يتم الاستخراج، أدخل البيانات يدويًا"}</span>}
                         </div>
                       )}
                     </div>
@@ -546,7 +599,7 @@ function EditInvoiceModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
       <div className="my-6 w-full max-w-2xl space-y-4 rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{en ? "Edit invoice" : "تعديل الفاتورة"}</h3>
