@@ -35,6 +35,17 @@ interface License {
   _count: { employees: number; branchLicenses: number };
 }
 
+function deriveBranchesFromLicenses(licenses: License[]): Branch[] {
+  const branchMap = new Map<string, Branch>();
+  for (const license of licenses) {
+    if (!license.branchId || !license.branch?.nameAr) continue;
+    if (!branchMap.has(license.branchId)) {
+      branchMap.set(license.branchId, { id: license.branchId, nameAr: license.branch.nameAr });
+    }
+  }
+  return Array.from(branchMap.values()).sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar"));
+}
+
 const EMPTY = {
   commercialNameAr: "", commercialNameEn: "", licenseNumber: "",
   isMainLicense: true, mainLicenseId: "",
@@ -151,7 +162,11 @@ export default function LicensesPage() {
       fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()),
     ]);
     if (a.success) setLicenses(a.data);
-    if (b.success) setBranches(b.data);
+    if (b.success && Array.isArray(b.data) && b.data.length > 0) {
+      setBranches(b.data);
+    } else if (a.success) {
+      setBranches(deriveBranchesFromLicenses(a.data as License[]));
+    }
     if (c.success) setInvestors(c.data);
     setLoading(false);
   }, [companyId]);

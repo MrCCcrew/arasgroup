@@ -36,6 +36,19 @@ interface LicenseBase {
   _count: { employees: number; branchLicenses: number };
 }
 
+function deriveBranchesFromLicenses(
+  licenses: Array<Pick<LicenseBase, "branchId" | "branch">>,
+): { id: string; nameAr: string }[] {
+  const branchMap = new Map<string, { id: string; nameAr: string }>();
+  for (const license of licenses) {
+    if (!license.branchId || !license.branch?.nameAr) continue;
+    if (!branchMap.has(license.branchId)) {
+      branchMap.set(license.branchId, { id: license.branchId, nameAr: license.branch.nameAr });
+    }
+  }
+  return Array.from(branchMap.values()).sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar"));
+}
+
 interface Sections {
   establishmentContracts: {
     id: string; version: number; isActive: boolean; contractDate: string | null;
@@ -312,7 +325,11 @@ export default function LicenseDetailPage() {
       fetch(`/api/investors?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/licenses?companyId=${companyId}`).then((r) => r.json()).catch(() => null),
     ]).then(([b, i, l]) => {
-      if (b?.success) setBranches(b.data);
+      if (b?.success && Array.isArray(b.data) && b.data.length > 0) {
+        setBranches(b.data);
+      } else if (l?.success) {
+        setBranches(deriveBranchesFromLicenses(l.data as LicenseBase[]));
+      }
       if (i?.success) setInvestors(i.data);
       if (l?.success) setMainLicenses((l.data as LicenseBase[]).filter((item) => item.isMainLicense).map((item) => ({
         id: item.id,
