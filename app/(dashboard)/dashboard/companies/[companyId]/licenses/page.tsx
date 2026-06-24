@@ -85,6 +85,17 @@ function ExpiryCell({ date }: { date: string | null | undefined }) {
   return <span>{label}</span>;
 }
 
+function getEffectiveStatus(license: License): string {
+  if (license.status === "CANCELLED" || license.status === "SUSPENDED") {
+    return license.status;
+  }
+  const expiryDays = daysLeft(license.licenseExpiryDate);
+  if (expiryDays !== null && expiryDays < 0) {
+    return "EXPIRED";
+  }
+  return license.status;
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 function Modal({ title, wide, onClose, children }: {
@@ -152,7 +163,10 @@ export default function LicensesPage() {
   useEffect(() => { load(); }, [load]);
 
   // ── Computed stats (exclude CANCELLED) ──────────────────────────────────────
-  const activeLicenses    = licenses.filter((l) => !EXCLUDED_STATUSES.has(l.status));
+  const activeLicenses    = licenses.filter((l) => {
+    const effectiveStatus = getEffectiveStatus(l);
+    return !EXCLUDED_STATUSES.has(effectiveStatus) && effectiveStatus !== "EXPIRED";
+  });
   const activeMainCount   = activeLicenses.filter((l) =>  l.isMainLicense).length;
   const activeSubCount    = activeLicenses.filter((l) => !l.isMainLicense).length;
   const expiringSoon      = activeLicenses.filter((l) => {
@@ -171,7 +185,8 @@ export default function LicensesPage() {
       const q = search.toLowerCase();
       if (!l.commercialNameAr.toLowerCase().includes(q) && !l.licenseNumber.toLowerCase().includes(q)) return false;
     }
-    if (filterStatus   && l.status    !== filterStatus)  return false;
+    const effectiveStatus = getEffectiveStatus(l);
+    if (filterStatus   && effectiveStatus !== filterStatus)  return false;
     if (filterType === "main"   && !l.isMainLicense)     return false;
     if (filterType === "branch" &&  l.isMainLicense)     return false;
     if (filterInvestor && l.investorId !== filterInvestor) return false;
@@ -469,8 +484,8 @@ export default function LicensesPage() {
                           : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[lic.status] ?? "bg-gray-100 text-gray-600"}`}>
-                          {STATUS_LABELS[lic.status] ?? lic.status}
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[getEffectiveStatus(lic)] ?? "bg-gray-100 text-gray-600"}`}>
+                          {STATUS_LABELS[getEffectiveStatus(lic)] ?? getEffectiveStatus(lic)}
                         </span>
                       </td>
                       <td className="no-print" onClick={(e) => e.stopPropagation()}>
