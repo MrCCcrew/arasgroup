@@ -553,7 +553,7 @@ export default function AccountsPage() {
       </div>
 
       {reclassSource && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setReclassSource(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg space-y-4 rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold">{locale === "en" ? "Move account movements" : "نقل حركات الحساب"}</h3>

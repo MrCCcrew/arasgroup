@@ -182,7 +182,7 @@ function SectionCard({
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} max-h-[90vh] overflow-y-auto rounded-xl bg-card shadow-2xl`} onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between border-b bg-card px-5 py-4">
           <h2 className="font-semibold text-sm">{title}</h2>

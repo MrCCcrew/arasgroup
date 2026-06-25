@@ -130,7 +130,7 @@ export function ClaimEditDeleteActions({ claimId, status, descriptionAr, type, d
 
       {/* Edit Modal */}
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !editSaving && setShowEdit(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-semibold">{locale === "en" ? "Edit claim" : "تعديل المطالبة"}</h2>
@@ -197,7 +197,7 @@ export function ClaimEditDeleteActions({ claimId, status, descriptionAr, type, d
 
       {/* Delete Confirm Modal */}
       {showDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !deleting && setShowDelete(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-semibold text-red-600">{locale === "en" ? "Delete claim" : "حذف المطالبة"}</h2>

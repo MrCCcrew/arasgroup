@@ -102,7 +102,7 @@ function Modal({ title, wide, onClose, children }: {
   title: string; wide?: boolean; onClose: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
         className={`w-full ${wide ? "max-w-2xl" : "max-w-sm"} max-h-[90vh] overflow-y-auto rounded-xl bg-card shadow-2xl`}
         onClick={(e) => e.stopPropagation()}

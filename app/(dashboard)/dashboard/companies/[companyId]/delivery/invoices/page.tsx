@@ -247,7 +247,7 @@ export default function DeliveryInvoicesPage() {
       )}
 
       {viewImg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setViewImg(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="relative max-h-[90vh] max-w-3xl overflow-auto" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setViewImg(null)} className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-black"><X size={18} /></button>
             {/* eslint-disable-next-line @next/next/no-img-element */}

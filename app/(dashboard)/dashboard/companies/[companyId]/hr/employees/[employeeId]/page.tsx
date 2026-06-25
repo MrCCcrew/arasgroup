@@ -385,7 +385,7 @@ export default function EmployeeDetailPage() {
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl bg-card shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b p-4">
               <p className="text-sm font-medium">{preview.originalName}</p>

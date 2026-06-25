@@ -380,7 +380,7 @@ export default function TalabatImportDetailPage() {
 
       {/* Allocation Modal */}
       {allocRider && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-10" onClick={() => setAllocRider(null)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-10">
           <div className="w-full max-w-xl rounded-xl bg-card shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b px-5 py-4">
               <h2 className="font-semibold">توزيع الطلبات</h2>
