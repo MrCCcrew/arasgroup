@@ -523,8 +523,8 @@ export default function LicenseDetailPage() {
         <div className="section-card grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
           {license.investor && <><span className="text-muted-foreground">المسئول والمدير</span><span className="font-medium">{license.investor.nameAr}</span></>}
           {license.licenseExpiryDate && <><span className="text-muted-foreground">انتهاء الترخيص</span><span className={`font-medium ${expiryStatus(license.licenseExpiryDate) === "danger" ? "text-red-600" : expiryStatus(license.licenseExpiryDate) === "warning" ? "text-yellow-600" : ""}`}>{fmt(license.licenseExpiryDate)}</span></>}
-          {license.unifiedEntityNumber && <><span className="text-muted-foreground">الكيان الموحد</span><span dir="ltr" className="font-mono text-xs">{license.unifiedEntityNumber}</span></>}
-          {license.civilEntityNumber && <><span className="text-muted-foreground">الكيان المدني</span><span dir="ltr" className="font-mono text-xs">{license.civilEntityNumber}</span></>}
+          {license.unifiedEntityNumber && <><span className="text-muted-foreground">الرقم الموحد</span><span dir="ltr" className="font-mono text-xs">{license.unifiedEntityNumber}</span></>}
+          {license.civilEntityNumber && <><span className="text-muted-foreground">رقم الجهة المدني</span><span dir="ltr" className="font-mono text-xs">{license.civilEntityNumber}</span></>}
           {license.legalEntity && <><span className="text-muted-foreground">الكيان القانوني</span><span>{license.legalEntity === "LLC" ? "ذات مسئولية محدودة" : license.legalEntity === "PARTNERSHIP" ? "تضامنية" : license.legalEntity === "JOINT_STOCK" ? "مساهمة" : license.legalEntity}</span></>}
           {license.capital && <><span className="text-muted-foreground">رأس المال</span><span dir="ltr" className="number">{Number(license.capital).toFixed(3)} د.ك</span></>}
         </div>
@@ -1266,7 +1266,7 @@ export default function LicenseDetailPage() {
                 <input className="input-field w-full" dir="ltr" value={form.unifiedEntityNumber as string ?? ""} onChange={f("unifiedEntityNumber")} />
               </div>
               <div>
-                <label className="form-label">الرقم المدني</label>
+                <label className="form-label">رقم الجهة المدني</label>
                 <input className="input-field w-full" dir="ltr" value={form.civilEntityNumber as string ?? ""} onChange={f("civilEntityNumber")} />
               </div>
               <div>

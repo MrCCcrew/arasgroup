@@ -619,9 +619,9 @@ export default function LicensesPage() {
                   <input className="input-field" dir="ltr" placeholder="+965XXXXXXXX" value={form.managerPhone} onChange={f("managerPhone")} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="form-label">رقم الكيان الموحد</label>
+                <div><label className="form-label">الرقم الموحد</label>
                   <input className="input-field" dir="ltr" value={form.unifiedEntityNumber} onChange={f("unifiedEntityNumber")} /></div>
-                <div><label className="form-label">رقم الكيان المدني</label>
+                <div><label className="form-label">رقم الجهة المدني</label>
                   <input className="input-field" dir="ltr" value={form.civilEntityNumber} onChange={f("civilEntityNumber")} /></div>
               </div>
             </div>

@@ -16,7 +16,7 @@ const BASE_COLS: ColDef[] = [
   { header: "تاريخ الإصدار",              key: "issueDate",                  width: 16, example: "01/01/2024" },
   { header: "تاريخ الانتهاء",             key: "licenseExpiryDate",          width: 16, example: "31/12/2025" },
   { header: "الرقم الموحد",               key: "unifiedEntityNumber",        width: 20, example: "123456789" },
-  { header: "رقم الجهة المدنية",          key: "civilEntityNumber",          width: 20, example: "987654321" },
+  { header: "رقم الجهة المدني",           key: "civilEntityNumber",          width: 20, example: "987654321" },
   { header: "رقم الملف",                  key: "fileNumber",                 width: 16, example: "F-12345" },
   { header: "الشكل القانوني",             key: "legalEntity",                width: 20, example: "مؤسسة فردية" },
   { header: "رأس المال",                  key: "capital",                    width: 14, example: "5000.000" },
