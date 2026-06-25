@@ -74,8 +74,21 @@ interface Attachment {
   fileSize: number;
   filePath: string;
   refModule: string;
+  attachmentType?: string | null;
   createdAt: string;
 }
+
+const BULK_ATTACHMENT_TYPE = "EMPLOYEE:BULK";
+const BULK_ATTACHMENT_LABELS = {
+  ar: "مرفق مجمع",
+  en: "Grouped attachment",
+} as const;
+
+type AttachmentTypeOption = {
+  value: string;
+  label: string;
+  multiple?: boolean;
+};
 
 interface Employee {
   id: string;
@@ -120,9 +133,10 @@ export default function EmployeeDetailPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState("EMPLOYEE:PASSPORT");
+  const [activeUploadType, setActiveUploadType] = useState("EMPLOYEE:PASSPORT");
   const [preview, setPreview] = useState<Attachment | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const singleFileRef = useRef<HTMLInputElement>(null);
+  const bulkFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const [employeeResponse, attachmentResponse] = await Promise.all([
@@ -151,10 +165,10 @@ export default function EmployeeDetailPage() {
       formData.append("companyId", companyId);
       formData.append("entityType", "EMPLOYEE");
       formData.append("entityId", employeeId);
-      // Keep refModule = docType so the GET grouping works (e.g. "EMPLOYEE:PASSPORT")
-      formData.append("refModule", docType);
+      // Keep refModule aligned with the selected attachment type so grouping still works.
+      formData.append("refModule", activeUploadType);
       formData.append("refId", employeeId);
-      formData.append("attachmentType", docType);
+      formData.append("attachmentType", activeUploadType);
       const response = await fetch("/api/storage/upload", { method: "POST", body: formData });
       const payload = await response.json();
       if (!payload.success) throw new Error(payload.error);
@@ -163,7 +177,41 @@ export default function EmployeeDetailPage() {
       window.alert(uploadError instanceof Error ? uploadError.message : locale === "en" ? "Upload failed" : "فشل الرفع");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      if (singleFileRef.current) singleFileRef.current.value = "";
+      if (bulkFileRef.current) bulkFileRef.current.value = "";
+    }
+  }
+
+  async function handleBulkUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    setActiveUploadType(BULK_ATTACHMENT_TYPE);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("companyId", companyId);
+        formData.append("entityType", "EMPLOYEE");
+        formData.append("entityId", employeeId);
+        formData.append("refModule", BULK_ATTACHMENT_TYPE);
+        formData.append("refId", employeeId);
+        formData.append("attachmentType", BULK_ATTACHMENT_TYPE);
+
+        const response = await fetch("/api/storage/upload", { method: "POST", body: formData });
+        const payload = await response.json();
+        if (!payload.success) throw new Error(payload.error);
+      }
+
+      await load();
+    } catch (uploadError) {
+      window.alert(uploadError instanceof Error ? uploadError.message : locale === "en" ? "Upload failed" : "فشل الرفع");
+    } finally {
+      setUploading(false);
+      setActiveUploadType("EMPLOYEE:PASSPORT");
+      if (singleFileRef.current) singleFileRef.current.value = "";
+      if (bulkFileRef.current) bulkFileRef.current.value = "";
     }
   }
 
@@ -176,7 +224,12 @@ export default function EmployeeDetailPage() {
     setAttachments((previous) => previous.filter((item) => item.id !== attachment.id));
   }
 
-  const grouped = DOC_TYPES[locale]
+  const attachmentTypes: AttachmentTypeOption[] = [
+    ...DOC_TYPES[locale],
+    { value: BULK_ATTACHMENT_TYPE, label: BULK_ATTACHMENT_LABELS[locale], multiple: true },
+  ];
+
+  const grouped = attachmentTypes
     .map((docTypeItem) => ({
       ...docTypeItem,
       items: attachments.filter((attachment) => attachment.refModule === docTypeItem.value),
@@ -252,24 +305,39 @@ export default function EmployeeDetailPage() {
 
           {/* زراير أنواع المرفقات */}
           <input
-            ref={fileRef}
+            ref={singleFileRef}
             type="file"
             className="hidden"
             accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
             onChange={handleUpload}
           />
+          <input
+            ref={bulkFileRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handleBulkUpload}
+          />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            {DOC_TYPES[locale].map((item) => {
+            {attachmentTypes.map((item) => {
               const count = attachments.filter((a) => a.refModule === item.value).length;
-              const isUploading = uploading && docType === item.value;
+              const isUploading = uploading && activeUploadType === item.value;
               return (
                 <button
                   key={item.value}
                   type="button"
                   disabled={uploading}
                   onClick={() => {
-                    setDocType(item.value);
-                    setTimeout(() => fileRef.current?.click(), 0);
+                    setActiveUploadType(item.value);
+                    setTimeout(() => {
+                      if (item.multiple) {
+                        bulkFileRef.current?.click();
+                        return;
+                      }
+
+                      singleFileRef.current?.click();
+                    }, 0);
                   }}
                   className={`relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center text-sm font-medium transition-all
                     ${isUploading
@@ -283,6 +351,11 @@ export default function EmployeeDetailPage() {
                     <Upload size={22} className="text-muted-foreground" />
                   )}
                   <span className="text-xs leading-tight">{item.label}</span>
+                  {item.multiple && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {locale === "en" ? "Upload multiple files" : "رفع عدة ملفات"}
+                    </span>
+                  )}
                   {count > 0 && (
                     <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                       {count}
