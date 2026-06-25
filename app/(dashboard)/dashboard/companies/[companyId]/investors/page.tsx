@@ -9,20 +9,49 @@ import { formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
+  searchParams?: Promise<{ q?: string; licenseType?: string }>;
 }
 
-export default async function InvestorsPage({ params }: Props) {
+export default async function InvestorsPage({ params, searchParams }: Props) {
   const { companyId } = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getSession();
   if (!session) redirect("/login");
 
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const searchQuery = resolvedSearchParams.q?.trim() ?? "";
+  const licenseType = resolvedSearchParams.licenseType === "main" || resolvedSearchParams.licenseType === "sub"
+    ? resolvedSearchParams.licenseType
+    : "all";
 
   // Query investors directly via the company relation (created via POST with companies.connect)
   // This ensures investors without branch links are also visible in the list.
   const investors = await prisma.investor.findMany({
-    where: { isActive: true, companies: { some: { id: companyId } } },
+    where: {
+      isActive: true,
+      companies: { some: { id: companyId } },
+      ...(searchQuery
+        ? {
+            OR: [
+              { nameAr: { contains: searchQuery } },
+              { nameEn: { contains: searchQuery } },
+              { phone: { contains: searchQuery } },
+              { phone2: { contains: searchQuery } },
+            ],
+          }
+        : {}),
+      ...(licenseType === "all"
+        ? {}
+        : {
+            licenses: {
+              some: {
+                companyId,
+                isMainLicense: licenseType === "main",
+              },
+            },
+          }),
+    },
     include: {
       _count: { select: { claims: true } },
       investorBranches: {
@@ -87,6 +116,31 @@ export default async function InvestorsPage({ params }: Props) {
       />
 
       <div className="page-container space-y-8">
+        <form className="grid grid-cols-1 gap-3 rounded-xl border bg-card p-4 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+          <input
+            name="q"
+            defaultValue={searchQuery}
+            className="input-field w-full"
+            placeholder={locale === "en" ? "Search by name or phone..." : "ابحث بالاسم أو رقم التليفون..."}
+          />
+          <select name="licenseType" defaultValue={licenseType} className="input-field w-full">
+            <option value="all">{locale === "en" ? "All licenses" : "كل التراخيص"}</option>
+            <option value="main">{locale === "en" ? "Main license" : "ترخيص رئيسي"}</option>
+            <option value="sub">{locale === "en" ? "Sub-license" : "ترخيص فرعي"}</option>
+          </select>
+          <div className="flex gap-2">
+            <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+              {locale === "en" ? "Search" : "بحث"}
+            </button>
+            <Link
+              href={`/dashboard/companies/${companyId}/investors`}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {locale === "en" ? "Reset" : "إلغاء"}
+            </Link>
+          </div>
+        </form>
+
         {investors.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <p>{locale === "en" ? "No investors are linked to this company yet" : "لا يوجد مسئولون ومديرون مرتبطون بهذه الشركة بعد"}</p>
