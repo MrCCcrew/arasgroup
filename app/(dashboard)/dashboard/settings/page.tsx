@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Building2, Users, Shield, Plus, Link2 } from "lucide-react";
 import Link from "next/link";
 import { GroupLogoUpload } from "@/components/group/GroupLogoUpload";
+import { ThemeSettings } from "@/components/settings/theme-settings";
 
 const companyTypeLabels: Record<string, string> = {
   DELIVERY: "توصيل",
@@ -89,6 +90,10 @@ export default async function SettingsPage() {
               <p className="text-xs text-muted-foreground">دور وظيفي</p>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6">
+          <ThemeSettings />
         </div>
 
         {/* Groups & Companies */}

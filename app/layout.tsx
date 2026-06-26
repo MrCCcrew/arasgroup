@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LocaleProvider } from "@/components/providers/locale-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { THEME_PREPAINT_SCRIPT } from "@/lib/theme";
 import { getLocale, getLocaleDirection } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
 
@@ -38,6 +40,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
+        {/* تطبيق ثيم المستخدم المحفوظ قبل الرسم (منع وميض الألوان) */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_PREPAINT_SCRIPT }} />
         <link rel="icon" href={faviconUrl} />
         <link rel="apple-touch-icon" href={faviconUrl} />
         <link
@@ -47,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen bg-background antialiased">
         <LocaleProvider initialLocale={locale}>
-          {children}
+          <ThemeProvider>{children}</ThemeProvider>
         </LocaleProvider>
       </body>
     </html>
