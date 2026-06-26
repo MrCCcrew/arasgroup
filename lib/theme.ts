@@ -3,6 +3,10 @@
 
 export const THEME_STORAGE_KEY = "aras-theme";
 
+export function getThemeStorageKey(userId?: string | null) {
+  return userId ? `${THEME_STORAGE_KEY}:${userId}` : THEME_STORAGE_KEY;
+}
+
 export interface ThemeColors {
   sidebar: string; // hex — لون الشريط الجانبي
   background: string; // hex — لون الواجهة (الخلفية)
@@ -103,9 +107,19 @@ export function clearThemeVars() {
 }
 
 // سكربت يُحقن في <head> ليطبّق الثيم المحفوظ قبل الرسم (منع الوميض)
-export const THEME_PREPAINT_SCRIPT = `
+export function getThemePrepaintScript(userId?: string | null) {
+  const storageKey = getThemeStorageKey(userId);
+
+  return `
 try {
-  var t = JSON.parse(localStorage.getItem('${THEME_STORAGE_KEY}') || 'null');
-  if (t && t.vars) { var r = document.documentElement; for (var k in t.vars) r.style.setProperty(k, t.vars[k]); }
+  var key = ${JSON.stringify(storageKey)};
+  var fallbackKey = ${JSON.stringify(THEME_STORAGE_KEY)};
+  var raw = localStorage.getItem(key) || localStorage.getItem(fallbackKey);
+  var t = raw ? JSON.parse(raw) : null;
+  if (t && t.vars) {
+    var r = document.documentElement;
+    for (var k in t.vars) r.style.setProperty(k, t.vars[k]);
+  }
 } catch (e) {}
 `;
+}

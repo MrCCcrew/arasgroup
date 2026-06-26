@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import {
+  getThemeStorageKey,
   THEME_STORAGE_KEY,
   DEFAULT_THEME,
   buildThemeVars,
@@ -20,26 +21,35 @@ interface ThemeCtx {
 
 const ThemeContext = createContext<ThemeCtx | null>(null);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  userId,
+}: {
+  children: React.ReactNode;
+  userId?: string | null;
+}) {
   const [colors, setColorsState] = useState<ThemeColors>(DEFAULT_THEME);
   const [isCustom, setIsCustom] = useState(false);
+  const storageKey = getThemeStorageKey(userId);
 
   // عند التحميل: طبّق الثيم المحفوظ (السكربت في <head> طبّقه قبل الرسم، وهنا نزامن الحالة)
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(THEME_STORAGE_KEY);
+      const raw = localStorage.getItem(storageKey) ?? localStorage.getItem(THEME_STORAGE_KEY);
       if (raw) {
         const t = JSON.parse(raw) as StoredTheme;
         if (t?.colors) {
+          const vars = t.vars ?? buildThemeVars(t.colors);
           setColorsState(t.colors);
           setIsCustom(true);
-          applyThemeVars(t.vars ?? buildThemeVars(t.colors));
+          applyThemeVars(vars);
+          localStorage.setItem(storageKey, JSON.stringify({ colors: t.colors, vars } satisfies StoredTheme));
         }
       }
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [storageKey]);
 
   function setColors(next: ThemeColors) {
     const vars = buildThemeVars(next);
@@ -47,7 +57,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setColorsState(next);
     setIsCustom(true);
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ colors: next, vars } satisfies StoredTheme));
+      localStorage.setItem(storageKey, JSON.stringify({ colors: next, vars } satisfies StoredTheme));
     } catch {
       /* ignore */
     }
@@ -58,7 +68,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setColorsState(DEFAULT_THEME);
     setIsCustom(false);
     try {
-      localStorage.removeItem(THEME_STORAGE_KEY);
+      localStorage.removeItem(storageKey);
     } catch {
       /* ignore */
     }
