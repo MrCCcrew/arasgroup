@@ -39,3 +39,23 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
   return NextResponse.json({ success: true, data: updated });
 }
+
+export async function DELETE(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+
+  const { notificationId } = await params;
+  const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
+
+  if (!notification) {
+    return NextResponse.json({ success: false, error: "Notification not found" }, { status: 404 });
+  }
+
+  await prisma.notification.delete({ where: { id: notificationId } });
+
+  return NextResponse.json({ success: true });
+}
