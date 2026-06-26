@@ -52,6 +52,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [regenResult, setRegenResult] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -102,7 +103,7 @@ export default function NotificationsPage() {
         setRegenResult(
           parts.length > 0
             ? (en ? `Notifications generated: ${parts.join(", ")}` : `تم توليد إشعارات: ${parts.join("، ")}`)
-            : (en ? "Checked successfully — there are no new notifications right now." : "تم التحقق — لا توجد إشعارات جديدة حالياً")
+            : (en ? "Checked successfully - there are no new notifications right now." : "تم التحقق - لا توجد إشعارات جديدة حالياً")
         );
         await load();
         router.refresh();
@@ -138,6 +139,34 @@ export default function NotificationsPage() {
     }
   }
 
+  async function deleteAllNotifications() {
+    const confirmed = window.confirm(
+      en ? "Do you want to delete all notifications?" : "هل تريد حذف كل الإشعارات؟",
+    );
+    if (!confirmed) return;
+
+    setDeletingAll(true);
+    setRegenResult(null);
+    try {
+      const res = await fetch("/api/notifications", { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        window.alert(data?.error ?? (en ? "Delete all failed" : "فشل حذف كل الإشعارات"));
+        return;
+      }
+
+      setNotifications([]);
+      const count = Number(data.data?.deletedCount ?? 0);
+      setRegenResult(
+        en ? `Deleted ${count} notification(s).` : `تم حذف ${count} إشعار.`,
+      );
+    } catch {
+      window.alert(en ? "A connection error occurred." : "حدث خطأ في الاتصال");
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
   const pendingCount = notifications.filter((n) => n.status === "PENDING").length;
   const criticalCount = notifications.filter((n) => n.severity === "CRITICAL" || n.severity === "DANGER").length;
   const columnCount = isSuperAdmin ? 7 : 6;
@@ -164,14 +193,26 @@ export default function NotificationsPage() {
         title={en ? "Notification Center" : "مركز الإشعارات"}
         subtitle={en ? "Expiry alerts and important deadlines" : "تنبيهات الانتهاء والمواعيد المهمة"}
         actions={
-          <button
-            onClick={regenerate}
-            disabled={regenerating}
-            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} />
-            {regenerating ? (en ? "Regenerating..." : "جاري التوليد...") : (en ? "Regenerate notifications" : "إعادة توليد الإشعارات")}
-          </button>
+          <div className="flex items-center gap-2">
+            {isSuperAdmin ? (
+              <button
+                onClick={deleteAllNotifications}
+                disabled={deletingAll || notifications.length === 0}
+                className="flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                {deletingAll ? (en ? "Deleting..." : "جاري الحذف...") : (en ? "Delete all" : "حذف الكل")}
+              </button>
+            ) : null}
+            <button
+              onClick={regenerate}
+              disabled={regenerating}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} />
+              {regenerating ? (en ? "Regenerating..." : "جاري التوليد...") : (en ? "Regenerate notifications" : "إعادة توليد الإشعارات")}
+            </button>
+          </div>
         }
       />
 
@@ -218,7 +259,7 @@ export default function NotificationsPage() {
                   {rows.length === 0 ? (
                     <tr>
                       <td colSpan={columnCount} className="py-10 text-center text-muted-foreground">
-                        {en ? 'No notifications right now — press "Regenerate" to create them.' : 'لا توجد إشعارات حالياً — اضغط "إعادة توليد" لإنشائها'}
+                        {en ? 'No notifications right now - press "Regenerate" to create them.' : 'لا توجد إشعارات حالياً - اضغط "إعادة توليد" لإنشائها'}
                       </td>
                     </tr>
                   ) : rows.map((n) => (

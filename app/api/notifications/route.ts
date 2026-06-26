@@ -49,3 +49,15 @@ export async function POST() {
   const summary = await regenerateNotifications();
   return NextResponse.json({ success: true, data: summary });
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+
+  const result = await prisma.notification.deleteMany();
+  return NextResponse.json({ success: true, data: { deletedCount: result.count } });
+}
