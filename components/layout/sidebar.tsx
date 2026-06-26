@@ -199,7 +199,7 @@ function filterGroupNav(user: SessionUser, items: NavItem[]) {
   return items.filter((item) => {
     if (item.href === "/dashboard") return true;
     if (item.module === "USERS") return user.isSuperAdmin || hasPermission(user, "USERS", "VIEW");
-    if (item.module === "SETTINGS") return user.isSuperAdmin || hasPermission(user, "SETTINGS", "VIEW");
+    if (item.module === "SETTINGS") return true;
     if (item.module === "COMPANIES") return user.isSuperAdmin || user.companyAccess.length > 0;
     if (item.module === "NOTIFICATIONS") return true;
     return true;

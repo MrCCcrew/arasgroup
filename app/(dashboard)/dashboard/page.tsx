@@ -121,7 +121,7 @@ export default async function GroupDashboardPage() {
     session.isSuperAdmin || hasPermission(session, "USERS", "VIEW")
       ? { href: "/dashboard/users", label: "إدارة المستخدمين", icon: <Users size={16} /> }
       : null,
-    session.isSuperAdmin || hasPermission(session, "SETTINGS", "VIEW")
+    true
       ? { href: "/dashboard/settings", label: "إعدادات النظام", icon: <Building2 size={16} /> }
       : null,
   ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[];
