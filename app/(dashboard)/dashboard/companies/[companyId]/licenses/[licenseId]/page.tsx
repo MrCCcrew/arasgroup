@@ -71,6 +71,14 @@ interface Sections {
   annualBalances: { id: string; year: number; accountant: string | null; fileUrl: string; notes: string | null }[];
 }
 
+interface AttachmentItem {
+  id: string;
+  filePath: string;
+  originalName: string | null;
+  documentCategory: string | null;
+  createdAt: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysLeft(d: string | null | undefined): number | null {
@@ -197,13 +205,15 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 // ─── File Upload Field ─────────────────────────────────────────────────────────
 
 function FileUploadField({
-  value, onChange, licenseId, label = "الملف", required,
+  value, onChange, licenseId, label = "الملف", required, documentCategory, onUploaded,
 }: {
   value: string;
   onChange: (url: string) => void;
   licenseId: string;
   label?: string;
   required?: boolean;
+  documentCategory?: string;
+  onUploaded?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -216,10 +226,12 @@ function FileUploadField({
     try {
       const fd = new FormData();
       fd.append("file", file);
+      if (documentCategory) fd.append("documentCategory", documentCategory);
       const res = await fetch(`/api/licenses/${licenseId}/attachments`, { method: "POST", body: fd });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
       onChange(json.data.filePath);
+      onUploaded?.();
     } catch (err) {
       setUploadErr(err instanceof Error ? err.message : "فشل الرفع");
     } finally {
@@ -273,6 +285,7 @@ export default function LicenseDetailPage() {
 
   const [license, setLicense] = useState<LicenseBase | null>(null);
   const [sections, setSections] = useState<Sections | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [investors, setInvestors] = useState<{ id: string; nameAr: string }[]>([]);
@@ -293,13 +306,15 @@ export default function LicenseDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [licRes, secRes] = await Promise.all([
+    const [licRes, secRes, attRes] = await Promise.all([
       fetch(`/api/licenses/${licenseId}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/licenses/${licenseId}/sections`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/licenses/${licenseId}/attachments`).then((r) => r.json()).catch(() => null),
     ]);
     if (licRes?.success) setLicense(licRes.data);
     else setError(licRes?.error ?? "فشل في جلب بيانات الترخيص");
     if (secRes?.success) setSections(secRes.data);
+    if (attRes?.success) setAttachments(attRes.data);
     setLoading(false);
   }, [licenseId]);
 
@@ -463,6 +478,7 @@ export default function LicenseDetailPage() {
   const s = sections;
   const activeEstContract = s?.establishmentContracts.find((c) => c.isActive);
   const activeLeaseContract = s?.leaseContracts.find((c) => c.isActive);
+  const commercialLicenseAttachment = attachments.find((attachment) => attachment.documentCategory === "COMMERCIAL_LICENSE");
 
   // Card statuses
   const statusMap: Record<string, CardStatus> = {
@@ -603,6 +619,7 @@ export default function LicenseDetailPage() {
               capital:             license.capital ?? "",
               managerName:         license.managerName ?? "",
               managerPhone:        license.managerPhone ?? "",
+              fileUrl:             commercialLicenseAttachment?.filePath ?? "",
               notes:               license.notes ?? "",
             })}
             editLabel="تعديل البيانات الأساسية"
@@ -611,6 +628,7 @@ export default function LicenseDetailPage() {
               {license.commercialRegNo && <><span className="text-muted-foreground">السجل التجاري</span><span dir="ltr">{license.commercialRegNo}</span></>}
               {license.issueDate && <><span className="text-muted-foreground">تاريخ الإصدار</span><span>{fmt(license.issueDate)}</span></>}
               {fmtDays(license.licenseExpiryDate)}
+              {commercialLicenseAttachment && <><span className="text-muted-foreground">ملف الترخيص</span><span><FileLink url={commercialLicenseAttachment.filePath} label="عرض الملف" /></span></>}
             </div>
           </SectionCard>
 
@@ -1296,6 +1314,14 @@ export default function LicenseDetailPage() {
                 <input className="input-field w-full" dir="ltr" value={form.managerPhone as string ?? ""} onChange={f("managerPhone")} />
               </div>
             </div>
+            <FileUploadField
+              value={form.fileUrl as string ?? ""}
+              onChange={setFileUrl}
+              onUploaded={load}
+              licenseId={licenseId}
+              label="ملف الترخيص"
+              documentCategory="COMMERCIAL_LICENSE"
+            />
             <div>
               <label className="form-label">ملاحظات</label>
               <textarea className="input-field w-full resize-none" rows={2} value={form.notes as string ?? ""} onChange={f("notes")} />
