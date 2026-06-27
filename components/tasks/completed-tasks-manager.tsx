@@ -101,6 +101,20 @@ export function CompletedTasksManager({
   }, [companies, form.companyId]);
 
   const visibleTasks = useMemo(() => tasks, [tasks]);
+  const groupedTasksForPrint = useMemo(() => {
+    const groups = new Map<string, { user: UserOption; tasks: TaskRecord[] }>();
+
+    for (const task of visibleTasks) {
+      const existing = groups.get(task.userId);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        groups.set(task.userId, { user: task.user, tasks: [task] });
+      }
+    }
+
+    return Array.from(groups.values());
+  }, [visibleTasks]);
 
   function localizeName(item?: Option | null) {
     if (!item) return "-";
@@ -249,7 +263,7 @@ export function CompletedTasksManager({
     t("tasks.deferred");
 
   const selectedUserName = filters.userId
-    ? (users.find((u) => u.id === filters.userId)?.nameAr ?? filters.userId)
+    ? localizeName(users.find((u) => u.id === filters.userId))
     : text("الكل", "All");
 
   const printDate = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ar-KW", {
@@ -463,7 +477,7 @@ export function CompletedTasksManager({
         </form>
       ) : null}
 
-      <div className="section-card">
+      <div className="section-card no-print">
         <div className="print-only mb-4 border-b pb-3">
           <h2 className="font-bold text-base">{t("tasks.pageTitle")}</h2>
         </div>
@@ -521,6 +535,87 @@ export function CompletedTasksManager({
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="print-only space-y-6">
+        {groupedTasksForPrint.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {t("tasks.noTasks")}
+          </div>
+        ) : (
+          groupedTasksForPrint.map((group, groupIndex) => (
+            <section
+              key={`${group.user.id}-${groupIndex}`}
+              className="rounded-xl border border-border p-4"
+              style={groupIndex > 0 ? { breakBefore: "page" } : undefined}
+            >
+              <div className="mb-4 border-b pb-3">
+                <h3 className="text-lg font-bold">{localizeName(group.user)}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {text("عدد المهام:", "Tasks count:")} {group.tasks.length}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {group.tasks.map((task, taskIndex) => (
+                  <article
+                    key={task.id}
+                    className="rounded-lg border border-border/70 p-4"
+                    style={taskIndex > 0 ? { breakInside: "avoid" } : undefined}
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-4 border-b border-border/50 pb-2">
+                      <div>
+                        <h4 className="font-bold">
+                          {locale === "en" ? task.titleEn || task.titleAr : task.titleAr}
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {text("تاريخ المهمة:", "Task date:")} {formatDate(task.taskDate)}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-muted px-2 py-1 text-xs">
+                        {statusLabel(task.status)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      <div><span className="font-medium">{t("tasks.company")}: </span>{localizeName(task.company)}</div>
+                      <div><span className="font-medium">{t("tasks.branch")}: </span>{localizeName(task.branch)}</div>
+                      <div><span className="font-medium">{t("tasks.departedAt")}: </span>{formatDate(task.departedAt, true)}</div>
+                      <div><span className="font-medium">{t("tasks.returnedAt")}: </span>{formatDate(task.returnedAt, true)}</div>
+                      <div><span className="font-medium">{t("tasks.location")}: </span>{task.location || "-"}</div>
+                      <div><span className="font-medium">{t("tasks.deferredToDate")}: </span>{formatDate(task.deferredToDate)}</div>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <div className="mb-1 font-medium">{t("tasks.detailsAr")}</div>
+                        <div className="rounded-lg bg-muted/30 p-3 whitespace-pre-wrap">
+                          {task.detailsAr || "-"}
+                        </div>
+                      </div>
+
+                      {(locale === "en" || task.detailsEn) ? (
+                        <div>
+                          <div className="mb-1 font-medium">{t("tasks.detailsEn")}</div>
+                          <div className="rounded-lg bg-muted/30 p-3 whitespace-pre-wrap" dir="ltr">
+                            {task.detailsEn || "-"}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div>
+                        <div className="mb-1 font-medium">{t("tasks.outcomeNotes")}</div>
+                        <div className="rounded-lg bg-muted/30 p-3 whitespace-pre-wrap">
+                          {task.outcomeNotes || "-"}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))
+        )}
       </div>
     </div>
   );
