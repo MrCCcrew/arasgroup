@@ -101,6 +101,15 @@ export function parseEnum<T extends string>(
   return null;
 }
 
+export function normalizeLookupValue(value: string | null | undefined): string {
+  return (value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه");
+}
+
 // ── Excel builder ─────────────────────────────────────────────────────────────
 export function buildWorkbook(
   cols: ColDef[],

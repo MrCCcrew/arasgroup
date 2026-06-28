@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import {
   buildWorkbook, parseWorkbook, validateRequired, parseDate, formatDateForExcel,
-  EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_DISPLAY, parseEnum,
+  EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_DISPLAY, parseEnum, normalizeLookupValue,
   type ColDef, type ImportResult,
 } from "@/lib/excel/import-export";
 import type { EmployeeType } from "@prisma/client";
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
   // Fetch branches for lookup
   const branches = await prisma.branch.findMany({ where: { companyId, isActive: true }, select: { id: true, nameAr: true } });
-  const branchMap = Object.fromEntries(branches.map((b) => [b.nameAr.trim(), b.id]));
+  const branchMap = Object.fromEntries(branches.map((b) => [normalizeLookupValue(b.nameAr), b.id]));
 
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const branchId = data.branchName ? (branchMap[data.branchName] ?? null) : null;
+    const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
     if (data.branchName && !branchId) {
       result.errors.push({ row: rowIndex, field: "الفرع", message: `الصف ${rowIndex}: الفرع "${data.branchName}" غير موجود` });
       continue;

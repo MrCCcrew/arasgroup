@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import {
   buildWorkbook, parseWorkbook, validateRequired, parseDate, formatDateForExcel,
+  normalizeLookupValue,
   type ColDef, type ImportResult,
 } from "@/lib/excel/import-export";
 
@@ -209,18 +210,18 @@ export async function POST(request: NextRequest) {
 
   // Pre-fetch lookups
   const branches  = await prisma.branch.findMany({ where: { companyId, isActive: true }, select: { id: true, nameAr: true } });
-  const branchMap = Object.fromEntries(branches.map((b) => [b.nameAr.trim(), b.id]));
+  const branchMap = Object.fromEntries(branches.map((b) => [normalizeLookupValue(b.nameAr), b.id]));
 
   const investors  = isInvestor
     ? await prisma.investor.findMany({ where: { isActive: true }, select: { id: true, nameAr: true } })
     : [];
-  const investorMap = Object.fromEntries(investors.map((i) => [i.nameAr.trim(), i.id]));
+  const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
 
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
   for (const { rowIndex, data } of parsedRows) {
     // Resolve branch
-    const branchId = data.branchName ? (branchMap[data.branchName] ?? null) : null;
+    const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
     if (data.branchName && !branchId) {
       result.errors.push({ row: rowIndex, field: "الفرع", message: `الصف ${rowIndex}: الفرع "${data.branchName}" غير موجود` });
       continue;
@@ -229,7 +230,7 @@ export async function POST(request: NextRequest) {
     // Resolve investor
     let investorId: string | null = null;
     if (isInvestor) {
-      investorId = investorMap[data.investorName?.trim() ?? ""] ?? null;
+      investorId = investorMap[normalizeLookupValue(data.investorName)] ?? null;
       if (!investorId) {
         result.errors.push({ row: rowIndex, field: "اسم المسئول", message: `الصف ${rowIndex}: المسئول "${data.investorName}" غير موجود في النظام` });
         continue;

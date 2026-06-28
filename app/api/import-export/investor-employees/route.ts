@@ -10,6 +10,7 @@ import {
   EMPLOYEE_TYPE_LABELS,
   EMPLOYEE_TYPE_DISPLAY,
   parseEnum,
+  normalizeLookupValue,
   type ColDef,
   type ImportResult,
 } from "@/lib/excel/import-export";
@@ -151,15 +152,15 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
-  const investorMap = Object.fromEntries(investors.map((i) => [i.nameAr.trim(), i.id]));
-  const licenseMap = Object.fromEntries(licenses.map((l) => [l.commercialNameAr.trim(), l.id]));
-  const branchMap = Object.fromEntries(branches.map((b) => [b.nameAr.trim(), b.id]));
+  const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
+  const licenseMap = Object.fromEntries(licenses.map((l) => [normalizeLookupValue(l.commercialNameAr), l.id]));
+  const branchMap = Object.fromEntries(branches.map((b) => [normalizeLookupValue(b.nameAr), b.id]));
 
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
   for (const { rowIndex, data } of parsedRows) {
     // Validate investor
-    const investorId = investorMap[data.investorName?.trim()];
+    const investorId = investorMap[normalizeLookupValue(data.investorName)];
     if (!investorId) {
       result.errors.push({
         row: rowIndex,
@@ -181,8 +182,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Optional lookups
-    const licenseId = data.licenseName ? (licenseMap[data.licenseName] ?? null) : null;
-    const branchId = data.branchName ? (branchMap[data.branchName] ?? null) : null;
+    const licenseId = data.licenseName ? (licenseMap[normalizeLookupValue(data.licenseName)] ?? null) : null;
+    const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
 
     const payload = {
       companyId,

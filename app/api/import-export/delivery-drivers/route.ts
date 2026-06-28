@@ -7,6 +7,7 @@ import {
   validateRequired,
   parseDate,
   formatDateForExcel,
+  normalizeLookupValue,
   type ColDef,
   type ImportResult,
 } from "@/lib/excel/import-export";
@@ -150,14 +151,24 @@ export async function POST(request: NextRequest) {
         : null;
 
       if (!employee && !civilId && data.nameAr) {
-        employee = await prisma.employee.findFirst({
+        const candidates = await prisma.employee.findMany({
           where: {
             companyId,
-            nameAr: data.nameAr,
             type: "DELIVERY_DRIVER",
             isDeleted: false,
           },
+          select: { id: true, nameAr: true },
         });
+
+        const matched = candidates.find((candidate) =>
+          normalizeLookupValue(candidate.nameAr) === normalizeLookupValue(data.nameAr)
+        );
+
+        if (matched) {
+          employee = await prisma.employee.findUnique({
+            where: { id: matched.id },
+          });
+        }
       }
 
       if (employee) {
