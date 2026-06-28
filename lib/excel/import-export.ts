@@ -110,6 +110,18 @@ export function normalizeLookupValue(value: string | null | undefined): string {
     .replace(/ة/g, "ه");
 }
 
+export function normalizeLicenseNumber(value: string | null | undefined): string {
+  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+  const easternDigits = "۰۱۲۳۴۵۶۷۸۹";
+
+  return (value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String(easternDigits.indexOf(digit)))
+    .replace(/[／\\]/g, "/");
+}
+
 // ── Excel builder ─────────────────────────────────────────────────────────────
 export function buildWorkbook(
   cols: ColDef[],

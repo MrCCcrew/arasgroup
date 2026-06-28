@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
 import {
   buildWorkbook, parseWorkbook, validateRequired, parseDate, formatDateForExcel,
-  normalizeLookupValue,
+  normalizeLookupValue, normalizeLicenseNumber,
   type ColDef, type ImportResult,
 } from "@/lib/excel/import-export";
 
@@ -216,6 +216,20 @@ export async function POST(request: NextRequest) {
     ? await prisma.investor.findMany({ where: { isActive: true }, select: { id: true, nameAr: true } })
     : [];
   const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
+  const mainLicenses = !isMain
+    ? await prisma.license.findMany({
+        where: { companyId, isMainLicense: true },
+        select: { id: true, investorId: true, licenseNumber: true },
+      })
+    : [];
+  const mainLicenseMap = new Map(
+    mainLicenses.map((license) => [normalizeLicenseNumber(license.licenseNumber), license])
+  );
+  const mainLicenseByInvestorMap = new Map(
+    mainLicenses
+      .filter((license) => license.investorId)
+      .map((license) => [`${license.investorId}:${normalizeLicenseNumber(license.licenseNumber)}`, license])
+  );
 
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
@@ -236,9 +250,10 @@ export async function POST(request: NextRequest) {
     // Resolve main license for sub-licenses
     let mainLicenseId: string | null = null;
     if (!isMain && data.mainLicenseNumber) {
-      const mainLic = await prisma.license.findFirst({
-        where: { companyId, licenseNumber: data.mainLicenseNumber, isMainLicense: true },
-      });
+      const normalizedMainLicenseNumber = normalizeLicenseNumber(data.mainLicenseNumber);
+      const mainLic = (isInvestor && investorId
+        ? mainLicenseByInvestorMap.get(`${investorId}:${normalizedMainLicenseNumber}`)
+        : null) ?? mainLicenseMap.get(normalizedMainLicenseNumber);
       if (!mainLic) {
         result.errors.push({ row: rowIndex, field: "رقم الترخيص الرئيسي", message: `الصف ${rowIndex}: الترخيص الرئيسي "${data.mainLicenseNumber}" غير موجود` });
         continue;
