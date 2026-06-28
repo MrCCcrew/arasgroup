@@ -234,6 +234,18 @@ export async function POST(request: NextRequest) {
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
   for (const { rowIndex, data } of parsedRows) {
+    const normalizedLicenseNumber = normalizeLicenseNumber(data.licenseNumber);
+    const normalizedMainLicenseNumber = normalizeLicenseNumber(data.mainLicenseNumber);
+
+    if (!isMain && normalizedLicenseNumber && normalizedMainLicenseNumber && normalizedLicenseNumber === normalizedMainLicenseNumber) {
+      result.errors.push({
+        row: rowIndex,
+        field: "رقم الترخيص",
+        message: `الصف ${rowIndex}: هذا الصف يبدو ترخيصًا رئيسيًا وليس فرعيًا لأن رقم الترخيص يساوي رقم الترخيص الرئيسي`,
+      });
+      continue;
+    }
+
     // Resolve branch
     const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
 
@@ -250,7 +262,6 @@ export async function POST(request: NextRequest) {
     // Resolve main license for sub-licenses
     let mainLicenseId: string | null = null;
     if (!isMain && data.mainLicenseNumber) {
-      const normalizedMainLicenseNumber = normalizeLicenseNumber(data.mainLicenseNumber);
       const mainLic = (isInvestor && investorId
         ? mainLicenseByInvestorMap.get(`${investorId}:${normalizedMainLicenseNumber}`)
         : null) ?? mainLicenseMap.get(normalizedMainLicenseNumber);
