@@ -195,6 +195,12 @@ export async function POST(request: NextRequest) {
   const cols = getCols(licenseType);
   const buf = Buffer.from(await file.arrayBuffer());
   const parsedRows = parseWorkbook(buf, cols);
+  if (parsedRows.length === 0) {
+    return NextResponse.json({
+      success: false,
+      error: "لا توجد صفوف بيانات للاستيراد. أدخل البيانات بدءًا من الصف الثالث بعد العناوين وصف المثال.",
+    }, { status: 400 });
+  }
   const requiredErrors = validateRequired(parsedRows, cols);
   if (requiredErrors.length > 0) return NextResponse.json({ success: false, errors: requiredErrors });
 
