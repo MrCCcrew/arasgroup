@@ -222,10 +222,6 @@ export async function POST(request: NextRequest) {
   for (const { rowIndex, data } of parsedRows) {
     // Resolve branch
     const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
-    if (data.branchName && !branchId) {
-      result.errors.push({ row: rowIndex, field: "الفرع", message: `الصف ${rowIndex}: الفرع "${data.branchName}" غير موجود` });
-      continue;
-    }
 
     // Resolve investor
     let investorId: string | null = null;
