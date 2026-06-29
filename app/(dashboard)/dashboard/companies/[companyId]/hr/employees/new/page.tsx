@@ -42,6 +42,7 @@ interface LicenseLookup {
   commercialNameAr: string;
   licenseNumber: string;
   unifiedEntityNumber?: string | null;
+  isMainLicense?: boolean;
   company?: { nameAr: string };
 }
 
@@ -221,6 +222,8 @@ export default function NewEmployeePage() {
     positionId: "",
     branchId: "",
     licenseId: "",
+    residencyLicenseId: "",
+    workPermitLicenseId: "",
     investorId: "",
     nationality: "",
     civilId: "",
@@ -241,6 +244,33 @@ export default function NewEmployeePage() {
     allowedTypes.includes(type.value as (typeof allowedTypes)[number]),
   );
   const showAdditionalLicenses = allowsCrossCompanyLicenses(companyType);
+  const selectableLicenseOptions = [
+    ...licenses.map((license) => ({
+      id: license.id,
+      label: `${license.commercialNameAr} (${license.licenseNumber})`,
+      sub: [
+        license.isMainLicense === false ? "فرعي" : "رئيسي",
+        license.unifiedEntityNumber ?? undefined,
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    })),
+    ...(showAdditionalLicenses
+      ? groupLicenses
+          .filter((license) => !licenses.some((item) => item.id === license.id))
+          .map((license) => ({
+            id: license.id,
+            label: `${license.commercialNameAr} (${license.licenseNumber})`,
+            sub: [
+              license.company?.nameAr ? `[${license.company.nameAr}]` : undefined,
+              license.isMainLicense === false ? "فرعي" : "رئيسي",
+              license.unifiedEntityNumber ?? undefined,
+            ]
+              .filter(Boolean)
+              .join(" • "),
+          }))
+      : []),
+  ];
 
   useEffect(() => {
     Promise.all([
@@ -297,6 +327,8 @@ export default function NewEmployeePage() {
           positionId: form.positionId || undefined,
           branchId: form.branchId || undefined,
           licenseId: form.licenseId || undefined,
+          residencyLicenseId: form.residencyLicenseId || undefined,
+          workPermitLicenseId: form.workPermitLicenseId || undefined,
           investorId: form.investorId || undefined,
           additionalLicenseIds: showAdditionalLicenses && additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
           nationality: form.nationality || undefined,
@@ -388,11 +420,7 @@ export default function NewEmployeePage() {
                   value={form.licenseId}
                   onChange={(id) => setField("licenseId", id)}
                   placeholder={locale === "en" ? "Select license" : "اختر الترخيص"}
-                  options={licenses.map((license) => ({
-                    id: license.id,
-                    label: `${license.commercialNameAr} (${license.licenseNumber})`,
-                    sub: license.unifiedEntityNumber ?? undefined,
-                  }))}
+                  options={selectableLicenseOptions}
                 />
               </div>
 
@@ -585,12 +613,30 @@ export default function NewEmployeePage() {
                 <input type="date" value={form.residencyExpiry} onChange={(event) => setField("residencyExpiry", event.target.value)} className="input-field w-full" />
               </div>
               <div>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Employee residency license" : "رخصة إقامة الموظف"}</label>
+                <SearchableSelect
+                  value={form.residencyLicenseId}
+                  onChange={(id) => setField("residencyLicenseId", id)}
+                  placeholder={locale === "en" ? "Select residency license" : "اختر رخصة الإقامة"}
+                  options={selectableLicenseOptions}
+                />
+              </div>
+              <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Driving license number" : "رقم الرخصة"}</label>
                 <input type="text" value={form.licenseNumber} onChange={(event) => setField("licenseNumber", event.target.value)} className="input-field w-full" dir="ltr" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Driving license expiry" : "تاريخ انتهاء الرخصة"}</label>
                 <input type="date" value={form.licenseExpiry} onChange={(event) => setField("licenseExpiry", event.target.value)} className="input-field w-full" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Employee actual work permit" : "رخصة العمل الفعلية للموظف"}</label>
+                <SearchableSelect
+                  value={form.workPermitLicenseId}
+                  onChange={(id) => setField("workPermitLicenseId", id)}
+                  placeholder={locale === "en" ? "Select work permit license" : "اختر رخصة العمل"}
+                  options={selectableLicenseOptions}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Bank account number" : "رقم الحساب البنكي"}</label>

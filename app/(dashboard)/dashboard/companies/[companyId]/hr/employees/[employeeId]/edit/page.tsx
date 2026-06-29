@@ -14,6 +14,15 @@ interface CompanyLookup { type: string; }
 
 interface InvestorLookup { id: string; nameAr: string; nameEn?: string | null; }
 
+interface LicenseLookup {
+  id: string;
+  commercialNameAr: string;
+  licenseNumber: string;
+  unifiedEntityNumber?: string | null;
+  isMainLicense?: boolean;
+  company?: { nameAr: string };
+}
+
 function SearchableSelect({
   options, value, onChange, placeholder,
 }: {
@@ -137,6 +146,8 @@ interface FormState {
   type: string;
   branchId: string;
   licenseId: string;
+  residencyLicenseId: string;
+  workPermitLicenseId: string;
   investorId: string;
   nationality: string;
   civilId: string;
@@ -173,8 +184,8 @@ export default function EditEmployeePage() {
   const [error, setError] = useState("");
   const [companyType, setCompanyType] = useState("OTHER");
   const [branches, setBranches] = useState<{ id: string; nameAr: string; nameEn?: string | null; unifiedEntityNumber?: string | null }[]>([]);
-  const [licenses, setLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null }[]>([]);
-  const [groupLicenses, setGroupLicenses] = useState<{ id: string; commercialNameAr: string; licenseNumber: string; unifiedEntityNumber?: string | null; company?: { nameAr: string } }[]>([]);
+  const [licenses, setLicenses] = useState<LicenseLookup[]>([]);
+  const [groupLicenses, setGroupLicenses] = useState<LicenseLookup[]>([]);
   const [investors, setInvestors] = useState<InvestorLookup[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
   const [form, setForm] = useState<FormState>({
@@ -184,6 +195,8 @@ export default function EditEmployeePage() {
     type: "OFFICE_EMPLOYEE",
     branchId: "",
     licenseId: "",
+    residencyLicenseId: "",
+    workPermitLicenseId: "",
     investorId: "",
     nationality: "",
     civilId: "",
@@ -200,6 +213,33 @@ export default function EditEmployeePage() {
     isActive: true,
   });
   const showAdditionalLicenses = allowsCrossCompanyLicenses(companyType);
+  const selectableLicenseOptions = [
+    ...licenses.map((license) => ({
+      id: license.id,
+      label: `${license.commercialNameAr} (${license.licenseNumber})`,
+      sub: [
+        license.isMainLicense === false ? "فرعي" : "رئيسي",
+        license.unifiedEntityNumber ?? undefined,
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    })),
+    ...(showAdditionalLicenses
+      ? groupLicenses
+          .filter((license) => !licenses.some((item) => item.id === license.id))
+          .map((license) => ({
+            id: license.id,
+            label: `${license.commercialNameAr} (${license.licenseNumber})`,
+            sub: [
+              license.company?.nameAr ? `[${license.company.nameAr}]` : undefined,
+              license.isMainLicense === false ? "فرعي" : "رئيسي",
+              license.unifiedEntityNumber ?? undefined,
+            ]
+              .filter(Boolean)
+              .join(" • "),
+          }))
+      : []),
+  ];
 
   const load = useCallback(async () => {
     try {
@@ -237,6 +277,8 @@ export default function EditEmployeePage() {
           type: e.type ?? "OFFICE_EMPLOYEE",
           branchId: e.branchId ?? "",
           licenseId: e.licenseId ?? "",
+          residencyLicenseId: e.residencyLicenseId ?? "",
+          workPermitLicenseId: e.workPermitLicenseId ?? "",
           investorId: e.investorId ?? "",
           nationality: e.nationality ?? "",
           civilId: e.civilId ?? "",
@@ -285,6 +327,8 @@ export default function EditEmployeePage() {
           nameEn: form.nameEn || undefined,
           branchId: form.branchId || null,
           licenseId: form.licenseId || null,
+          residencyLicenseId: form.residencyLicenseId || null,
+          workPermitLicenseId: form.workPermitLicenseId || null,
           investorId: form.investorId || null,
           additionalLicenseIds: showAdditionalLicenses && additionalLicenseIds.length > 0 ? additionalLicenseIds : undefined,
           nationality: form.nationality || undefined,
@@ -388,11 +432,7 @@ export default function EditEmployeePage() {
                   value={form.licenseId}
                   onChange={(id) => setField("licenseId", id)}
                   placeholder={locale === "en" ? "Select license" : "اختر الترخيص"}
-                  options={licenses.map((l) => ({
-                    id: l.id,
-                    label: `${l.commercialNameAr} (${l.licenseNumber})`,
-                    sub: l.unifiedEntityNumber ?? undefined,
-                  }))}
+                  options={selectableLicenseOptions}
                 />
               </div>
               {investors.length > 0 && (
@@ -626,6 +666,17 @@ export default function EditEmployeePage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Employee residency license" : "رخصة إقامة الموظف"}
+                </label>
+                <SearchableSelect
+                  value={form.residencyLicenseId}
+                  onChange={(id) => setField("residencyLicenseId", id)}
+                  placeholder={locale === "en" ? "Select residency license" : "اختر رخصة الإقامة"}
+                  options={selectableLicenseOptions}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
                   {locale === "en" ? "Driving license number" : "رقم الرخصة"}
                 </label>
                 <input
@@ -645,6 +696,17 @@ export default function EditEmployeePage() {
                   value={form.licenseExpiry}
                   onChange={(e) => setField("licenseExpiry", e.target.value)}
                   className="input-field w-full"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Employee actual work permit" : "رخصة العمل الفعلية للموظف"}
+                </label>
+                <SearchableSelect
+                  value={form.workPermitLicenseId}
+                  onChange={(id) => setField("workPermitLicenseId", id)}
+                  placeholder={locale === "en" ? "Select work permit license" : "اختر رخصة العمل"}
+                  options={selectableLicenseOptions}
                 />
               </div>
               <div>

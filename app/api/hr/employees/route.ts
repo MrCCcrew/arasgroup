@@ -9,6 +9,8 @@ const employeeSchema = z.object({
   companyId: z.string(),
   branchId: z.string().optional(),
   licenseId: z.string().optional(),
+  residencyLicenseId: z.string().optional(),
+  workPermitLicenseId: z.string().optional(),
   additionalLicenseIds: z.array(z.string()).optional(),
   clientGeneratedId: z.string().optional(),
   positionId: z.string().optional(),
@@ -183,12 +185,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const licenseIdsToValidate = [data.licenseId, data.residencyLicenseId, data.workPermitLicenseId].filter(
+      (value): value is string => Boolean(value),
+    );
+
+    if (licenseIdsToValidate.length > 0) {
+      const validLicenses = await prisma.license.findMany({
+        where: allowsCrossCompanyLicenses(company.type)
+          ? { id: { in: licenseIdsToValidate } }
+          : { id: { in: licenseIdsToValidate }, companyId: data.companyId },
+        select: { id: true },
+      });
+
+      if (validLicenses.length !== new Set(licenseIdsToValidate).size) {
+        return NextResponse.json({ success: false, error: "أحد التراخيص المحددة غير صالح" }, { status: 400 });
+      }
+    }
+
     const employee = await prisma.$transaction(async (tx) => {
+      const licenseIdsToValidate = [data.licenseId, data.residencyLicenseId, data.workPermitLicenseId].filter(
+        (value): value is string => Boolean(value),
+      );
+
+      if (licenseIdsToValidate.length > 0) {
+        const validLicenses = await tx.license.findMany({
+          where: allowsCrossCompanyLicenses(company.type)
+            ? { id: { in: licenseIdsToValidate } }
+            : { id: { in: licenseIdsToValidate }, companyId: data.companyId },
+          select: { id: true },
+        });
+
+        if (validLicenses.length !== new Set(licenseIdsToValidate).size) {
+          throw new Error("أحد التراخيص المحددة غير صالح");
+        }
+      }
+
       const createdEmployee = await tx.employee.create({
         data: {
           companyId: data.companyId,
           branchId: data.branchId,
           licenseId: data.licenseId,
+          residencyLicenseId: data.residencyLicenseId,
+          workPermitLicenseId: data.workPermitLicenseId,
           investorId: data.investorId,
           clientGeneratedId: data.clientGeneratedId,
           positionId: data.positionId,

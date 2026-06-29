@@ -30,6 +30,8 @@ const updateSchema = z.object({
   employeeNumber: optionalString,
   branchId: optionalString,
   licenseId: optionalString,
+  residencyLicenseId: optionalString,
+  workPermitLicenseId: optionalString,
   additionalLicenseIds: z.array(z.string()).optional(),
   nationality: optionalString,
   civilId: optionalString,
@@ -78,6 +80,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       include: {
         branch: { select: { nameAr: true } },
         license: { select: { id: true, commercialNameAr: true, licenseNumber: true, unifiedEntityNumber: true } },
+        residencyLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true, unifiedEntityNumber: true } },
+        workPermitLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true, unifiedEntityNumber: true } },
         licenseAssignments: {
           select: {
             licenseId: true,
@@ -160,6 +164,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     const branchId = normalizeOptionalString(parsed.data.branchId);
     const licenseId = normalizeOptionalString(parsed.data.licenseId);
+    const residencyLicenseId = normalizeOptionalString(parsed.data.residencyLicenseId);
+    const workPermitLicenseId = normalizeOptionalString(parsed.data.workPermitLicenseId);
     const investorId = normalizeOptionalString(parsed.data.investorId);
     const additionalLicenseIds = parsed.data.additionalLicenseIds
       ? [...new Set(parsed.data.additionalLicenseIds.map((licenseValue) => licenseValue.trim()).filter(Boolean))]
@@ -197,6 +203,24 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       });
       if (!license) {
         return NextResponse.json({ success: false, error: "الترخيص المحدد غير صالح" }, { status: 400 });
+      }
+    }
+
+    for (const [selectedLicenseId, errorMessage] of [
+      [residencyLicenseId, "رخصة الإقامة المحددة غير صالحة"],
+      [workPermitLicenseId, "رخصة العمل المحددة غير صالحة"],
+    ] as const) {
+      if (!selectedLicenseId) continue;
+
+      const selectedLicense = await prisma.license.findFirst({
+        where: allowsCrossCompanyLicenses(company.type)
+          ? { id: selectedLicenseId }
+          : { id: selectedLicenseId, companyId: existingEmployee.companyId },
+        select: { id: true },
+      });
+
+      if (!selectedLicense) {
+        return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
       }
     }
 
@@ -240,6 +264,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       ...(parsed.data.type !== undefined ? { type: parsed.data.type } : {}),
       ...(parsed.data.branchId !== undefined ? { branchId } : {}),
       ...(parsed.data.licenseId !== undefined ? { licenseId } : {}),
+      ...(parsed.data.residencyLicenseId !== undefined ? { residencyLicenseId } : {}),
+      ...(parsed.data.workPermitLicenseId !== undefined ? { workPermitLicenseId } : {}),
       ...(parsed.data.investorId !== undefined ? { investorId } : {}),
       ...(parsed.data.joinDate !== undefined ? { joinDate: joinDate.value } : {}),
       ...(parsed.data.residencyExpiry !== undefined ? { residencyExpiry: residencyExpiry.value } : {}),

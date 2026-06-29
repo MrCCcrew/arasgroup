@@ -757,6 +757,8 @@ model Employee {
   branchId           String?
   investorId         String?
   licenseId          String?
+  residencyLicenseId String?
+  workPermitLicenseId String?
   clientGeneratedId  String?
   employeeNumber     String?
   nameAr             String
@@ -802,6 +804,8 @@ model Employee {
   branch         Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
   investor       Investor?         @relation(fields: [investorId], references: [id], onDelete: SetNull)
   license        License?          @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  residencyLicense License?       @relation("EmployeeResidencyLicense", fields: [residencyLicenseId], references: [id], onDelete: SetNull)
+  workPermitLicense License?      @relation("EmployeeWorkPermitLicense", fields: [workPermitLicenseId], references: [id], onDelete: SetNull)
   position       EmployeePosition? @relation(fields: [positionId], references: [id], onDelete: Restrict)
   driver         Driver?
   carWashWorker  CarWashWorker?
@@ -829,6 +833,8 @@ model Employee {
   @@index([branchId])
   @@index([investorId])
   @@index([licenseId])
+  @@index([residencyLicenseId])
+  @@index([workPermitLicenseId])
   @@index([positionId])
   @@index([type])
   @@index([employmentStatus])
@@ -2393,6 +2399,8 @@ model License {
   mainLicense    License?        @relation("LicenseHierarchy", fields: [mainLicenseId], references: [id], onDelete: SetNull)
   branchLicenses License[]       @relation("LicenseHierarchy")
   employees              Employee[]
+  residencyEmployees     Employee[] @relation("EmployeeResidencyLicense")
+  workPermitEmployees    Employee[] @relation("EmployeeWorkPermitLicense")
   investorAccountAgreements InvestorAccountAgreement[]
   employeeAssignments    EmployeeLicenseAssignment[]
   branchMainFor          Branch[]        @relation("BranchMainLicense")

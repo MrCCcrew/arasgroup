@@ -19,12 +19,13 @@ export async function GET(request: NextRequest, { params }: Props) {
     const { companyId } = await params;
 
     const branches = await prisma.branch.findMany({
-      where: { companyId },
-      include: {
-        investorBranches: {
-          where: { isActive: true },
-          include: { investor: { select: { nameAr: true } } },
-        },
+      where: { companyId, isActive: true },
+      select: {
+        id: true,
+        nameAr: true,
+        nameEn: true,
+        unifiedEntityNumber: true,
+        isActive: true,
       },
       orderBy: [{ sortOrder: "asc" }, { nameAr: "asc" }],
     });

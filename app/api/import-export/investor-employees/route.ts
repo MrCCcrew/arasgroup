@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { EmployeeType, License } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 import {
   buildWorkbook,
   parseWorkbook,
@@ -11,14 +12,14 @@ import {
   EMPLOYEE_TYPE_DISPLAY,
   parseEnum,
   normalizeLookupValue,
+  normalizeLicenseNumber,
   type ColDef,
   type ImportResult,
 } from "@/lib/excel/import-export";
-import type { EmployeeType } from "@prisma/client";
 
 const COLS: ColDef[] = [
   { header: "اسم المسئول *", key: "investorName", required: true, width: 25, example: "أحمد محمد" },
-  { header: "الاسم بالعربية *", key: "nameAr", required: true, width: 25, example: "عبدالله أحمد" },
+  { header: "اسم المفوض *", key: "nameAr", required: true, width: 25, example: "عبدالله أحمد" },
   { header: "الاسم بالإنجليزية", key: "nameEn", width: 25, example: "Abdullah Ahmed" },
   { header: "نوع الموظف *", key: "type", required: true, width: 18, example: "موظف إداري" },
   { header: "الجنسية", key: "nationality", width: 15, example: "مصري" },
@@ -34,9 +35,14 @@ const COLS: ColDef[] = [
   { header: "الراتب الأساسي", key: "baseSalary", width: 14, example: "250.000" },
   { header: "تاريخ الالتحاق", key: "joinDate", width: 16, example: "01/09/2023" },
   { header: "رقم الحساب البنكي", key: "bankAccountNumber", width: 20, example: "KW12NBOK..." },
-  { header: "الترخيص", key: "licenseName", width: 30, example: "ترخيص الفرع الرئيسي" },
+  { header: "الترخيص", key: "licenseName", width: 30, example: "الدرة الكبيرة للملابس الجاهزة (2026/3950)" },
   { header: "الفرع", key: "branchName", width: 20, example: "الفرع الرئيسي" },
   { header: "ملاحظات", key: "notes", width: 30, example: "" },
+  { header: "رقم الموظف", key: "employeeNumber", width: 18, example: "EMP-301" },
+  { header: "الرخصة الرئيسية", key: "mainLicenseName", width: 34, example: "شركة الوادي الفضي للتجارة العامة (2016/628)" },
+  { header: "الرخصة الفرعية", key: "subLicenseName", width: 34, example: "الدرة الكبيرة للملابس الجاهزة (2026/3950)" },
+  { header: "رخصة إقامة الموظف", key: "residencyLicenseName", width: 34, example: "شركة الوادي الفضي للتجارة العامة (2016/628)" },
+  { header: "رخصة العمل الفعلية للموظف", key: "workPermitLicenseName", width: 34, example: "الدرة الكبيرة للملابس الجاهزة (2026/3950)" },
 ];
 
 const EMPLOYEE_TYPES = [
@@ -52,6 +58,87 @@ const EMPLOYEE_TYPES = [
   "OTHER",
 ] as EmployeeType[];
 
+type LicenseLookup = Pick<License, "id" | "commercialNameAr" | "licenseNumber" | "isMainLicense" | "mainLicenseId"> & {
+  mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null;
+};
+
+function formatLicenseLabel(license: { commercialNameAr: string; licenseNumber: string }) {
+  return `${license.commercialNameAr} (${license.licenseNumber})`;
+}
+
+function dedupeLicenses<T extends { id: string }>(licenses: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const license of licenses) {
+    if (seen.has(license.id)) continue;
+    seen.add(license.id);
+    result.push(license);
+  }
+  return result;
+}
+
+function buildLicenseMaps(licenses: LicenseLookup[]) {
+  const anyMap = new Map<string, LicenseLookup>();
+  const mainMap = new Map<string, LicenseLookup>();
+  const subMap = new Map<string, LicenseLookup>();
+
+  for (const license of licenses) {
+    const targets = [anyMap, license.isMainLicense ? mainMap : subMap];
+    const keys = [
+      normalizeLookupValue(license.commercialNameAr),
+      normalizeLicenseNumber(license.licenseNumber),
+      normalizeLookupValue(formatLicenseLabel(license)),
+    ].filter(Boolean);
+
+    for (const target of targets) {
+      for (const key of keys) {
+        if (!target.has(key)) {
+          target.set(key, license);
+        }
+      }
+    }
+  }
+
+  return { anyMap, mainMap, subMap };
+}
+
+function resolveLicenseValue(
+  value: string,
+  maps: ReturnType<typeof buildLicenseMaps>,
+  mode: "any" | "main" | "sub" = "any",
+) {
+  const normalizedName = normalizeLookupValue(value);
+  const normalizedNumber = normalizeLicenseNumber(value);
+  const source = mode === "main" ? maps.mainMap : mode === "sub" ? maps.subMap : maps.anyMap;
+
+  return (
+    source.get(normalizedName) ??
+    source.get(normalizedNumber) ??
+    null
+  );
+}
+
+function classifyEmployeeLicenses(employee: {
+  license: { id: string; commercialNameAr: string; licenseNumber: string; isMainLicense: boolean; mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null } | null;
+  licenseAssignments: Array<{
+    license: { id: string; commercialNameAr: string; licenseNumber: string; isMainLicense: boolean; mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null };
+  }>;
+}) {
+  const assignedLicenses = dedupeLicenses([
+    ...(employee.license ? [employee.license] : []),
+    ...employee.licenseAssignments.map((assignment) => assignment.license),
+  ]);
+
+  const mainLicense =
+    assignedLicenses.find((license) => license.isMainLicense) ??
+    assignedLicenses.find((license) => !license.isMainLicense && license.mainLicense)?.mainLicense ??
+    null;
+
+  const subLicense = assignedLicenses.find((license) => !license.isMainLicense) ?? null;
+
+  return { mainLicense, subLicense };
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -60,7 +147,12 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get("companyId");
   const mode = searchParams.get("mode") ?? "template";
 
-  if (!companyId) return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
+  if (!companyId) {
+    return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
+  }
+
+  const accessError = assertCompanyAccess(session, companyId);
+  if (accessError) return accessError;
 
   let rows: Record<string, unknown>[] = [];
 
@@ -74,39 +166,70 @@ export async function GET(request: NextRequest) {
       },
       include: {
         investor: { select: { nameAr: true } },
-        license: { select: { commercialNameAr: true } },
+        license: {
+          select: {
+            id: true,
+            commercialNameAr: true,
+            licenseNumber: true,
+            isMainLicense: true,
+            mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+          },
+        },
+        residencyLicense: { select: { commercialNameAr: true, licenseNumber: true } },
+        workPermitLicense: { select: { commercialNameAr: true, licenseNumber: true } },
         branch: { select: { nameAr: true } },
+        licenseAssignments: {
+          select: {
+            license: {
+              select: {
+                id: true,
+                commercialNameAr: true,
+                licenseNumber: true,
+                isMainLicense: true,
+                mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: [{ investor: { nameAr: "asc" } }, { nameAr: "asc" }],
     });
 
-    rows = employees.map((e) => ({
-      investorName: e.investor?.nameAr ?? "",
-      nameAr: e.nameAr,
-      nameEn: e.nameEn ?? "",
-      type: EMPLOYEE_TYPE_DISPLAY[e.type] ?? e.type,
-      nationality: e.nationality ?? "",
-      civilId: e.civilId ?? "",
-      passportNumber: e.passportNumber ?? "",
-      passportExpiryDate: formatDateForExcel(e.passportExpiryDate),
-      residencyNumber: e.residencyNumber ?? "",
-      residencyExpiry: formatDateForExcel(e.residencyExpiry),
-      licenseNumber: e.licenseNumber ?? "",
-      licenseExpiry: formatDateForExcel(e.licenseExpiry),
-      phone: e.phone ?? "",
-      jobTitle: e.jobTitle ?? "",
-      baseSalary: e.baseSalary ? Number(e.baseSalary) : "",
-      joinDate: formatDateForExcel(e.joinDate),
-      bankAccountNumber: e.bankAccountNumber ?? "",
-      licenseName: e.license?.commercialNameAr ?? "",
-      branchName: e.branch?.nameAr ?? "",
-      notes: e.notes ?? "",
-    }));
+    rows = employees.map((employee) => {
+      const { mainLicense, subLicense } = classifyEmployeeLicenses(employee);
+
+      return {
+        investorName: employee.investor?.nameAr ?? "",
+        nameAr: employee.nameAr,
+        nameEn: employee.nameEn ?? "",
+        type: EMPLOYEE_TYPE_DISPLAY[employee.type] ?? employee.type,
+        nationality: employee.nationality ?? "",
+        civilId: employee.civilId ?? "",
+        passportNumber: employee.passportNumber ?? "",
+        passportExpiryDate: formatDateForExcel(employee.passportExpiryDate),
+        residencyNumber: employee.residencyNumber ?? "",
+        residencyExpiry: formatDateForExcel(employee.residencyExpiry),
+        licenseNumber: employee.licenseNumber ?? "",
+        licenseExpiry: formatDateForExcel(employee.licenseExpiry),
+        phone: employee.phone ?? "",
+        jobTitle: employee.jobTitle ?? "",
+        baseSalary: employee.baseSalary ? Number(employee.baseSalary) : "",
+        joinDate: formatDateForExcel(employee.joinDate),
+        bankAccountNumber: employee.bankAccountNumber ?? "",
+        licenseName: employee.license ? formatLicenseLabel(employee.license) : "",
+        branchName: employee.branch?.nameAr ?? "",
+        notes: employee.notes ?? "",
+        employeeNumber: employee.employeeNumber ?? "",
+        mainLicenseName: mainLicense ? formatLicenseLabel(mainLicense) : "",
+        subLicenseName: subLicense ? formatLicenseLabel(subLicense) : "",
+        residencyLicenseName: employee.residencyLicense ? formatLicenseLabel(employee.residencyLicense) : "",
+        workPermitLicenseName: employee.workPermitLicense ? formatLicenseLabel(employee.workPermitLicense) : "",
+      };
+    });
   }
 
-  const buf = buildWorkbook(COLS, rows, "موظفين المستثمرين", mode === "template");
-  const filename =
-    mode === "export" ? "investor-employees-export.xlsx" : "investor-employees-template.xlsx";
+  const buf = buildWorkbook(COLS, rows, "موظفي المسئولين والمديرين", mode === "template");
+  const filename = mode === "export" ? "investor-employees-export.xlsx" : "investor-employees-template.xlsx";
 
   return new NextResponse(buf, {
     headers: {
@@ -122,29 +245,41 @@ export async function POST(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const companyId = searchParams.get("companyId");
-  if (!companyId) return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
+  if (!companyId) {
+    return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
+  }
+
+  const accessError = assertCompanyAccess(session, companyId);
+  if (accessError) return accessError;
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "الملف مطلوب" }, { status: 400 });
+  if (!file) {
+    return NextResponse.json({ error: "الملف مطلوب" }, { status: 400 });
+  }
 
   const buf = Buffer.from(await file.arrayBuffer());
   const parsedRows = parseWorkbook(buf, COLS);
-
   const requiredErrors = validateRequired(parsedRows, COLS);
   if (requiredErrors.length > 0) {
-    return NextResponse.json({
-      success: false,
-      errors: requiredErrors,
-    } satisfies { success: false; errors: typeof requiredErrors });
+    return NextResponse.json({ success: false, errors: requiredErrors });
   }
 
-  // Fetch lookup tables
   const [investors, licenses, branches] = await Promise.all([
-    prisma.investor.findMany({ where: { isActive: true }, select: { id: true, nameAr: true } }),
+    prisma.investor.findMany({
+      where: { isActive: true, companies: { some: { id: companyId } } },
+      select: { id: true, nameAr: true },
+    }),
     prisma.license.findMany({
       where: { companyId, status: "ACTIVE" },
-      select: { id: true, commercialNameAr: true },
+      select: {
+        id: true,
+        commercialNameAr: true,
+        licenseNumber: true,
+        isMainLicense: true,
+        mainLicenseId: true,
+        mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+      },
     }),
     prisma.branch.findMany({
       where: { companyId, isActive: true },
@@ -152,14 +287,13 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
-  const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
-  const licenseMap = Object.fromEntries(licenses.map((l) => [normalizeLookupValue(l.commercialNameAr), l.id]));
-  const branchMap = Object.fromEntries(branches.map((b) => [normalizeLookupValue(b.nameAr), b.id]));
+  const investorMap = Object.fromEntries(investors.map((investor) => [normalizeLookupValue(investor.nameAr), investor.id]));
+  const branchMap = Object.fromEntries(branches.map((branch) => [normalizeLookupValue(branch.nameAr), branch.id]));
+  const licenseMaps = buildLicenseMaps(licenses);
 
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
   for (const { rowIndex, data } of parsedRows) {
-    // Validate investor
     const investorId = investorMap[normalizeLookupValue(data.investorName)];
     if (!investorId) {
       result.errors.push({
@@ -170,7 +304,6 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // Validate employee type
     const employeeType = parseEnum(data.type, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPES);
     if (!employeeType) {
       result.errors.push({
@@ -181,15 +314,66 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // Optional lookups
-    const licenseId = data.licenseName ? (licenseMap[normalizeLookupValue(data.licenseName)] ?? null) : null;
     const branchId = data.branchName ? (branchMap[normalizeLookupValue(data.branchName)] ?? null) : null;
+    if (data.branchName && !branchId) {
+      result.errors.push({
+        row: rowIndex,
+        field: "الفرع",
+        message: `الصف ${rowIndex}: الفرع "${data.branchName}" غير موجود`,
+      });
+      continue;
+    }
+
+    const genericLicense = data.licenseName ? resolveLicenseValue(data.licenseName, licenseMaps, "any") : null;
+    const mainLicense = data.mainLicenseName ? resolveLicenseValue(data.mainLicenseName, licenseMaps, "main") : null;
+    const subLicense = data.subLicenseName ? resolveLicenseValue(data.subLicenseName, licenseMaps, "sub") : null;
+    const residencyLicense = data.residencyLicenseName ? resolveLicenseValue(data.residencyLicenseName, licenseMaps, "any") : null;
+    const workPermitLicense = data.workPermitLicenseName ? resolveLicenseValue(data.workPermitLicenseName, licenseMaps, "any") : null;
+
+    for (const [value, resolved, field] of [
+      [data.licenseName, genericLicense, "الترخيص"],
+      [data.mainLicenseName, mainLicense, "الرخصة الرئيسية"],
+      [data.subLicenseName, subLicense, "الرخصة الفرعية"],
+      [data.residencyLicenseName, residencyLicense, "رخصة إقامة الموظف"],
+      [data.workPermitLicenseName, workPermitLicense, "رخصة العمل الفعلية للموظف"],
+    ] as const) {
+      if (value && !resolved) {
+        result.errors.push({
+          row: rowIndex,
+          field,
+          message: `الصف ${rowIndex}: ${field} "${value}" غير موجودة`,
+        });
+        continue;
+      }
+    }
+
+    if (
+      (data.licenseName && !genericLicense) ||
+      (data.mainLicenseName && !mainLicense) ||
+      (data.subLicenseName && !subLicense) ||
+      (data.residencyLicenseName && !residencyLicense) ||
+      (data.workPermitLicenseName && !workPermitLicense)
+    ) {
+      continue;
+    }
+
+    const primaryLicenseId = genericLicense?.id ?? subLicense?.id ?? mainLicense?.id ?? null;
+    const additionalLicenseIds = Array.from(
+      new Set(
+        [mainLicense?.id, subLicense?.id]
+          .filter((licenseId): licenseId is string => Boolean(licenseId))
+          .filter((licenseId) => licenseId !== primaryLicenseId),
+      ),
+    );
 
     const payload = {
       companyId,
       investorId,
-      licenseId,
       branchId,
+      licenseId: primaryLicenseId,
+      residencyLicenseId: residencyLicense?.id ?? null,
+      workPermitLicenseId: workPermitLicense?.id ?? null,
+      employeeNumber: data.employeeNumber || null,
       nameAr: data.nameAr,
       nameEn: data.nameEn || null,
       type: employeeType,
@@ -210,23 +394,48 @@ export async function POST(request: NextRequest) {
     };
 
     try {
-      // Upsert by civilId if provided
-      if (data.civilId) {
-        const existing = await prisma.employee.findFirst({
-          where: { companyId, civilId: data.civilId, isDeleted: false },
+      const existing = data.civilId
+        ? await prisma.employee.findFirst({
+            where: { companyId, civilId: data.civilId, isDeleted: false },
+            select: { id: true },
+          })
+        : null;
+
+      if (existing) {
+        await prisma.$transaction(async (tx) => {
+          await tx.employee.update({
+            where: { id: existing.id },
+            data: payload,
+          });
+
+          await tx.employeeLicenseAssignment.deleteMany({ where: { employeeId: existing.id } });
+          if (additionalLicenseIds.length > 0) {
+            await tx.employeeLicenseAssignment.createMany({
+              data: additionalLicenseIds.map((licenseId) => ({ employeeId: existing.id, licenseId })),
+              skipDuplicates: true,
+            });
+          }
         });
-        if (existing) {
-          await prisma.employee.update({ where: { id: existing.id }, data: payload });
-          result.updated++;
-          continue;
-        }
+
+        result.updated++;
+        continue;
       }
-      await prisma.employee.create({ data: payload });
+
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.employee.create({ data: payload });
+        if (additionalLicenseIds.length > 0) {
+          await tx.employeeLicenseAssignment.createMany({
+            data: additionalLicenseIds.map((licenseId) => ({ employeeId: created.id, licenseId })),
+            skipDuplicates: true,
+          });
+        }
+      });
+
       result.created++;
-    } catch (err) {
+    } catch (error) {
       result.errors.push({
         row: rowIndex,
-        message: `الصف ${rowIndex}: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`,
+        message: `الصف ${rowIndex}: ${error instanceof Error ? error.message : "خطأ غير متوقع"}`,
       });
     }
   }
