@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n";
+import { getAccessibleCompanyIds } from "@/lib/auth/permissions";
 import { VehiclesClient } from "./VehiclesClient";
 
 interface Props {
@@ -17,6 +18,9 @@ export default async function VehiclesPage({ params }: Props) {
 
   const { companyId } = await params;
   const locale = await getLocale();
+  const accessibleCompanyIds = session.isSuperAdmin
+    ? undefined
+    : getAccessibleCompanyIds(session);
 
   const [vehicles, branches, licenses, adminEmployees] = await Promise.all([
     prisma.vehicle.findMany({
@@ -43,9 +47,17 @@ export default async function VehiclesPage({ params }: Props) {
       orderBy: { nameAr: "asc" },
     }),
     prisma.license.findMany({
-      where: { companyId, status: { not: "CANCELLED" } },
-      select: { id: true, commercialNameAr: true, licenseNumber: true },
-      orderBy: { commercialNameAr: "asc" },
+      where: {
+        companyId: accessibleCompanyIds ? { in: accessibleCompanyIds } : undefined,
+        status: { not: "CANCELLED" },
+      },
+      select: {
+        id: true,
+        commercialNameAr: true,
+        licenseNumber: true,
+        company: { select: { nameAr: true } },
+      },
+      orderBy: [{ company: { nameAr: "asc" } }, { commercialNameAr: "asc" }],
     }),
     prisma.employee.findMany({
       where: {

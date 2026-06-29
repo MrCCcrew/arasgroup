@@ -16,6 +16,7 @@ interface LicenseOption {
   id: string;
   commercialNameAr: string;
   licenseNumber: string;
+  company?: { nameAr: string } | null;
 }
 
 interface AdminEmployeeOption {
@@ -259,7 +260,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
           <option value="__none__">بدون ترخيص</option>
           {licenses.map(l => (
             <option key={l.id} value={l.id}>
-              {l.commercialNameAr} — {l.licenseNumber}
+              {l.commercialNameAr} — {l.licenseNumber}{l.company?.nameAr ? ` — ${l.company.nameAr}` : ""}
             </option>
           ))}
         </select>
@@ -449,7 +450,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
                 <option value="">— بدون ترخيص —</option>
                 {licenses.map(l => (
                   <option key={l.id} value={l.id}>
-                    {l.commercialNameAr} — {l.licenseNumber}
+                    {l.commercialNameAr} — {l.licenseNumber}{l.company?.nameAr ? ` — ${l.company.nameAr}` : ""}
                   </option>
                 ))}
               </select>

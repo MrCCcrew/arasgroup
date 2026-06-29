@@ -10,6 +10,7 @@ interface LicenseOption {
   id: string;
   commercialNameAr: string;
   licenseNumber: string;
+  company?: { nameAr: string } | null;
 }
 
 interface AdminEmployeeOption {
@@ -50,7 +51,7 @@ export default function NewDeliveryVehiclePage() {
   });
 
   useEffect(() => {
-    fetch(`/api/licenses?companyId=${companyId}`)
+    fetch(`/api/licenses?groupWide=true`)
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.data)) {
@@ -58,10 +59,11 @@ export default function NewDeliveryVehiclePage() {
           setLicenses(
             d.data
               .filter((l: { status?: string }) => !EXCLUDED.has(l.status ?? ""))
-              .map((l: { id: string; commercialNameAr: string; licenseNumber: string }) => ({
+              .map((l: { id: string; commercialNameAr: string; licenseNumber: string; company?: { nameAr?: string } | null }) => ({
                 id: l.id,
                 commercialNameAr: l.commercialNameAr,
                 licenseNumber: l.licenseNumber,
+                company: l.company?.nameAr ? { nameAr: l.company.nameAr } : null,
               }))
           );
         }
@@ -263,7 +265,7 @@ export default function NewDeliveryVehiclePage() {
                 <option value="">— بدون ترخيص —</option>
                 {licenses.map(l => (
                   <option key={l.id} value={l.id}>
-                    {l.commercialNameAr} — {l.licenseNumber}
+                    {l.commercialNameAr} — {l.licenseNumber}{l.company?.nameAr ? ` — ${l.company.nameAr}` : ""}
                   </option>
                 ))}
               </select>
