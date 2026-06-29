@@ -56,11 +56,50 @@ const licenseSchema = z.object({
   }).optional(),
 });
 
+async function findDefaultCompanyMainLicenseId(companyId: string) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { mainLicenseNumber: true },
+  });
+
+  if (company?.mainLicenseNumber) {
+    const matched = await prisma.license.findFirst({
+      where: {
+        companyId,
+        investorId: null,
+        isMainLicense: true,
+        licenseNumber: company.mainLicenseNumber,
+      },
+      select: { id: true },
+    });
+
+    if (matched) {
+      return matched.id;
+    }
+  }
+
+  const fallback = await prisma.license.findFirst({
+    where: {
+      companyId,
+      investorId: null,
+      isMainLicense: true,
+    },
+    orderBy: [{ createdAt: "asc" }, { commercialNameAr: "asc" }],
+    select: { id: true },
+  });
+
+  return fallback?.id ?? null;
+}
+
 async function resolveLicenseBranchForCreate(input: z.infer<typeof licenseSchema>) {
   if (input.isMainLicense) {
+    const defaultMainLicenseId = input.investorId
+      ? await findDefaultCompanyMainLicenseId(input.companyId)
+      : null;
+
     return {
       branchId: null as string | null,
-      mainLicenseId: null as string | null,
+      mainLicenseId: defaultMainLicenseId,
     };
   }
 

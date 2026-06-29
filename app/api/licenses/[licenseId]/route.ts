@@ -42,6 +42,39 @@ function toDate(v: string | null | undefined): Date | null | undefined {
   return new Date(v);
 }
 
+async function findDefaultCompanyMainLicenseId(companyId: string) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { mainLicenseNumber: true },
+  });
+
+  if (company?.mainLicenseNumber) {
+    const matched = await prisma.license.findFirst({
+      where: {
+        companyId,
+        investorId: null,
+        isMainLicense: true,
+        licenseNumber: company.mainLicenseNumber,
+      },
+      select: { id: true },
+    });
+
+    if (matched) return matched.id;
+  }
+
+  const fallback = await prisma.license.findFirst({
+    where: {
+      companyId,
+      investorId: null,
+      isMainLicense: true,
+    },
+    orderBy: [{ createdAt: "asc" }, { commercialNameAr: "asc" }],
+    select: { id: true },
+  });
+
+  return fallback?.id ?? null;
+}
+
 export async function GET(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -101,7 +134,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     const existing = await prisma.license.findUnique({
       where: { id: licenseId },
-      select: { companyId: true, branchId: true, isMainLicense: true, mainLicenseId: true },
+      select: { companyId: true, branchId: true, investorId: true, isMainLicense: true, mainLicenseId: true },
     });
     if (!existing) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
 
@@ -115,10 +148,14 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
 
     const d = parsed.data;
+    const nextInvestorId = d.investorId !== undefined ? d.investorId : existing.investorId;
+    const nextIsMainLicense = d.isMainLicense ?? existing.isMainLicense;
     let nextMainLicenseId = existing.mainLicenseId;
 
-    if (existing.isMainLicense) {
-      nextMainLicenseId = null;
+    if (nextIsMainLicense) {
+      nextMainLicenseId = nextInvestorId
+        ? await findDefaultCompanyMainLicenseId(existing.companyId)
+        : null;
     } else {
       const requestedParentLicenseId = d.mainLicenseId !== undefined ? d.mainLicenseId : existing.mainLicenseId;
       if (!requestedParentLicenseId) {
@@ -150,7 +187,9 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         ...(d.commercialNameAr ? { commercialNameAr: d.commercialNameAr } : {}),
         ...(d.commercialNameEn !== undefined ? { commercialNameEn: d.commercialNameEn } : {}),
         ...(d.isMainLicense !== undefined ? { isMainLicense: d.isMainLicense } : {}),
-        ...(d.mainLicenseId !== undefined || !existing.isMainLicense ? { mainLicenseId: nextMainLicenseId } : {}),
+        ...(d.mainLicenseId !== undefined || d.isMainLicense !== undefined || d.investorId !== undefined || existing.mainLicenseId !== nextMainLicenseId
+          ? { mainLicenseId: nextMainLicenseId }
+          : {}),
         ...(d.status ? { status: d.status } : {}),
         ...(d.notes !== undefined ? { notes: d.notes } : {}),
         ...(d.unifiedEntityNumber !== undefined ? { unifiedEntityNumber: d.unifiedEntityNumber } : {}),

@@ -130,6 +130,41 @@ function licenseToRow(lic: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+async function findDefaultCompanyMainLicenseId(companyId: string) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { mainLicenseNumber: true },
+  });
+
+  if (company?.mainLicenseNumber) {
+    const matched = await prisma.license.findFirst({
+      where: {
+        companyId,
+        investorId: null,
+        isMainLicense: true,
+        licenseNumber: company.mainLicenseNumber,
+      },
+      select: { id: true },
+    });
+
+    if (matched) {
+      return matched.id;
+    }
+  }
+
+  const fallback = await prisma.license.findFirst({
+    where: {
+      companyId,
+      investorId: null,
+      isMainLicense: true,
+    },
+    orderBy: [{ createdAt: "asc" }, { commercialNameAr: "asc" }],
+    select: { id: true },
+  });
+
+  return fallback?.id ?? null;
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
@@ -207,6 +242,9 @@ export async function POST(request: NextRequest) {
 
   const isMain     = licenseType.endsWith("main");
   const isInvestor = licenseType.startsWith("investor");
+  const defaultCompanyMainLicenseId = isMain && isInvestor
+    ? await findDefaultCompanyMainLicenseId(companyId)
+    : null;
 
   // Pre-fetch lookups
   const branches  = await prisma.branch.findMany({ where: { companyId, isActive: true }, select: { id: true, nameAr: true } });
@@ -260,7 +298,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve main license for sub-licenses
-    let mainLicenseId: string | null = null;
+    let mainLicenseId: string | null = isMain && isInvestor ? defaultCompanyMainLicenseId : null;
     if (!isMain && data.mainLicenseNumber) {
       const mainLic = (isInvestor && investorId
         ? mainLicenseByInvestorMap.get(`${investorId}:${normalizedMainLicenseNumber}`)
@@ -286,6 +324,20 @@ export async function POST(request: NextRequest) {
         where: { companyId, licenseNumber: data.licenseNumber },
       });
       if (existing) {
+        const canPromoteInvestorMain =
+          licenseType === "investor-main" &&
+          isMain &&
+          !existing.isMainLicense &&
+          existing.investorId === investorId;
+
+        if (existing.isMainLicense !== isMain && !canPromoteInvestorMain) {
+          result.errors.push({
+            row: rowIndex,
+            field: "رقم الترخيص",
+            message: `الصف ${rowIndex}: يوجد ترخيص بنفس الرقم لكنه مسجل كـ ${existing.isMainLicense ? "رئيسي" : "فرعي"}، لذلك لن يتم تغيير نوعه عبر الاستيراد`,
+          });
+          continue;
+        }
         await prisma.license.update({ where: { id: existing.id }, data: payload });
         result.updated++;
       } else {
