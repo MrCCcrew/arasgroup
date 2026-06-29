@@ -7,7 +7,7 @@ import {
   type ColDef, type ImportResult,
 } from "@/lib/excel/import-export";
 
-// licenseType: owner-main | owner-sub | investor-main | investor-sub
+// licenseType: owner-main | owner-sub | investor-main | investor-sub | investor-combined
 
 const BASE_COLS: ColDef[] = [
   { header: "رقم الترخيص *",              key: "licenseNumber",              required: true,  width: 18, example: "123456/2024" },
@@ -47,8 +47,10 @@ const INVESTOR_COL: ColDef = {
 const MAIN_LICENSE_COL: ColDef = {
   header: "رقم الترخيص الرئيسي *", key: "mainLicenseNumber", required: true, width: 20, example: "123456/2024",
 };
+const COMBINED_MAIN_LICENSE_COL: ColDef = { ...MAIN_LICENSE_COL, header: "رقم الترخيص الرئيسي", required: false };
 
 function getCols(licenseType: string): ColDef[] {
+  if (licenseType === "investor-combined") return [INVESTOR_COL, COMBINED_MAIN_LICENSE_COL, ...BASE_COLS];
   if (licenseType === "investor-main") return [INVESTOR_COL, ...BASE_COLS];
   if (licenseType === "investor-sub")  return [INVESTOR_COL, MAIN_LICENSE_COL, ...BASE_COLS];
   if (licenseType === "owner-sub")     return [MAIN_LICENSE_COL, ...BASE_COLS];
@@ -61,6 +63,7 @@ function getSheetName(licenseType: string): string {
     "owner-sub":     "تراخيص المالك الفرعية",
     "investor-main": "تراخيص المسئولين الرئيسية",
     "investor-sub":  "تراخيص المسئولين الفرعية",
+    "investor-combined": "تراخيص المسئولين الرئيسية والفرعية",
   };
   return map[licenseType] ?? "التراخيص";
 }
@@ -179,13 +182,14 @@ export async function GET(request: NextRequest) {
   let rows: Record<string, unknown>[] = [];
 
   if (mode === "export") {
+    const isCombinedInvestor = licenseType === "investor-combined";
     const isMain     = licenseType.endsWith("main");
     const isInvestor = licenseType.startsWith("investor");
 
     const licenses = await prisma.license.findMany({
       where: {
         companyId,
-        isMainLicense: isMain,
+        ...(isCombinedInvestor ? {} : { isMainLicense: isMain }),
         investorId: isInvestor ? { not: null } : null,
       },
       include: {
@@ -193,13 +197,21 @@ export async function GET(request: NextRequest) {
         investor: { select: { nameAr: true } },
         mainLicense: { select: { licenseNumber: true } },
       },
-      orderBy: { commercialNameAr: "asc" },
+      orderBy: isCombinedInvestor
+        ? [{ isMainLicense: "desc" }, { commercialNameAr: "asc" }]
+        : { commercialNameAr: "asc" },
     });
 
     rows = licenses.map((lic) => {
       const row = licenseToRow(lic as unknown as Record<string, unknown>);
       if (isInvestor) row.investorName = lic.investor?.nameAr ?? "";
-      if (!isMain)    row.mainLicenseNumber = lic.mainLicense?.licenseNumber ?? "";
+      if (isCombinedInvestor) {
+        row.mainLicenseNumber = lic.isMainLicense
+          ? lic.licenseNumber
+          : (lic.mainLicense?.licenseNumber ?? "");
+      } else if (!isMain) {
+        row.mainLicenseNumber = lic.mainLicense?.licenseNumber ?? "";
+      }
       return row;
     });
   }
@@ -240,9 +252,10 @@ export async function POST(request: NextRequest) {
   const requiredErrors = validateRequired(parsedRows, cols);
   if (requiredErrors.length > 0) return NextResponse.json({ success: false, errors: requiredErrors });
 
+  const isCombinedInvestor = licenseType === "investor-combined";
   const isMain     = licenseType.endsWith("main");
   const isInvestor = licenseType.startsWith("investor");
-  const defaultCompanyMainLicenseId = isMain && isInvestor
+  const defaultCompanyMainLicenseId = (isMain && isInvestor) || isCombinedInvestor
     ? await findDefaultCompanyMainLicenseId(companyId)
     : null;
 
@@ -254,10 +267,10 @@ export async function POST(request: NextRequest) {
     ? await prisma.investor.findMany({ where: { isActive: true }, select: { id: true, nameAr: true } })
     : [];
   const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
-  const mainLicenses = !isMain
+  const mainLicenses = (!isMain || isCombinedInvestor)
     ? await prisma.license.findMany({
         where: { companyId, isMainLicense: true },
-        select: { id: true, investorId: true, licenseNumber: true },
+        select: { id: true, investorId: true, licenseNumber: true, commercialNameAr: true, isMainLicense: true },
       })
     : [];
   const mainLicenseMap = new Map(
@@ -274,8 +287,11 @@ export async function POST(request: NextRequest) {
   for (const { rowIndex, data } of parsedRows) {
     const normalizedLicenseNumber = normalizeLicenseNumber(data.licenseNumber);
     const normalizedMainLicenseNumber = normalizeLicenseNumber(data.mainLicenseNumber);
+    const rowIsMain = isCombinedInvestor
+      ? !normalizedMainLicenseNumber || normalizedLicenseNumber === normalizedMainLicenseNumber
+      : isMain;
 
-    if (!isMain && normalizedLicenseNumber && normalizedMainLicenseNumber && normalizedLicenseNumber === normalizedMainLicenseNumber) {
+    if (!rowIsMain && normalizedLicenseNumber && normalizedMainLicenseNumber && normalizedLicenseNumber === normalizedMainLicenseNumber) {
       result.errors.push({
         row: rowIndex,
         field: "رقم الترخيص",
@@ -298,8 +314,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve main license for sub-licenses
-    let mainLicenseId: string | null = isMain && isInvestor ? defaultCompanyMainLicenseId : null;
-    if (!isMain && data.mainLicenseNumber) {
+    let mainLicenseId: string | null = rowIsMain && isInvestor ? defaultCompanyMainLicenseId : null;
+    if (!rowIsMain && data.mainLicenseNumber) {
       const mainLic = (isInvestor && investorId
         ? mainLicenseByInvestorMap.get(`${investorId}:${normalizedMainLicenseNumber}`)
         : null) ?? mainLicenseMap.get(normalizedMainLicenseNumber);
@@ -315,7 +331,7 @@ export async function POST(request: NextRequest) {
       branchId,
       investorId,
       mainLicenseId,
-      isMainLicense: isMain,
+      isMainLicense: rowIsMain,
       ...rowToLicense(data),
     };
 
@@ -325,12 +341,12 @@ export async function POST(request: NextRequest) {
       });
       if (existing) {
         const canPromoteInvestorMain =
-          licenseType === "investor-main" &&
-          isMain &&
+          (licenseType === "investor-main" || isCombinedInvestor) &&
+          rowIsMain &&
           !existing.isMainLicense &&
           existing.investorId === investorId;
 
-        if (existing.isMainLicense !== isMain && !canPromoteInvestorMain) {
+        if (existing.isMainLicense !== rowIsMain && !canPromoteInvestorMain) {
           result.errors.push({
             row: rowIndex,
             field: "رقم الترخيص",
@@ -338,10 +354,36 @@ export async function POST(request: NextRequest) {
           });
           continue;
         }
-        await prisma.license.update({ where: { id: existing.id }, data: payload });
+        const updated = await prisma.license.update({ where: { id: existing.id }, data: payload });
+        if (updated.isMainLicense) {
+          const mapped = {
+            id: updated.id,
+            investorId: updated.investorId,
+            licenseNumber: updated.licenseNumber,
+            commercialNameAr: updated.commercialNameAr,
+            isMainLicense: updated.isMainLicense,
+          };
+          mainLicenseMap.set(normalizeLicenseNumber(updated.licenseNumber), mapped);
+          if (updated.investorId) {
+            mainLicenseByInvestorMap.set(`${updated.investorId}:${normalizeLicenseNumber(updated.licenseNumber)}`, mapped);
+          }
+        }
         result.updated++;
       } else {
-        await prisma.license.create({ data: payload });
+        const created = await prisma.license.create({ data: payload });
+        if (created.isMainLicense) {
+          const mapped = {
+            id: created.id,
+            investorId: created.investorId,
+            licenseNumber: created.licenseNumber,
+            commercialNameAr: created.commercialNameAr,
+            isMainLicense: created.isMainLicense,
+          };
+          mainLicenseMap.set(normalizeLicenseNumber(created.licenseNumber), mapped);
+          if (created.investorId) {
+            mainLicenseByInvestorMap.set(`${created.investorId}:${normalizeLicenseNumber(created.licenseNumber)}`, mapped);
+          }
+        }
         result.created++;
       }
     } catch (err) {

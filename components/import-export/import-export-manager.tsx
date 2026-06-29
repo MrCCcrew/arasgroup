@@ -85,6 +85,14 @@ const ENTITIES: EntityConfig[] = [
     extraParams: "&licenseType=owner-sub",
   },
   {
+    key: "licenses-investor-combined",
+    labelAr: "تراخيص المسئولين الرئيسية والفرعية",
+    description: "ملف موحد لتراخيص المسئولين والمديرين الرئيسية والفرعية بنفس ترتيب الأعمدة",
+    apiPath: "licenses",
+    color: "sky",
+    extraParams: "&licenseType=investor-combined",
+  },
+  {
     key: "licenses-investor-main",
     labelAr: "تراخيص المسئولين الرئيسية",
     description: "التراخيص الرئيسية للمسئولين والمديرين المستثمرين",
@@ -109,6 +117,7 @@ const COLOR_CLASSES: Record<string, { bg: string; border: string; text: string; 
   pink:    { bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-700",    badge: "bg-pink-100 text-pink-700" },
   slate:   { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700",   badge: "bg-slate-100 text-slate-700" },
   cyan:    { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-700",    badge: "bg-cyan-100 text-cyan-700" },
+  sky:     { bg: "bg-sky-50",     border: "border-sky-200",     text: "text-sky-700",     badge: "bg-sky-100 text-sky-700" },
   emerald: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
   green:   { bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700",   badge: "bg-green-100 text-green-700" },
   violet:  { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
