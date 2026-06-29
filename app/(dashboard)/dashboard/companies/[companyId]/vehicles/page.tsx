@@ -24,12 +24,43 @@ export default async function VehiclesPage({ params }: Props) {
 
   const [vehicles, branches, licenses, adminEmployees] = await Promise.all([
     prisma.vehicle.findMany({
-      where: { companyId, isActive: true, type: { not: "CAR_WASH" } },
+      where: {
+        isActive: true,
+        type: { not: "CAR_WASH" },
+        OR: [
+          { companyId },
+          {
+            assignedEmployee: {
+              companyId,
+              isActive: true,
+              isDeleted: false,
+            },
+          },
+          {
+            assignedDrivers: {
+              some: {
+                employee: {
+                  companyId,
+                  isActive: true,
+                  isDeleted: false,
+                },
+              },
+            },
+          },
+        ],
+      },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
         assignedEmployee: { select: { id: true, nameAr: true, nameEn: true } },
         assignedDrivers: {
+          where: {
+            employee: {
+              companyId,
+              isActive: true,
+              isDeleted: false,
+            },
+          },
           select: {
             id: true,
             employee: { select: { id: true, nameAr: true, nameEn: true } },
