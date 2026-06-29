@@ -183,7 +183,12 @@ export default function LicensesPage() {
   const filtered = licenses.filter((l) => {
     if (search) {
       const q = search.toLowerCase();
-      if (!l.commercialNameAr.toLowerCase().includes(q) && !l.licenseNumber.toLowerCase().includes(q)) return false;
+      const matchesSearch =
+        l.commercialNameAr.toLowerCase().includes(q) ||
+        (l.commercialNameEn?.toLowerCase().includes(q) ?? false) ||
+        l.licenseNumber.toLowerCase().includes(q) ||
+        (l.investor?.nameAr?.toLowerCase().includes(q) ?? false);
+      if (!matchesSearch) return false;
     }
     const effectiveStatus = getEffectiveStatus(l);
     if (filterStatus   && effectiveStatus !== filterStatus)  return false;
@@ -351,7 +356,7 @@ export default function LicensesPage() {
               <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <input
                 type="text"
-                placeholder="بحث بالاسم أو رقم الترخيص..."
+                  placeholder="بحث بالاسم أو اسم المسئول أو رقم الترخيص..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="input-field w-full pr-8 text-sm"

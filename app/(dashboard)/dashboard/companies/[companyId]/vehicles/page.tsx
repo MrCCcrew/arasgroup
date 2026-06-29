@@ -25,6 +25,14 @@ export default async function VehiclesPage({ params }: Props) {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
         assignedEmployee: { select: { id: true, nameAr: true, nameEn: true } },
+        assignedDrivers: {
+          select: {
+            id: true,
+            employee: { select: { id: true, nameAr: true, nameEn: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
         license: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
       },
       orderBy: { plateNumber: "asc" },
@@ -109,5 +117,9 @@ export type VehicleRow = {
   branch: { nameAr: string; nameEn: string | null } | null;
   investor: { nameAr: string; nameEn: string | null } | null;
   assignedEmployee: { id: string; nameAr: string; nameEn: string | null } | null;
+  assignedDrivers: Array<{
+    id: string;
+    employee: { id: string; nameAr: string; nameEn: string | null };
+  }>;
   license: { id: string; commercialNameAr: string; licenseNumber: string } | null;
 };

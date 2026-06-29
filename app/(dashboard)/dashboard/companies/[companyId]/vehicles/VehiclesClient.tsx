@@ -308,9 +308,12 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
                   const branchName = v.branch
                     ? locale === "en" ? v.branch.nameEn ?? v.branch.nameAr : v.branch.nameAr
                     : "—";
+                  const assignedDriverEmployee = v.assignedDrivers[0]?.employee;
                   const driverName = v.assignedEmployee
                     ? locale === "en" ? v.assignedEmployee.nameEn ?? v.assignedEmployee.nameAr : v.assignedEmployee.nameAr
-                    : "—";
+                    : assignedDriverEmployee
+                      ? locale === "en" ? assignedDriverEmployee.nameEn ?? assignedDriverEmployee.nameAr : assignedDriverEmployee.nameAr
+                      : "—";
 
                   return (
                     <tr key={v.id} className={`hover:bg-muted/20 transition-colors ${expiringSoon ? "bg-yellow-50/30" : ""}`}>
