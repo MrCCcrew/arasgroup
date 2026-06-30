@@ -19,9 +19,9 @@ import {
 
 const COLS: ColDef[] = [
   { header: "اسم المسئول *", key: "investorName", required: true, width: 25, example: "أحمد محمد" },
-  { header: "اسم المفوض *", key: "nameAr", required: true, width: 25, example: "عبدالله أحمد" },
+  { header: "الاسم بالعربية *", key: "nameAr", required: true, width: 25, example: "عبدالله أحمد" },
   { header: "الاسم بالإنجليزية", key: "nameEn", width: 25, example: "Abdullah Ahmed" },
-  { header: "نوع الموظف *", key: "type", required: true, width: 18, example: "موظف إداري" },
+  { header: "نوع الموظف *", key: "type", required: true, width: 18, example: "موظف مكتب" },
   { header: "الجنسية", key: "nationality", width: 15, example: "مصري" },
   { header: "رقم الهوية المدنية", key: "civilId", width: 15, example: "287654321098" },
   { header: "رقم جواز السفر", key: "passportNumber", width: 18, example: "A1234567" },
@@ -43,6 +43,7 @@ const COLS: ColDef[] = [
   { header: "الرخصة الفرعية", key: "subLicenseName", width: 34, example: "الدرة الكبيرة للملابس الجاهزة (2026/3950)" },
   { header: "رخصة إقامة الموظف", key: "residencyLicenseName", width: 34, example: "شركة الوادي الفضي للتجارة العامة (2016/628)" },
   { header: "رخصة العمل الفعلية للموظف", key: "workPermitLicenseName", width: 34, example: "الدرة الكبيرة للملابس الجاهزة (2026/3950)" },
+  { header: "اسم المفوض", key: "signatoryName", width: 28, example: "محمد أحمد" },
 ];
 
 const EMPLOYEE_TYPES = [
@@ -58,12 +59,40 @@ const EMPLOYEE_TYPES = [
   "OTHER",
 ] as EmployeeType[];
 
+type SignatoryRef = { signatories: Array<{ nameAr: string }> };
+
 type LicenseLookup = Pick<License, "id" | "commercialNameAr" | "licenseNumber" | "isMainLicense" | "mainLicenseId"> & {
-  mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null;
+  employerSignatureCert?: SignatoryRef | null;
+  mainLicense?: {
+    id: string;
+    commercialNameAr: string;
+    licenseNumber: string;
+    employerSignatureCert?: SignatoryRef | null;
+  } | null;
 };
 
 function formatLicenseLabel(license: { commercialNameAr: string; licenseNumber: string }) {
   return `${license.commercialNameAr} (${license.licenseNumber})`;
+}
+
+function collectSignatoryNames(
+  ...licenses: Array<{
+    employerSignatureCert?: SignatoryRef | null;
+  } | null | undefined>
+) {
+  const names: string[] = [];
+  const seen = new Set<string>();
+
+  for (const license of licenses) {
+    for (const signatory of license?.employerSignatureCert?.signatories ?? []) {
+      const name = signatory.nameAr.trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      names.push(name);
+    }
+  }
+
+  return names.join("، ");
 }
 
 function dedupeLicenses<T extends { id: string }>(licenses: T[]): T[] {
@@ -119,9 +148,33 @@ function resolveLicenseValue(
 }
 
 function classifyEmployeeLicenses(employee: {
-  license: { id: string; commercialNameAr: string; licenseNumber: string; isMainLicense: boolean; mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null } | null;
+  license: {
+    id: string;
+    commercialNameAr: string;
+    licenseNumber: string;
+    isMainLicense: boolean;
+    employerSignatureCert?: SignatoryRef | null;
+    mainLicense?: {
+      id: string;
+      commercialNameAr: string;
+      licenseNumber: string;
+      employerSignatureCert?: SignatoryRef | null;
+    } | null;
+  } | null;
   licenseAssignments: Array<{
-    license: { id: string; commercialNameAr: string; licenseNumber: string; isMainLicense: boolean; mainLicense?: { id: string; commercialNameAr: string; licenseNumber: string } | null };
+    license: {
+      id: string;
+      commercialNameAr: string;
+      licenseNumber: string;
+      isMainLicense: boolean;
+      employerSignatureCert?: SignatoryRef | null;
+      mainLicense?: {
+        id: string;
+        commercialNameAr: string;
+        licenseNumber: string;
+        employerSignatureCert?: SignatoryRef | null;
+      } | null;
+    };
   }>;
 }) {
   const assignedLicenses = dedupeLicenses([
@@ -172,7 +225,15 @@ export async function GET(request: NextRequest) {
             commercialNameAr: true,
             licenseNumber: true,
             isMainLicense: true,
-            mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+            employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+            mainLicense: {
+              select: {
+                id: true,
+                commercialNameAr: true,
+                licenseNumber: true,
+                employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+              },
+            },
           },
         },
         residencyLicense: { select: { commercialNameAr: true, licenseNumber: true } },
@@ -186,7 +247,15 @@ export async function GET(request: NextRequest) {
                 commercialNameAr: true,
                 licenseNumber: true,
                 isMainLicense: true,
-                mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+                employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+                mainLicense: {
+                  select: {
+                    id: true,
+                    commercialNameAr: true,
+                    licenseNumber: true,
+                    employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+                  },
+                },
               },
             },
           },
@@ -197,6 +266,7 @@ export async function GET(request: NextRequest) {
 
     rows = employees.map((employee) => {
       const { mainLicense, subLicense } = classifyEmployeeLicenses(employee);
+      const signatoryName = collectSignatoryNames(employee.license, subLicense, mainLicense);
 
       return {
         investorName: employee.investor?.nameAr ?? "",
@@ -224,6 +294,7 @@ export async function GET(request: NextRequest) {
         subLicenseName: subLicense ? formatLicenseLabel(subLicense) : "",
         residencyLicenseName: employee.residencyLicense ? formatLicenseLabel(employee.residencyLicense) : "",
         workPermitLicenseName: employee.workPermitLicense ? formatLicenseLabel(employee.workPermitLicense) : "",
+        signatoryName,
       };
     });
   }
@@ -278,7 +349,15 @@ export async function POST(request: NextRequest) {
         licenseNumber: true,
         isMainLicense: true,
         mainLicenseId: true,
-        mainLicense: { select: { id: true, commercialNameAr: true, licenseNumber: true } },
+        employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+        mainLicense: {
+          select: {
+            id: true,
+            commercialNameAr: true,
+            licenseNumber: true,
+            employerSignatureCert: { select: { signatories: { select: { nameAr: true }, orderBy: { sortOrder: "asc" } } } },
+          },
+        },
       },
     }),
     prisma.branch.findMany({

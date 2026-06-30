@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 import {
   buildWorkbook, parseWorkbook, validateRequired, parseDate, formatDateForExcel,
   normalizeLookupValue, normalizeLicenseNumber,
@@ -178,6 +178,9 @@ export async function GET(request: NextRequest) {
   const mode        = searchParams.get("mode") ?? "template";
   if (!companyId) return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
 
+  const accessError = assertCompanyAccess(session, companyId);
+  if (accessError) return accessError;
+
   const cols = getCols(licenseType);
   let rows: Record<string, unknown>[] = [];
 
@@ -236,6 +239,9 @@ export async function POST(request: NextRequest) {
   const licenseType = searchParams.get("licenseType") ?? "owner-main";
   if (!companyId) return NextResponse.json({ error: "companyId مطلوب" }, { status: 400 });
 
+  const accessError = assertCompanyAccess(session, companyId);
+  if (accessError) return accessError;
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "الملف مطلوب" }, { status: 400 });
@@ -264,7 +270,7 @@ export async function POST(request: NextRequest) {
   const branchMap = Object.fromEntries(branches.map((b) => [normalizeLookupValue(b.nameAr), b.id]));
 
   const investors  = isInvestor
-    ? await prisma.investor.findMany({ where: { isActive: true }, select: { id: true, nameAr: true } })
+    ? await prisma.investor.findMany({ where: { isActive: true, companies: { some: { id: companyId } } }, select: { id: true, nameAr: true } })
     : [];
   const investorMap = Object.fromEntries(investors.map((i) => [normalizeLookupValue(i.nameAr), i.id]));
   const mainLicenses = (!isMain || isCombinedInvestor)

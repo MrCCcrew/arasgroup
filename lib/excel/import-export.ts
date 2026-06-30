@@ -65,6 +65,7 @@ export const EMPLOYEE_TYPE_LABELS: Record<string, string> = {
   "مشرف توصيل": "DELIVERY_ADMIN",
   "سائق غسيل": "CAR_WASH_DRIVER",
   "عامل غسيل": "CAR_WASH_WORKER",
+  "موظف مكتب": "OFFICE_EMPLOYEE",
   "موظف إداري": "OFFICE_EMPLOYEE",
   "محاسب": "ACCOUNTANT",
   "مندوب": "MANDOUB",
@@ -72,9 +73,18 @@ export const EMPLOYEE_TYPE_LABELS: Record<string, string> = {
   "أخرى": "OTHER",
 };
 
-export const EMPLOYEE_TYPE_DISPLAY: Record<string, string> = Object.fromEntries(
-  Object.entries(EMPLOYEE_TYPE_LABELS).map(([ar, en]) => [en, ar])
-);
+export const EMPLOYEE_TYPE_DISPLAY: Record<string, string> = {
+  DRIVER: "سائق",
+  DELIVERY_DRIVER: "سائق توصيل",
+  DELIVERY_ADMIN: "مشرف توصيل",
+  CAR_WASH_DRIVER: "سائق غسيل",
+  CAR_WASH_WORKER: "عامل غسيل",
+  OFFICE_EMPLOYEE: "موظف مكتب",
+  ACCOUNTANT: "محاسب",
+  MANDOUB: "مندوب",
+  OFFICE_BOY: "ساعي",
+  OTHER: "أخرى",
+};
 
 export const VEHICLE_TYPE_LABELS: Record<string, string> = {
   "توصيل": "DELIVERY",
@@ -123,6 +133,12 @@ export function normalizeLicenseNumber(value: string | null | undefined): string
 }
 
 // ── Excel builder ─────────────────────────────────────────────────────────────
+function sanitizeSheetName(sheetName: string): string {
+  const cleaned = (sheetName || "البيانات").replace(/[:\\/?*\[\]]/g, " ").trim();
+  if (cleaned.length <= 31) return cleaned;
+  return cleaned.slice(0, 31).trim();
+}
+
 export function buildWorkbook(
   cols: ColDef[],
   rows: Record<string, unknown>[],
@@ -130,7 +146,8 @@ export function buildWorkbook(
   includeExampleRow = false,
 ): ArrayBuffer {
   const wb = XLSX.utils.book_new();
-  wb.Props = { Title: sheetName };
+  const safeSheetName = sanitizeSheetName(sheetName);
+  wb.Props = { Title: safeSheetName };
 
   const aoa: unknown[][] = [];
 
@@ -181,7 +198,7 @@ export function buildWorkbook(
     });
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
 
   const raw: Buffer = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true }));
   const ab = new ArrayBuffer(raw.byteLength);
