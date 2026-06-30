@@ -22,7 +22,7 @@ interface Driver {
   employee: { nameAr: string; nameEn?: string; isActive: boolean };
 }
 
-type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "MISSED_SHIFT" | "LATE_LOGIN";
+type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "MISSED_SHIFT" | "LATE_LOGIN" | "ABSENT";
 
 interface EntryLine {
   driverId: string;
@@ -56,6 +56,7 @@ const AR = {
   noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
   missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
   lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  absent: "\u063a\u064a\u0627\u0628",
   inactive: "(\u063a\u064a\u0631 \u0646\u0634\u0637)",
   enterOneLine: "\u0623\u062f\u062e\u0644 \u0633\u0637\u0631\u064b\u0627 \u0648\u0627\u062d\u062f\u064b\u0627 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644",
   saveFailed: "\u0641\u0634\u0644 \u0641\u064a \u0627\u0644\u062d\u0641\u0638",
@@ -107,6 +108,7 @@ const WORK_STATUS_LABELS = {
     NO_SHIFTS: AR.noShifts,
     MISSED_SHIFT: AR.missedShift,
     LATE_LOGIN: AR.lateLogin,
+    ABSENT: AR.absent,
   },
   en: {
     WORKED: "Worked",
@@ -115,6 +117,7 @@ const WORK_STATUS_LABELS = {
     NO_SHIFTS: "No shifts",
     MISSED_SHIFT: "Missed shift",
     LATE_LOGIN: "Late login",
+    ABSENT: "Absent",
   },
 } as const;
 

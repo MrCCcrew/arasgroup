@@ -1415,6 +1415,7 @@ enum DeliveryDailyOrderWorkStatus {
   NO_SHIFTS
   MISSED_SHIFT
   LATE_LOGIN
+  ABSENT
 }
 
 model DeliveryDailyOrder {

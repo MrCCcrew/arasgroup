@@ -16,6 +16,7 @@ const AR = {
   noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
   missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
   lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  absent: "\u063a\u064a\u0627\u0628",
   reportTitle: "\u062a\u0642\u0631\u064a\u0631 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0627\u0644\u0645\u062c\u0645\u0639",
   printDate: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0637\u0628\u0627\u0639\u0629",
   totalRecords: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
@@ -49,6 +50,7 @@ const WORK_STATUS_LABELS = {
   NO_SHIFTS: AR.noShifts,
   MISSED_SHIFT: AR.missedShift,
   LATE_LOGIN: AR.lateLogin,
+  ABSENT: AR.absent,
 } as const;
 
 type WorkStatus = keyof typeof WORK_STATUS_LABELS;
@@ -129,6 +131,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
           NO_SHIFTS: 0,
           MISSED_SHIFT: 0,
           LATE_LOGIN: 0,
+          ABSENT: 0,
         },
         aliases: [],
         contracts: [],

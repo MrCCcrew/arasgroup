@@ -22,6 +22,7 @@ const AR = {
   noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
   missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
   lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  absent: "\u063a\u064a\u0627\u0628",
   kwd: "\u062f.\u0643",
   title: "\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
   subtitle: "\u0633\u062c\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
@@ -59,6 +60,7 @@ const WORK_STATUS_LABELS = {
     NO_SHIFTS: AR.noShifts,
     MISSED_SHIFT: AR.missedShift,
     LATE_LOGIN: AR.lateLogin,
+    ABSENT: AR.absent,
   },
   en: {
     WORKED: "Worked",
@@ -67,6 +69,7 @@ const WORK_STATUS_LABELS = {
     NO_SHIFTS: "No shifts",
     MISSED_SHIFT: "Missed shift",
     LATE_LOGIN: "Late login",
+    ABSENT: "Absent",
   },
 } as const;
 
@@ -286,7 +289,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["", "WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN"] as const).map((status) => (
+          {(["", "WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"] as const).map((status) => (
             <Link
               key={status || "all-statuses"}
               href={buildHref(companyId, { contractId: sp.contractId, driverId: sp.driverId, workStatus: status || undefined })}
