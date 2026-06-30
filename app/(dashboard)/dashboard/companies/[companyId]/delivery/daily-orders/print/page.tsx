@@ -21,6 +21,10 @@ const AR = {
   totalRecords: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
   totalDrivers: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
   totalOrders: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a",
+  totalInvoices: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0648\u0627\u062a\u064a\u0631",
+  netBalance: "\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0635\u064a\u062f",
+  kwd: "\u062f.\u0643",
   selectedStatus: "\u0627\u0644\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u062e\u062a\u0627\u0631\u0629",
   allStatuses: "\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a",
   driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
@@ -63,7 +67,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     ...(sp.workStatus ? { workStatus: sp.workStatus as WorkStatus } : {}),
   };
 
-  const [company, orders] = await Promise.all([
+  const [company, orders, selectedDriver, totalInvoicesAmount] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: { nameAr: true, nameEn: true, logoUrl: true },
@@ -77,7 +81,27 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
       },
       orderBy: [{ driver: { employee: { nameAr: "asc" } } }, { date: "asc" }],
     }),
+    sp.driverId
+      ? prisma.driver.findUnique({
+          where: { id: sp.driverId },
+          select: { walletBalance: true },
+        })
+      : null,
+    sp.driverId
+      ? prisma.deliveryInvoice.aggregate({
+          where: {
+            targetType: "DRIVER",
+            driverId: sp.driverId,
+            deletedAt: null,
+          },
+          _sum: { amount: true },
+        })
+      : null,
   ]);
+
+  const driverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
+  const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
+  const netBalance = selectedDriver ? driverBalance! - driverInvoicesTotal : null;
 
   const grouped = new Map<
     string,
@@ -170,6 +194,29 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
           <div className="card"><div className="label">{AR.totalOrders}</div><div>{orders.reduce((sum, order) => sum + order.ordersCount, 0)}</div></div>
           <div className="card"><div className="label">{AR.selectedStatus}</div><div>{sp.workStatus ? WORK_STATUS_LABELS[sp.workStatus as WorkStatus] : AR.allStatuses}</div></div>
         </div>
+
+        {selectedDriver && (
+          <div className="meta" style={{ marginBottom: "1rem" }}>
+            <div className="card">
+              <div className="label">{AR.walletBalance}</div>
+              <div style={{ color: (driverBalance ?? 0) > 0 ? "#dc2626" : "#059669", fontWeight: "bold" }}>
+                {(driverBalance ?? 0).toFixed(3)} {AR.kwd}
+              </div>
+            </div>
+            <div className="card">
+              <div className="label">{AR.totalInvoices}</div>
+              <div style={{ color: "#9333ea", fontWeight: "bold" }}>
+                {driverInvoicesTotal.toFixed(3)} {AR.kwd}
+              </div>
+            </div>
+            <div className="card">
+              <div className="label">{AR.netBalance}</div>
+              <div style={{ color: (netBalance ?? 0) >= 0 ? "#dc2626" : "#059669", fontWeight: "bold" }}>
+                {(netBalance ?? 0).toFixed(3)} {AR.kwd}
+              </div>
+            </div>
+          </div>
+        )}
 
         <table>
           <thead>

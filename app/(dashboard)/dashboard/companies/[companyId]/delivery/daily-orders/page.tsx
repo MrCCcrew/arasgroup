@@ -38,6 +38,7 @@ const AR = {
   walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u064a \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0633\u0627\u0626\u0642",
   totalCollected: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u062d\u0635\u0644",
   totalInvoices: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0648\u0627\u062a\u064a\u0631",
+  netBalance: "\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0635\u064a\u062f",
   date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
   driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
   status: "\u0627\u0644\u062d\u0627\u0644\u0629",
@@ -185,6 +186,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     : null;
   const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
 
+  // Calculate net balance (Current Balance - Invoices)
+  const netBalance = selectedDriver ? (selectedDriverBalance ?? 0) - driverInvoicesTotal : null;
+
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
   const kwd = locale === "en" ? "KWD" : AR.kwd;
@@ -311,11 +315,19 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
               </p>
               <p className="number text-2xl font-bold text-blue-600">{totalCollectionAmount.toFixed(3)} {kwd}</p>
             </div>
-            <div>
+            <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
               <p className="text-xs text-muted-foreground">
                 {locale === "en" ? "Total invoices" : AR.totalInvoices}
               </p>
               <p className="number text-2xl font-bold text-purple-600">{driverInvoicesTotal.toFixed(3)} {kwd}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Net balance" : AR.netBalance}
+              </p>
+              <p className={`number text-2xl font-bold ${(netBalance ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                {(netBalance ?? 0).toFixed(3)} {kwd}
+              </p>
             </div>
           </div>
         )}
