@@ -435,6 +435,7 @@ export default function LicensesPage() {
                     <th>انتهاء الصحة</th>
                     <th className="text-center">موظفون</th>
                     <th className="text-center">تراخيص فرعية</th>
+                    <th className="text-center">إجمالي الرخص</th>
                     <th>الحالة</th>
                     <th className="no-print"></th>
                   </tr>
@@ -442,7 +443,7 @@ export default function LicensesPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={14} className="py-12 text-center text-muted-foreground">
                         {hasFilters ? "لا توجد نتائج تطابق الفلاتر المحددة" : "لا توجد تراخيص — اضغط \"إضافة ترخيص\" للبدء"}
                       </td>
                     </tr>
@@ -488,6 +489,15 @@ export default function LicensesPage() {
                             })()
                           : <span className="text-muted-foreground">—</span>}
                       </td>
+                      <td className="text-center">
+                        {lic.isMainLicense
+                          ? (() => {
+                              const branchCnt = activeBranchCount(lic.id);
+                              const total = 1 + branchCnt;
+                              return <span className="font-bold text-emerald-600">{total}</span>;
+                            })()
+                          : <span className="text-muted-foreground">1</span>}
+                      </td>
                       <td>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[getEffectiveStatus(lic)] ?? "bg-gray-100 text-gray-600"}`}>
                           {STATUS_LABELS[getEffectiveStatus(lic)] ?? getEffectiveStatus(lic)}
@@ -526,6 +536,9 @@ export default function LicensesPage() {
                       <td className="text-center py-2">{filtered.reduce((s, l) => s + l._count.employees, 0)}</td>
                       <td className="text-center py-2">
                         {filtered.filter((l) => l.isMainLicense).reduce((s, l) => s + activeBranchCount(l.id), 0)}
+                      </td>
+                      <td className="text-center py-2">
+                        {filtered.filter((l) => l.isMainLicense).reduce((s, l) => s + 1 + activeBranchCount(l.id), 0)}
                       </td>
                       <td colSpan={2}></td>
                     </tr>
