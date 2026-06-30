@@ -36,7 +36,7 @@ const AR = {
   clear: "\u0645\u0633\u062d",
   allStatuses: "\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a",
   walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u064a \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0633\u0627\u0626\u0642",
-  shownCollected: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u062d\u0635\u0644 \u0641\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629",
+  totalCollected: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u062d\u0635\u0644",
   date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
   driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
   status: "\u0627\u0644\u062d\u0627\u0644\u0629",
@@ -132,11 +132,17 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     isActive: driver.employee.isActive,
   }));
 
-  const pageDriverIds = [...new Set(orders.map((order) => order.driverId))];
+  // Get all filtered orders (no pagination) to calculate total collection
+  const allFilteredOrders = await prisma.deliveryDailyOrder.findMany({
+    where,
+    select: { id: true, driverId: true, contractId: true, date: true },
+  });
+
+  const allDriverIds = [...new Set(allFilteredOrders.map((order) => order.driverId))];
   const charges =
-    pageDriverIds.length > 0
+    allDriverIds.length > 0
       ? await prisma.driverWalletTransaction.findMany({
-          where: { type: "CHARGE", driverId: { in: pageDriverIds } },
+          where: { type: "CHARGE", driverId: { in: allDriverIds } },
           select: { dailyOrderId: true, driverId: true, contractId: true, date: true, amount: true },
         })
       : [];
@@ -152,12 +158,18 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     chargeByKey.set(key, (chargeByKey.get(key) ?? 0) + amount);
   }
 
-  const orderCollection = (order: (typeof orders)[number]) =>
+  const orderCollection = (order: { id: string; driverId: string; contractId: string; date: Date }) =>
     chargeByOrder.get(order.id) ?? chargeByKey.get(`${order.driverId}|${order.contractId}|${order.date.toISOString().slice(0, 10)}`) ?? null;
+
+  // Calculate total collection for all filtered orders
+  let totalCollectionAmount = 0;
+  for (const order of allFilteredOrders) {
+    const collection = orderCollection(order) ?? 0;
+    totalCollectionAmount += collection;
+  }
 
   const selectedDriver = sp.driverId ? driverRows.find((driver) => driver.id === sp.driverId) : null;
   const selectedDriverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
-  const shownCollectionTotal = orders.reduce((sum, order) => sum + (orderCollection(order) ?? 0), 0);
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
   const kwd = locale === "en" ? "KWD" : AR.kwd;
@@ -280,9 +292,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             </div>
             <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
               <p className="text-xs text-muted-foreground">
-                {locale === "en" ? "Collected in shown records" : AR.shownCollected}
+                {locale === "en" ? "Total collected" : AR.totalCollected}
               </p>
-              <p className="number text-2xl font-bold text-blue-600">{shownCollectionTotal.toFixed(3)} {kwd}</p>
+              <p className="number text-2xl font-bold text-blue-600">{totalCollectionAmount.toFixed(3)} {kwd}</p>
             </div>
           </div>
         )}
