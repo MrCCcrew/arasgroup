@@ -37,6 +37,7 @@ const AR = {
   allStatuses: "\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a",
   walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a \u0641\u064a \u0645\u062d\u0641\u0638\u0629 \u0627\u0644\u0633\u0627\u0626\u0642",
   totalCollected: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u062d\u0635\u0644",
+  totalInvoices: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0648\u0627\u062a\u064a\u0631",
   date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
   driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
   status: "\u0627\u0644\u062d\u0627\u0644\u0629",
@@ -170,6 +171,20 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
 
   const selectedDriver = sp.driverId ? driverRows.find((driver) => driver.id === sp.driverId) : null;
   const selectedDriverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
+
+  // Calculate total invoices for the selected driver
+  const totalInvoicesAmount = selectedDriver
+    ? await prisma.deliveryInvoice.aggregate({
+        where: {
+          targetType: "DRIVER",
+          driverId: selectedDriver.id,
+          deletedAt: null,
+        },
+        _sum: { amount: true },
+      })
+    : null;
+  const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
+
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
   const kwd = locale === "en" ? "KWD" : AR.kwd;
@@ -295,6 +310,12 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                 {locale === "en" ? "Total collected" : AR.totalCollected}
               </p>
               <p className="number text-2xl font-bold text-blue-600">{totalCollectionAmount.toFixed(3)} {kwd}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Total invoices" : AR.totalInvoices}
+              </p>
+              <p className="number text-2xl font-bold text-purple-600">{driverInvoicesTotal.toFixed(3)} {kwd}</p>
             </div>
           </div>
         )}
