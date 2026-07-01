@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Save, Loader2, AlertCircle } from "lucide-react";
 
-type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "MISSED_SHIFT" | "LATE_LOGIN";
+type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "MISSED_SHIFT" | "LATE_LOGIN" | "ABSENT";
 
 interface Order {
   id: string;
@@ -33,6 +33,7 @@ const WORK_STATUS_LABELS: Record<WorkStatus, string> = {
   NO_SHIFTS: "بدون شيفتات",
   MISSED_SHIFT: "عنده شيفت ولم يعمل",
   LATE_LOGIN: "تأخر في تسجيل الدخول",
+  ABSENT: "غياب",
 };
 
 export default function EditDailyOrderPage() {

@@ -174,23 +174,26 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   }
 
   const selectedDriver = sp.driverId ? driverRows.find((driver) => driver.id === sp.driverId) : null;
-  const selectedDriverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
+  const statsDriverRows = selectedDriver
+    ? [selectedDriver]
+    : driverRows.filter((driver) => allDriverIds.includes(driver.id));
+  const totalWalletBalance = statsDriverRows.reduce((sum, driver) => sum + Number(driver.walletBalance), 0);
 
-  // Calculate total invoices for the selected driver
-  const totalInvoicesAmount = selectedDriver
-    ? await prisma.deliveryInvoice.aggregate({
-        where: {
-          targetType: "DRIVER",
-          driverId: selectedDriver.id,
-          deletedAt: null,
-        },
-        _sum: { amount: true },
-      })
-    : null;
+  const totalInvoicesAmount =
+    statsDriverRows.length > 0
+      ? await prisma.deliveryInvoice.aggregate({
+          where: {
+            targetType: "DRIVER",
+            driverId: { in: statsDriverRows.map((driver) => driver.id) },
+            deletedAt: null,
+          },
+          _sum: { amount: true },
+        })
+      : null;
   const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
 
   // Calculate net balance (Current Balance - Invoices)
-  const netBalance = selectedDriver ? (selectedDriverBalance ?? 0) - driverInvoicesTotal : null;
+  const netBalance = totalWalletBalance - driverInvoicesTotal;
 
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
@@ -302,14 +305,14 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           ))}
         </div>
 
-        {selectedDriver && (
+        {(selectedDriver || statsDriverRows.length > 0) && (
           <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-blue-50/60 p-4">
             <div>
               <p className="text-xs text-muted-foreground">
                 {locale === "en" ? "Driver's current wallet balance" : AR.walletBalance}
               </p>
-              <p className={`number text-2xl font-bold ${(selectedDriverBalance ?? 0) > 0 ? "text-red-600" : "text-emerald-600"}`}>
-                {(selectedDriverBalance ?? 0).toFixed(3)} {kwd}
+              <p className={`number text-2xl font-bold ${totalWalletBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                {totalWalletBalance.toFixed(3)} {kwd}
               </p>
             </div>
             <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
@@ -328,8 +331,8 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
               <p className="text-xs text-muted-foreground">
                 {locale === "en" ? "Net balance" : AR.netBalance}
               </p>
-              <p className={`number text-2xl font-bold ${(netBalance ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                {(netBalance ?? 0).toFixed(3)} {kwd}
+              <p className={`number text-2xl font-bold ${netBalance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                {netBalance.toFixed(3)} {kwd}
               </p>
             </div>
           </div>

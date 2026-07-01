@@ -10,7 +10,7 @@ const entrySchema = z.object({
   driverId: z.string(),
   ordersCount: z.number().int().min(0),
   operatedAsDriverId: z.string().optional().nullable(),
-  workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN"]).optional(),
+  workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"]).optional(),
   ratePerOrder: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   walletDeducted: z.number().min(0).optional(),
