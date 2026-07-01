@@ -9,6 +9,7 @@ type WorkStatus = "WORKED" | "ON_LEAVE" | "VEHICLE_BREAKDOWN" | "NO_SHIFTS" | "M
 
 interface Order {
   id: string;
+  driverId: string;
   date: string;
   ordersCount: number;
   rating: string | number | null;
@@ -47,7 +48,7 @@ export default function EditDailyOrderPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
-  const [inactiveDrivers, setInactiveDrivers] = useState<DriverOption[]>([]);
+  const [driverOptions, setDriverOptions] = useState<DriverOption[]>([]);
 
   const [ordersCount, setOrdersCount] = useState("");
   const [rating, setRating] = useState("");
@@ -77,7 +78,7 @@ export default function EditDailyOrderPage() {
         setOperatedAsDriverId(currentOrder.operatedAsDriverId ?? "");
 
         if (driversPayload.success) {
-          setInactiveDrivers((driversPayload.data as DriverOption[]).filter((driver) => !driver.employee.isActive));
+          setDriverOptions(driversPayload.data as DriverOption[]);
         }
       })
       .catch((err) => setFetchError(err instanceof Error ? err.message : "فشل في تحميل البيانات"))
@@ -165,8 +166,13 @@ export default function EditDailyOrderPage() {
             <label className="mb-1.5 block text-sm font-medium">عمل باسم</label>
             <select value={operatedAsDriverId} onChange={(event) => setOperatedAsDriverId(event.target.value)} className="input-field w-full">
               <option value="">باسمه</option>
-              {inactiveDrivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>{driver.employee.nameAr}</option>
+              {driverOptions
+                .filter((driver) => driver.id !== order.driverId)
+                .map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.employee.nameAr}
+                  {!driver.employee.isActive ? " (غير نشط)" : ""}
+                </option>
               ))}
             </select>
           </div>
