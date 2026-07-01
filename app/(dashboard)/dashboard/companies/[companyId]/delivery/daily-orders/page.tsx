@@ -27,6 +27,7 @@ const AR = {
   title: "\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
   subtitle: "\u0633\u062c\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
   printReport: "\u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u062a\u0642\u0631\u064a\u0631",
+  shortDetailedReport: "\u062a\u0642\u0631\u064a\u0631 \u062a\u0641\u0635\u064a\u0644\u064a \u0645\u062e\u062a\u0635\u0631",
   newEntry: "\u062a\u0633\u062c\u064a\u0644 \u064a\u0648\u0645\u064a",
   totalRecords: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
   totalOrders: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
@@ -205,6 +206,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
   }).toString();
   const printHref = `/dashboard/companies/${companyId}/delivery/daily-orders/print${printQuery ? `?${printQuery}` : ""}`;
+  const summaryHref = `/dashboard/companies/${companyId}/delivery/daily-orders/summary-report${printQuery ? `?${printQuery}` : ""}`;
 
   const canUpdate = hasPermission(session, "DELIVERY_OPERATIONS", "UPDATE", { companyId });
   const canDelete = hasPermission(session, "DELIVERY_OPERATIONS", "DELETE", { companyId });
@@ -219,6 +221,9 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           <>
             <Link href={printHref} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
               {locale === "en" ? "Print report" : AR.printReport}
+            </Link>
+            <Link href={summaryHref} className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+              {locale === "en" ? "Short detailed report" : AR.shortDetailedReport}
             </Link>
             <Link
               href={`/dashboard/companies/${companyId}/delivery/daily-orders/new`}
