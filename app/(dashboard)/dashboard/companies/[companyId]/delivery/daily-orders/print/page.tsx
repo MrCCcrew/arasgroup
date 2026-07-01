@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 
 interface Props {
@@ -10,50 +11,95 @@ interface Props {
 }
 
 const AR = {
-  worked: "\u0639\u0645\u0644",
-  onLeave: "\u0625\u062c\u0627\u0632\u0629",
-  vehicleBreakdown: "\u0639\u0637\u0644 \u0633\u064a\u0627\u0631\u0629",
-  noShifts: "\u0628\u062f\u0648\u0646 \u0634\u064a\u0641\u062a\u0627\u062a",
-  missedShift: "\u0639\u0646\u062f\u0647 \u0634\u064a\u0641\u062a \u0648\u0644\u0645 \u064a\u0639\u0645\u0644",
-  lateLogin: "\u062a\u0623\u062e\u0631 \u0641\u064a \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
-  absent: "\u063a\u064a\u0627\u0628",
-  reportTitle: "\u062a\u0642\u0631\u064a\u0631 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0627\u0644\u0645\u062c\u0645\u0639",
-  printDate: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0637\u0628\u0627\u0639\u0629",
-  totalRecords: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
-  totalDrivers: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0633\u0627\u0626\u0642\u064a\u0646",
-  totalOrders: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
-  walletBalance: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062d\u0627\u0644\u064a",
-  totalInvoices: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0648\u0627\u062a\u064a\u0631",
-  netBalance: "\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0635\u064a\u062f",
-  kwd: "\u062f.\u0643",
-  selectedStatus: "\u0627\u0644\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u062e\u062a\u0627\u0631\u0629",
-  allStatuses: "\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a",
-  driver: "\u0627\u0644\u0633\u0627\u0626\u0642",
-  contracts: "\u0627\u0644\u0639\u0642\u0648\u062f",
-  totalOrdersCol: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
-  dayRows: "\u0639\u062f\u062f \u0627\u0644\u0623\u064a\u0627\u0645/\u0627\u0644\u0633\u062c\u0644\u0627\u062a",
-  statuses: "\u0627\u0644\u062d\u0627\u0644\u0627\u062a",
-  workedUnder: "\u0639\u0645\u0644 \u0628\u0627\u0633\u0645",
-  details: "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0633\u062c\u0644\u0627\u062a",
-  date: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e",
-  contract: "\u0627\u0644\u0639\u0642\u062f",
-  status: "\u0627\u0644\u062d\u0627\u0644\u0629",
-  ordersCount: "\u0639\u062f\u062f \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
-  notes: "\u0645\u0644\u0627\u062d\u0638\u0627\u062a",
-  arabicComma: "\u060c ",
+  worked: "عمل",
+  onLeave: "إجازة",
+  vehicleBreakdown: "عطل سيارة",
+  noShifts: "بدون شيفتات",
+  missedShift: "عنده شيفت ولم يعمل",
+  lateLogin: "تأخر في تسجيل الدخول",
+  absent: "غياب",
+  reportTitle: "تقرير الطلبات اليومية المجمع",
+  printDate: "تاريخ الطباعة",
+  totalRecords: "إجمالي السجلات",
+  totalDrivers: "إجمالي السائقين",
+  totalOrders: "إجمالي الطلبات",
+  walletBalance: "الرصيد الحالي",
+  totalInvoices: "إجمالي الفواتير",
+  netBalance: "صافي الرصيد",
+  kwd: "د.ك",
+  selectedStatus: "الحالة المختارة",
+  allStatuses: "كل الحالات",
+  driver: "السائق",
+  contracts: "العقود",
+  totalOrdersCol: "إجمالي الطلبات",
+  dayRows: "عدد الأيام/السجلات",
+  statuses: "الحالات",
+  workedUnder: "عمل باسم",
+  details: "تفاصيل السجلات",
+  date: "التاريخ",
+  contract: "العقد",
+  status: "الحالة",
+  ordersCount: "عدد الطلبات",
+  notes: "ملاحظات",
+  comma: "، ",
+} as const;
+
+const EN = {
+  worked: "Worked",
+  onLeave: "On leave",
+  vehicleBreakdown: "Vehicle breakdown",
+  noShifts: "No shifts",
+  missedShift: "Missed shift",
+  lateLogin: "Late login",
+  absent: "Absent",
+  reportTitle: "Daily Orders Summary Report",
+  printDate: "Print Date",
+  totalRecords: "Total Records",
+  totalDrivers: "Total Drivers",
+  totalOrders: "Total Orders",
+  walletBalance: "Current Balance",
+  totalInvoices: "Total Invoices",
+  netBalance: "Net Balance",
+  kwd: "KWD",
+  selectedStatus: "Selected Status",
+  allStatuses: "All statuses",
+  driver: "Driver",
+  contracts: "Contracts",
+  totalOrdersCol: "Total Orders",
+  dayRows: "Days / Rows",
+  statuses: "Statuses",
+  workedUnder: "Worked Under",
+  details: "Record Details",
+  date: "Date",
+  contract: "Contract",
+  status: "Status",
+  ordersCount: "Orders Count",
+  notes: "Notes",
+  comma: ", ",
 } as const;
 
 const WORK_STATUS_LABELS = {
-  WORKED: AR.worked,
-  ON_LEAVE: AR.onLeave,
-  VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
-  NO_SHIFTS: AR.noShifts,
-  MISSED_SHIFT: AR.missedShift,
-  LATE_LOGIN: AR.lateLogin,
-  ABSENT: AR.absent,
+  ar: {
+    WORKED: AR.worked,
+    ON_LEAVE: AR.onLeave,
+    VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
+    NO_SHIFTS: AR.noShifts,
+    MISSED_SHIFT: AR.missedShift,
+    LATE_LOGIN: AR.lateLogin,
+    ABSENT: AR.absent,
+  },
+  en: {
+    WORKED: EN.worked,
+    ON_LEAVE: EN.onLeave,
+    VEHICLE_BREAKDOWN: EN.vehicleBreakdown,
+    NO_SHIFTS: EN.noShifts,
+    MISSED_SHIFT: EN.missedShift,
+    LATE_LOGIN: EN.lateLogin,
+    ABSENT: EN.absent,
+  },
 } as const;
 
-type WorkStatus = keyof typeof WORK_STATUS_LABELS;
+type WorkStatus = keyof typeof WORK_STATUS_LABELS.ar;
 
 export default async function DailyOrdersPrintPage({ params, searchParams }: Props) {
   const session = await getSession();
@@ -61,6 +107,10 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
 
   const { companyId } = await params;
   const sp = await searchParams;
+  const locale = await getLocale();
+  const t = locale === "en" ? EN : AR;
+  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const isEnglish = locale === "en";
 
   const where = {
     companyId,
@@ -77,9 +127,9 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     prisma.deliveryDailyOrder.findMany({
       where,
       include: {
-        driver: { include: { employee: { select: { nameAr: true } } } },
-        operatedAsDriver: { include: { employee: { select: { nameAr: true } } } },
-        contract: { select: { nameAr: true } },
+        driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
+        operatedAsDriver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
+        contract: { select: { nameAr: true, nameEn: true } },
       },
       orderBy: [{ driver: { employee: { nameAr: "asc" } } }, { date: "asc" }],
     }),
@@ -103,7 +153,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
 
   const driverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
   const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
-  const netBalance = selectedDriver ? driverBalance! - driverInvoicesTotal : null;
+  const netBalance = selectedDriver ? (driverBalance ?? 0) - driverInvoicesTotal : null;
 
   const grouped = new Map<
     string,
@@ -121,7 +171,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     const key = order.driverId;
     if (!grouped.has(key)) {
       grouped.set(key, {
-        driverName: order.driver.employee.nameAr,
+        driverName: isEnglish ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr,
         totalOrders: 0,
         totalRows: 0,
         statuses: {
@@ -137,15 +187,20 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
         contracts: [],
       });
     }
+
     const item = grouped.get(key)!;
     item.totalOrders += order.ordersCount;
     item.totalRows += 1;
     item.statuses[order.workStatus as WorkStatus] += 1;
-    if (order.operatedAsDriver?.employee.nameAr && !item.aliases.includes(order.operatedAsDriver.employee.nameAr)) {
-      item.aliases.push(order.operatedAsDriver.employee.nameAr);
+
+    const aliasName = isEnglish ? order.operatedAsDriver?.employee.nameEn ?? order.operatedAsDriver?.employee.nameAr : order.operatedAsDriver?.employee.nameAr;
+    if (aliasName && !item.aliases.includes(aliasName)) {
+      item.aliases.push(aliasName);
     }
-    if (!item.contracts.includes(order.contract.nameAr)) {
-      item.contracts.push(order.contract.nameAr);
+
+    const contractName = isEnglish ? order.contract.nameEn ?? order.contract.nameAr : order.contract.nameAr;
+    if (!item.contracts.includes(contractName)) {
+      item.contracts.push(contractName);
     }
   }
 
@@ -155,13 +210,13 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
   }).toString();
   const backHref = `/dashboard/companies/${companyId}/delivery/daily-orders${backQuery ? `?${backQuery}` : ""}`;
-  const printDate = new Date().toLocaleDateString("ar-KW", { year: "numeric", month: "long", day: "numeric" });
+  const printDate = new Date().toLocaleDateString(numberLocale, { year: "numeric", month: "long", day: "numeric" });
 
   return (
     <>
       <style>{`
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f5f5f5; font-size: 11pt; }
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ${isEnglish ? "ltr" : "rtl"}; background: #f5f5f5; font-size: 11pt; }
         .page { max-width: 210mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
         .header { text-align: center; border-bottom: 2px solid #1f2937; padding-bottom: 1rem; margin-bottom: 1.25rem; }
         .company { font-size: 1.4rem; font-weight: 700; }
@@ -173,7 +228,6 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
         th { background: #111827; color: white; padding: .45rem; border: 1px solid #111827; }
         td { padding: .45rem; border: 1px solid #d1d5db; vertical-align: top; }
         tr:nth-child(even) td { background: #f9fafb; }
-        .muted { color: #6b7280; font-size: .72rem; }
         .badge { display: inline-block; border-radius: 999px; padding: .15rem .5rem; background: #f3f4f6; margin: .1rem; }
         @media print {
           body { background: white; }
@@ -186,36 +240,36 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
 
       <div className="page">
         <div className="header">
-          <div className="company">{company?.nameAr}</div>
-          <div className="sub">{AR.reportTitle}</div>
-          <div className="sub">{AR.printDate}: {printDate}</div>
+          <div className="company">{isEnglish ? company?.nameEn ?? company?.nameAr : company?.nameAr}</div>
+          <div className="sub">{t.reportTitle}</div>
+          <div className="sub">{t.printDate}: {printDate}</div>
         </div>
 
         <div className="meta">
-          <div className="card"><div className="label">{AR.totalRecords}</div><div>{orders.length}</div></div>
-          <div className="card"><div className="label">{AR.totalDrivers}</div><div>{grouped.size}</div></div>
-          <div className="card"><div className="label">{AR.totalOrders}</div><div>{orders.reduce((sum, order) => sum + order.ordersCount, 0)}</div></div>
-          <div className="card"><div className="label">{AR.selectedStatus}</div><div>{sp.workStatus ? WORK_STATUS_LABELS[sp.workStatus as WorkStatus] : AR.allStatuses}</div></div>
+          <div className="card"><div className="label">{t.totalRecords}</div><div>{orders.length}</div></div>
+          <div className="card"><div className="label">{t.totalDrivers}</div><div>{grouped.size}</div></div>
+          <div className="card"><div className="label">{t.totalOrders}</div><div>{orders.reduce((sum, order) => sum + order.ordersCount, 0)}</div></div>
+          <div className="card"><div className="label">{t.selectedStatus}</div><div>{sp.workStatus ? WORK_STATUS_LABELS[locale][sp.workStatus as WorkStatus] : t.allStatuses}</div></div>
         </div>
 
         {selectedDriver && (
           <div className="meta" style={{ marginBottom: "1rem" }}>
             <div className="card">
-              <div className="label">{AR.walletBalance}</div>
+              <div className="label">{t.walletBalance}</div>
               <div style={{ color: (driverBalance ?? 0) > 0 ? "#dc2626" : "#059669", fontWeight: "bold" }}>
-                {(driverBalance ?? 0).toFixed(3)} {AR.kwd}
+                {(driverBalance ?? 0).toFixed(3)} {t.kwd}
               </div>
             </div>
             <div className="card">
-              <div className="label">{AR.totalInvoices}</div>
+              <div className="label">{t.totalInvoices}</div>
               <div style={{ color: "#9333ea", fontWeight: "bold" }}>
-                {driverInvoicesTotal.toFixed(3)} {AR.kwd}
+                {driverInvoicesTotal.toFixed(3)} {t.kwd}
               </div>
             </div>
             <div className="card">
-              <div className="label">{AR.netBalance}</div>
+              <div className="label">{t.netBalance}</div>
               <div style={{ color: (netBalance ?? 0) >= 0 ? "#dc2626" : "#059669", fontWeight: "bold" }}>
-                {(netBalance ?? 0).toFixed(3)} {AR.kwd}
+                {(netBalance ?? 0).toFixed(3)} {t.kwd}
               </div>
             </div>
           </div>
@@ -224,19 +278,19 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
         <table>
           <thead>
             <tr>
-              <th>{AR.driver}</th>
-              <th>{AR.contracts}</th>
-              <th>{AR.totalOrdersCol}</th>
-              <th>{AR.dayRows}</th>
-              <th>{AR.statuses}</th>
-              <th>{AR.workedUnder}</th>
+              <th>{t.driver}</th>
+              <th>{t.contracts}</th>
+              <th>{t.totalOrdersCol}</th>
+              <th>{t.dayRows}</th>
+              <th>{t.statuses}</th>
+              <th>{t.workedUnder}</th>
             </tr>
           </thead>
           <tbody>
             {Array.from(grouped.values()).map((item) => (
               <tr key={item.driverName}>
                 <td>{item.driverName}</td>
-                <td>{item.contracts.join(AR.arabicComma) || "-"}</td>
+                <td>{item.contracts.join(t.comma) || "-"}</td>
                 <td>{item.totalOrders}</td>
                 <td>{item.totalRows}</td>
                 <td>
@@ -244,38 +298,38 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
                     .filter(([, count]) => count > 0)
                     .map(([status, count]) => (
                       <span key={status} className="badge">
-                        {WORK_STATUS_LABELS[status as WorkStatus]}: {count}
+                        {WORK_STATUS_LABELS[locale][status as WorkStatus]}: {count}
                       </span>
                     ))}
                 </td>
-                <td>{item.aliases.length > 0 ? item.aliases.join(AR.arabicComma) : "-"}</td>
+                <td>{item.aliases.length > 0 ? item.aliases.join(t.comma) : "-"}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
         <div style={{ marginTop: "1rem" }}>
-          <div style={{ fontWeight: 700, marginBottom: ".4rem" }}>{AR.details}</div>
+          <div style={{ fontWeight: 700, marginBottom: ".4rem" }}>{t.details}</div>
           <table>
             <thead>
               <tr>
-                <th>{AR.date}</th>
-                <th>{AR.driver}</th>
-                <th>{AR.contract}</th>
-                <th>{AR.status}</th>
-                <th>{AR.workedUnder}</th>
-                <th>{AR.ordersCount}</th>
-                <th>{AR.notes}</th>
+                <th>{t.date}</th>
+                <th>{t.driver}</th>
+                <th>{t.contract}</th>
+                <th>{t.status}</th>
+                <th>{t.workedUnder}</th>
+                <th>{t.ordersCount}</th>
+                <th>{t.notes}</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id}>
-                  <td>{formatDate(order.date, "ar-KW")}</td>
-                  <td>{order.driver.employee.nameAr}</td>
-                  <td>{order.contract.nameAr}</td>
-                  <td>{WORK_STATUS_LABELS[order.workStatus as WorkStatus]}</td>
-                  <td>{order.operatedAsDriver?.employee.nameAr ?? "-"}</td>
+                  <td>{formatDate(order.date, numberLocale)}</td>
+                  <td>{isEnglish ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}</td>
+                  <td>{isEnglish ? order.contract.nameEn ?? order.contract.nameAr : order.contract.nameAr}</td>
+                  <td>{WORK_STATUS_LABELS[locale][order.workStatus as WorkStatus]}</td>
+                  <td>{isEnglish ? order.operatedAsDriver?.employee.nameEn ?? order.operatedAsDriver?.employee.nameAr ?? "-" : order.operatedAsDriver?.employee.nameAr ?? "-"}</td>
                   <td>{order.ordersCount}</td>
                   <td>{order.notes ?? "-"}</td>
                 </tr>
