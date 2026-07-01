@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { getLocale } from "@/lib/i18n";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -33,17 +34,53 @@ const AR = {
   absent: "غياب",
 } as const;
 
-const WORK_STATUS_LABELS = {
-  WORKED: AR.worked,
-  ON_LEAVE: AR.onLeave,
-  VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
-  NO_SHIFTS: AR.noShifts,
-  MISSED_SHIFT: AR.missedShift,
-  LATE_LOGIN: AR.lateLogin,
-  ABSENT: AR.absent,
+const EN = {
+  reportTitle: "Short Detailed Drivers Report",
+  printDate: "Print Date",
+  totalDrivers: "Total Drivers",
+  totalOrders: "Total Orders",
+  totalCollected: "Total Collected",
+  totalInvoices: "Total Invoices",
+  totalWalletBalance: "Total Current Balance",
+  totalNetBalance: "Total Net Balance",
+  selectedStatus: "Selected Status",
+  allStatuses: "All statuses",
+  driver: "Driver",
+  currentWalletBalance: "Current Wallet Balance",
+  netBalance: "Net Balance",
+  ordersCount: "Total Orders",
+  kwd: "KWD",
+  worked: "Worked",
+  onLeave: "On leave",
+  vehicleBreakdown: "Vehicle breakdown",
+  noShifts: "No shifts",
+  missedShift: "Missed shift",
+  lateLogin: "Late login",
+  absent: "Absent",
 } as const;
 
-type WorkStatus = keyof typeof WORK_STATUS_LABELS;
+const WORK_STATUS_LABELS = {
+  ar: {
+    WORKED: AR.worked,
+    ON_LEAVE: AR.onLeave,
+    VEHICLE_BREAKDOWN: AR.vehicleBreakdown,
+    NO_SHIFTS: AR.noShifts,
+    MISSED_SHIFT: AR.missedShift,
+    LATE_LOGIN: AR.lateLogin,
+    ABSENT: AR.absent,
+  },
+  en: {
+    WORKED: EN.worked,
+    ON_LEAVE: EN.onLeave,
+    VEHICLE_BREAKDOWN: EN.vehicleBreakdown,
+    NO_SHIFTS: EN.noShifts,
+    MISSED_SHIFT: EN.missedShift,
+    LATE_LOGIN: EN.lateLogin,
+    ABSENT: EN.absent,
+  },
+} as const;
+
+type WorkStatus = keyof typeof WORK_STATUS_LABELS.ar;
 
 export default async function DailyOrdersSummaryReportPage({ params, searchParams }: Props) {
   const session = await getSession();
@@ -51,6 +88,10 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
 
   const { companyId } = await params;
   const sp = await searchParams;
+  const locale = await getLocale();
+  const t = locale === "en" ? EN : AR;
+  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const isEnglish = locale === "en";
 
   const where = {
     companyId,
@@ -62,7 +103,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
   const [company, orders, driverRows] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
-      select: { nameAr: true },
+      select: { nameAr: true, nameEn: true },
     }),
     prisma.deliveryDailyOrder.findMany({
       where,
@@ -77,6 +118,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
             employee: {
               select: {
                 nameAr: true,
+                nameEn: true,
               },
             },
           },
@@ -94,6 +136,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
         employee: {
           select: {
             nameAr: true,
+            nameEn: true,
           },
         },
       },
@@ -166,7 +209,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
       const walletBalance = Number(driver.walletBalance);
       const totalInvoices = invoiceByDriverId.get(order.driverId) ?? 0;
       summaryMap.set(order.driverId, {
-        driverName: driver.employee.nameAr,
+        driverName: isEnglish ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr,
         walletBalance,
         totalCollected: 0,
         totalInvoices,
@@ -185,7 +228,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     item.totalOrders += order.ordersCount;
   }
 
-  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.driverName.localeCompare(b.driverName, "ar"));
+  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.driverName.localeCompare(b.driverName, isEnglish ? "en" : "ar"));
   const totals = summaryRows.reduce(
     (acc, row) => {
       acc.walletBalance += row.walletBalance;
@@ -204,13 +247,13 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
   }).toString();
   const backHref = `/dashboard/companies/${companyId}/delivery/daily-orders${backQuery ? `?${backQuery}` : ""}`;
-  const printDate = new Date().toLocaleDateString("ar-KW", { year: "numeric", month: "long", day: "numeric" });
+  const printDate = new Date().toLocaleDateString(numberLocale, { year: "numeric", month: "long", day: "numeric" });
 
   return (
     <>
       <style>{`
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f5f5f5; font-size: 11pt; }
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ${isEnglish ? "ltr" : "rtl"}; background: #f5f5f5; font-size: 11pt; }
         .page { max-width: 210mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
         .header { text-align: center; border-bottom: 2px solid #1f2937; padding-bottom: 1rem; margin-bottom: 1.25rem; }
         .company { font-size: 1.4rem; font-weight: 700; }
@@ -234,56 +277,56 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
 
       <div className="page">
         <div className="header">
-          <div className="company">{company?.nameAr}</div>
-          <div className="sub">{AR.reportTitle}</div>
+          <div className="company">{isEnglish ? company?.nameEn ?? company?.nameAr : company?.nameAr}</div>
+          <div className="sub">{t.reportTitle}</div>
           <div className="sub">
-            {AR.printDate}: {printDate}
+            {t.printDate}: {printDate}
           </div>
         </div>
 
         <div className="meta">
           <div className="card">
-            <div className="label">{AR.totalDrivers}</div>
+            <div className="label">{t.totalDrivers}</div>
             <div>{summaryRows.length}</div>
           </div>
           <div className="card">
-            <div className="label">{AR.totalOrders}</div>
+            <div className="label">{t.totalOrders}</div>
             <div>{totals.totalOrders}</div>
           </div>
           <div className="card">
-            <div className="label">{AR.selectedStatus}</div>
-            <div>{sp.workStatus ? WORK_STATUS_LABELS[sp.workStatus as WorkStatus] : AR.allStatuses}</div>
+            <div className="label">{t.selectedStatus}</div>
+            <div>{sp.workStatus ? WORK_STATUS_LABELS[locale][sp.workStatus as WorkStatus] : t.allStatuses}</div>
           </div>
           <div className="card">
-            <div className="label">{AR.totalWalletBalance}</div>
-            <div className="number">{totals.walletBalance.toFixed(3)} {AR.kwd}</div>
+            <div className="label">{t.totalWalletBalance}</div>
+            <div className="number">{totals.walletBalance.toFixed(3)} {t.kwd}</div>
           </div>
           <div className="card">
-            <div className="label">{AR.totalCollected}</div>
-            <div className="number">{totals.totalCollected.toFixed(3)} {AR.kwd}</div>
+            <div className="label">{t.totalCollected}</div>
+            <div className="number">{totals.totalCollected.toFixed(3)} {t.kwd}</div>
           </div>
           <div className="card">
-            <div className="label">{AR.totalInvoices}</div>
-            <div className="number">{totals.totalInvoices.toFixed(3)} {AR.kwd}</div>
+            <div className="label">{t.totalInvoices}</div>
+            <div className="number">{totals.totalInvoices.toFixed(3)} {t.kwd}</div>
           </div>
         </div>
 
         <div className="meta" style={{ gridTemplateColumns: "1fr" }}>
           <div className="card">
-            <div className="label">{AR.totalNetBalance}</div>
-            <div className="number">{totals.netBalance.toFixed(3)} {AR.kwd}</div>
+            <div className="label">{t.totalNetBalance}</div>
+            <div className="number">{totals.netBalance.toFixed(3)} {t.kwd}</div>
           </div>
         </div>
 
         <table>
           <thead>
             <tr>
-              <th>{AR.driver}</th>
-              <th>{AR.currentWalletBalance}</th>
-              <th>{AR.totalCollected}</th>
-              <th>{AR.totalInvoices}</th>
-              <th>{AR.netBalance}</th>
-              <th>{AR.ordersCount}</th>
+              <th>{t.driver}</th>
+              <th>{t.currentWalletBalance}</th>
+              <th>{t.totalCollected}</th>
+              <th>{t.totalInvoices}</th>
+              <th>{t.netBalance}</th>
+              <th>{t.ordersCount}</th>
             </tr>
           </thead>
           <tbody>
@@ -295,10 +338,10 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
               summaryRows.map((row) => (
                 <tr key={row.driverName}>
                   <td>{row.driverName}</td>
-                  <td className="number">{row.walletBalance.toFixed(3)} {AR.kwd}</td>
-                  <td className="number">{row.totalCollected.toFixed(3)} {AR.kwd}</td>
-                  <td className="number">{row.totalInvoices.toFixed(3)} {AR.kwd}</td>
-                  <td className="number">{row.netBalance.toFixed(3)} {AR.kwd}</td>
+                  <td className="number">{row.walletBalance.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.totalCollected.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.totalInvoices.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.netBalance.toFixed(3)} {t.kwd}</td>
                   <td className="number">{row.totalOrders}</td>
                 </tr>
               ))
