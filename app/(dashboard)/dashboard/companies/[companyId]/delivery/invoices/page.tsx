@@ -87,6 +87,8 @@ export default function DeliveryInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
   const [fType, setFType] = useState("");
   const [search, setSearch] = useState("");
   const [viewImg, setViewImg] = useState<string | null>(null);
@@ -95,10 +97,29 @@ export default function DeliveryInvoicesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
+    // Calculate from/to from month/year if selected
+    let effectiveFrom = from;
+    let effectiveTo = to;
+    if (month && year) {
+      const monthNum = Number.parseInt(month, 10);
+      const yearNum = Number.parseInt(year, 10);
+      const startDate = new Date(yearNum, monthNum - 1, 1);
+      const endDate = new Date(yearNum, monthNum, 0);
+      effectiveFrom = startDate.toISOString().split("T")[0];
+      effectiveTo = endDate.toISOString().split("T")[0];
+    } else if (year && !from && !to) {
+      const yearNum = Number.parseInt(year, 10);
+      const startDate = new Date(yearNum, 0, 1);
+      const endDate = new Date(yearNum, 11, 31);
+      effectiveFrom = startDate.toISOString().split("T")[0];
+      effectiveTo = endDate.toISOString().split("T")[0];
+    }
+
     const qs = new URLSearchParams({
       companyId,
-      ...(from ? { from } : {}),
-      ...(to ? { to } : {}),
+      ...(effectiveFrom ? { from: effectiveFrom } : {}),
+      ...(effectiveTo ? { to: effectiveTo } : {}),
       ...(fType ? { targetType: fType } : {}),
       ...(search ? { search } : {}),
     });
@@ -106,7 +127,7 @@ export default function DeliveryInvoicesPage() {
     const p = await res.json();
     if (p.success) setInvoices(p.data);
     setLoading(false);
-  }, [companyId, from, to, fType, search]);
+  }, [companyId, from, to, month, year, fType, search]);
 
   useEffect(() => {
     load();
@@ -160,6 +181,33 @@ export default function DeliveryInvoicesPage() {
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Year" : "السنة"}</label>
+            <select value={year} onChange={(e) => setYear(e.target.value)} className="input-field w-32">
+              <option value="">{en ? "All" : "الكل"}</option>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Month" : "الشهر"}</label>
+            <select value={month} onChange={(e) => setMonth(e.target.value)} className="input-field w-32">
+              <option value="">{en ? "All" : "الكل"}</option>
+              <option value="1">{en ? "Jan" : "يناير"}</option>
+              <option value="2">{en ? "Feb" : "فبراير"}</option>
+              <option value="3">{en ? "Mar" : "مارس"}</option>
+              <option value="4">{en ? "Apr" : "أبريل"}</option>
+              <option value="5">{en ? "May" : "مايو"}</option>
+              <option value="6">{en ? "Jun" : "يونيو"}</option>
+              <option value="7">{en ? "Jul" : "يوليو"}</option>
+              <option value="8">{en ? "Aug" : "أغسطس"}</option>
+              <option value="9">{en ? "Sep" : "سبتمبر"}</option>
+              <option value="10">{en ? "Oct" : "أكتوبر"}</option>
+              <option value="11">{en ? "Nov" : "نوفمبر"}</option>
+              <option value="12">{en ? "Dec" : "ديسمبر"}</option>
+            </select>
+          </div>
           <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "From" : "من"}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input-field" dir="ltr" /></div>
           <div><label className="mb-1 block text-xs text-muted-foreground">{en ? "To" : "إلى"}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input-field" dir="ltr" /></div>
           <div>
@@ -174,8 +222,8 @@ export default function DeliveryInvoicesPage() {
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
           </div>
-          {(from || to || fType || search) && (
-            <button onClick={() => { setFrom(""); setTo(""); setFType(""); setSearch(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+          {(from || to || month || year || fType || search) && (
+            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setSearch(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
               {en ? "Clear" : "مسح"}
             </button>
           )}
