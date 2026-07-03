@@ -114,22 +114,29 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   const page = Number.parseInt(sp.page ?? "1", 10);
   const pageSize = 25;
 
+  // Default to current month/year if not specified
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1);
+  const currentYear = String(now.getFullYear());
+  const effectiveMonth = sp.month ?? currentMonth;
+  const effectiveYear = sp.year ?? currentYear;
+
   const contracts = await prisma.deliveryContract.findMany({
     where: { companyId, isActive: true },
     orderBy: { nameAr: "asc" },
   });
 
-  // Date filtering by month/year
+  // Date filtering by month/year (default to current month/year)
   let dateFilter = {};
-  if (sp.month && sp.year) {
-    const monthNum = Number.parseInt(sp.month, 10);
-    const yearNum = Number.parseInt(sp.year, 10);
-    const startDate = new Date(yearNum, monthNum - 1, 1);
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
     const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
     dateFilter = { date: { gte: startDate, lte: endDate } };
-  } else if (sp.year) {
-    const yearNum = Number.parseInt(sp.year, 10);
-    const startDate = new Date(yearNum, 0, 1);
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
     const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
     dateFilter = { date: { gte: startDate, lte: endDate } };
   }
@@ -237,8 +244,8 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     ...(sp.contractId ? { contractId: sp.contractId } : {}),
     ...(sp.driverId ? { driverId: sp.driverId } : {}),
     ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
-    ...(sp.month ? { month: sp.month } : {}),
-    ...(sp.year ? { year: sp.year } : {}),
+    month: effectiveMonth,
+    year: effectiveYear,
   }).toString();
   const printHref = `/dashboard/companies/${companyId}/delivery/daily-orders/print${printQuery ? `?${printQuery}` : ""}`;
   const summaryHref = `/dashboard/companies/${companyId}/delivery/daily-orders/summary-report${printQuery ? `?${printQuery}` : ""}`;
@@ -313,14 +320,14 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           {sp.contractId && <input type="hidden" name="contractId" value={sp.contractId} />}
           {sp.workStatus && <input type="hidden" name="workStatus" value={sp.workStatus} />}
 
-          <select name="year" defaultValue={sp.year ?? ""} className="input-field w-32">
+          <select name="year" defaultValue={effectiveYear} className="input-field w-32">
             <option value="">{locale === "en" ? "All years" : AR.selectYear}</option>
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((year) => (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
 
-          <select name="month" defaultValue={sp.month ?? ""} className="input-field w-32">
+          <select name="month" defaultValue={effectiveMonth} className="input-field w-32">
             <option value="">{locale === "en" ? "All months" : AR.allMonths}</option>
             <option value="1">{locale === "en" ? "January" : AR.january}</option>
             <option value="2">{locale === "en" ? "February" : AR.february}</option>

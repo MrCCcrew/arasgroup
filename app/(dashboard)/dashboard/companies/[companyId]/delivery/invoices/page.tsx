@@ -87,8 +87,8 @@ export default function DeliveryInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [fType, setFType] = useState("");
   const [search, setSearch] = useState("");
   const [viewImg, setViewImg] = useState<string | null>(null);
@@ -106,14 +106,13 @@ export default function DeliveryInvoicesPage() {
       const yearNum = Number.parseInt(year, 10);
       const startDate = new Date(yearNum, monthNum - 1, 1);
       const endDate = new Date(yearNum, monthNum, 0);
-      effectiveFrom = startDate.toISOString().split("T")[0];
-      effectiveTo = endDate.toISOString().split("T")[0];
+      // Format dates without timezone conversion
+      effectiveFrom = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+      effectiveTo = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
     } else if (year && !from && !to) {
       const yearNum = Number.parseInt(year, 10);
-      const startDate = new Date(yearNum, 0, 1);
-      const endDate = new Date(yearNum, 11, 31);
-      effectiveFrom = startDate.toISOString().split("T")[0];
-      effectiveTo = endDate.toISOString().split("T")[0];
+      effectiveFrom = `${yearNum}-01-01`;
+      effectiveTo = `${yearNum}-12-31`;
     }
 
     const qs = new URLSearchParams({
