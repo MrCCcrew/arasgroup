@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ contractId?: string; driverId?: string; workStatus?: string }>;
+  searchParams: Promise<{ contractId?: string; driverId?: string; workStatus?: string; month?: string; year?: string }>;
 }
 
 const AR = {
@@ -112,11 +112,34 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const isEnglish = locale === "en";
 
+  // Default to current month/year if not specified
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1);
+  const currentYear = String(now.getFullYear());
+  const effectiveMonth = sp.month ?? currentMonth;
+  const effectiveYear = sp.year ?? currentYear;
+
+  // Date filtering by month/year
+  let dateFilter = {};
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+    dateFilter = { date: { gte: startDate, lte: endDate } };
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+    dateFilter = { date: { gte: startDate, lte: endDate } };
+  }
+
   const where = {
     companyId,
     ...(sp.contractId ? { contractId: sp.contractId } : {}),
     ...(sp.driverId ? { driverId: sp.driverId } : {}),
     ...(sp.workStatus ? { workStatus: sp.workStatus as WorkStatus } : {}),
+    ...dateFilter,
   };
 
   const [company, orders, selectedDriver, totalInvoicesAmount] = await Promise.all([
@@ -208,6 +231,8 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     ...(sp.contractId ? { contractId: sp.contractId } : {}),
     ...(sp.driverId ? { driverId: sp.driverId } : {}),
     ...(sp.workStatus ? { workStatus: sp.workStatus } : {}),
+    month: effectiveMonth,
+    year: effectiveYear,
   }).toString();
   const backHref = `/dashboard/companies/${companyId}/delivery/daily-orders${backQuery ? `?${backQuery}` : ""}`;
   const printDate = new Date().toLocaleDateString(numberLocale, { year: "numeric", month: "long", day: "numeric" });
