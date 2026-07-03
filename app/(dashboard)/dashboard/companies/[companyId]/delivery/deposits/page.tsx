@@ -8,7 +8,7 @@ import { formatDate, formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ driverId?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ driverId?: string; from?: string; to?: string; month?: string; year?: string }>;
 }
 
 export default async function DriverDepositsPage({ params, searchParams }: Props) {
@@ -21,9 +21,28 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
   const en = locale === "en";
   const numberLocale = en ? "en-US" : "ar-KW";
 
+  // Default to current month/year if not specified
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1);
+  const currentYear = String(now.getFullYear());
+  const effectiveMonth = sp.month ?? currentMonth;
+  const effectiveYear = sp.year ?? currentYear;
+
   // نطاق التواريخ (اختياري) — to شامل لليوم بالكامل
-  const fromDate = sp.from ? new Date(sp.from) : undefined;
-  const toDate = sp.to ? new Date(`${sp.to}T23:59:59.999`) : undefined;
+  let fromDate = sp.from ? new Date(sp.from) : undefined;
+  let toDate = sp.to ? new Date(`${sp.to}T23:59:59.999`) : undefined;
+
+  // Override with month/year if provided
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    fromDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    toDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+  } else if (effectiveYear && !sp.from && !sp.to) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    fromDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    toDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+  }
 
   const where = {
     type: "DEPOSIT" as const,
@@ -62,8 +81,8 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
 
   const printQuery = new URLSearchParams({
     ...(sp.driverId ? { driverId: sp.driverId } : {}),
-    ...(sp.from ? { from: sp.from } : {}),
-    ...(sp.to ? { to: sp.to } : {}),
+    month: effectiveMonth,
+    year: effectiveYear,
   }).toString();
 
   const methodLabel = (m: string | null) =>
@@ -105,6 +124,33 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
 
         {/* فلتر: السائق + نطاق التاريخ */}
         <form method="GET" className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Year" : "السنة"}</label>
+            <select name="year" defaultValue={effectiveYear} className="input-field w-28">
+              <option value="">{en ? "All" : "الكل"}</option>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Month" : "الشهر"}</label>
+            <select name="month" defaultValue={effectiveMonth} className="input-field w-28">
+              <option value="">{en ? "All" : "الكل"}</option>
+              <option value="1">{en ? "Jan" : "يناير"}</option>
+              <option value="2">{en ? "Feb" : "فبراير"}</option>
+              <option value="3">{en ? "Mar" : "مارس"}</option>
+              <option value="4">{en ? "Apr" : "أبريل"}</option>
+              <option value="5">{en ? "May" : "مايو"}</option>
+              <option value="6">{en ? "Jun" : "يونيو"}</option>
+              <option value="7">{en ? "Jul" : "يوليو"}</option>
+              <option value="8">{en ? "Aug" : "أغسطس"}</option>
+              <option value="9">{en ? "Sep" : "سبتمبر"}</option>
+              <option value="10">{en ? "Oct" : "أكتوبر"}</option>
+              <option value="11">{en ? "Nov" : "نوفمبر"}</option>
+              <option value="12">{en ? "Dec" : "ديسمبر"}</option>
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Driver" : "السائق"}</label>
             <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-64">

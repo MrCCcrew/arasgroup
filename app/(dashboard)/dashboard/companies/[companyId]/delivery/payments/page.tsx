@@ -42,8 +42,9 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
 
-  const year = sp.year ? Number.parseInt(sp.year, 10) : new Date().getFullYear();
-  const month = sp.month ? Number.parseInt(sp.month, 10) : undefined;
+  const now = new Date();
+  const year = sp.year ? Number.parseInt(sp.year, 10) : now.getFullYear();
+  const month = sp.month ? Number.parseInt(sp.month, 10) : now.getMonth() + 1;
 
   const where = {
     companyId,
@@ -106,7 +107,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
-              <select name="month" defaultValue={month ?? ""} className="input-field">
+              <select name="month" defaultValue={month} className="input-field">
                 <option value="">{locale === "en" ? "All months" : "كل الشهور"}</option>
                 {MONTHS[locale].map((monthName, index) => (
                   <option key={index + 1} value={index + 1}>
