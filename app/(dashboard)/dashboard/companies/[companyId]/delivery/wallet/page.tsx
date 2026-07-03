@@ -133,6 +133,8 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [summary, setSummary] = useState<{ driverId: string; type: string; amount: number }[]>([]);
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -153,9 +155,14 @@ export default function WalletPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const walletQuery = new URLSearchParams({
+      companyId,
+      ...(month ? { month } : {}),
+      ...(year ? { year } : {}),
+    });
     const [d, t, b] = await Promise.all([
       fetch(`/api/delivery/drivers?companyId=${companyId}`).then((r) => r.json()),
-      fetch(`/api/delivery/wallet?companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/delivery/wallet?${walletQuery}`).then((r) => r.json()).catch(() => ({ success: false })),
       fetch(`/api/accounting/bank-accounts?companyId=${companyId}`).then((r) => r.json()).catch(() => ({ success: false })),
     ]);
     if (d.success) setDrivers(d.data);
@@ -163,7 +170,7 @@ export default function WalletPage() {
     if (t.success && Array.isArray(t.data?.summary)) setSummary(t.data.summary);
     if (b.success && Array.isArray(b.data)) setBankAccounts(b.data);
     setLoading(false);
-  }, [companyId]);
+  }, [companyId, month, year]);
 
   async function reclassifyOldDeposits() {
     if (!reclassBank) return;
@@ -467,7 +474,32 @@ export default function WalletPage() {
             </div>
 
             <div className="section-card">
-              <h2 className="mb-4 text-base font-bold">{t.recentMovements}</h2>
+              <div className="mb-4 flex flex-wrap items-end gap-2">
+                <h2 className="flex-1 text-base font-bold">{t.recentMovements}</h2>
+                <div className="flex gap-2">
+                  <select value={year} onChange={(e) => setYear(e.target.value)} className="input-field w-28 text-sm">
+                    <option value="">{en ? "All" : "الكل"}</option>
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <select value={month} onChange={(e) => setMonth(e.target.value)} className="input-field w-28 text-sm">
+                    <option value="">{en ? "All" : "الكل"}</option>
+                    <option value="1">{en ? "Jan" : "يناير"}</option>
+                    <option value="2">{en ? "Feb" : "فبراير"}</option>
+                    <option value="3">{en ? "Mar" : "مارس"}</option>
+                    <option value="4">{en ? "Apr" : "أبريل"}</option>
+                    <option value="5">{en ? "May" : "مايو"}</option>
+                    <option value="6">{en ? "Jun" : "يونيو"}</option>
+                    <option value="7">{en ? "Jul" : "يوليو"}</option>
+                    <option value="8">{en ? "Aug" : "أغسطس"}</option>
+                    <option value="9">{en ? "Sep" : "سبتمبر"}</option>
+                    <option value="10">{en ? "Oct" : "أكتوبر"}</option>
+                    <option value="11">{en ? "Nov" : "نوفمبر"}</option>
+                    <option value="12">{en ? "Dec" : "ديسمبر"}</option>
+                  </select>
+                </div>
+              </div>
               <div className="space-y-2">
                 {transactions.length === 0 ? (
                   <p className="py-4 text-center text-sm text-muted-foreground">{t.noMovements}</p>

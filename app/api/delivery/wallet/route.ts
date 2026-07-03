@@ -23,20 +23,45 @@ export async function GET(request: NextRequest) {
     const driverId = searchParams.get("driverId");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const month = searchParams.get("month");
+    const year = searchParams.get("year");
     const companyId = searchParams.get("companyId");
+
+    // Build date filter
+    let dateFilter = {};
+    if (month && year) {
+      const monthNum = Number.parseInt(month, 10);
+      const yearNum = Number.parseInt(year, 10);
+      const start = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+      const end = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+      dateFilter = { date: { gte: start, lte: end } };
+    } else if (year) {
+      const yearNum = Number.parseInt(year, 10);
+      const start = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+      const end = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+      dateFilter = { date: { gte: start, lte: end } };
+    } else if (startDate && endDate) {
+      dateFilter = { date: { gte: new Date(startDate), lte: new Date(endDate) } };
+    }
 
     if (!driverId && companyId) {
       const [transactions, summary] = await Promise.all([
         prisma.driverWalletTransaction.findMany({
-          where: { driver: { employee: { companyId } } },
+          where: {
+            driver: { employee: { companyId } },
+            ...dateFilter,
+          },
           include: { driver: { include: { employee: { select: { nameAr: true } } } } },
           orderBy: { createdAt: "desc" },
-          take: 50,
+          take: 500,
         }),
         // مجاميع لكل سائق حسب نوع الحركة (للتوفيق: محصّل/مودَع/المتبقّي)
         prisma.driverWalletTransaction.groupBy({
           by: ["driverId", "type"],
-          where: { driver: { employee: { companyId } } },
+          where: {
+            driver: { employee: { companyId } },
+            ...dateFilter,
+          },
           _sum: { amount: true },
         }),
       ]);
