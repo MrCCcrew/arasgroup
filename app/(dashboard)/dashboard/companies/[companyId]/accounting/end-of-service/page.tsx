@@ -145,7 +145,7 @@ export default async function EndOfServicePage({ params }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  records.map((record) => {
+                  records.map((record: typeof records[number]) => {
                     const status = statusLabels[record.status as keyof typeof statusLabels] ?? statusLabels.CALCULATED;
                     const employeeName =
                       locale === "en"
