@@ -12,6 +12,17 @@ interface Props {
   searchParams: Promise<{ page?: string }>;
 }
 
+interface BankTransfer {
+  id: string;
+  transferDate: Date;
+  amount: unknown;
+  purposeAr: string;
+  purposeEn: string | null;
+  reference: string | null;
+  sourceBankAccount: { nameAr: string; bankName: string };
+  destinationBankAccount: { nameAr: string; bankName: string };
+}
+
 export default async function BankTransfersPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -114,7 +125,7 @@ export default async function BankTransfersPage({ params, searchParams }: Props)
                     </td>
                   </tr>
                 ) : (
-                  transfers.map((transfer) => (
+                  transfers.map((transfer: BankTransfer) => (
                     <tr key={transfer.id} className="hover:bg-muted/30">
                       <td className="text-sm">{formatDate(transfer.transferDate, numberLocale)}</td>
                       <td>
