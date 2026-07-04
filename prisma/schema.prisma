@@ -1527,6 +1527,17 @@ model DeliveryMonthlyReportLine {
   talabatImportId         String?
   talabatAllocationNotes  String?
 
+  // NEW: Carriage CSV extended fields
+  actualCompletedDeliveries Int?     // From "Total Completed Deliveries" (not calculated)
+  evaluatedHours            Decimal? @db.Decimal(10, 2)
+  achievementPayment        Decimal? @db.Decimal(12, 3)
+  operatorDeduction         Decimal? @db.Decimal(12, 3)
+  netCost                   Decimal? @db.Decimal(12, 3)
+
+  // Flags
+  hasOperatorDeduction      Boolean  @default(false)
+  operatorDeductionNotes    String?
+
   report DeliveryMonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   driver Driver                @relation(fields: [driverId], references: [id], onDelete: Restrict)
 
@@ -3297,6 +3308,7 @@ model TalabatReportImport {
   contract DeliveryContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
   createdBy User            @relation("TalabatImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   riders   TalabatReportImportRider[]
+  fleetItems TalabatReportFleetItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3329,6 +3341,56 @@ model TalabatReportImportRider {
   downgradedTotalPayment      Decimal @default(0) @db.Decimal(12, 3)
   matchingStatus          String  @default("UNMATCHED")
   matchedDriverId         String?
+
+  // ── NEW: Carriage CSV report fields (additive, backward compatible) ──────
+  reportType                  String?  @default("TALABAT_EXCEL") // TALABAT_EXCEL | CARRIAGE_CSV
+  legalName                   String?
+  vehicle                     String?
+
+  // Productivity metrics
+  evaluatedHours              Decimal? @db.Decimal(10, 2)
+  actualCompletedDeliveries   Int?
+  pickupsCount                Int?
+  pickupCancellations         Int?
+  dropoffsCount               Int?
+  dropoffCancellations        Int?
+
+  // Achievement & incentives
+  achievementPayment          Decimal? @db.Decimal(12, 3)
+  riderIncentives             Decimal? @db.Decimal(12, 3)
+  riderCompensation           Decimal? @db.Decimal(12, 3)
+  riderDeduction              Decimal? @db.Decimal(12, 3)
+  riderPositiveAdjustment     Decimal? @db.Decimal(12, 3)
+  riderNegativeAdjustment     Decimal? @db.Decimal(12, 3)
+
+  // Operator deduction (IMPORTANT: operational flag for shared accounts)
+  operatorDeduction           Decimal? @db.Decimal(12, 3)
+  hasOperatorDeduction        Boolean  @default(false)
+
+  // 3PL level
+  thirdPartyIncentives        Decimal? @db.Decimal(12, 3)
+  thirdPartyDeductions        Decimal? @db.Decimal(12, 3)
+  thirdPartyPositiveAdjustments Decimal? @db.Decimal(12, 3)
+  thirdPartyNegativeAdjustments Decimal? @db.Decimal(12, 3)
+
+  // Net cost (driver productivity before fleet deductions)
+  netCost                     Decimal? @db.Decimal(12, 3)
+
+  // Fleet-level deductions (usually 0 for individual riders, but may exist)
+  codDeficit                  Decimal? @db.Decimal(12, 3)
+  clawbackDeduction           Decimal? @db.Decimal(12, 3)
+  clawbackRefund              Decimal? @db.Decimal(12, 3)
+  inventoryDeduction          Decimal? @db.Decimal(12, 3)
+  inventoryClaim              Decimal? @db.Decimal(12, 3)
+  thirdPartyOtherDeductions   Decimal? @db.Decimal(12, 3)
+  contractFees                Decimal? @db.Decimal(12, 3)
+
+  // Net payment (final after all fleet deductions)
+  netPayment                  Decimal? @db.Decimal(12, 3)
+
+  // Flags
+  isSuspenseItem              Boolean  @default(false)
+  suspenseReason              String?
 
   import        TalabatReportImport       @relation(fields: [importId], references: [id], onDelete: Cascade)
   matchedDriver Driver?                   @relation("TalabatMatchedDriver", fields: [matchedDriverId], references: [id], onDelete: SetNull)
@@ -3365,4 +3427,28 @@ model TalabatReportAllocation {
   @@index([importRiderId])
   @@index([driverId])
   @@map("talabat_report_allocations")
+}
+
+model TalabatReportFleetItem {
+  id                      String  @id @default(cuid())
+  importId                String
+  type                    String  // FLEET_DEDUCTION | FLEET_ADJUSTMENT
+  description             String?
+  legalName               String?
+
+  // Fleet-level amounts
+  codDeficit              Decimal @default(0) @db.Decimal(12, 3)
+  inventoryDeduction      Decimal @default(0) @db.Decimal(12, 3)
+  contractFees            Decimal @default(0) @db.Decimal(12, 3)
+  thirdPartyOtherDeductions Decimal @default(0) @db.Decimal(12, 3)
+  clawbackDeduction       Decimal @default(0) @db.Decimal(12, 3)
+  clawbackRefund          Decimal @default(0) @db.Decimal(12, 3)
+  netPayment              Decimal @default(0) @db.Decimal(12, 3)
+
+  import TalabatReportImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([importId])
+  @@map("talabat_report_fleet_items")
 }

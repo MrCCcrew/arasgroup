@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import type { CarriageParseResult } from "./carriage-parser";
 
 export interface TalabatRiderRow {
   riderId: string;
@@ -314,4 +315,65 @@ export function parseTalabatExcel(buffer: Buffer): TalabatParseResult {
   }
 
   return { riders, contractSummary, totalRows, errors };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-DETECT: Unified parser for both Talabat Excel and Carriage CSV
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type DeliveryReportParseResult = TalabatParseResult | CarriageParseResult;
+
+export async function parseDeliveryReport(
+  buffer: Buffer,
+  fileName: string
+): Promise<DeliveryReportParseResult> {
+  const lowerName = fileName.toLowerCase();
+
+  // ── Strategy 1: File extension detection ────────────────────────────────
+  if (lowerName.endsWith(".csv")) {
+    // CSV → Carriage format
+    const { parseCarriageCSV } = await import("./carriage-parser");
+    return parseCarriageCSV(buffer);
+  }
+
+  if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+    // XLSX → Check sheet structure to distinguish old vs new
+    let workbook: XLSX.WorkBook;
+    try {
+      workbook = XLSX.read(buffer, { type: "buffer" });
+    } catch {
+      return {
+        riders: [],
+        contractSummary: null,
+        totalRows: 0,
+        errors: [
+          "ملف غير صالح أو تالف / Invalid or corrupted file",
+        ],
+      };
+    }
+
+    const sheetNames = workbook.SheetNames.map((n) => n.trim().toLowerCase());
+
+    // ── Strategy 2: Sheet name detection ──────────────────────────────────
+    // Old Talabat format has a sheet named "Data"
+    if (sheetNames.includes("data")) {
+      return parseTalabatExcel(buffer);
+    }
+
+    // Future: if Carriage also uses XLSX with different sheet names
+    // Add detection logic here
+
+    // Default: try Talabat parser (for backward compatibility)
+    return parseTalabatExcel(buffer);
+  }
+
+  // Unsupported format
+  return {
+    riders: [],
+    contractSummary: null,
+    totalRows: 0,
+    errors: [
+      "صيغة الملف غير مدعومة. يُسمح فقط بملفات .xlsx أو .csv / Unsupported file format. Only .xlsx or .csv files are supported.",
+    ],
+  };
 }
