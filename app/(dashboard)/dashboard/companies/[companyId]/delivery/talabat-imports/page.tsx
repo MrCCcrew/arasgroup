@@ -266,11 +266,11 @@ export default function TalabatImportsPage() {
               </div>
 
               <div>
-                <label className="form-label">ملف Excel (.xlsx) <span className="text-red-500">*</span></label>
+                <label className="form-label">ملف (.xlsx .csv) <span className="text-red-500">*</span></label>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".xlsx"
+                  accept=".xlsx,.csv"
                   className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border file:px-3 file:py-1.5 file:text-xs file:font-medium file:bg-orange-50 file:text-orange-700 file:border-orange-200 hover:file:bg-orange-100"
                 />
               </div>
