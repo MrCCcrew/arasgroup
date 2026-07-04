@@ -40,6 +40,29 @@ interface Rider {
   matchedDriverId: string | null;
   matchedDriver: { employee: { nameAr: string; nameEn: string | null } } | null;
   allocations: Allocation[];
+  // Carriage CSV fields
+  reportType?: string;
+  actualCompletedDeliveries?: number;
+  evaluatedHours?: string;
+  achievementPayment?: string;
+  operatorDeduction?: string;
+  hasOperatorDeduction?: boolean;
+  netCost?: string;
+  isSuspenseItem?: boolean;
+  suspenseReason?: string;
+}
+
+interface FleetItem {
+  id: string;
+  type: string;
+  description: string | null;
+  codDeficit: string;
+  inventoryDeduction: string;
+  contractFees: string;
+  thirdPartyOtherDeductions: string;
+  clawbackDeduction: string;
+  clawbackRefund: string;
+  netPayment: string;
 }
 
 interface TalabatImport {
@@ -61,6 +84,7 @@ interface TalabatImport {
   contract: { nameAr: string; nameEn: string | null } | null;
   createdBy: { nameAr: string };
   riders: Rider[];
+  fleetItems?: FleetItem[];
 }
 
 const MONTHS_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -376,6 +400,136 @@ export default function TalabatImportDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Operator Deduction Alerts */}
+        {(() => {
+          const operatorCases = imp.riders.filter(r => r.hasOperatorDeduction && Number(r.operatorDeduction || 0) !== 0);
+          if (operatorCases.length === 0) return null;
+          return (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-orange-800">
+                <AlertTriangle size={18} />
+                ⚠️ تحذير: Operator Deduction
+              </h3>
+              <p className="mb-3 text-sm text-orange-700">
+                السائقون التالية لديهم <strong>Operator Deduction</strong> - قد تكون حساباتهم في Talabat مستخدمة بواسطة سائقين آخرين:
+              </p>
+              <div className="space-y-2">
+                {operatorCases.map(r => (
+                  <div key={r.id} className="flex items-center justify-between rounded-lg border border-orange-300 bg-white px-4 py-2.5">
+                    <div>
+                      <span className="font-medium text-orange-900">{r.talabatRiderName}</span>
+                      <span className="mr-2 font-mono text-sm text-orange-600">({r.talabatRiderId})</span>
+                    </div>
+                    <div className="text-sm font-bold text-red-600 number">
+                      {fmt3(r.operatorDeduction || 0)} د.ك
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-orange-600">
+                💡 تحقق من أن السائق الداخلي المربوط هو من قام فعلياً بالعمل، وليس صاحب الحساب الأصلي.
+              </p>
+            </div>
+          );
+        })()}
+
+        {/* Fleet Items Section */}
+        {imp.fleetItems && imp.fleetItems.length > 0 && (
+          <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-purple-800">
+              <AlertTriangle size={18} />
+              💰 خصومات الشركة (Fleet-Level Deductions)
+            </h3>
+            <p className="mb-3 text-sm text-purple-700">
+              هذه خصومات عامة على الشركة <strong>وليست مرتبطة بسائق محدد</strong>:
+            </p>
+            <div className="overflow-hidden rounded-lg border border-purple-300 bg-white">
+              <table className="ar-table text-sm">
+                <thead>
+                  <tr>
+                    <th>النوع</th>
+                    <th>COD Deficit</th>
+                    <th>Inventory</th>
+                    <th>Contract Fees</th>
+                    <th>3PL Other</th>
+                    <th>Clawback</th>
+                    <th>صافي الدفع</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {imp.fleetItems.map((f, i) => (
+                    <tr key={f.id || i}>
+                      <td className="text-xs">{f.description || f.type}</td>
+                      <td className="number text-red-600 font-bold">{fmt3(f.codDeficit)}</td>
+                      <td className="number text-red-600 font-bold">{fmt3(f.inventoryDeduction)}</td>
+                      <td className="number text-red-600 font-bold">{fmt3(f.contractFees)}</td>
+                      <td className="number">{fmt3(f.thirdPartyOtherDeductions)}</td>
+                      <td className="number">
+                        {Number(f.clawbackDeduction) !== 0 && <span className="text-red-600">{fmt3(f.clawbackDeduction)}</span>}
+                        {Number(f.clawbackRefund) !== 0 && <span className="text-green-600">{fmt3(f.clawbackRefund)}</span>}
+                      </td>
+                      <td className="number font-bold text-purple-700">{fmt3(f.netPayment)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-purple-100 font-bold">
+                    <td>الإجمالي</td>
+                    <td className="number text-red-700">{fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.codDeficit), 0))}</td>
+                    <td className="number text-red-700">{fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.inventoryDeduction), 0))}</td>
+                    <td className="number text-red-700">{fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.contractFees), 0))}</td>
+                    <td className="number">{fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.thirdPartyOtherDeductions), 0))}</td>
+                    <td className="number">
+                      {fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.clawbackDeduction) + Number(f.clawbackRefund), 0))}
+                    </td>
+                    <td className="number text-purple-800">{fmt3(imp.fleetItems.reduce((s, f) => s + Number(f.netPayment), 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-purple-600">
+              ℹ️ هذه المبالغ <strong>لا تدخل في حساب رواتب السائقين</strong> - هي تسوية مالية بين الشركة و Talabat فقط.
+            </p>
+          </div>
+        )}
+
+        {/* Suspense Items */}
+        {(() => {
+          const suspenseItems = imp.riders.filter(r => r.isSuspenseItem);
+          if (suspenseItems.length === 0) return null;
+          return (
+            <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-yellow-800">
+                <AlertTriangle size={18} />
+                🔍 عناصر معلقة للمراجعة (Suspense Items)
+              </h3>
+              <p className="mb-3 text-sm text-yellow-700">
+                صفوف بدون <strong>Rider ID</strong> أو <strong>Rider Name</strong> - تحتاج مراجعة يدوية:
+              </p>
+              <div className="space-y-2">
+                {suspenseItems.map(r => (
+                  <div key={r.id} className="rounded-lg border border-yellow-300 bg-white p-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-yellow-900">
+                          {r.talabatRiderId !== "UNKNOWN" ? `Rider ID: ${r.talabatRiderId}` : ""}
+                          {r.talabatRiderId !== "UNKNOWN" && r.talabatRiderName !== "UNKNOWN" && " - "}
+                          {r.talabatRiderName !== "UNKNOWN" ? r.talabatRiderName : ""}
+                        </p>
+                        <p className="mt-1 text-xs text-yellow-600">{r.suspenseReason}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-yellow-800 number">{fmt3(r.totalPayment || 0)} د.ك</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-yellow-600">
+                ⚠️ هذه العناصر <strong>لن تُرحّل</strong> حتى يتم تحديد السائق الصحيح.
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Allocation Modal */}

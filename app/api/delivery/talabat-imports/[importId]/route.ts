@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   if (session instanceof NextResponse) return session;
 
   const { importId } = await params;
-  const imp = await prisma.talabatReportImport.findUnique({
+  const imp = await (prisma as any).talabatReportImport.findUnique({
     where: { id: importId },
     include: {
       contract: { select: { nameAr: true, nameEn: true } },
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
         },
         orderBy: { talabatRiderName: "asc" },
       },
+      fleetItems: true,
     },
   });
 
