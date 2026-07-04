@@ -103,8 +103,8 @@ export default async function JournalEntryDetailPage({ params }: Props) {
     unbalanced: (d: string) => (en ? `Entry is unbalanced — difference: ${d}` : `القيد غير متوازن - الفرق: ${d}`),
   };
 
-  const totalDebit = entry.lines.reduce((sum, line) => sum + Number(line.debit), 0);
-  const totalCredit = entry.lines.reduce((sum, line) => sum + Number(line.credit), 0);
+  const totalDebit = entry.lines.reduce((sum: number, line) => sum + Number(line.debit), 0);
+  const totalCredit = entry.lines.reduce((sum: number, line) => sum + Number(line.credit), 0);
 
   const canUpdate = hasPermission(session, "ACCOUNTING", "UPDATE", { companyId });
   const canApprove = hasPermission(session, "ACCOUNTING", "APPROVE", { companyId });
