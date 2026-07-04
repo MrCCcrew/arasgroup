@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { redirect } from "next/navigation";
-import type { JournalStatus } from "@prisma/client";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -84,7 +83,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
   const where = {
     companyId,
     isDeleted: false,
-    ...(statusFilter ? { status: statusFilter as JournalStatus } : {}),
+    ...(statusFilter ? { status: statusFilter as any } : {}),
   };
 
   const [total, entries, unpostedCount] = await Promise.all([
