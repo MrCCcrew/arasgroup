@@ -339,8 +339,48 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
       continue;
     }
 
-    // ── Case 2: Rider ID exists but NO Rider Name (or vice versa) → Suspense ──
+    // ── Case 2: Rider ID exists but NO Rider Name (or vice versa) ──
     if (!riderId || !riderName) {
+      const codDeficit = parseNumber(row["COD Deficit"]);
+      const inventoryDeduction = parseNumber(row["Inventory Deduction"]);
+      const contractFees = parseNumber(row["Contract fees"]);
+      const thirdPartyOtherDeductions = parseNumber(row["3PL Other Deductions"]);
+      const clawbackDeduction = parseNumber(row["Clawback Deduction"]);
+      const clawbackRefund = parseNumber(row["Clawback Refund"]);
+      const netPayment = parseNumber(row["Net Payment"]);
+      const netCost = parseNumber(row["Net Cost"]);
+      const completedDeliveries = parseNumber(row["Total Completed Deliveries"]);
+      const pickupPayment = parseNumber(row["Pickup Payment"]);
+      const dropoffPayment = parseNumber(row["Dropoff Payment"]);
+
+      // Check if this is a Fleet-level row (has fleet deductions but NO productivity)
+      const hasFleetDeductions = codDeficit !== 0 || inventoryDeduction !== 0 || contractFees !== 0 ||
+                                  thirdPartyOtherDeductions !== 0 || clawbackDeduction !== 0 || clawbackRefund !== 0;
+      const hasProductivity = completedDeliveries !== 0 || pickupPayment !== 0 || dropoffPayment !== 0;
+
+      if (hasFleetDeductions && !hasProductivity) {
+        // This is a Fleet-level deduction row (not a rider)
+        const legalName = parseString(row["3PL Legal Name"]);
+        fleetRows.push({
+          type: "FLEET_DEDUCTION",
+          description: riderId ? `Fleet deduction (ID: ${riderId})` : (riderName || legalName || "Fleet deduction"),
+          codDeficit,
+          inventoryDeduction,
+          contractFees,
+          thirdPartyOtherDeductions,
+          clawbackDeduction,
+          clawbackRefund,
+          netPayment,
+          rawRow: row,
+        });
+
+        warnings.push(
+          `صف Fleet-level: ${riderId || riderName || legalName} - خصومات الشركة: ${netPayment.toFixed(3)} د.ك / Fleet-level row: deductions = ${netPayment.toFixed(3)} KWD`
+        );
+        continue;
+      }
+
+      // Otherwise, it's a Suspense item (partial data that needs review)
       const reason = !riderId
         ? "Rider ID فارغ / Missing Rider ID"
         : "Rider Name فارغ / Missing Rider Name";
@@ -349,16 +389,16 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
         riderId: riderId || undefined,
         riderName: riderName || undefined,
         reason,
-        inventoryDeduction: parseNumber(row["Inventory Deduction"]),
-        codDeficit: parseNumber(row["COD Deficit"]),
-        contractFees: parseNumber(row["Contract fees"]),
-        netCost: parseNumber(row["Net Cost"]),
-        netPayment: parseNumber(row["Net Payment"]),
+        inventoryDeduction,
+        codDeficit,
+        contractFees,
+        netCost,
+        netPayment,
         rawRow: row,
       });
 
       warnings.push(
-        `${reason}: ${riderId || riderName} - صافي الدفع: ${parseNumber(row["Net Payment"])} د.ك / ${reason}: ${riderId || riderName} - Net Payment: ${parseNumber(row["Net Payment"])} KWD`
+        `${reason}: ${riderId || riderName} - صافي الدفع: ${netPayment} د.ك / ${reason}: ${riderId || riderName} - Net Payment: ${netPayment} KWD`
       );
       continue;
     }
