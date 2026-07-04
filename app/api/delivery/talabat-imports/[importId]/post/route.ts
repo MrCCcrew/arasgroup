@@ -47,28 +47,61 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }
   }
 
-  // Build driver allocations map: driverId → { orders, pickupPay, dropoffPay, payment, notes }
+  // Build driver allocations map: driverId → { orders, pickupPay, dropoffPay, payment, notes, ... }
   const driverAllocs = new Map<string, {
     orders: number; pickupPay: number; dropoffPay: number;
     payment: number; notes: string[]; riderId: string; riderName: string;
+    // NEW: Carriage fields
+    actualCompletedDeliveries?: number;
+    evaluatedHours?: number;
+    achievementPayment?: number;
+    operatorDeduction?: number;
+    netCost?: number;
+    hasOperatorDeduction?: boolean;
   }>();
 
   for (const rider of imp.riders) {
+    const isCarriage = (rider as any).reportType === "CARRIAGE_CSV";
     const riderOrders = Number(rider.calculatedOrdersRounded);
     const riderPickup = Number(rider.totalPickupPay);
     const riderDropoff = Number(rider.totalDropoffPay);
     const riderPayment = Number(rider.totalPayment);
+
+    // Carriage-specific fields
+    const riderActualOrders = isCarriage ? Number((rider as any).actualCompletedDeliveries || 0) : 0;
+    const riderEvaluatedHours = isCarriage ? Number((rider as any).evaluatedHours || 0) : 0;
+    const riderAchievement = isCarriage ? Number((rider as any).achievementPayment || 0) : 0;
+    const riderOperatorDeduction = isCarriage ? Number((rider as any).operatorDeduction || 0) : 0;
+    const riderNetCost = isCarriage ? Number((rider as any).netCost || 0) : 0;
+    const hasOperatorDed = isCarriage ? Boolean((rider as any).hasOperatorDeduction) : false;
 
     for (const alloc of rider.allocations) {
       const share = riderOrders > 0 ? Number(alloc.allocatedOrders) / riderOrders : 0;
       const existing = driverAllocs.get(alloc.driverId) ?? {
         orders: 0, pickupPay: 0, dropoffPay: 0, payment: 0,
         notes: [], riderId: rider.talabatRiderId, riderName: rider.talabatRiderName,
+        actualCompletedDeliveries: 0,
+        evaluatedHours: 0,
+        achievementPayment: 0,
+        operatorDeduction: 0,
+        netCost: 0,
+        hasOperatorDeduction: false,
       };
       existing.orders += Number(alloc.allocatedOrders);
       existing.pickupPay += riderPickup * share;
       existing.dropoffPay += riderDropoff * share;
       existing.payment += riderPayment * share;
+
+      // Carriage fields
+      if (isCarriage) {
+        existing.actualCompletedDeliveries = (existing.actualCompletedDeliveries || 0) + (riderActualOrders * share);
+        existing.evaluatedHours = (existing.evaluatedHours || 0) + (riderEvaluatedHours * share);
+        existing.achievementPayment = (existing.achievementPayment || 0) + (riderAchievement * share);
+        existing.operatorDeduction = (existing.operatorDeduction || 0) + (riderOperatorDeduction * share);
+        existing.netCost = (existing.netCost || 0) + (riderNetCost * share);
+        existing.hasOperatorDeduction = existing.hasOperatorDeduction || hasOperatorDed;
+      }
+
       if (alloc.notes) existing.notes.push(alloc.notes);
       driverAllocs.set(alloc.driverId, existing);
     }
@@ -131,35 +164,48 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         (l) => l.driverId === driverId && !l.talabatImportId
       );
 
+      // Build common data (both old and new format)
+      const commonData: any = {
+        ordersCount: Math.round(alloc.orders),
+        talabatCalculatedOrders: alloc.orders,
+        talabatPickupPay: alloc.pickupPay,
+        talabatDropoffPay: alloc.dropoffPay,
+        talabatTotalPayment: alloc.payment,
+        talabatImportId: importId,
+        talabatAllocationNotes: alloc.notes.join("; ") || null,
+      };
+
+      // Add Carriage-specific fields if present
+      if (alloc.actualCompletedDeliveries !== undefined && alloc.actualCompletedDeliveries > 0) {
+        commonData.actualCompletedDeliveries = Math.round(alloc.actualCompletedDeliveries);
+        commonData.evaluatedHours = alloc.evaluatedHours || 0;
+        commonData.achievementPayment = alloc.achievementPayment || 0;
+        commonData.operatorDeduction = alloc.operatorDeduction || 0;
+        commonData.netCost = alloc.netCost || 0;
+        commonData.hasOperatorDeduction = alloc.hasOperatorDeduction || false;
+
+        // Add warning note if operator deduction exists
+        if (alloc.hasOperatorDeduction) {
+          const opWarning = `تحذير: Operator Deduction = ${(alloc.operatorDeduction || 0).toFixed(3)} د.ك - قد يكون الحساب مستخدم من سائق آخر`;
+          commonData.operatorDeductionNotes = opWarning;
+        }
+      }
+
       if (existing) {
         await tx.deliveryMonthlyReportLine.update({
           where: { id: existing.id },
-          data: {
-            ordersCount: Math.round(alloc.orders),
-            talabatCalculatedOrders: alloc.orders,
-            talabatPickupPay: alloc.pickupPay,
-            talabatDropoffPay: alloc.dropoffPay,
-            talabatTotalPayment: alloc.payment,
-            talabatImportId: importId,
-            talabatAllocationNotes: alloc.notes.join("; ") || null,
-          },
+          data: commonData,
         });
       } else {
         await tx.deliveryMonthlyReportLine.create({
           data: {
             reportId,
             driverId,
-            ordersCount: Math.round(alloc.orders),
             ratePerOrder: 0,
             grossAmount: 0,
             walletDeducted: 0,
             netAmount: 0,
-            talabatCalculatedOrders: alloc.orders,
-            talabatPickupPay: alloc.pickupPay,
-            talabatDropoffPay: alloc.dropoffPay,
-            talabatTotalPayment: alloc.payment,
-            talabatImportId: importId,
-            talabatAllocationNotes: alloc.notes.join("; ") || null,
+            ...commonData,
           },
         });
       }
