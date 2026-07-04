@@ -195,8 +195,9 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
   }
   monthlyBalances.reverse(); // Most recent first
 
-  // Current month balance (from driver.walletBalance)
-  const currentBalance = Number(driver.walletBalance);
+  // Get balance for the filtered month
+  const filteredMonthKey = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+  const filteredMonthBalance = monthMap.get(filteredMonthKey) ?? 0;
 
   return (
     <div>
@@ -411,7 +412,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                 {locale === "en" ? "Monthly Balances" : "الأرصدة الشهرية"}
               </h3>
               <div className="flex flex-wrap gap-3">
-                {/* Current month */}
+                {/* Filtered month */}
                 <div className="flex-1 min-w-[150px] rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                   <p className="text-xs text-emerald-700">
                     {months[monthNum - 1]} {yearNum}
@@ -419,8 +420,8 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                       <> {locale === "en" ? "(Current)" : "(الحالي)"}</>
                     )}
                   </p>
-                  <p className={`mt-1 text-lg font-bold number ${currentBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {formatKWD(currentBalance, numberLocale)}
+                  <p className={`mt-1 text-lg font-bold number ${filteredMonthBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {formatKWD(filteredMonthBalance, numberLocale)}
                   </p>
                 </div>
 
