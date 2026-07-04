@@ -235,7 +235,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {entry.lines.map((line, index) => (
+                {entry.lines.map((line: typeof entry.lines[number], index: number) => (
                   <tr key={line.id}>
                     <td className="text-xs text-muted-foreground">{index + 1}</td>
                     <td className="font-mono text-xs">{line.account.code}</td>
