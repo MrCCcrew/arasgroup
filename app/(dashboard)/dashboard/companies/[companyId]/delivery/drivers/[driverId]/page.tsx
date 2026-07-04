@@ -12,6 +12,7 @@ import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string; driverId: string }>;
+  searchParams: Promise<{ month?: string; year?: string }>;
 }
 
 const WALLET_TX_LABELS = {
@@ -31,13 +32,27 @@ const WALLET_TX_LABELS = {
   },
 } as const;
 
-export default async function DriverDetailPage({ params }: Props) {
+export default async function DriverDetailPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { companyId, driverId } = await params;
+  const sp = await searchParams;
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+
+  // Default to current month/year
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1);
+  const currentYear = String(now.getFullYear());
+  const effectiveMonth = sp.month ?? currentMonth;
+  const effectiveYear = sp.year ?? currentYear;
+
+  // Calculate date range for current selected month
+  const monthNum = Number.parseInt(effectiveMonth, 10);
+  const yearNum = Number.parseInt(effectiveYear, 10);
+  const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
 
   const driver = await prisma.driver.findUnique({
     where: { id: driverId },
@@ -72,8 +87,10 @@ export default async function DriverDetailPage({ params }: Props) {
         },
       },
       walletTransactions: {
+        where: {
+          date: { gte: startDate, lte: endDate },
+        },
         orderBy: { date: "desc" },
-        take: 20,
       },
       dailyOrders: {
         orderBy: { date: "desc" },
@@ -135,6 +152,51 @@ export default async function DriverDetailPage({ params }: Props) {
   };
 
   const driverName = locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr;
+
+  // ── Monthly Balances (previous months) ────────────────────────────────────
+  // Get all wallet transactions to calculate monthly balances
+  const allTransactions = await prisma.driverWalletTransaction.findMany({
+    where: { driverId },
+    orderBy: { date: "asc" },
+    select: { date: true, type: true, amount: true },
+  });
+
+  // Group by month and calculate running balance
+  type MonthlyBalance = { month: number; year: number; balance: number; label: string };
+  const monthlyBalances: MonthlyBalance[] = [];
+  const monthMap = new Map<string, number>(); // "YYYY-MM" → balance
+
+  let runningBalance = 0;
+  for (const tx of allTransactions) {
+    const amount = Number(tx.amount);
+    // CHARGE & DEPOSIT increase balance (amounts owed to company)
+    // Other types decrease balance (payments/settlements)
+    if (tx.type === "CHARGE" || tx.type === "DEPOSIT") {
+      runningBalance += amount;
+    } else {
+      runningBalance -= amount;
+    }
+
+    const txDate = new Date(tx.date);
+    const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+    monthMap.set(monthKey, runningBalance);
+  }
+
+  // Convert to array and sort (most recent first)
+  const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  for (const [monthKey, balance] of monthMap.entries()) {
+    const [year, month] = monthKey.split('-').map(Number);
+    monthlyBalances.push({
+      month,
+      year,
+      balance,
+      label: `${months[month - 1]} ${year}`,
+    });
+  }
+  monthlyBalances.reverse(); // Most recent first
+
+  // Current month balance (from driver.walletBalance)
+  const currentBalance = Number(driver.walletBalance);
 
   return (
     <div>
@@ -310,6 +372,66 @@ export default async function DriverDetailPage({ params }: Props) {
               </Link>
             </div>
           </div>
+
+          {/* Month/Year Filter */}
+          <form method="GET" className="mb-4 flex items-end gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{locale === "en" ? "Year" : "السنة"}</label>
+              <select name="year" defaultValue={effectiveYear} className="input-field w-28">
+                {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i).map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{locale === "en" ? "Month" : "الشهر"}</label>
+              <select name="month" defaultValue={effectiveMonth} className="input-field w-28">
+                {months.map((m, i) => (
+                  <option key={i + 1} value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              {locale === "en" ? "Filter" : "تصفية"}
+            </button>
+            {(sp.month || sp.year) && (
+              <Link
+                href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}`}
+                className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+              >
+                {locale === "en" ? "Clear" : "مسح"}
+              </Link>
+            )}
+          </form>
+
+          {/* Monthly Balances */}
+          {monthlyBalances.length > 0 && (
+            <div className="mb-4 rounded-xl border bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+              <h3 className="mb-3 text-sm font-bold text-blue-900">
+                {locale === "en" ? "Monthly Balances" : "الأرصدة الشهرية"}
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {/* Current month */}
+                <div className="flex-1 min-w-[150px] rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-xs text-emerald-700">{months[monthNum - 1]} {yearNum} {locale === "en" ? "(Current)" : "(الحالي)"}</p>
+                  <p className={`mt-1 text-lg font-bold number ${currentBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {formatKWD(currentBalance, numberLocale)}
+                  </p>
+                </div>
+
+                {/* Previous months (show last 5) */}
+                {monthlyBalances.filter(mb => !(mb.month === monthNum && mb.year === yearNum)).slice(0, 5).map((mb, i) => (
+                  <div key={i} className="flex-1 min-w-[150px] rounded-lg border border-blue-200 bg-white px-3 py-2">
+                    <p className="text-xs text-blue-700">{mb.label}</p>
+                    <p className={`mt-1 text-base font-bold number ${mb.balance > 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                      {formatKWD(mb.balance, numberLocale)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <table className="ar-table">
               <thead>
