@@ -127,10 +127,11 @@ export async function POST(request: NextRequest) {
 
     if (isCarriageCSV) {
       // Carriage CSV totals
-      totalPickup = parsed.totals.pickupPayment;
-      totalDropoff = parsed.totals.dropoffPayment;
-      totalCalc = parsed.totals.completedDeliveries; // Actual deliveries, not calculated
-      totalPayment = parsed.totals.netPayment;
+      const carriageParsed = parsed as any;
+      totalPickup = carriageParsed.totals.pickupPayment;
+      totalDropoff = carriageParsed.totals.dropoffPayment;
+      totalCalc = carriageParsed.totals.completedDeliveries; // Actual deliveries, not calculated
+      totalPayment = carriageParsed.totals.netPayment;
     } else {
       // Talabat Excel totals (old logic)
       totalPickup = parsed.riders.reduce((s: number, r: any) => s + r.totalPickupPay, 0);
@@ -243,7 +244,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Build fleet items data (only for Carriage)
-    const fleetItemsData = isCarriageCSV && parsed.fleetRows ? parsed.fleetRows.map((f: any) => ({
+    const carriageParsed = parsed as any;
+    const fleetItemsData = isCarriageCSV && carriageParsed.fleetRows ? carriageParsed.fleetRows.map((f: any) => ({
       type: f.type,
       description: f.description,
       legalName: f.description,
@@ -257,7 +259,7 @@ export async function POST(request: NextRequest) {
     })) : [];
 
     // Build suspense riders data (only for Carriage)
-    const suspenseRidersData = isCarriageCSV && parsed.suspenseRows ? parsed.suspenseRows.map((s: any) => ({
+    const suspenseRidersData = isCarriageCSV && carriageParsed.suspenseRows ? carriageParsed.suspenseRows.map((s: any) => ({
       talabatRiderId: s.riderId || "UNKNOWN",
       talabatRiderName: s.riderName || "UNKNOWN",
       reportType: "CARRIAGE_CSV",
@@ -290,13 +292,13 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         status: "DRAFT",
         orderRoundingMode,
-        totalRows: isCarriageCSV ? parsed.totalDataRows : parsed.totalRows,
+        totalRows: isCarriageCSV ? (parsed as any).totalDataRows : (parsed as any).totalRows,
         totalRiders: parsed.riders.length,
         totalPickupPay: totalPickup,
         totalDropoffPay: totalDropoff,
         totalCalculatedOrders: totalCalc,
         totalPayment,
-        contractSummaryFinalPayment: isCarriageCSV ? undefined : (parsed.contractSummary?.finalPayment ?? undefined),
+        contractSummaryFinalPayment: isCarriageCSV ? undefined : ((parsed as any).contractSummary?.finalPayment ?? undefined),
         createdById: session.id,
         riders: {
           create: allRidersData,
@@ -326,8 +328,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const warnings = parsed.warnings && parsed.warnings.length > 0 ? parsed.warnings :
-                     (parsed.errors && parsed.errors.length > 0 ? parsed.errors : undefined);
+    const parsedAny = parsed as any;
+    const warnings = parsedAny.warnings && parsedAny.warnings.length > 0 ? parsedAny.warnings :
+                     (parsedAny.errors && parsedAny.errors.length > 0 ? parsedAny.errors : undefined);
     return NextResponse.json({ success: true, data: importRecord, warnings }, { status: 201 });
 
   } catch (error) {
