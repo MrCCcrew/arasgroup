@@ -43,6 +43,8 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
           totalExpenses: true,
           netRevenue: true,
           date: true,
+          revenues: { select: { date: true } },
+          expenses: { select: { date: true } },
         },
       },
     },
@@ -57,7 +59,18 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
     const totalExpenses = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalExpenses), 0);
     const netRevenue = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.netRevenue), 0);
     const grossRevenue = totalCash + totalKnet;
-    const operationDays = vehicle.operations.length;
+
+    // Count unique dates from all revenues and expenses
+    const uniqueDates = new Set<string>();
+    for (const operation of vehicle.operations) {
+      for (const revenue of operation.revenues) {
+        uniqueDates.add(new Date(revenue.date).toISOString().split('T')[0]);
+      }
+      for (const expense of operation.expenses) {
+        uniqueDates.add(new Date(expense.date).toISOString().split('T')[0]);
+      }
+    }
+    const operationDays = uniqueDates.size;
     const avgDaily = operationDays > 0 ? netRevenue / operationDays : 0;
 
     return {
