@@ -224,6 +224,21 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     : driverRows.filter((driver: DriverRowItem) => allDriverIds.includes(driver.id));
   const totalWalletBalance = statsDriverRows.reduce((sum: number, driver: DriverRowItem) => sum + Number(driver.walletBalance), 0);
 
+  // Build invoice date filter matching the orders filter
+  let invoiceDateFilter = {};
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
+  }
+
   const totalInvoicesAmount =
     statsDriverRows.length > 0
       ? await prisma.deliveryInvoice.aggregate({
@@ -231,6 +246,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             targetType: "DRIVER",
             driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
             deletedAt: null,
+            ...invoiceDateFilter,
           },
           _sum: { amount: true },
         })
