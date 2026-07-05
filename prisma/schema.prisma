@@ -1755,7 +1755,7 @@ model CarWashRevenue {
   type        RevenueType
   amount      Decimal     @db.Decimal(18, 3)
   description String?
-  date        DateTime?   // Temporary optional, will be required after migration
+  date        DateTime
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
@@ -1777,7 +1777,7 @@ model CarWashExpense {
   categoryId  String?
   amount      Decimal @db.Decimal(18, 3)
   description String
-  date        DateTime?   // Temporary optional, will be required after migration
+  date        DateTime
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 

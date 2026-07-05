@@ -13,12 +13,14 @@ const revenueSchema = z.object({
   type: z.enum(["CASH", "KNET"]),
   amount: z.number().min(0),
   description: z.string().optional(),
+  date: z.string().transform((s) => new Date(s)),
 });
 
 const expenseSchema = z.object({
   categoryId: z.string().optional(),
   amount: z.number().min(0),
   description: z.string(),
+  date: z.string().transform((s) => new Date(s)),
 });
 
 const createOperationSchema = z.object({
@@ -126,23 +128,23 @@ export async function POST(request: NextRequest) {
           netRevenue,
           notes: data.notes,
           revenues: {
-            create: data.revenues.map((r) => ({ type: r.type, amount: r.amount, description: r.description })),
+            create: data.revenues.map((r) => ({ type: r.type, amount: r.amount, description: r.description, date: r.date })),
           },
           expenses: {
-            create: data.expenses.map((e) => ({ categoryId: e.categoryId, amount: e.amount, description: e.description })),
+            create: data.expenses.map((e) => ({ categoryId: e.categoryId, amount: e.amount, description: e.description, date: e.date })),
           },
         },
         include: { revenues: true, expenses: true },
       });
 
-      // Create KNET transactions for KNET revenues
+      // Create KNET transactions for KNET revenues (using their actual dates)
       const knetRevenues = data.revenues.filter((r) => r.type === "KNET");
       for (const kr of knetRevenues) {
         await tx.knetTransaction.create({
           data: {
             operationId: op.id,
             amount: kr.amount,
-            date: data.date,
+            date: kr.date,
             isSettled: false,
           },
         });
@@ -150,21 +152,45 @@ export async function POST(request: NextRequest) {
 
       let primaryJournalEntryId: string | undefined;
 
-      // Auto revenue journal entry
-      if (totalCash > 0 || totalKnet > 0) {
-        const je = await createCarWashDailyJE({
-          companyId: data.companyId,
-          userId,
-          vehicleId: data.vehicleId,
-          costCenterId: validatedCostCenterId,
-          cashAmount: totalCash,
-          knetAmount: totalKnet,
-          date: data.date,
-          refId: op.id,
-        });
-
-        primaryJournalEntryId = je.id;
+      // Group revenues by date and create separate journal entries
+      const revenuesByDate = new Map<string, { cash: number; knet: number }>();
+      for (const rev of data.revenues) {
+        const dateKey = rev.date.toISOString().split('T')[0];
+        const existing = revenuesByDate.get(dateKey) ?? { cash: 0, knet: 0 };
+        if (rev.type === 'CASH') {
+          existing.cash += rev.amount;
+        } else {
+          existing.knet += rev.amount;
+        }
+        revenuesByDate.set(dateKey, existing);
       }
+
+      for (const [dateStr, amounts] of revenuesByDate.entries()) {
+        if (amounts.cash > 0 || amounts.knet > 0) {
+          const je = await createCarWashDailyJE({
+            companyId: data.companyId,
+            userId,
+            vehicleId: data.vehicleId,
+            costCenterId: validatedCostCenterId,
+            cashAmount: amounts.cash,
+            knetAmount: amounts.knet,
+            date: new Date(dateStr),
+            refId: op.id,
+          });
+
+          primaryJournalEntryId ??= je.id;
+        }
+      }
+
+      // Group expenses by date and category for separate journal entries
+      type ExpenseGroupKey = string; // "date|categoryId"
+      const expenseGroups = new Map<ExpenseGroupKey, {
+        categoryId: string;
+        date: Date;
+        totalAmount: number;
+        descriptions: string[];
+        expenseIds: string[];
+      }>();
 
       for (const [index, expense] of data.expenses.entries()) {
         if (expense.amount <= 0) continue;
@@ -185,7 +211,7 @@ export async function POST(request: NextRequest) {
           data: {
             companyId: data.companyId,
             categoryId: expense.categoryId,
-            date: data.date,
+            date: expense.date,
             amount: expense.amount,
             descriptionAr: expense.description,
             paymentMethod: "CASH",
@@ -196,21 +222,56 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Group by date and category
+        const dateKey = expense.date.toISOString().split('T')[0];
+        const groupKey = `${dateKey}|${expense.categoryId}`;
+        const existing = expenseGroups.get(groupKey);
+        if (existing) {
+          existing.totalAmount += expense.amount;
+          existing.descriptions.push(expense.description);
+          existing.expenseIds.push(accountingExpense.id);
+        } else {
+          expenseGroups.set(groupKey, {
+            categoryId: expense.categoryId,
+            date: expense.date,
+            totalAmount: expense.amount,
+            descriptions: [expense.description],
+            expenseIds: [accountingExpense.id],
+          });
+        }
+      }
+
+      // Create journal entries for grouped expenses
+      for (const group of expenseGroups.values()) {
+        const category = await tx.expenseCategory.findUnique({
+          where: { id: group.categoryId },
+          select: { type: true },
+        });
+        if (!category) continue;
+
+        const combinedDescription = group.descriptions.length === 1
+          ? `مصروف غسيل سيارات - ${group.descriptions[0]}`
+          : `مصروف غسيل سيارات - ${group.descriptions.join(' + ')}`;
+
         const expenseJournalEntry = await createExpenseJE({
           companyId: data.companyId,
           userId,
           expenseAccountCode: resolveExpenseAccountCode(category.type),
-          amount: expense.amount,
+          amount: group.totalAmount,
           isCash: true,
           costCenterId: validatedCostCenterId,
-          refId: accountingExpense.id,
-          descriptionAr: `مصروف غسيل سيارات - ${expense.description}`,
+          refId: group.expenseIds[0],
+          descriptionAr: combinedDescription,
+          date: group.date,
         });
 
-        await tx.expense.update({
-          where: { id: accountingExpense.id },
-          data: { journalEntryId: expenseJournalEntry.id },
-        });
+        // Update all expenses in this group with the journal entry ID
+        for (const expenseId of group.expenseIds) {
+          await tx.expense.update({
+            where: { id: expenseId },
+            data: { journalEntryId: expenseJournalEntry.id },
+          });
+        }
 
         primaryJournalEntryId ??= expenseJournalEntry.id;
       }

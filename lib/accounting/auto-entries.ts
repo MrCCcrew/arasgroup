@@ -395,6 +395,7 @@ export async function createExpenseJE(params: {
   costCenterId?: string;
   refId: string;
   descriptionAr: string;
+  date?: Date;
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
   const cashBankCode = params.isCash ? "1000" : "1010";
@@ -407,7 +408,7 @@ export async function createExpenseJE(params: {
   return createAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
-    date: new Date(),
+    date: params.date ?? new Date(),
     descriptionAr: params.descriptionAr,
     type: "EXPENSE",
     refModule: "expenses",

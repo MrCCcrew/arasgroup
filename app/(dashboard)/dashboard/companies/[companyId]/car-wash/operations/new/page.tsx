@@ -33,6 +33,7 @@ interface RevenueRow {
   type: "CASH" | "KNET";
   amount: string;
   description: string;
+  date: string;
 }
 
 interface ExpenseRow {
@@ -40,6 +41,7 @@ interface ExpenseRow {
   categoryId: string;
   amount: string;
   description: string;
+  date: string;
 }
 
 const expenseCategoryTypes = [
@@ -81,7 +83,7 @@ export default function NewCarWashOperationPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [revenues, setRevenues] = useState<RevenueRow[]>([
-    { id: nextId++, type: "CASH", amount: "", description: "" },
+    { id: nextId++, type: "CASH", amount: "", description: "", date: new Date().toISOString().slice(0, 10) },
   ]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
 
@@ -111,7 +113,7 @@ export default function NewCarWashOperationPage() {
   }, [ar, companyId]);
 
   function addRevenue() {
-    setRevenues((previous) => [...previous, { id: nextId++, type: "CASH", amount: "", description: "" }]);
+    setRevenues((previous) => [...previous, { id: nextId++, type: "CASH", amount: "", description: "", date: new Date().toISOString().slice(0, 10) }]);
   }
 
   function removeRevenue(id: number) {
@@ -125,7 +127,7 @@ export default function NewCarWashOperationPage() {
   function addExpense() {
     setExpenses((previous) => [
       ...previous,
-      { id: nextId++, categoryId: categories[0]?.id ?? "", amount: "", description: "" },
+      { id: nextId++, categoryId: categories[0]?.id ?? "", amount: "", description: "", date: new Date().toISOString().slice(0, 10) },
     ]);
   }
 
@@ -223,6 +225,7 @@ export default function NewCarWashOperationPage() {
         type: revenue.type,
         amount: Number.parseFloat(revenue.amount),
         description: revenue.description || undefined,
+        date: revenue.date,
       }));
 
     const invalidExpense = expenses.find(
@@ -239,6 +242,7 @@ export default function NewCarWashOperationPage() {
         categoryId: expense.categoryId,
         amount: Number.parseFloat(expense.amount),
         description: expense.description,
+        date: expense.date,
       }));
 
     if (revenuePayload.length === 0) {
@@ -347,8 +351,9 @@ export default function NewCarWashOperationPage() {
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium text-muted-foreground">
-                  <span className="col-span-3">{ar ? "النوع" : "Type"}</span>
-                  <span className="col-span-4">{ar ? "المبلغ (د.ك)" : "Amount (KWD)"}</span>
+                  <span className="col-span-2">{ar ? "النوع" : "Type"}</span>
+                  <span className="col-span-2">{ar ? "التاريخ" : "Date"}</span>
+                  <span className="col-span-3">{ar ? "المبلغ (د.ك)" : "Amount (KWD)"}</span>
                   <span className="col-span-4">{ar ? "البيان" : "Description"}</span>
                   <span className="col-span-1" />
                 </div>
@@ -357,11 +362,18 @@ export default function NewCarWashOperationPage() {
                     <select
                       value={revenue.type}
                       onChange={(event) => setRevField(revenue.id, "type", event.target.value as "CASH" | "KNET")}
-                      className="input-field col-span-3 text-sm"
+                      className="input-field col-span-2 text-sm"
                     >
                       <option value="CASH">{ar ? "نقدي" : "Cash"}</option>
                       <option value="KNET">KNET</option>
                     </select>
+                    <input
+                      type="date"
+                      required
+                      value={revenue.date}
+                      onChange={(event) => setRevField(revenue.id, "date", event.target.value)}
+                      className="input-field col-span-2 text-sm"
+                    />
                     <input
                       type="number"
                       step="0.001"
@@ -369,7 +381,7 @@ export default function NewCarWashOperationPage() {
                       placeholder="0.000"
                       value={revenue.amount}
                       onChange={(event) => setRevField(revenue.id, "amount", event.target.value)}
-                      className="input-field col-span-4 text-sm"
+                      className="input-field col-span-3 text-sm"
                       dir="ltr"
                     />
                     <input
@@ -410,15 +422,16 @@ export default function NewCarWashOperationPage() {
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium text-muted-foreground">
-                  <span className="col-span-4">{ar ? "الفئة" : "Category"}</span>
-                  <span className="col-span-4">{ar ? "البيان" : "Description"}</span>
+                  <span className="col-span-3">{ar ? "الفئة" : "Category"}</span>
+                  <span className="col-span-3">{ar ? "البيان" : "Description"}</span>
+                  <span className="col-span-2">{ar ? "التاريخ" : "Date"}</span>
                   <span className="col-span-3">{ar ? "المبلغ (د.ك)" : "Amount (KWD)"}</span>
                   <span className="col-span-1" />
                 </div>
                 {expenses.map((expense) => (
                   <div key={expense.id} className="space-y-2">
                     <div className="grid grid-cols-12 items-center gap-2">
-                      <div className="col-span-4 flex items-center gap-2">
+                      <div className="col-span-3 flex items-center gap-2">
                         <select
                           required
                           value={expense.categoryId}
@@ -446,7 +459,14 @@ export default function NewCarWashOperationPage() {
                         placeholder={ar ? "وصف المصروف" : "Expense description"}
                         value={expense.description}
                         onChange={(event) => setExpField(expense.id, "description", event.target.value)}
-                        className="input-field col-span-4 text-sm"
+                        className="input-field col-span-3 text-sm"
+                      />
+                      <input
+                        type="date"
+                        required
+                        value={expense.date}
+                        onChange={(event) => setExpField(expense.id, "date", event.target.value)}
+                        className="input-field col-span-2 text-sm"
                       />
                       <input
                         type="number"
