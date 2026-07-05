@@ -170,10 +170,10 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                       <td>
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}`}
+                            href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}/edit`}
                             className="text-xs text-primary hover:underline"
                           >
-                            {locale === "en" ? "View" : "عرض"}
+                            {locale === "en" ? "Edit" : "تعديل"}
                           </Link>
                           {canDelete && <DeleteOperationButton operationId={operation.id} locale={locale} />}
                         </div>
