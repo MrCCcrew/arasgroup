@@ -222,7 +222,42 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   const statsDriverRows = selectedDriver
     ? [selectedDriver]
     : driverRows.filter((driver: DriverRowItem) => allDriverIds.includes(driver.id));
-  const totalWalletBalance = statsDriverRows.reduce((sum: number, driver: DriverRowItem) => sum + Number(driver.walletBalance), 0);
+
+  // Calculate wallet balance for the filtered month
+  // Wallet balance = CHARGE - DEPOSIT (for the filtered period)
+  let walletDateFilter = {};
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+    walletDateFilter = { date: { gte: startDate, lte: endDate } };
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+    walletDateFilter = { date: { gte: startDate, lte: endDate } };
+  }
+
+  const walletTransactions = statsDriverRows.length > 0
+    ? await prisma.driverWalletTransaction.findMany({
+        where: {
+          driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
+          ...walletDateFilter,
+        },
+        select: { type: true, amount: true },
+      })
+    : [];
+
+  let totalWalletBalance = 0;
+  for (const tx of walletTransactions) {
+    const amount = Number(tx.amount);
+    if (tx.type === "CHARGE" || tx.type === "DEPOSIT") {
+      totalWalletBalance += amount;
+    } else {
+      totalWalletBalance -= amount;
+    }
+  }
 
   // Build invoice date filter matching the orders filter
   let invoiceDateFilter = {};
