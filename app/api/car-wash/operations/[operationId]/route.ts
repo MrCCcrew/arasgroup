@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: Props) {
 
     const existingOperation = await prisma.carWashDailyOperation.findFirst({
       where: { id: operationId, companyId: data.companyId },
-      include: { journalEntry: true },
+      select: { id: true, journalEntryId: true },
     });
 
     if (!existingOperation) {
@@ -132,9 +132,9 @@ export async function PUT(request: NextRequest, { params }: Props) {
     }
 
     const operation = await prisma.$transaction(async (tx) => {
-      if (existingOperation.journalEntry) {
-        await tx.journalEntryLine.deleteMany({ where: { journalEntryId: existingOperation.journalEntry.id } });
-        await tx.journalEntry.delete({ where: { id: existingOperation.journalEntry.id } });
+      if (existingOperation.journalEntryId) {
+        await tx.journalEntryLine.deleteMany({ where: { journalEntryId: existingOperation.journalEntryId } });
+        await tx.journalEntry.delete({ where: { id: existingOperation.journalEntryId } });
       }
 
       // Delete old expense journal entries and expense records
