@@ -1755,12 +1755,14 @@ model CarWashRevenue {
   type        RevenueType
   amount      Decimal     @db.Decimal(18, 3)
   description String?
+  date        DateTime?   // Temporary optional, will be required after migration
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
+  @@index([date])
   @@map("car_wash_revenues")
 }
 
@@ -1775,12 +1777,14 @@ model CarWashExpense {
   categoryId  String?
   amount      Decimal @db.Decimal(18, 3)
   description String
+  date        DateTime?   // Temporary optional, will be required after migration
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
+  @@index([date])
   @@map("car_wash_expenses")
 }
 
