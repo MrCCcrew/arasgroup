@@ -252,11 +252,14 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   let totalWalletBalance = 0;
   for (const tx of walletTransactions) {
     const amount = Number(tx.amount);
-    if (tx.type === "CHARGE" || tx.type === "DEPOSIT") {
+    if (tx.type === "CHARGE") {
+      // CHARGE increases driver debt (money owed to company)
       totalWalletBalance += amount;
-    } else {
+    } else if (tx.type === "DEPOSIT") {
+      // DEPOSIT decreases driver debt (driver paid to company)
       totalWalletBalance -= amount;
     }
+    // Other types like CREDIT/DEBIT are handled separately
   }
 
   // Build invoice date filter matching the orders filter
