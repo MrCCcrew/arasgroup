@@ -59,7 +59,7 @@ const expenseCategoryTypes = [
 let nextId = 1000;
 
 export default function EditCarWashOperationPage() {
-  const { companyId, id: operationId } = useParams<{ companyId: string; id: string }>();
+  const { companyId, operationId } = useParams<{ companyId: string; operationId: string }>();
   const { locale } = useLocale();
   const router = useRouter();
   const ar = locale !== "en";
