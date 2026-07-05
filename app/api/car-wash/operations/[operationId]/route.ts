@@ -86,12 +86,22 @@ export async function PUT(request: NextRequest, { params }: Props) {
 
     const existingOperation = await prisma.carWashDailyOperation.findFirst({
       where: { id: operationId, companyId: data.companyId },
-      include: { revenues: true, expenses: { include: { Expense: true } }, journalEntry: true },
+      include: { journalEntry: true },
     });
 
     if (!existingOperation) {
       return NextResponse.json({ success: false, error: "العملية غير موجودة أو غير مصرح بها" }, { status: 404 });
     }
+
+    // Get linked expense records (from general expenses table)
+    const linkedExpenses = await prisma.expense.findMany({
+      where: {
+        reference: `CWOP:${operationId}`,
+        companyId: data.companyId,
+        isDeleted: false,
+      },
+      select: { id: true, journalEntryId: true },
+    });
 
     const totalCash = data.revenues.filter((r) => r.type === "CASH").reduce((s, r) => s + r.amount, 0);
     const totalKnet = data.revenues.filter((r) => r.type === "KNET").reduce((s, r) => s + r.amount, 0);
@@ -127,14 +137,13 @@ export async function PUT(request: NextRequest, { params }: Props) {
         await tx.journalEntry.delete({ where: { id: existingOperation.journalEntry.id } });
       }
 
-      for (const expense of existingOperation.expenses) {
-        if (expense.Expense && expense.Expense.journalEntryId) {
-          await tx.journalEntryLine.deleteMany({ where: { journalEntryId: expense.Expense.journalEntryId } });
-          await tx.journalEntry.delete({ where: { id: expense.Expense.journalEntryId } });
+      // Delete old expense journal entries and expense records
+      for (const expense of linkedExpenses) {
+        if (expense.journalEntryId) {
+          await tx.journalEntryLine.deleteMany({ where: { journalEntryId: expense.journalEntryId } });
+          await tx.journalEntry.delete({ where: { id: expense.journalEntryId } });
         }
-        if (expense.Expense) {
-          await tx.expense.delete({ where: { id: expense.Expense.id } });
-        }
+        await tx.expense.delete({ where: { id: expense.id } });
       }
 
       await tx.knetTransaction.deleteMany({ where: { operationId } });
