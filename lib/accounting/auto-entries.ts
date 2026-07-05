@@ -83,6 +83,7 @@ export async function createDriverWalletDepositJE(params: {
   refId: string;
   descriptionAr: string;
   bankAccountId?: string | null;
+  date?: Date;
 }): Promise<JournalEntry> {
   const fiscalYearId = await getCurrentFiscalYear(params.companyId);
 
@@ -103,7 +104,7 @@ export async function createDriverWalletDepositJE(params: {
   return createAndPostAutomaticEntry({
     companyId: params.companyId,
     fiscalYearId,
-    date: new Date(),
+    date: params.date ?? new Date(),
     descriptionAr: params.descriptionAr,
     type: "DELIVERY_WALLET",
     refModule: "delivery",

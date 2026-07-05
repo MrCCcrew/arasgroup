@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
         bankAccountId: paymentMethod === "BANK" ? data.bankAccountId : null,
         refId: walletTx.id,
         descriptionAr: data.descriptionAr ?? `إيداع محفظة سائق - ${data.amount.toFixed(3)} د.ك`,
+        date: data.date,
       });
 
       await tx.driverWalletTransaction.update({
