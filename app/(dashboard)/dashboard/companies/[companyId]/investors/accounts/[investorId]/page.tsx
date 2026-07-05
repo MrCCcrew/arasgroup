@@ -66,7 +66,15 @@ export default async function InvestorAccountDetailPage({ params }: Props) {
     }),
   ]);
 
-  if (!investor || !investor.companies.some((item) => item.id === companyId)) notFound();
+  type CompanyAccessRow = NonNullable<typeof investor>["companies"][number];
+  type LicenseRow = typeof licenses[number];
+  type AgreementRow = typeof agreements[number];
+  type SalaryProfileRow = typeof salaryProfiles[number];
+  type ClaimRow = typeof claims[number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type SalaryCollectionRow = typeof salaryCollections[number];
+
+  if (!investor || !investor.companies.some((item: CompanyAccessRow) => item.id === companyId)) notFound();
 
   return (
     <div>
@@ -83,9 +91,9 @@ export default async function InvestorAccountDetailPage({ params }: Props) {
           investorName={investor.nameAr}
           investorPhone={investor.phone}
           branches={branches}
-          licenses={licenses.map((item) => ({ id: item.id, nameAr: item.commercialNameAr, nameEn: item.commercialNameEn, licenseNumber: item.licenseNumber }))}
+          licenses={licenses.map((item: LicenseRow) => ({ id: item.id, nameAr: item.commercialNameAr, nameEn: item.commercialNameEn, licenseNumber: item.licenseNumber }))}
           employees={employees}
-          agreements={agreements.map((item) => ({
+          agreements={agreements.map((item: AgreementRow) => ({
             ...item,
             amount: item.amount.toString(),
             license: item.license
@@ -97,18 +105,18 @@ export default async function InvestorAccountDetailPage({ params }: Props) {
                 }
               : null,
           }))}
-          salaryProfiles={salaryProfiles.map((item) => ({
+          salaryProfiles={salaryProfiles.map((item: SalaryProfileRow) => ({
             ...item,
             monthlyAmount: item.monthlyAmount.toString(),
           }))}
-          claims={claims.map((item) => ({
+          claims={claims.map((item: ClaimRow) => ({
             ...item,
-            lines: item.lines.map((line) => ({
+            lines: item.lines.map((line: ClaimLineRow) => ({
               actualAmount: line.actualAmount.toString(),
               collectedAmount: line.collectedAmount.toString(),
             })),
           }))}
-          salaryCollections={salaryCollections.map((item) => ({
+          salaryCollections={salaryCollections.map((item: SalaryCollectionRow) => ({
             ...item,
             collectedAmount: item.collectedAmount.toString(),
           }))}

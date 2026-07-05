@@ -77,14 +77,15 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
     }),
   ]);
 
-  const journalEntryIds = expenses.map((expense) => expense.journalEntryId).filter((value): value is string => Boolean(value));
+  type ExpenseRow = typeof expenses[number];
+  const journalEntryIds = expenses.map((expense: ExpenseRow) => expense.journalEntryId).filter((value: ExpenseRow["journalEntryId"]): value is string => Boolean(value));
   const linkedJournalEntries = journalEntryIds.length
     ? await prisma.journalEntry.findMany({
         where: { id: { in: journalEntryIds } },
         select: { id: true, status: true },
       })
     : [];
-  const journalStatusById = new Map(linkedJournalEntries.map((entry) => [entry.id, entry.status]));
+  const journalStatusById = new Map<string, typeof linkedJournalEntries[number]["status"]>(linkedJournalEntries.map((entry: typeof linkedJournalEntries[number]) => [entry.id, entry.status]));
 
   const totalAmount = Number(expensesTotal._sum.amount ?? 0);
   const totalPages = Math.ceil(total / pageSize);
@@ -153,7 +154,7 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  expenses.map((expense) => (
+                  expenses.map((expense: ExpenseRow) => (
                     <tr key={expense.id} className="transition-colors hover:bg-muted/20">
                       <td className="text-sm">{formatDate(expense.date, numberLocale)}</td>
                       <td className="max-w-48 truncate text-sm">{expense.descriptionAr}</td>
@@ -227,7 +228,7 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
 
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map((currentPage) => (
+            {Array.from({ length: totalPages }, (_: unknown, index: number) => index + 1).map((currentPage: number) => (
               <Link
                 key={currentPage}
                 href={`/dashboard/companies/${companyId}/expenses?page=${currentPage}`}

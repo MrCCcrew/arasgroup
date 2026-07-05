@@ -168,6 +168,9 @@ export default async function CompanyDashboardPage({ params }: Props) {
     }),
   ]);
 
+  type RecentJournalEntryRow = typeof recentJEs[number];
+  type ExpiringResidencyRow = typeof expiringResidencies[number];
+
   const isDelivery = company.type === "DELIVERY";
   const isCarWash = company.type === "CAR_WASH";
   const isTrading = company.type === "TRADING" || company.type === "GENERAL_TRADING";
@@ -345,7 +348,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
           <div>
             <h2 className="mb-3 text-base font-bold">{locale === "en" ? "Quick actions" : "إجراءات سريعة"}</h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-              {quickLinks.map((link) => (
+              {quickLinks.map((link: QuickLink) => (
                 <QuickAction key={link.href} {...link} />
               ))}
             </div>
@@ -368,7 +371,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
                     {locale === "en" ? "No journal entries yet" : "لا توجد قيود"}
                   </p>
                 ) : (
-                  recentJEs.map((entry) => (
+                  recentJEs.map((entry: RecentJournalEntryRow) => (
                     <Link
                       key={entry.id}
                       href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}`}
@@ -407,7 +410,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
                   {locale === "en" ? "No residencies expiring in the next 30 days" : "لا توجد إقامات منتهية خلال 30 يوم"}
                 </p>
               ) : (
-                expiringResidencies.map((employee, index) => {
+                expiringResidencies.map((employee: ExpiringResidencyRow, index: number) => {
                   const days = daysUntilExpiry(employee.residencyExpiry);
                   const employeeName = locale === "en" ? employee.nameEn ?? employee.nameAr : employee.nameAr;
                   return (

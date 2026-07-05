@@ -218,8 +218,8 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
   ]);
 
   const employeeAlerts = dedupeAlerts(
-    employees.flatMap((employee) =>
-      EMPLOYEE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
+    employees.flatMap((employee: EmployeeAlertRow) =>
+      EMPLOYEE_TYPES.flatMap(({ key, ar, en: enLabel }: TypeDef<EmployeeAlertRow>) => {
         const date = employee[key];
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
@@ -243,8 +243,8 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
   );
 
   const vehicleAlerts = dedupeAlerts(
-    vehicles.flatMap((vehicle) =>
-      VEHICLE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
+    vehicles.flatMap((vehicle: VehicleAlertRow) =>
+      VEHICLE_TYPES.flatMap(({ key, ar, en: enLabel }: TypeDef<VehicleAlertRow>) => {
         const date = vehicle[key];
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
@@ -271,8 +271,8 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
   );
 
   const licenseAlerts = dedupeAlerts(
-    licenses.flatMap((license) =>
-      LICENSE_TYPES.flatMap(({ key, ar, en: enLabel }) => {
+    licenses.flatMap((license: LicenseAlertRow) =>
+      LICENSE_TYPES.flatMap(({ key, ar, en: enLabel }: TypeDef<LicenseAlertRow>) => {
         const date = license[key];
         if (!date || date > in90) return [];
         const expiryDate = ensureDate(date);

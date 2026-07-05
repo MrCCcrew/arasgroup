@@ -60,9 +60,10 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
     }),
   ]);
 
-  const totalGross = settlements.reduce((sum, settlement) => sum + Number(settlement.grossAmount), 0);
-  const totalCommission = settlements.reduce((sum, settlement) => sum + Number(settlement.commission), 0);
-  const totalNet = settlements.reduce((sum, settlement) => sum + Number(settlement.netAmount), 0);
+  type KnetSettlementItem = typeof settlements[number];
+  const totalGross = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.grossAmount), 0);
+  const totalCommission = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.commission), 0);
+  const totalNet = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.netAmount), 0);
   const pendingAmount = Number(unsettledTotal._sum.amount ?? 0);
   const pendingCount = unsettledTotal._count.id;
 
@@ -100,7 +101,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
               <select name="month" defaultValue={month} className="input-field">
-                {MONTHS[locale].map((monthName, index) => (
+                {MONTHS[locale].map((monthName: string, index: number) => (
                   <option key={index + 1} value={index + 1}>
                     {monthName}
                   </option>
@@ -110,7 +111,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Year" : "السنة"}</label>
               <select name="year" defaultValue={year} className="input-field">
-                {[2024, 2025, 2026].map((value) => (
+                {[2024, 2025, 2026].map((value: number) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -176,7 +177,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
                     </td>
                   </tr>
                 ) : (
-                  settlements.map((settlement) => (
+                  settlements.map((settlement: KnetSettlementItem) => (
                     <tr key={settlement.id} className="hover:bg-muted/10">
                       <td className="text-sm">{formatDate(settlement.settlementDate, numberLocale)}</td>
                       <td className="text-sm">

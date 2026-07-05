@@ -49,11 +49,11 @@ export default async function LeavePayPage({ params }: Props) {
   });
 
   const totalPaid = records
-    .filter((record) => record.status === "PAID")
-    .reduce((sum, record) => sum + Number(record.totalAmount), 0);
+    .filter((record: typeof records[number]) => record.status === "PAID")
+    .reduce((sum: number, record: typeof records[number]) => sum + Number(record.totalAmount), 0);
   const totalAccrued = records
-    .filter((record) => record.status === "ACCRUED")
-    .reduce((sum, record) => sum + Number(record.totalAmount), 0);
+    .filter((record: typeof records[number]) => record.status === "ACCRUED")
+    .reduce((sum: number, record: typeof records[number]) => sum + Number(record.totalAmount), 0);
 
   return (
     <div>
@@ -117,7 +117,7 @@ export default async function LeavePayPage({ params }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  records.map((record) => {
+                  records.map((record: typeof records[number]) => {
                     const status = labels[record.status as keyof typeof labels] ?? labels.CALCULATED;
                     const employeeName =
                       locale === "en"

@@ -82,6 +82,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
+  const getTypeLabel = (type: EmployeeType) => typeLabels[locale][type];
   const showingDeleted = query.status === "deleted";
 
   const activeWhere = { companyId, isActive: true, isDeleted: false };
@@ -132,7 +133,8 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     }),
   ]);
 
-  const typeCounts = employees.reduce<Record<string, number>>((accumulator, employee) => {
+  type EmployeeRow = typeof employees[number];
+  const typeCounts = employees.reduce<Record<string, number>>((accumulator: Record<string, number>, employee: EmployeeRow) => {
     accumulator[employee.type] = (accumulator[employee.type] ?? 0) + 1;
     return accumulator;
   }, {});
@@ -215,7 +217,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           >
             {locale === "en" ? "All types" : "كل الأنواع"}
           </Link>
-          {Object.entries(typeLabels[locale]).map(([type, label]) => {
+          {Object.entries(typeLabels[locale]).map(([type, label]: [string, string]) => {
             const count = typeCounts[type] ?? 0;
             if (count === 0) return null;
 
@@ -262,7 +264,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  employees.map((employee) => {
+                  employees.map((employee: EmployeeRow) => {
                     const days = daysUntilExpiry(employee.residencyExpiry);
                     const isExpired = days !== null && days < 0;
                     const isExpiringSoon = days !== null && days <= 60;
@@ -293,7 +295,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                           </div>
                         </td>
                         <td>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{typeLabels[locale][employee.type]}</span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{getTypeLabel(employee.type)}</span>
                         </td>
                         <td className="text-sm">{employee.nationality ?? (locale === "en" ? "Not set" : "غير محدد")}</td>
                         <td className="number text-sm" dir="ltr">

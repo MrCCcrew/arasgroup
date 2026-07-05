@@ -102,12 +102,14 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
     }),
   ]);
 
-  const earnings = items.filter((item) => item.category === "EARNING");
-  const deductions = items.filter((item) => item.category === "DEDUCTION");
+  type SalaryItemRow = typeof items[number];
+  const earnings = items.filter((item: SalaryItemRow) => item.category === "EARNING");
+  const deductions = items.filter((item: SalaryItemRow) => item.category === "DEDUCTION");
   const month = locale === "en" ? MONTHS_EN[payment.batch.month - 1] : MONTHS_AR[payment.batch.month - 1];
   const employeeName = locale === "en" ? payment.employee.nameEn || payment.employee.nameAr : payment.employee.nameAr;
   const companyName = locale === "en" ? company?.nameEn || company?.nameAr : company?.nameAr;
   const backHref = `/dashboard/companies/${companyId}/hr/salaries/${batchId}`;
+  type DetailRow = { label: string; value: string };
   const details = [
     payment.attendanceDays != null
       ? { label: locale === "en" ? "Attendance days:" : `${AR.attendanceDays}:`, value: Number(payment.attendanceDays).toFixed(1) }
@@ -125,13 +127,13 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
       ? { label: locale === "en" ? "Wallet amount:" : `${AR.walletAmount}:`, value: formatKWD(Number(payment.walletAmount), numberLocale) }
       : null,
     payment.amountDeliveredByDriver != null
-      ? {
-          label: locale === "en" ? "Delivered amount:" : `${AR.deliveredAmount}:`,
-          value: formatKWD(Number(payment.amountDeliveredByDriver), numberLocale),
-        }
+      ? { label: locale === "en" ? "Delivered amount:" : `${AR.deliveredAmount}:`, value: formatKWD(Number(payment.amountDeliveredByDriver), numberLocale) }
       : null,
     payment.notes ? { label: locale === "en" ? "Notes:" : `${AR.notes}:`, value: payment.notes } : null,
-  ].filter(Boolean) as Array<{ label: string; value: string }>;
+  ].reduce<DetailRow[]>((rows: DetailRow[], detail: DetailRow | null) => {
+    if (detail) rows.push(detail);
+    return rows;
+  }, []);
 
   return (
     <>
@@ -289,7 +291,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
           <>
             <div className="section">{locale === "en" ? "Additional details" : AR.additionalDetails}</div>
             <div className="info">
-              {details.map((detail) => (
+              {details.map((detail: DetailRow) => (
                 <div key={detail.label} className="info-row">
                   <span className="label">{detail.label}</span>
                   <span className="value">{detail.value}</span>
@@ -308,7 +310,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
             </tr>
           </thead>
           <tbody>
-            {earnings.map((item) => (
+            {earnings.map((item: SalaryItemRow) => (
               <tr key={item.id}>
                 <td>{locale === "en" ? item.titleEn : item.titleAr}</td>
                 <td className="amount">{formatKWD(Number(item.amount), numberLocale)}</td>
@@ -328,7 +330,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {deductions.map((item) => (
+                {deductions.map((item: SalaryItemRow) => (
                   <tr key={item.id}>
                     <td>{locale === "en" ? item.titleEn : item.titleAr}</td>
                     <td className="amount">{formatKWD(Number(item.amount), numberLocale)}</td>

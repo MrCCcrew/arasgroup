@@ -52,9 +52,10 @@ export default async function KnetPrintPage({ params, searchParams }: Props) {
     }),
   ]);
 
-  const totalGross = settlements.reduce((sum, settlement) => sum + Number(settlement.grossAmount), 0);
-  const totalCommission = settlements.reduce((sum, settlement) => sum + Number(settlement.commission), 0);
-  const totalNet = settlements.reduce((sum, settlement) => sum + Number(settlement.netAmount), 0);
+  type KnetSettlementItem = typeof settlements[number];
+  const totalGross = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.grossAmount), 0);
+  const totalCommission = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.commission), 0);
+  const totalNet = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.netAmount), 0);
   const pendingAmount = Number(unsettledTotal._sum.amount ?? 0);
   const pendingCount = unsettledTotal._count.id;
 
@@ -100,7 +101,7 @@ export default async function KnetPrintPage({ params, searchParams }: Props) {
             </tr>
           </thead>
           <tbody>
-            {settlements.map((settlement) => (
+            {settlements.map((settlement: KnetSettlementItem) => (
               <tr key={settlement.id}>
                 <td className="border p-2">{formatDate(settlement.settlementDate, numberLocale)}</td>
                 <td className="border p-2">{locale === "en" ? settlement.bankAccount.nameEn ?? settlement.bankAccount.nameAr : settlement.bankAccount.nameAr}</td>

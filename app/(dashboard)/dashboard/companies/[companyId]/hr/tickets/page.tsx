@@ -74,14 +74,15 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
       orderBy: { nameAr: "asc" },
     }),
   ]);
+  type TicketRow = typeof tickets[number];
 
-  const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+  const totalCost = tickets.reduce((sum: number, ticket: TicketRow) => sum + Number(ticket.cost ?? 0), 0);
   const companyCost = tickets
-    .filter((ticket) => ticket.paidBy === "COMPANY")
-    .reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+    .filter((ticket: TicketRow) => ticket.paidBy === "COMPANY")
+    .reduce((sum: number, ticket: TicketRow) => sum + Number(ticket.cost ?? 0), 0);
   const investorCost = tickets
-    .filter((ticket) => ticket.paidBy === "INVESTOR")
-    .reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+    .filter((ticket: TicketRow) => ticket.paidBy === "INVESTOR")
+    .reduce((sum: number, ticket: TicketRow) => sum + Number(ticket.cost ?? 0), 0);
 
   const printHref = `/dashboard/companies/${companyId}/hr/tickets/print?year=${year}${sp.type ? `&type=${sp.type}` : ""}${sp.paidBy ? `&paidBy=${sp.paidBy}` : ""}${sp.search ? `&search=${encodeURIComponent(sp.search)}` : ""}`;
 
@@ -108,7 +109,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Year" : "السنة"}</label>
               <select name="year" defaultValue={year} className="input-field">
-                {[2023, 2024, 2025, 2026].map((value) => (
+                {[2023, 2024, 2025, 2026].map((value: number) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -119,7 +120,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Type" : "النوع"}</label>
               <select name="type" defaultValue={sp.type ?? ""} className="input-field">
                 <option value="">{locale === "en" ? "All types" : "كل الأنواع"}</option>
-                {Object.entries(TICKET_TYPE_LABELS[locale]).map(([value, label]) => (
+                {Object.entries(TICKET_TYPE_LABELS[locale]).map(([value, label]: [string, string]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
@@ -193,7 +194,7 @@ export default async function HrTicketsPage({ params, searchParams }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  tickets.map((ticket) => (
+                  tickets.map((ticket: TicketRow) => (
                     <tr key={ticket.id} className="hover:bg-muted/10">
                       <td className="font-medium">{locale === "en" ? ticket.employee.nameEn ?? ticket.employee.nameAr : ticket.employee.nameAr}</td>
                       <td>

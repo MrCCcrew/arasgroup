@@ -36,9 +36,15 @@ export default async function InvestorAccountsPage({ params }: Props) {
     orderBy: { nameAr: "asc" },
   });
 
-  const totalOutstanding = investors.reduce((sum, investor) => {
-    const actual = investor.claims.reduce((claimSum, claim) => claimSum + claim.lines.reduce((lineSum, line) => lineSum + toNumber(line.actualAmount), 0), 0);
-    const collected = investor.claims.reduce((claimSum, claim) => claimSum + claim.lines.reduce((lineSum, line) => lineSum + toNumber(line.collectedAmount), 0), 0);
+  type InvestorRow = typeof investors[number];
+  type ClaimRow = InvestorRow["claims"][number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type AgreementRow = InvestorRow["accountAgreements"][number];
+  type SalaryProfileRow = InvestorRow["salaryFundingProfiles"][number];
+
+  const totalOutstanding = investors.reduce((sum: number, investor: InvestorRow) => {
+    const actual = investor.claims.reduce((claimSum: number, claim: ClaimRow) => claimSum + claim.lines.reduce((lineSum: number, line: ClaimLineRow) => lineSum + toNumber(line.actualAmount), 0), 0);
+    const collected = investor.claims.reduce((claimSum: number, claim: ClaimRow) => claimSum + claim.lines.reduce((lineSum: number, line: ClaimLineRow) => lineSum + toNumber(line.collectedAmount), 0), 0);
     return sum + (actual - collected);
   }, 0);
 
@@ -53,8 +59,8 @@ export default async function InvestorAccountsPage({ params }: Props) {
       <div className="page-container space-y-4">
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard label="عدد المسئولين" value={String(investors.length)} />
-          <StatCard label="الاتفاقيات النشطة" value={String(investors.reduce((sum, investor) => sum + investor.accountAgreements.filter((item) => item.isActive).length, 0))} />
-          <StatCard label="ملفات تمويل الرواتب" value={String(investors.reduce((sum, investor) => sum + investor.salaryFundingProfiles.filter((item) => item.isActive).length, 0))} />
+          <StatCard label="الاتفاقيات النشطة" value={String(investors.reduce((sum: number, investor: InvestorRow) => sum + investor.accountAgreements.filter((item: AgreementRow) => item.isActive).length, 0))} />
+          <StatCard label="ملفات تمويل الرواتب" value={String(investors.reduce((sum: number, investor: InvestorRow) => sum + investor.salaryFundingProfiles.filter((item: SalaryProfileRow) => item.isActive).length, 0))} />
           <StatCard label="إجمالي المتبقي" value={formatKWD(totalOutstanding)} />
         </div>
 
@@ -74,9 +80,9 @@ export default async function InvestorAccountsPage({ params }: Props) {
               <tbody>
                 {investors.length === 0 ? (
                   <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">لا يوجد مسئولون مرتبطون بهذه الشركة</td></tr>
-                ) : investors.map((investor) => {
-                  const actual = investor.claims.reduce((claimSum, claim) => claimSum + claim.lines.reduce((lineSum, line) => lineSum + toNumber(line.actualAmount), 0), 0);
-                  const collected = investor.claims.reduce((claimSum, claim) => claimSum + claim.lines.reduce((lineSum, line) => lineSum + toNumber(line.collectedAmount), 0), 0);
+                ) : investors.map((investor: InvestorRow) => {
+                  const actual = investor.claims.reduce((claimSum: number, claim: ClaimRow) => claimSum + claim.lines.reduce((lineSum: number, line: ClaimLineRow) => lineSum + toNumber(line.actualAmount), 0), 0);
+                  const collected = investor.claims.reduce((claimSum: number, claim: ClaimRow) => claimSum + claim.lines.reduce((lineSum: number, line: ClaimLineRow) => lineSum + toNumber(line.collectedAmount), 0), 0);
                   return (
                     <tr key={investor.id}>
                       <td>

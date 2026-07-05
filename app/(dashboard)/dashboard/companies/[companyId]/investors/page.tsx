@@ -71,7 +71,10 @@ export default async function InvestorsPage({ params, searchParams }: Props) {
     _count: { id: true },
   });
 
-  const openClaimsMap = new Map(openClaims.map((item) => [item.investorId, item._count.id]));
+  type InvestorRow = typeof investors[number];
+  type OpenClaimGroupRow = typeof openClaims[number];
+
+  const openClaimsMap = new Map<string, number>(openClaims.map((item: OpenClaimGroupRow) => [item.investorId, item._count.id]));
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -85,7 +88,9 @@ export default async function InvestorsPage({ params, searchParams }: Props) {
     _sum: { amount: true },
   });
 
-  const collectionsMap = new Map(monthlyCollections.map((item) => [item.investorId, Number(item._sum.amount ?? 0)]));
+  type MonthlyCollectionRow = typeof monthlyCollections[number];
+
+  const collectionsMap = new Map<string, number>(monthlyCollections.map((item: MonthlyCollectionRow) => [item.investorId, Number(item._sum.amount ?? 0)]));
 
   // investors is already a deduplicated, sorted array from the query above
 
@@ -148,7 +153,7 @@ export default async function InvestorsPage({ params, searchParams }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {investors.map((investor) => {
+            {investors.map((investor: InvestorRow) => {
               const openCount = openClaimsMap.get(investor.id) ?? 0;
               const monthlyCollected = collectionsMap.get(investor.id) ?? 0;
               const investorName = locale === "en" ? investor.nameEn ?? investor.nameAr : investor.nameAr;
@@ -234,6 +239,11 @@ async function RecentClaims({
     take: 10,
   });
 
+  type RecentClaimRow = typeof claims[number];
+  type RecentClaimLineRow = RecentClaimRow["lines"][number];
+  const getRecentClaimTypeLabel = (type: keyof typeof claimTypeLabels.ar) => claimTypeLabels[locale][type];
+  const getRecentStatusLabel = (status: keyof typeof statusLabels.ar) => statusLabels[locale][status];
+
   const statusLabels = {
     ar: {
       PENDING: "معلق",
@@ -306,10 +316,10 @@ async function RecentClaims({
               </td>
             </tr>
           ) : (
-            claims.map((claim) => {
-              const totalCollected = claim.lines.reduce((sum, line) => sum + Number(line.collectedAmount), 0);
-              const totalActual = claim.lines.reduce((sum, line) => sum + Number(line.actualAmount), 0);
-              const totalIncome = claim.lines.reduce((sum, line) => sum + Number(line.groupIncome), 0);
+            claims.map((claim: RecentClaimRow) => {
+              const totalCollected = claim.lines.reduce((sum: number, line: RecentClaimLineRow) => sum + Number(line.collectedAmount), 0);
+              const totalActual = claim.lines.reduce((sum: number, line: RecentClaimLineRow) => sum + Number(line.actualAmount), 0);
+              const totalIncome = claim.lines.reduce((sum: number, line: RecentClaimLineRow) => sum + Number(line.groupIncome), 0);
               const investorName = locale === "en" ? claim.investor.nameEn ?? claim.investor.nameAr : claim.investor.nameAr;
 
               return (
@@ -317,7 +327,7 @@ async function RecentClaims({
                   <td className="font-medium">{investorName}</td>
                   <td>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                      {claimTypeLabels[locale][claim.type]}
+                      {getRecentClaimTypeLabel(claim.type)}
                     </span>
                   </td>
                   <td className="max-w-40 truncate text-sm">{claim.descriptionAr}</td>
@@ -334,7 +344,7 @@ async function RecentClaims({
                             : "bg-yellow-100 text-yellow-700"
                       }`}
                     >
-                      {statusLabels[locale][claim.status]}
+                      {getRecentStatusLabel(claim.status)}
                     </span>
                   </td>
                 </tr>

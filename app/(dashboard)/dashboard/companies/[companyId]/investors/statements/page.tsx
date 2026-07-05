@@ -35,18 +35,23 @@ export default async function InvestorStatementsPage({ params }: Props) {
     orderBy: { nameAr: "asc" },
   });
 
+  type InvestorRow = typeof investors[number];
+  type ClaimRow = InvestorRow["claims"][number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type PaymentRow = ClaimRow["payments"][number];
+
   // Build row data server-side (needed for print totals)
-  const rows = investors.map((investor) => {
+  const rows = investors.map((investor: InvestorRow) => {
     const totalCollected = investor.claims.reduce(
-      (sum, c) => sum + c.lines.reduce((s, l) => s + Number(l.collectedAmount), 0),
+      (sum: number, c: ClaimRow) => sum + c.lines.reduce((s: number, l: ClaimLineRow) => s + Number(l.collectedAmount), 0),
       0,
     );
     const totalActual = investor.claims.reduce(
-      (sum, c) => sum + c.lines.reduce((s, l) => s + Number(l.actualAmount), 0),
+      (sum: number, c: ClaimRow) => sum + c.lines.reduce((s: number, l: ClaimLineRow) => s + Number(l.actualAmount), 0),
       0,
     );
     const totalPaid = investor.claims.reduce(
-      (sum, c) => sum + c.payments.reduce((s, p) => s + Number(p.amount), 0),
+      (sum: number, c: ClaimRow) => sum + c.payments.reduce((s: number, p: PaymentRow) => s + Number(p.amount), 0),
       0,
     );
     const balance = totalCollected - totalPaid;
@@ -62,8 +67,9 @@ export default async function InvestorStatementsPage({ params }: Props) {
   });
 
   // Grand totals
+  type StatementRow = typeof rows[number];
   const grand = rows.reduce(
-    (acc, r) => ({
+    (acc: { claimsCount: number; totalCollected: number; totalActual: number; totalPaid: number; balance: number }, r: StatementRow) => ({
       claimsCount:    acc.claimsCount    + r.claimsCount,
       totalCollected: acc.totalCollected + r.totalCollected,
       totalActual:    acc.totalActual    + r.totalActual,
@@ -115,7 +121,7 @@ export default async function InvestorStatementsPage({ params }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
+                  rows.map((r: StatementRow) => (
                     <tr key={r.id}>
                       <td className="font-medium">{r.name}</td>
                       <td className="number">{r.claimsCount}</td>

@@ -44,11 +44,11 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
   ]);
 
   const currentFiscalYear =
-    fiscalYears.find((fy) => fy.isCurrent) ?? fiscalYears[0];
+    fiscalYears.find((fy: typeof fiscalYears[number]) => fy.isCurrent) ?? fiscalYears[0];
 
   const selectedFiscalYearId = sp.fiscalYearId ?? currentFiscalYear?.id;
-  const selectedFiscalYear = fiscalYears.find((fy) => fy.id === selectedFiscalYearId);
-  const selectedAccount = sp.accountId ? accounts.find((a) => a.id === sp.accountId) : null;
+  const selectedFiscalYear = fiscalYears.find((fy: typeof fiscalYears[number]) => fy.id === selectedFiscalYearId);
+  const selectedAccount = sp.accountId ? accounts.find((a: typeof accounts[number]) => a.id === sp.accountId) : null;
 
   const en = (await getLocale()) === "en";
   const numberLocale = en ? "en-US" : "ar-KW";
@@ -112,11 +112,11 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
               >
                 <option value="">{t.chooseAccount}</option>
                 {Object.entries(ACCOUNT_TYPE_LABELS).map(([type, label]) => {
-                  const group = accounts.filter((a) => a.type === type);
+                  const group = accounts.filter((a: typeof accounts[number]) => a.type === type);
                   if (!group.length) return null;
                   return (
                     <optgroup key={type} label={en ? label.en : label.ar}>
-                      {group.map((a) => (
+                      {group.map((a: typeof accounts[number]) => (
                         <option key={a.id} value={a.id}>
                           {a.code} — {a.nameAr}
                         </option>
@@ -136,7 +136,7 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
                 className="input-field"
               >
                 <option value="">{t.allPeriods}</option>
-                {fiscalYears.map((fy) => (
+                {fiscalYears.map((fy: typeof fiscalYears[number]) => (
                   <option key={fy.id} value={fy.id}>
                     {fy.year}
                   </option>
@@ -256,7 +256,7 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
                         </td>
                       </tr>
                     ) : (
-                      ledger.rows.map((row, i) => (
+                      ledger.rows.map((row: typeof ledger.rows[number], i: number) => (
                         <tr
                           key={row.lineId}
                           className={i % 2 === 0 ? "" : "bg-muted/5"}

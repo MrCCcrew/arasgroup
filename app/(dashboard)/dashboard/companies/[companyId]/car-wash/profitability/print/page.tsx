@@ -46,11 +46,13 @@ export default async function CarWashProfitabilityPrintPage({ params, searchPara
     orderBy: { code: "asc" },
   });
 
-  const rows = vehicles.map((vehicle) => {
-    const totalCash = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalCash), 0);
-    const totalKnet = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalKnet), 0);
-    const totalExpenses = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalExpenses), 0);
-    const netRevenue = vehicle.operations.reduce((sum, operation) => sum + Number(operation.netRevenue), 0);
+  type ProfitabilityVehicleItem = typeof vehicles[number];
+  type ProfitabilityOperationItem = ProfitabilityVehicleItem["operations"][number];
+  const rows = vehicles.map((vehicle: ProfitabilityVehicleItem) => {
+    const totalCash = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalCash), 0);
+    const totalKnet = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalKnet), 0);
+    const totalExpenses = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalExpenses), 0);
+    const netRevenue = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.netRevenue), 0);
     const operationDays = vehicle.operations.length;
 
     return {
@@ -66,9 +68,10 @@ export default async function CarWashProfitabilityPrintPage({ params, searchPara
       avgDaily: operationDays > 0 ? netRevenue / operationDays : 0,
     };
   });
+  type ProfitabilityRow = typeof rows[number];
 
   const totals = rows.reduce(
-    (acc, row) => ({
+    (acc: { operationDays: number; totalCash: number; totalKnet: number; grossRevenue: number; totalExpenses: number; netRevenue: number }, row: ProfitabilityRow) => ({
       operationDays: acc.operationDays + row.operationDays,
       totalCash: acc.totalCash + row.totalCash,
       totalKnet: acc.totalKnet + row.totalKnet,
@@ -104,7 +107,7 @@ export default async function CarWashProfitabilityPrintPage({ params, searchPara
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row: ProfitabilityRow) => (
               <tr key={row.id}>
                 <td className="border p-2">{row.code}</td>
                 <td className="border p-2">{row.name}</td>

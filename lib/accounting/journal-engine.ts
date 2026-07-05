@@ -411,7 +411,7 @@ export async function reverseJournalEntry(journalEntryId: string, userId: string
     if (!entry) throw new Error("القيد غير موجود");
     if (entry.isDeleted) throw new Error("القيد محذوف");
     if (entry.status !== "POSTED") throw new Error("لا يمكن عكس قيد غير مرحّل");
-    if ((entry as any).isReversed) throw new Error("هذا القيد تم عكسه سابقاً");
+    if (entry.isReversed) throw new Error("هذا القيد تم عكسه سابقاً");
     if (entry.fiscalYear.isLocked) throw new Error("الفترة المالية مغلقة");
 
     // Mark as reversed FIRST to prevent duplicate reversals

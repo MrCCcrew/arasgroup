@@ -118,7 +118,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
     revert: canUpdate && ["PENDING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"].includes(entry.status),
     cancel: canUpdate && ["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"].includes(entry.status),
     delete: canDelete && !entry.isAutomatic && ["DRAFT", "REJECTED", "CANCELLED"].includes(entry.status),
-    reverse: canUpdate && entry.status === "POSTED" && !(entry as any).isReversed,
+    reverse: canUpdate && entry.status === "POSTED" && !entry.isReversed,
   };
 
   const isPrintable = entry.type === "RECEIPT" || entry.type === "PAYMENT";

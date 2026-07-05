@@ -55,22 +55,27 @@ export default async function SalariesPage({ params }: Props) {
 
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const getStatusLabel = (status: keyof typeof statusLabels.ar) => statusLabels[locale][status];
 
   const batches = await prisma.salaryBatch.findMany({
     where: { companyId },
     include: { _count: { select: { payments: true } } },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
+  type SalaryBatchRow = typeof batches[number];
+  const journalEntryIds = batches
+    .map((batch: SalaryBatchRow) => batch.journalEntryId)
+    .filter((value: SalaryBatchRow["journalEntryId"]): value is string => Boolean(value));
 
   const journalEntries = await prisma.journalEntry.findMany({
-    where: { id: { in: batches.map((batch) => batch.journalEntryId).filter(Boolean) as string[] } },
+    where: { id: { in: journalEntryIds } },
     select: { id: true, status: true, isDeleted: true },
   });
-  const journalEntryMap = new Map(journalEntries.map((entry) => [entry.id, entry]));
+  const journalEntryMap = new Map<string, typeof journalEntries[number]>(journalEntries.map((entry: typeof journalEntries[number]) => [entry.id, entry]));
 
   const totalPaid = batches
-    .filter((batch) => batch.status === "PAID")
-    .reduce((sum, batch) => sum + Number(batch.totalNet), 0);
+    .filter((batch: SalaryBatchRow) => batch.status === "PAID")
+    .reduce((sum: number, batch: SalaryBatchRow) => sum + Number(batch.totalNet), 0);
 
   return (
     <div>
@@ -99,7 +104,7 @@ export default async function SalariesPage({ params }: Props) {
           </div>
           <div className="stat-card">
             <div>
-              <p className="text-2xl font-bold text-green-600">{batches.filter((batch) => batch.status === "PAID").length}</p>
+              <p className="text-2xl font-bold text-green-600">{batches.filter((batch: SalaryBatchRow) => batch.status === "PAID").length}</p>
               <p className="text-xs text-muted-foreground">{locale === "en" ? "Paid batches" : ar.paidBatches}</p>
             </div>
           </div>
@@ -133,7 +138,7 @@ export default async function SalariesPage({ params }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  batches.map((batch) => {
+                  batches.map((batch: SalaryBatchRow) => {
                     const journalEntry = batch.journalEntryId ? journalEntryMap.get(batch.journalEntryId) : null;
                     const canMutate =
                       (batch.status === "DRAFT" || batch.status === "APPROVED") &&
@@ -161,7 +166,7 @@ export default async function SalariesPage({ params }: Props) {
                                     : "bg-gray-50 text-gray-700"
                             }`}
                           >
-                            {statusLabels[locale][batch.status]}
+                            {getStatusLabel(batch.status)}
                           </span>
                         </td>
                         <td>

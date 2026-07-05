@@ -108,7 +108,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
                 defaultValue={fiscalYear?.id ?? ""}
                 className="input-field"
               >
-                {allFiscalYears.map((fy) => (
+                {allFiscalYears.map((fy: typeof allFiscalYears[number]) => (
                   <option key={fy.id} value={fy.id}>
                     {fy.year} {fy.isCurrent ? t.current : ""}
                   </option>
@@ -202,7 +202,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
                         <td colSpan={2} className="text-center text-muted-foreground py-4">{t.noRevenues}</td>
                       </tr>
                     ) : (
-                      report.revenues.map((row) => (
+                      report.revenues.map((row: typeof report.revenues[number]) => (
                         <tr
                           key={row.accountId}
                           className={row.isHeader ? "bg-muted/20" : "hover:bg-muted/10"}
@@ -235,7 +235,7 @@ export default async function IncomeStatementPage({ params, searchParams }: Prop
                         <td colSpan={2} className="text-center text-muted-foreground py-4">{t.noExpenses}</td>
                       </tr>
                     ) : (
-                      report.expenses.map((row) => (
+                      report.expenses.map((row: typeof report.expenses[number]) => (
                         <tr
                           key={row.accountId}
                           className={row.isHeader ? "bg-muted/20" : "hover:bg-muted/10"}

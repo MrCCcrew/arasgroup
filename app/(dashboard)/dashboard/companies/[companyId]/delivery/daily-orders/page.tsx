@@ -172,7 +172,11 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     }),
   ]);
 
-  const driverOptions = driverRows.map((driver) => ({
+  type DailyOrderItem = typeof orders[number];
+  type DriverRowItem = typeof driverRows[number];
+  type DriverOption = { id: string; name: string; isActive: boolean };
+
+  const driverOptions = driverRows.map((driver: DriverRowItem): DriverOption => ({
     id: driver.id,
     name: locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr,
     isActive: driver.employee.isActive,
@@ -184,7 +188,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     select: { id: true, driverId: true, contractId: true, date: true },
   });
 
-  const allDriverIds = [...new Set(allFilteredOrders.map((order) => order.driverId))];
+  const allDriverIds = [...new Set(allFilteredOrders.map((order: typeof allFilteredOrders[number]) => order.driverId))];
   const charges =
     allDriverIds.length > 0
       ? await prisma.driverWalletTransaction.findMany({
@@ -214,18 +218,18 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     totalCollectionAmount += collection;
   }
 
-  const selectedDriver = sp.driverId ? driverRows.find((driver) => driver.id === sp.driverId) : null;
+  const selectedDriver = sp.driverId ? driverRows.find((driver: DriverRowItem) => driver.id === sp.driverId) : null;
   const statsDriverRows = selectedDriver
     ? [selectedDriver]
-    : driverRows.filter((driver) => allDriverIds.includes(driver.id));
-  const totalWalletBalance = statsDriverRows.reduce((sum, driver) => sum + Number(driver.walletBalance), 0);
+    : driverRows.filter((driver: DriverRowItem) => allDriverIds.includes(driver.id));
+  const totalWalletBalance = statsDriverRows.reduce((sum: number, driver: DriverRowItem) => sum + Number(driver.walletBalance), 0);
 
   const totalInvoicesAmount =
     statsDriverRows.length > 0
       ? await prisma.deliveryInvoice.aggregate({
           where: {
             targetType: "DRIVER",
-            driverId: { in: statsDriverRows.map((driver) => driver.id) },
+            driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
             deletedAt: null,
           },
           _sum: { amount: true },
@@ -303,7 +307,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
           >
             {locale === "en" ? "All" : AR.all}
           </Link>
-          {contracts.map((contract) => (
+          {contracts.map((contract: typeof contracts[number]) => (
             <Link
               key={contract.id}
               href={buildHref(companyId, { contractId: contract.id, driverId: sp.driverId, workStatus: sp.workStatus, month: sp.month, year: sp.year })}
@@ -322,7 +326,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
 
           <select name="year" defaultValue={effectiveYear} className="input-field w-32">
             <option value="">{locale === "en" ? "All years" : AR.selectYear}</option>
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+            {Array.from({ length: 5 }, (_: unknown, i: number) => new Date().getFullYear() - i).map((year: number) => (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
@@ -345,7 +349,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
 
           <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-80">
             <option value="">{locale === "en" ? "All drivers" : AR.allDrivers}</option>
-            {driverOptions.map((driver) => (
+            {driverOptions.map((driver: DriverOption) => (
               <option key={driver.id} value={driver.id}>
                 {driver.name}
                 {driver.isActive ? "" : locale === "en" ? " (Inactive)" : ` (${AR.inactive})`}
@@ -363,7 +367,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["", "WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"] as const).map((status) => (
+          {(["", "WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"] as const).map((status: "" | WorkStatus) => (
             <Link
               key={status || "all-statuses"}
               href={buildHref(companyId, { contractId: sp.contractId, driverId: sp.driverId, workStatus: status || undefined, month: sp.month, year: sp.year })}
@@ -432,7 +436,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order) => (
+                  orders.map((order: DailyOrderItem) => (
                     <tr key={order.id} className="hover:bg-muted/30">
                       <td className="text-sm">{formatDate(order.date, numberLocale)}</td>
                       <td className="font-medium">
@@ -452,7 +456,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                         )}
                         {order.allocations.length > 0 && (
                           <div className="mt-1 space-y-0.5">
-                            {order.allocations.map((allocation) => (
+                            {order.allocations.map((allocation: DailyOrderItem["allocations"][number]) => (
                               <p key={allocation.id} className="text-xs font-normal text-emerald-600">
                                 {"\u21b3"} {locale === "en" ? allocation.driver.employee.nameEn ?? allocation.driver.employee.nameAr : allocation.driver.employee.nameAr}:{" "}
                                 {allocation.allocatedOrders}
@@ -501,8 +505,8 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                               orderId={order.id}
                               ordersCount={order.ordersCount}
                               originalDriverName={locale === "en" ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}
-                              drivers={driverOptions.filter((driver) => driver.isActive).map((driver) => ({ id: driver.id, name: driver.name }))}
-                              initial={order.allocations.map((allocation) => ({
+                              drivers={driverOptions.filter((driver: DriverOption) => driver.isActive).map((driver: DriverOption) => ({ id: driver.id, name: driver.name }))}
+                              initial={order.allocations.map((allocation: DailyOrderItem["allocations"][number]) => ({
                                 driverId: allocation.driverId,
                                 allocatedOrders: allocation.allocatedOrders,
                                 walletAmount: allocation.walletAmount != null ? Number(allocation.walletAmount) : null,
@@ -537,7 +541,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
 
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map((currentPage) => (
+            {Array.from({ length: totalPages }, (_: unknown, index: number) => index + 1).map((currentPage: number) => (
               <Link
                 key={currentPage}
                 href={buildHref(companyId, {

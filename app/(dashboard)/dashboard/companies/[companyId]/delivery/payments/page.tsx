@@ -71,9 +71,10 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
     }),
   ]);
 
-  const totalGross = payments.reduce((sum, payment) => sum + Number(payment.grossAmount), 0);
-  const totalWallet = payments.reduce((sum, payment) => sum + Number(payment.walletDeductions), 0);
-  const totalNet = payments.reduce((sum, payment) => sum + Number(payment.netReceived), 0);
+  type DeliveryPaymentRow = typeof payments[number];
+  const totalGross = payments.reduce((sum: number, payment: DeliveryPaymentRow) => sum + Number(payment.grossAmount), 0);
+  const totalWallet = payments.reduce((sum: number, payment: DeliveryPaymentRow) => sum + Number(payment.walletDeductions), 0);
+  const totalNet = payments.reduce((sum: number, payment: DeliveryPaymentRow) => sum + Number(payment.netReceived), 0);
 
   return (
     <div>
@@ -98,7 +99,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Year" : "السنة"}</label>
               <select name="year" defaultValue={year} className="input-field">
-                {[2024, 2025, 2026].map((value) => (
+                {[2024, 2025, 2026].map((value: number) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -109,7 +110,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
               <select name="month" defaultValue={month} className="input-field">
                 <option value="">{locale === "en" ? "All months" : "كل الشهور"}</option>
-                {MONTHS[locale].map((monthName, index) => (
+                {MONTHS[locale].map((monthName: string, index: number) => (
                   <option key={index + 1} value={index + 1}>
                     {monthName}
                   </option>
@@ -120,7 +121,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Platform" : "المنصة"}</label>
               <select name="platform" defaultValue={sp.platform ?? ""} className="input-field">
                 <option value="">{locale === "en" ? "All platforms" : "كل المنصات"}</option>
-                {Object.entries(KNOWN_PLATFORMS).map(([key, val]) => (
+                {Object.entries(KNOWN_PLATFORMS).map(([key, val]: [string, { ar: string; en: string; color: string }]) => (
                   <option key={key} value={key}>{locale === "en" ? val.en : val.ar}</option>
                 ))}
               </select>
@@ -183,7 +184,7 @@ export default async function DeliveryPaymentsPage({ params, searchParams }: Pro
                     </td>
                   </tr>
                 ) : (
-                  payments.map((payment) => (
+                  payments.map((payment: DeliveryPaymentRow) => (
                     <tr key={payment.id} className="hover:bg-muted/10">
                       <td className="text-sm">{formatDate(payment.receivedDate, numberLocale)}</td>
                       <td>

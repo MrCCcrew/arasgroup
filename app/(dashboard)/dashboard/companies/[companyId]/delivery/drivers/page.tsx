@@ -119,7 +119,7 @@ export default async function DriversPage({ params, searchParams }: Props) {
             { value: "", label: en ? `All (${drivers.length})` : `الكل (${drivers.length})` },
             { value: "TALABAT", label: en ? "Talabat" : "طلبات" },
             { value: "RO_POPS", label: "Ro Pops" },
-          ].map((filterItem) => (
+          ].map((filterItem: { value: string; label: string }) => (
             <Link
               key={filterItem.value}
               href={buildHref({ platform: filterItem.value })}
@@ -140,7 +140,7 @@ export default async function DriversPage({ params, searchParams }: Props) {
             { value: "active", label: en ? "Active" : "النشطون" },
             { value: "inactive", label: en ? "Inactive" : "غير النشطين" },
             { value: "all", label: en ? "All statuses" : "كل الحالات" },
-          ].map((item) => (
+          ].map((item: { value: string; label: string }) => (
             <Link
               key={item.value}
               href={buildHref({ view: item.value })}
@@ -156,7 +156,7 @@ export default async function DriversPage({ params, searchParams }: Props) {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {drivers.map((driver) => {
+          {drivers.map((driver: typeof drivers[number]) => {
             const days = daysUntilExpiry(driver.employee.residencyExpiry);
             const isExpired = days !== null && days < 0;
             const isExpiringSoon = days !== null && days <= 60;

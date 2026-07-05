@@ -107,6 +107,12 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
     orderBy: { claimDate: "desc" },
   });
 
+  type ClaimRow = typeof claims[number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type BeneficiaryRow = ClaimRow["beneficiaries"][number];
+  const getTypeLabel = (type: keyof typeof typeLabels.ar) => typeLabels[locale][type];
+  const getStatusLabel = (status: keyof typeof statusLabels.ar) => statusLabels[locale][status];
+
   const filters = [
     "",
     "PENDING",
@@ -189,9 +195,9 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  claims.map((claim) => {
-                    const totalActual    = claim.lines.reduce((s, l) => s + Number(l.actualAmount), 0);
-                    const totalCollected = claim.lines.reduce((s, l) => s + Number(l.collectedAmount), 0);
+                  claims.map((claim: ClaimRow) => {
+                    const totalActual    = claim.lines.reduce((s: number, l: ClaimLineRow) => s + Number(l.actualAmount), 0);
+                    const totalCollected = claim.lines.reduce((s: number, l: ClaimLineRow) => s + Number(l.collectedAmount), 0);
                     const investorName   = locale === "en" ? claim.investor.nameEn ?? claim.investor.nameAr : claim.investor.nameAr;
                     const branchName     = claim.branch
                       ? (locale === "en" ? claim.branch.nameEn ?? claim.branch.nameAr : claim.branch.nameAr)
@@ -203,11 +209,11 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                         <td>
                           <div className="space-y-1">
                             <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                              {typeLabels[locale][claim.type]}
+                              {getTypeLabel(claim.type)}
                             </span>
                             {claim.beneficiaries.length > 0 && (
                               <div className="flex flex-wrap gap-1">
-                                {claim.beneficiaries.map((b) => (
+                                {claim.beneficiaries.map((b: BeneficiaryRow) => (
                                   <span
                                     key={b.id}
                                     className={`rounded-full px-1.5 py-0.5 text-xs ${b.isInvestor ? "bg-primary/10 text-primary" : "bg-blue-50 text-blue-700"}`}
@@ -230,7 +236,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                         </td>
                         <td>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[claim.status] ?? "bg-muted text-muted-foreground"}`}>
-                            {statusLabels[locale][claim.status as keyof typeof statusLabels.ar] ?? claim.status}
+                            {getStatusLabel(claim.status) ?? claim.status}
                           </span>
                         </td>
                         <td>
@@ -244,7 +250,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
                               investorName={investorName}
                               claimType={claim.type}
                               claimDescription={claim.descriptionAr}
-                              claimLines={claim.lines.map((l) => ({
+                              claimLines={claim.lines.map((l: ClaimLineRow) => ({
                                 id: l.id,
                                 descriptionAr: l.descriptionAr,
                                 actualAmount: Number(l.actualAmount),
@@ -359,18 +365,22 @@ async function RenewalAlertsPanel({
     }),
   ]);
 
+  type ResidencyEmployeeRow = typeof residencyEmps[number];
+  type LicenseEmployeeRow = typeof licenseEmps[number];
+  type CompanyLicenseRow = typeof companyLicenses[number];
+
   // فلتر الموظفين بحدود التنبيه الخاصة بكل منهم
-  const residencyAlerts = residencyEmps.filter((e) => {
+  const residencyAlerts = residencyEmps.filter((e: ResidencyEmployeeRow) => {
     const d = Math.ceil((e.residencyExpiry!.getTime() - now.getTime()) / 86400000);
     return d <= e.residencyAlertDays;
   });
-  const empLicenseAlerts = licenseEmps.filter((e) => {
+  const empLicenseAlerts = licenseEmps.filter((e: LicenseEmployeeRow) => {
     const d = Math.ceil((e.licenseExpiry!.getTime() - now.getTime()) / 86400000);
     return d <= 60;
   });
 
   // مطالبات موظفين مفتوحة
-  const empIds = [...residencyAlerts.map((e) => e.id), ...empLicenseAlerts.map((e) => e.id)];
+  const empIds = [...residencyAlerts.map((e: ResidencyEmployeeRow) => e.id), ...empLicenseAlerts.map((e: LicenseEmployeeRow) => e.id)];
   const openBeneficiaries = empIds.length > 0
     ? await prisma.investorClaimBeneficiary.findMany({
         where: {
@@ -380,6 +390,7 @@ async function RenewalAlertsPanel({
         select: { employeeId: true, claim: { select: { id: true, status: true, type: true } } },
       })
     : [];
+  type OpenBeneficiaryRow = typeof openBeneficiaries[number];
 
   const claimMap = new Map<string, { id: string; status: string }>();
   for (const b of openBeneficiaries) {

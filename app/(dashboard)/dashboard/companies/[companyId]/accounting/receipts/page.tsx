@@ -62,8 +62,8 @@ export default async function ReceiptsPage({ params, searchParams }: Props) {
   const totalAmount = Number(receiptsTotal._sum.credit ?? 0);
 
   function getReceiptInfo(entry: typeof entries[0]) {
-    const creditLine = entry.lines.find((l) => Number(l.credit) > 0);
-    const debitLine = entry.lines.find((l) => Number(l.debit) > 0);
+    const creditLine = entry.lines.find((l: typeof entry.lines[number]) => Number(l.credit) > 0);
+    const debitLine = entry.lines.find((l: typeof entry.lines[number]) => Number(l.debit) > 0);
     const amount = Number(creditLine?.credit ?? 0);
     const method = debitLine?.descriptionAr === "نقدي" ? "cash" : debitLine?.descriptionAr === "بنك" ? "bank" : "none";
     return { creditAccount: creditLine?.account, debitAccount: debitLine?.account, amount, method };
@@ -172,7 +172,7 @@ export default async function ReceiptsPage({ params, searchParams }: Props) {
                       {t.empty}
                     </td>
                   </tr>
-                ) : entries.map((entry) => {
+                ) : entries.map((entry: typeof entries[number]) => {
                   const { creditAccount, amount, method } = getReceiptInfo(entry);
                   const parts = entry.descriptionAr.split(" — ");
                   const desc = parts[0];

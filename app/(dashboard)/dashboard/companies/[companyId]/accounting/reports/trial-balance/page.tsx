@@ -51,13 +51,14 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
   const rows = fiscalYear
     ? await getTrialBalance(companyId, fiscalYear.id)
     : [];
+  type TrialBalanceRow = typeof rows[number];
 
-  const totalOpeningDebit = rows.reduce((s, r) => s + r.openingDebit, 0);
-  const totalOpeningCredit = rows.reduce((s, r) => s + r.openingCredit, 0);
-  const totalPeriodDebit = rows.reduce((s, r) => s + r.periodDebit, 0);
-  const totalPeriodCredit = rows.reduce((s, r) => s + r.periodCredit, 0);
-  const totalClosingDebit = rows.reduce((s, r) => s + r.closingDebit, 0);
-  const totalClosingCredit = rows.reduce((s, r) => s + r.closingCredit, 0);
+  const totalOpeningDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.openingDebit, 0);
+  const totalOpeningCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.openingCredit, 0);
+  const totalPeriodDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.periodDebit, 0);
+  const totalPeriodCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.periodCredit, 0);
+  const totalClosingDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.closingDebit, 0);
+  const totalClosingCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.closingCredit, 0);
 
   return (
     <div>
@@ -120,7 +121,7 @@ export default async function TrialBalancePage({ params, searchParams }: Props) 
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row: TrialBalanceRow) => (
                     <tr
                       key={row.accountId}
                       className={`${row.isHeader ? "bg-muted/20 font-bold" : "hover:bg-muted/10"}`}

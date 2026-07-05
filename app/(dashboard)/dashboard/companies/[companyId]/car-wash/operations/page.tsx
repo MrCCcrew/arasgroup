@@ -53,11 +53,13 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
     select: { id: true, code: true, nameAr: true, nameEn: true },
   });
 
-  const totalCash = operations.reduce((sum, operation) => sum + Number(operation.totalCash), 0);
-  const totalKnet = operations.reduce((sum, operation) => sum + Number(operation.totalKnet), 0);
+  type CarWashOperationItem = typeof operations[number];
+  type CarWashVehicleItem = typeof vehicles[number];
+  const totalCash = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.totalCash), 0);
+  const totalKnet = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.totalKnet), 0);
   const totalRevenue = totalCash + totalKnet;
-  const totalExpenses = operations.reduce((sum, operation) => sum + Number(operation.totalExpenses), 0);
-  const netRevenue = operations.reduce((sum, operation) => sum + Number(operation.netRevenue), 0);
+  const totalExpenses = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.totalExpenses), 0);
+  const netRevenue = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.netRevenue), 0);
 
   const canDelete = hasPermission(session, "CAR_WASH_OPERATIONS", "DELETE", { companyId });
 
@@ -85,7 +87,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
             { label: locale === "en" ? "Cash" : "نقدي", value: totalCash, color: "text-blue-600" },
             { label: "KNET", value: totalKnet, color: "text-purple-600" },
             { label: locale === "en" ? "Net profit" : "صافي الربح", value: netRevenue, color: "text-emerald-600" },
-          ].map((stat) => (
+          ].map((stat: { label: string; value: number; color: string }) => (
             <div key={stat.label} className="stat-card">
               <p className="text-xs text-muted-foreground">{stat.label}</p>
               <p className={`number text-xl font-bold ${stat.color}`}>{formatKWD(stat.value, numberLocale)}</p>
@@ -100,7 +102,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
           >
             {locale === "en" ? "All" : "الكل"}
           </Link>
-          {vehicles.map((vehicle) => (
+          {vehicles.map((vehicle: CarWashVehicleItem) => (
             <Link
               key={vehicle.id}
               href={`/dashboard/companies/${companyId}/car-wash/operations?vehicleId=${vehicle.id}&month=${month}&year=${year}`}
@@ -135,7 +137,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                     </td>
                   </tr>
                 ) : (
-                  operations.map((operation) => (
+                  operations.map((operation: CarWashOperationItem) => (
                     <tr key={operation.id} className="transition-colors hover:bg-muted/20">
                       <td className="text-sm">{formatDate(operation.date, numberLocale)}</td>
                       <td>

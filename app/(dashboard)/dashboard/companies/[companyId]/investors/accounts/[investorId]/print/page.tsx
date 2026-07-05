@@ -42,9 +42,14 @@ export default async function InvestorAccountPrintPage({ params }: Props) {
 
   if (!investor) notFound();
 
-  const totalActual = claims.reduce((sum, claim) => sum + claim.lines.reduce((inner, line) => inner + toNumber(line.actualAmount), 0), 0);
-  const totalCollected = claims.reduce((sum, claim) => sum + claim.lines.reduce((inner, line) => inner + toNumber(line.collectedAmount), 0), 0);
-  const salaryCollected = salaryCollections.reduce((sum, item) => sum + toNumber(item.collectedAmount), 0);
+  type ClaimRow = typeof claims[number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type AgreementRow = typeof agreements[number];
+  type SalaryCollectionRow = typeof salaryCollections[number];
+
+  const totalActual = claims.reduce((sum: number, claim: ClaimRow) => sum + claim.lines.reduce((inner: number, line: ClaimLineRow) => inner + toNumber(line.actualAmount), 0), 0);
+  const totalCollected = claims.reduce((sum: number, claim: ClaimRow) => sum + claim.lines.reduce((inner: number, line: ClaimLineRow) => inner + toNumber(line.collectedAmount), 0), 0);
+  const salaryCollected = salaryCollections.reduce((sum: number, item: SalaryCollectionRow) => sum + toNumber(item.collectedAmount), 0);
 
   return (
     <div className="min-h-screen bg-white p-8 text-black">
@@ -78,7 +83,7 @@ export default async function InvestorAccountPrintPage({ params }: Props) {
               </tr>
             </thead>
             <tbody>
-              {agreements.map((item) => (
+              {agreements.map((item: AgreementRow) => (
                 <tr key={item.id}>
                   <td className="border p-2">{item.titleAr}</td>
                   <td className="border p-2">{item.branch?.nameAr ?? "—"} {item.license ? `• ${item.license.licenseNumber}` : ""}</td>
@@ -104,9 +109,9 @@ export default async function InvestorAccountPrintPage({ params }: Props) {
               </tr>
             </thead>
             <tbody>
-              {claims.map((claim) => {
-                const actual = claim.lines.reduce((sum, line) => sum + toNumber(line.actualAmount), 0);
-                const collected = claim.lines.reduce((sum, line) => sum + toNumber(line.collectedAmount), 0);
+              {claims.map((claim: ClaimRow) => {
+                const actual = claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + toNumber(line.actualAmount), 0);
+                const collected = claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + toNumber(line.collectedAmount), 0);
                 return (
                   <tr key={claim.id}>
                     <td className="border p-2">{formatDate(claim.claimDate)}</td>
@@ -133,7 +138,7 @@ export default async function InvestorAccountPrintPage({ params }: Props) {
               </tr>
             </thead>
             <tbody>
-              {salaryCollections.map((item) => (
+              {salaryCollections.map((item: SalaryCollectionRow) => (
                 <tr key={item.id}>
                   <td className="border p-2">{formatMonthYear(item.month, item.year)}</td>
                   <td className="border p-2">{formatDate(item.collectedDate)}</td>

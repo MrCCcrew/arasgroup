@@ -49,11 +49,13 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
     orderBy: { code: "asc" },
   });
 
-  const vehicleStats = vehicles.map((vehicle) => {
-    const totalCash = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalCash), 0);
-    const totalKnet = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalKnet), 0);
-    const totalExpenses = vehicle.operations.reduce((sum, operation) => sum + Number(operation.totalExpenses), 0);
-    const netRevenue = vehicle.operations.reduce((sum, operation) => sum + Number(operation.netRevenue), 0);
+  type ProfitabilityVehicleItem = typeof vehicles[number];
+  type ProfitabilityOperationItem = ProfitabilityVehicleItem["operations"][number];
+  const vehicleStats = vehicles.map((vehicle: ProfitabilityVehicleItem) => {
+    const totalCash = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalCash), 0);
+    const totalKnet = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalKnet), 0);
+    const totalExpenses = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.totalExpenses), 0);
+    const netRevenue = vehicle.operations.reduce((sum: number, operation: ProfitabilityOperationItem) => sum + Number(operation.netRevenue), 0);
     const grossRevenue = totalCash + totalKnet;
     const operationDays = vehicle.operations.length;
     const avgDaily = operationDays > 0 ? netRevenue / operationDays : 0;
@@ -73,15 +75,16 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
       avgDaily,
     };
   });
+  type VehicleStat = typeof vehicleStats[number];
 
   const grandTotal = {
-    grossRevenue: vehicleStats.reduce((sum, vehicle) => sum + vehicle.grossRevenue, 0),
-    totalExpenses: vehicleStats.reduce((sum, vehicle) => sum + vehicle.totalExpenses, 0),
-    netRevenue: vehicleStats.reduce((sum, vehicle) => sum + vehicle.netRevenue, 0),
-    operationDays: vehicleStats.reduce((sum, vehicle) => sum + vehicle.operationDays, 0),
+    grossRevenue: vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.grossRevenue, 0),
+    totalExpenses: vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.totalExpenses, 0),
+    netRevenue: vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.netRevenue, 0),
+    operationDays: vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.operationDays, 0),
   };
 
-  const maxNet = Math.max(...vehicleStats.map((vehicle) => vehicle.netRevenue), 1);
+  const maxNet = Math.max(...vehicleStats.map((vehicle: VehicleStat) => vehicle.netRevenue), 1);
 
   return (
     <div>
@@ -97,7 +100,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
               <select name="month" defaultValue={month} className="input-field">
-                {MONTHS[locale].map((monthName, index) => (
+                {MONTHS[locale].map((monthName: string, index: number) => (
                   <option key={index + 1} value={index + 1}>
                     {monthName}
                   </option>
@@ -107,7 +110,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Year" : "السنة"}</label>
               <select name="year" defaultValue={year} className="input-field">
-                {[2024, 2025, 2026].map((value) => (
+                {[2024, 2025, 2026].map((value: number) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -165,7 +168,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
               {locale === "en" ? "Vehicle comparison - net revenue" : "مقارنة المركبات - صافي الإيراد"}
             </h3>
             <div className="space-y-3">
-              {[...vehicleStats].sort((a, b) => b.netRevenue - a.netRevenue).map((vehicle) => (
+              {[...vehicleStats].sort((a: VehicleStat, b: VehicleStat) => b.netRevenue - a.netRevenue).map((vehicle: VehicleStat) => (
                 <div key={vehicle.id} className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{locale === "en" ? vehicle.nameEn ?? vehicle.nameAr : vehicle.nameAr}</span>
@@ -209,7 +212,7 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
                     </td>
                   </tr>
                 ) : (
-                  vehicleStats.map((vehicle) => (
+                  vehicleStats.map((vehicle: VehicleStat) => (
                     <tr key={vehicle.id} className="hover:bg-muted/10">
                       <td className="font-mono text-sm">{vehicle.code}</td>
                       <td className="font-medium">
@@ -236,8 +239,8 @@ export default async function CarWashProfitabilityPage({ params, searchParams }:
                   <tr>
                     <td colSpan={2} className="py-2 text-center">{locale === "en" ? "Total" : "الإجمالي"}</td>
                     <td className="number text-center">{grandTotal.operationDays}</td>
-                    <td className="number">{formatKWD(vehicleStats.reduce((sum, vehicle) => sum + vehicle.totalCash, 0), numberLocale)}</td>
-                    <td className="number">{formatKWD(vehicleStats.reduce((sum, vehicle) => sum + vehicle.totalKnet, 0), numberLocale)}</td>
+                    <td className="number">{formatKWD(vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.totalCash, 0), numberLocale)}</td>
+                    <td className="number">{formatKWD(vehicleStats.reduce((sum: number, vehicle: VehicleStat) => sum + vehicle.totalKnet, 0), numberLocale)}</td>
                     <td className="number">{formatKWD(grandTotal.grossRevenue, numberLocale)}</td>
                     <td className="number text-red-600">{formatKWD(grandTotal.totalExpenses, numberLocale)}</td>
                     <td className="number text-emerald-600">{formatKWD(grandTotal.netRevenue, numberLocale)}</td>

@@ -62,8 +62,8 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
   const totalAmount = Number(paymentsTotal._sum.debit ?? 0);
 
   function getPaymentInfo(entry: typeof entries[0]) {
-    const debitLine = entry.lines.find((l) => Number(l.debit) > 0);
-    const creditLine = entry.lines.find((l) => Number(l.credit) > 0);
+    const debitLine = entry.lines.find((l: typeof entry.lines[number]) => Number(l.debit) > 0);
+    const creditLine = entry.lines.find((l: typeof entry.lines[number]) => Number(l.credit) > 0);
     const amount = Number(debitLine?.debit ?? 0);
     const method = creditLine?.descriptionAr === "نقدي" ? "cash" : creditLine?.descriptionAr === "بنك" ? "bank" : "none";
     return { debitAccount: debitLine?.account, creditAccount: creditLine?.account, amount, method };
@@ -174,7 +174,7 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
                       {t.empty}
                     </td>
                   </tr>
-                ) : entries.map((entry) => {
+                ) : entries.map((entry: typeof entries[number]) => {
                   const { debitAccount, amount, method } = getPaymentInfo(entry);
                   const parts = entry.descriptionAr.split(" — ");
                   const desc = parts[0];

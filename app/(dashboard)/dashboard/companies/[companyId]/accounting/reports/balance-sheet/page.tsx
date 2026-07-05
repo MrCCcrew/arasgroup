@@ -108,7 +108,7 @@ export default async function BalanceSheetPage({ params, searchParams }: Props) 
                 defaultValue={fiscalYear?.id ?? ""}
                 className="input-field"
               >
-                {allFiscalYears.map((fy) => (
+                {allFiscalYears.map((fy: typeof allFiscalYears[number]) => (
                   <option key={fy.id} value={fy.id}>
                     {fy.year} {fy.isCurrent ? t.current : ""}
                   </option>
@@ -182,7 +182,7 @@ export default async function BalanceSheetPage({ params, searchParams }: Props) 
                 <div className="bg-blue-50 px-4 py-2 font-bold text-blue-800 text-sm border-b">{t.assets}</div>
                 <table className="ar-table text-xs">
                   <tbody>
-                    {report.assets.map((row) => (
+                    {report.assets.map((row: typeof report.assets[number]) => (
                       <tr key={row.accountId} className={row.isHeader ? "bg-muted/20" : "hover:bg-muted/10"}>
                         <td className="font-mono text-muted-foreground w-20">{row.code}</td>
                         <td className={row.isHeader ? "font-bold" : ""}>{row.nameAr}</td>
@@ -205,7 +205,7 @@ export default async function BalanceSheetPage({ params, searchParams }: Props) 
                   <div className="bg-orange-50 px-4 py-2 font-bold text-orange-800 text-sm border-b">{t.liabilities}</div>
                   <table className="ar-table text-xs">
                     <tbody>
-                      {report.liabilities.map((row) => (
+                      {report.liabilities.map((row: typeof report.liabilities[number]) => (
                         <tr key={row.accountId} className={row.isHeader ? "bg-muted/20" : "hover:bg-muted/10"}>
                           <td className="font-mono text-muted-foreground w-20">{row.code}</td>
                           <td className={row.isHeader ? "font-bold" : ""}>{row.nameAr}</td>
@@ -226,7 +226,7 @@ export default async function BalanceSheetPage({ params, searchParams }: Props) 
                   <div className="bg-emerald-50 px-4 py-2 font-bold text-emerald-800 text-sm border-b">{t.equity}</div>
                   <table className="ar-table text-xs">
                     <tbody>
-                      {report.equity.map((row) => (
+                      {report.equity.map((row: typeof report.equity[number]) => (
                         <tr key={row.accountId} className={row.isHeader ? "bg-muted/20" : "hover:bg-muted/10"}>
                           <td className="font-mono text-muted-foreground w-20">{row.code}</td>
                           <td className={row.isHeader ? "font-bold" : ""}>{row.nameAr}</td>

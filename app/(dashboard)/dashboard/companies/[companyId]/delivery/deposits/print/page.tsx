@@ -66,6 +66,7 @@ export default async function DriverDepositsPrintPage({ params, searchParams }: 
       orderBy: [{ driver: { employee: { nameAr: "asc" } } }, { date: "asc" }],
     }),
   ]);
+  type DepositPrintRow = typeof deposits[number];
 
   // ملخص لكل سائق
   const grouped = new Map<string, { driverName: string; count: number; total: number }>();
@@ -79,7 +80,7 @@ export default async function DriverDepositsPrintPage({ params, searchParams }: 
     item.total += Number(d.amount);
   }
 
-  const grandTotal = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
+  const grandTotal = deposits.reduce((sum: number, d: DepositPrintRow) => sum + Number(d.amount), 0);
 
   const backQuery = new URLSearchParams({
     ...(sp.driverId ? { driverId: sp.driverId } : {}),
@@ -144,7 +145,7 @@ export default async function DriverDepositsPrintPage({ params, searchParams }: 
             </tr>
           </thead>
           <tbody>
-            {Array.from(grouped.values()).map((item) => (
+            {Array.from(grouped.values()).map((item: { driverName: string; count: number; total: number }) => (
               <tr key={item.driverName}>
                 <td>{item.driverName}</td>
                 <td>{item.count}</td>
@@ -175,7 +176,7 @@ export default async function DriverDepositsPrintPage({ params, searchParams }: 
               </tr>
             </thead>
             <tbody>
-              {deposits.map((d) => (
+              {deposits.map((d: DepositPrintRow) => (
                 <tr key={d.id}>
                   <td>{formatDate(d.date, "ar-KW")}</td>
                   <td>{d.driver.employee.nameAr}</td>

@@ -62,8 +62,9 @@ export default async function HrTicketsPrintPage({ params, searchParams }: Props
     },
     orderBy: [{ travelDate: "desc" }, { createdAt: "desc" }],
   });
+  type TicketPrintRow = typeof tickets[number];
 
-  const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.cost ?? 0), 0);
+  const totalCost = tickets.reduce((sum: number, ticket: TicketPrintRow) => sum + Number(ticket.cost ?? 0), 0);
 
   const activeFilters = [
     sp.type ? TICKET_TYPE_LABELS[locale][sp.type as keyof typeof TICKET_TYPE_LABELS.ar] ?? sp.type : null,
@@ -111,7 +112,7 @@ export default async function HrTicketsPrintPage({ params, searchParams }: Props
             </tr>
           </thead>
           <tbody>
-            {tickets.map((ticket) => (
+            {tickets.map((ticket: TicketPrintRow) => (
               <tr key={ticket.id}>
                 <td className="border p-2">{locale === "en" ? ticket.employee.nameEn ?? ticket.employee.nameAr : ticket.employee.nameAr}</td>
                 <td className="border p-2">{TICKET_TYPE_LABELS[locale][ticket.type as keyof typeof TICKET_TYPE_LABELS.ar] ?? ticket.type}</td>

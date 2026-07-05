@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import type { JournalStatus } from "@prisma/client";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -78,12 +79,14 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
 
   const page = parseInt(query.page ?? "1", 10);
   const pageSize = 20;
-  const statusFilter = query.status;
+  const allowedStatuses = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED"] as const satisfies readonly JournalStatus[];
+  const filters = ["", ...allowedStatuses] as const;
+  const statusFilter = allowedStatuses.find((status) => status === query.status);
 
   const where = {
     companyId,
     isDeleted: false,
-    ...(statusFilter ? { status: statusFilter as any } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
   };
 
   const [total, entries, unpostedCount] = await Promise.all([
@@ -108,7 +111,6 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const filters = ["", "DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED"] as const;
 
   const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
 
@@ -210,7 +212,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
                       <td className="font-bold number text-blue-600">{formatKWD(Number(entry.totalDebit), numberLocale)}</td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
-                          {statusLabels[locale][entry.status]}
+                          {statusLabels[locale][entry.status as keyof typeof statusLabels.ar]}
                         </span>
                       </td>
                       <td className="text-xs text-muted-foreground">
@@ -258,7 +260,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
 
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map((currentPage) => (
+            {Array.from({ length: totalPages }, (_: unknown, index: number) => index + 1).map((currentPage: number) => (
               <Link
                 key={currentPage}
                 href={`/dashboard/companies/${companyId}/accounting/journal-entries?page=${currentPage}${statusFilter ? `&status=${statusFilter}` : ""}`}

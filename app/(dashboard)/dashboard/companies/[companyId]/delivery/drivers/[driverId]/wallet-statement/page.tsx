@@ -78,6 +78,7 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
   const driverName = locale === "en"
     ? driver.employee.nameEn ?? driver.employee.nameAr
     : driver.employee.nameAr;
+  const getTypeLabel = (type: keyof typeof TYPE_LABELS.ar) => TYPE_LABELS[locale][type];
 
   return (
     <div>
@@ -141,7 +142,7 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((tx) => (
+                  transactions.map((tx: typeof transactions[number]) => (
                     <tr key={tx.id} className="hover:bg-muted/30">
                       <td className="text-sm">{formatDate(tx.date, numberLocale)}</td>
                       <td>
@@ -154,7 +155,7 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
                                 : "bg-blue-50 text-blue-700"
                           }`}
                         >
-                          {TYPE_LABELS[locale][tx.type]}
+                          {getTypeLabel(tx.type)}
                         </span>
                       </td>
                       <td
@@ -183,7 +184,7 @@ export default async function WalletStatementPage({ params, searchParams }: Prop
 
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            {Array.from({ length: totalPages }, (_: unknown, i: number) => i + 1).map((p: number) => (
               <Link
                 key={p}
                 href={`/dashboard/companies/${companyId}/delivery/drivers/${driverId}/wallet-statement?page=${p}`}

@@ -43,32 +43,39 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
     }),
   ]);
 
+  type InvestorRow = typeof investors[number];
+  type ChargeRow = typeof charges[number];
+  type ChargePaymentRow = ChargeRow["payments"][number];
+  type BatchRow = typeof batches[number];
+  type BatchLineRow = BatchRow["lines"][number];
+  type BatchPaymentRow = BatchRow["payments"][number];
+
   // كشوف لكل مسئول حسب النوع
   function chargeRows(type: string): { rows: Row[]; totals: Row } {
     const map = new Map<string, Row>();
-    for (const c of charges.filter((x) => x.type === type)) {
+    for (const c of charges.filter((x: ChargeRow) => x.type === type)) {
       const due = Number(c.amount);
-      const paid = c.payments.reduce((s, p) => s + Number(p.amount), 0);
+      const paid = c.payments.reduce((s: number, p: ChargePaymentRow) => s + Number(p.amount), 0);
       const r = map.get(c.investorId) ?? { id: c.investorId, name: c.investor.nameAr, due: 0, paid: 0, remaining: 0 };
       r.due += due; r.paid += paid; r.remaining += due - paid;
       map.set(c.investorId, r);
     }
     const rows = [...map.values()].sort((a, b) => b.remaining - a.remaining);
-    const totals = rows.reduce((t, r) => ({ id: "", name: "", due: t.due + r.due, paid: t.paid + r.paid, remaining: t.remaining + r.remaining }), { id: "", name: "", due: 0, paid: 0, remaining: 0 });
+    const totals = rows.reduce((t: Row, r: Row) => ({ id: "", name: "", due: t.due + r.due, paid: t.paid + r.paid, remaining: t.remaining + r.remaining }), { id: "", name: "", due: 0, paid: 0, remaining: 0 });
     return { rows, totals };
   }
 
   // كشف الرواتب لكل مسئول
   const salaryMap = new Map<string, Row>();
   for (const b of batches) {
-    const due = b.lines.reduce((s, l) => s + Number(l.amount), 0) + Number(b.bankCommission);
-    const paid = b.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const due = b.lines.reduce((s: number, l: BatchLineRow) => s + Number(l.amount), 0) + Number(b.bankCommission);
+    const paid = b.payments.reduce((s: number, p: BatchPaymentRow) => s + Number(p.amount), 0);
     const r = salaryMap.get(b.investorId) ?? { id: b.investorId, name: b.investor.nameAr, due: 0, paid: 0, remaining: 0 };
     r.due += due; r.paid += paid; r.remaining += due - paid;
     salaryMap.set(b.investorId, r);
   }
   const salaryRows = [...salaryMap.values()].sort((a, b) => b.remaining - a.remaining);
-  const salaryTotals = salaryRows.reduce((t, r) => ({ due: t.due + r.due, paid: t.paid + r.paid, remaining: t.remaining + r.remaining }), { due: 0, paid: 0, remaining: 0 });
+  const salaryTotals = salaryRows.reduce((t: { due: number; paid: number; remaining: number }, r: Row) => ({ due: t.due + r.due, paid: t.paid + r.paid, remaining: t.remaining + r.remaining }), { due: 0, paid: 0, remaining: 0 });
 
   // كشف لكل موظف (إجمالي رواتبه المسجّلة عبر الدفعات)
   const empMap = new Map<string, { name: string; total: number; count: number }>();
@@ -118,7 +125,7 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Official" : "المسئول"}</label>
             <select name="investorId" defaultValue={investorId ?? ""} className="input-field w-full sm:w-64">
               <option value="">{en ? "All officials" : "كل المسئولين"}</option>
-              {investors.map((i) => (<option key={i.id} value={i.id}>{i.nameAr}</option>))}
+              {investors.map((i: InvestorRow) => (<option key={i.id} value={i.id}>{i.nameAr}</option>))}
             </select>
           </div>
           <div>
@@ -147,7 +154,7 @@ export default async function ManagersReportsPage({ params, searchParams }: Prop
             <tbody>
               {empRows.length === 0 ? (
                 <tr><td colSpan={3} className="py-4 text-center text-muted-foreground">—</td></tr>
-              ) : empRows.map((e, i) => (
+              ) : empRows.map((e, i: number) => (
                 <tr key={i}><td className="font-medium">{e.name}</td><td className="number text-center">{e.count}</td><td className="number text-end font-bold">{money(e.total)}</td></tr>
               ))}
             </tbody>

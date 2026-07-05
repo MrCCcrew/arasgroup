@@ -70,13 +70,15 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
     prisma.driverWalletTransaction.aggregate({ where, _sum: { amount: true }, _count: true }),
   ]);
 
-  const driverOptions = driverRows.map((d) => ({
+  type DepositRow = typeof deposits[number];
+  type DepositDriverRow = typeof driverRows[number];
+  const driverOptions = driverRows.map((d: DepositDriverRow) => ({
     id: d.id,
     name: en ? d.employee.nameEn ?? d.employee.nameAr : d.employee.nameAr,
   }));
 
   const totalAmount = Number(agg._sum.amount ?? 0);
-  const selectedDriver = sp.driverId ? driverRows.find((d) => d.id === sp.driverId) : null;
+  const selectedDriver = sp.driverId ? driverRows.find((d: DepositDriverRow) => d.id === sp.driverId) : null;
   const selectedDriverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
 
   const printQuery = new URLSearchParams({
@@ -128,7 +130,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Year" : "السنة"}</label>
             <select name="year" defaultValue={effectiveYear} className="input-field w-28">
               <option value="">{en ? "All" : "الكل"}</option>
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+              {Array.from({ length: 5 }, (_: unknown, i: number) => new Date().getFullYear() - i).map((y: number) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
@@ -155,7 +157,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Driver" : "السائق"}</label>
             <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-64">
               <option value="">{en ? "All drivers" : "كل السائقين"}</option>
-              {driverOptions.map((d) => (
+              {driverOptions.map((d: { id: string; name: string }) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
@@ -215,7 +217,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
                     </td>
                   </tr>
                 ) : (
-                  deposits.map((d) => (
+                  deposits.map((d: DepositRow) => (
                     <tr key={d.id} className="hover:bg-muted/30">
                       <td className="text-sm">{formatDate(d.date, numberLocale)}</td>
                       <td className="font-medium">{en ? d.driver.employee.nameEn ?? d.driver.employee.nameAr : d.driver.employee.nameAr}</td>

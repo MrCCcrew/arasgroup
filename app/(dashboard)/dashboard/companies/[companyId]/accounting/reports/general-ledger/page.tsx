@@ -26,9 +26,9 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
     prisma.fiscalYear.findMany({ where: { companyId }, orderBy: { year: "desc" } }),
   ]);
 
-  const currentFiscalYear = fiscalYears.find((fy) => fy.isCurrent) ?? fiscalYears[0];
+  const currentFiscalYear = fiscalYears.find((fy: typeof fiscalYears[number]) => fy.isCurrent) ?? fiscalYears[0];
   const selectedFiscalYearId = sp.fiscalYearId ?? currentFiscalYear?.id;
-  const selectedFiscalYear = fiscalYears.find((fy) => fy.id === selectedFiscalYearId);
+  const selectedFiscalYear = fiscalYears.find((fy: typeof fiscalYears[number]) => fy.id === selectedFiscalYearId);
 
   const start = sp.startDate ? new Date(sp.startDate) : undefined;
   const end = sp.endDate ? new Date(sp.endDate) : undefined;
@@ -52,33 +52,14 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
   });
 
   // ── Fetch account names for those IDs ──
-  const accountIds = summaries.map((s) => s.accountId);
+  const accountIds = summaries.map((s: typeof summaries[number]) => s.accountId);
   const accounts = await prisma.chartOfAccount.findMany({
     where: { id: { in: accountIds } },
     select: { id: true, code: true, nameAr: true, type: true },
     orderBy: { code: "asc" },
   });
-  const accountMap = new Map(accounts.map((a) => [a.id, a]));
-
-  const accountData = summaries
-    .map((s) => {
-      const acc = accountMap.get(s.accountId);
-      if (!acc) return null;
-      const totalDebit = Number(s._sum.debit ?? 0);
-      const totalCredit = Number(s._sum.credit ?? 0);
-      return {
-        accountId: s.accountId,
-        code: acc.code,
-        nameAr: acc.nameAr,
-        type: acc.type,
-        totalDebit,
-        totalCredit,
-        closingBalance: totalDebit - totalCredit,
-        lineCount: s._count._all,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a!.code.localeCompare(b!.code)) as {
+  const accountMap = new Map<string, typeof accounts[number]>(accounts.map((a: typeof accounts[number]) => [a.id, a]));
+  type LedgerAccountSummary = {
     accountId: string;
     code: string;
     nameAr: string;
@@ -87,10 +68,30 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
     totalCredit: number;
     closingBalance: number;
     lineCount: number;
-  }[];
+  };
 
-  const grandTotalDebit = accountData.reduce((s, a) => s + a.totalDebit, 0);
-  const grandTotalCredit = accountData.reduce((s, a) => s + a.totalCredit, 0);
+  const accountData = summaries
+    .reduce<LedgerAccountSummary[]>((rows: LedgerAccountSummary[], s: typeof summaries[number]) => {
+      const acc = accountMap.get(s.accountId);
+      if (!acc) return rows;
+      const totalDebit = Number(s._sum.debit ?? 0);
+      const totalCredit = Number(s._sum.credit ?? 0);
+      rows.push({
+        accountId: s.accountId,
+        code: acc.code,
+        nameAr: acc.nameAr,
+        type: acc.type,
+        totalDebit,
+        totalCredit,
+        closingBalance: totalDebit - totalCredit,
+        lineCount: s._count._all,
+      });
+      return rows;
+    }, [])
+    .sort((a: LedgerAccountSummary, b: LedgerAccountSummary) => a.code.localeCompare(b.code));
+
+  const grandTotalDebit = accountData.reduce((s: number, a: LedgerAccountSummary) => s + a.totalDebit, 0);
+  const grandTotalCredit = accountData.reduce((s: number, a: LedgerAccountSummary) => s + a.totalCredit, 0);
 
   const en = (await getLocale()) === "en";
   const numberLocale = en ? "en-US" : "ar-KW";
@@ -128,7 +129,7 @@ export default async function GeneralLedgerPage({ params, searchParams }: Props)
                 className="input-field"
               >
                 <option value="">{t.allPeriodsOpt}</option>
-                {fiscalYears.map((fy) => (
+                {fiscalYears.map((fy: typeof fiscalYears[number]) => (
                   <option key={fy.id} value={fy.id}>
                     {fy.year}
                   </option>

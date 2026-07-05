@@ -53,7 +53,7 @@ export default async function VehicleIncidentsPage({ params }: Props) {
   // Serialize — convert Date → ISO string, Decimal → string for client component
   const serialize = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-  const drivers:          DriverRow[]  = driversRaw.map((d) => ({
+  const drivers:          DriverRow[]  = driversRaw.map((d: typeof driversRaw[number]) => ({
     id: d.id,
     employee: { nameAr: d.employee.nameAr, nameEn: d.employee.nameEn },
     assignedVehicleId: d.assignedVehicleId ?? null,
@@ -72,11 +72,11 @@ export default async function VehicleIncidentsPage({ params }: Props) {
   // قائمة "المركبة المتضررة" يجب أن تعرض كل المركبات (المملوكة + المستأجرة)،
   // وليس المستأجرة فقط — مع إزالة التكرار لأن المستأجرة قد تكون من نوع DELIVERY أيضاً.
   const incidentVehicles: VehicleRow[] = Array.from(
-    new Map([...ownVehicles, ...rentedVehicles].map((v) => [v.id, v])).values(),
+    new Map<string, VehicleRow>([...ownVehicles, ...rentedVehicles].map((v: VehicleRow) => [v.id, v])).values(),
   ).sort((a, b) => a.plateNumber.localeCompare(b.plateNumber, "ar"));
 
   const incidents: Incident[] = serialize(
-    incidentsRaw.map((inc) => ({
+    incidentsRaw.map((inc: typeof incidentsRaw[number]) => ({
       id:                     inc.id,
       driverId:               inc.driverId,
       vehicleId:              inc.vehicleId,

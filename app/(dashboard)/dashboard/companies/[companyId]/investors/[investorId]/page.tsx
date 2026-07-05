@@ -95,6 +95,8 @@ export default async function InvestorDetailPage({ params }: Props) {
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
+  const getClaimTypeLabel = (type: keyof typeof claimTypeLabels.ar) => claimTypeLabels[locale][type];
+  const getClaimStatusLabel = (status: keyof typeof statusLabels.ar) => statusLabels[locale][status];
 
   const investor = await prisma.investor.findUnique({
     where: { id: investorId, isActive: true },
@@ -131,11 +133,14 @@ export default async function InvestorDetailPage({ params }: Props) {
     },
     orderBy: { claimDate: "desc" },
   });
+  type ClaimRow = typeof claims[number];
+  type ClaimLineRow = ClaimRow["lines"][number];
+  type InvestorEmployeeRow = typeof investorEmployees[number];
 
   const totalClaims = claims.length;
-  const openClaims = claims.filter((claim) => ["PENDING", "PARTIALLY_COLLECTED", "SENT_TO_ACCOUNTANT", "OVERDUE"].includes(claim.status)).length;
-  const totalCollected = claims.reduce((sum, claim) => sum + claim.lines.reduce((inner, line) => inner + Number(line.collectedAmount), 0), 0);
-  const totalIncome = claims.reduce((sum, claim) => sum + claim.lines.reduce((inner, line) => inner + Number(line.groupIncome), 0), 0);
+  const openClaims = claims.filter((claim: ClaimRow) => ["PENDING", "PARTIALLY_COLLECTED", "SENT_TO_ACCOUNTANT", "OVERDUE"].includes(claim.status)).length;
+  const totalCollected = claims.reduce((sum: number, claim: ClaimRow) => sum + claim.lines.reduce((inner: number, line: ClaimLineRow) => inner + Number(line.collectedAmount), 0), 0);
+  const totalIncome = claims.reduce((sum: number, claim: ClaimRow) => sum + claim.lines.reduce((inner: number, line: ClaimLineRow) => inner + Number(line.groupIncome), 0), 0);
 
   const investorName = locale === "en" ? investor.nameEn ?? investor.nameAr : investor.nameAr;
 
@@ -220,7 +225,7 @@ export default async function InvestorDetailPage({ params }: Props) {
               <div className="border-t pt-2">
                 <p className="mb-2 text-xs text-muted-foreground">{locale === "en" ? "Linked branches" : "الفروع المرتبطة"}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {investor.investorBranches.map((item) => (
+                  {investor.investorBranches.map((item: typeof investor.investorBranches[number]) => (
                     <span key={item.id} className="rounded-full bg-muted px-2 py-0.5 text-xs">
                       {locale === "en" ? item.branch.nameEn ?? item.branch.nameAr : item.branch.nameAr}
                       {Number(item.ownershipPct) !== 100 && (
@@ -269,7 +274,7 @@ export default async function InvestorDetailPage({ params }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {investorEmployees.map((emp) => (
+                  {investorEmployees.map((emp: InvestorEmployeeRow) => (
                     <tr key={emp.id} className="transition-colors hover:bg-muted/20">
                       <td>
                         <div className="flex items-center gap-2">
@@ -332,10 +337,10 @@ export default async function InvestorDetailPage({ params }: Props) {
                     </td>
                   </tr>
                 ) : (
-                  claims.map((claim) => {
-                    const collected = claim.lines.reduce((sum, line) => sum + Number(line.collectedAmount), 0);
-                    const actual = claim.lines.reduce((sum, line) => sum + Number(line.actualAmount), 0);
-                    const income = claim.lines.reduce((sum, line) => sum + Number(line.groupIncome), 0);
+                  claims.map((claim: ClaimRow) => {
+                    const collected = claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + Number(line.collectedAmount), 0);
+                    const actual = claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + Number(line.actualAmount), 0);
+                    const income = claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + Number(line.groupIncome), 0);
 
                     return (
                       <tr key={claim.id} className="transition-colors hover:bg-muted/20">
@@ -343,11 +348,11 @@ export default async function InvestorDetailPage({ params }: Props) {
                         <td>
                           <div className="space-y-1">
                             <span className="whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-xs">
-                              {claimTypeLabels[locale][claim.type]}
+                              {getClaimTypeLabel(claim.type)}
                             </span>
                             {claim.beneficiaries.length > 0 && (
                               <div className="flex flex-wrap gap-1">
-                                {claim.beneficiaries.map((b) => (
+                                {claim.beneficiaries.map((b: ClaimRow["beneficiaries"][number]) => (
                                   <span
                                     key={b.id}
                                     className={`rounded-full px-1.5 py-0.5 text-xs ${b.isInvestor ? "bg-primary/10 text-primary" : "bg-blue-50 text-blue-700"}`}
@@ -368,7 +373,7 @@ export default async function InvestorDetailPage({ params }: Props) {
                         <td className="font-bold number text-green-600">{formatKWD(income, numberLocale)}</td>
                         <td>
                           <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${statusColors[claim.status] ?? "bg-muted text-muted-foreground"}`}>
-                            {statusLabels[locale][claim.status]}
+                            {getClaimStatusLabel(claim.status)}
                           </span>
                         </td>
                       </tr>

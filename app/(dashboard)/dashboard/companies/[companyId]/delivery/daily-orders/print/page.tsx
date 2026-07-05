@@ -177,6 +177,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
   const driverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
   const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
   const netBalance = selectedDriver ? (driverBalance ?? 0) - driverInvoicesTotal : null;
+  type PrintedOrder = typeof orders[number];
 
   const grouped = new Map<
     string,
@@ -273,7 +274,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
         <div className="meta">
           <div className="card"><div className="label">{t.totalRecords}</div><div>{orders.length}</div></div>
           <div className="card"><div className="label">{t.totalDrivers}</div><div>{grouped.size}</div></div>
-          <div className="card"><div className="label">{t.totalOrders}</div><div>{orders.reduce((sum, order) => sum + order.ordersCount, 0)}</div></div>
+          <div className="card"><div className="label">{t.totalOrders}</div><div>{orders.reduce((sum: number, order: PrintedOrder) => sum + order.ordersCount, 0)}</div></div>
           <div className="card"><div className="label">{t.selectedStatus}</div><div>{sp.workStatus ? WORK_STATUS_LABELS[locale][sp.workStatus as WorkStatus] : t.allStatuses}</div></div>
         </div>
 
@@ -312,7 +313,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
             </tr>
           </thead>
           <tbody>
-            {Array.from(grouped.values()).map((item) => (
+            {Array.from(grouped.values()).map((item: { driverName: string; totalOrders: number; totalRows: number; statuses: Record<WorkStatus, number>; aliases: string[]; contracts: string[] }) => (
               <tr key={item.driverName}>
                 <td>{item.driverName}</td>
                 <td>{item.contracts.join(t.comma) || "-"}</td>
@@ -320,8 +321,8 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
                 <td>{item.totalRows}</td>
                 <td>
                   {Object.entries(item.statuses)
-                    .filter(([, count]) => count > 0)
-                    .map(([status, count]) => (
+                    .filter((entry: [string, number]) => entry[1] > 0)
+                    .map(([status, count]: [string, number]) => (
                       <span key={status} className="badge">
                         {WORK_STATUS_LABELS[locale][status as WorkStatus]}: {count}
                       </span>
@@ -348,7 +349,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {orders.map((order: PrintedOrder) => (
                 <tr key={order.id}>
                   <td>{formatDate(order.date, numberLocale)}</td>
                   <td>{isEnglish ? order.driver.employee.nameEn ?? order.driver.employee.nameAr : order.driver.employee.nameAr}</td>

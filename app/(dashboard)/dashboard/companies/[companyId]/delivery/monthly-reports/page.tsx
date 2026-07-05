@@ -82,7 +82,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
 
   const grouped = new Map<string, ReportLine>();
 
-  dailyOrders.forEach((order) => {
+  dailyOrders.forEach((order: typeof dailyOrders[number]) => {
     const key = `${order.driverId}-${order.contractId}`;
     const existing = grouped.get(key);
 
@@ -122,10 +122,11 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
   });
 
   const reports = Array.from(grouped.values());
+  type MonthlyReportRow = typeof reports[number];
 
   // Calculate totals
   const totals = reports.reduce(
-    (acc, report) => ({
+    (acc: { orders: number; gross: number; wallet: number; net: number }, report: MonthlyReportRow) => ({
       orders: acc.orders + report.ordersCount,
       gross: acc.gross + report.grossAmount,
       wallet: acc.wallet + report.walletDeducted,
@@ -166,7 +167,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                     </td>
                   </tr>
                 ) : (
-                  reports.map((report) => (
+                  reports.map((report: MonthlyReportRow) => (
                     <tr key={`${report.driverId}-${report.contractId}`} className="hover:bg-muted/30">
                       <td className="font-medium">{report.driverName}</td>
                       <td>

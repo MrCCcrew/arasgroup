@@ -379,7 +379,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">{locale === "en" ? "Year" : "السنة"}</label>
               <select name="year" defaultValue={effectiveYear} className="input-field w-28">
-                {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i).map((y) => (
+                {Array.from({ length: 5 }, (_: unknown, i: number) => now.getFullYear() - i).map((y: number) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
@@ -387,7 +387,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">{locale === "en" ? "Month" : "الشهر"}</label>
               <select name="month" defaultValue={effectiveMonth} className="input-field w-28">
-                {months.map((m, i) => (
+                {months.map((m: string, i: number) => (
                   <option key={i + 1} value={i + 1}>{m}</option>
                 ))}
               </select>
@@ -426,7 +426,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                 </div>
 
                 {/* Previous months (show last 5) */}
-                {monthlyBalances.filter(mb => !(mb.month === monthNum && mb.year === yearNum)).slice(0, 5).map((mb, i) => (
+                {monthlyBalances.filter((mb: typeof monthlyBalances[number]) => !(mb.month === monthNum && mb.year === yearNum)).slice(0, 5).map((mb: typeof monthlyBalances[number], i: number) => (
                   <div key={i} className="flex-1 min-w-[150px] rounded-lg border border-blue-200 bg-white px-3 py-2">
                     <p className="text-xs text-blue-700">{mb.label}</p>
                     <p className={`mt-1 text-base font-bold number ${mb.balance > 0 ? 'text-red-600' : 'text-gray-600'}`}>
@@ -458,7 +458,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                     </td>
                   </tr>
                 ) : (
-                  driver.walletTransactions.map((transaction) => (
+                  driver.walletTransactions.map((transaction: typeof driver.walletTransactions[number]) => (
                     <tr key={transaction.id}>
                       <td className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(transaction.date, numberLocale)}</td>
                       <td>
@@ -517,7 +517,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                     </td>
                   </tr>
                 ) : (
-                  driver.dailyOrders.map((order) => (
+                  driver.dailyOrders.map((order: typeof driver.dailyOrders[number]) => (
                     <tr key={order.id}>
                       <td className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(order.date, numberLocale)}</td>
                       <td>
@@ -568,7 +568,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                   </tr>
                 </thead>
                 <tbody>
-                  {driverViolations.map((v) => {
+                  {driverViolations.map((v: typeof driverViolations[number]) => {
                     const driverShare = v.responsibility === "SPLIT" ? (v.driverSharePct ?? 50) / 100 : v.responsibility === "DRIVER" ? 1 : 0;
                     const driverAmount = Number(v.amount) * driverShare;
                     const totalInst = v.paymentMode === "INSTALLMENT" ? (v.installmentMonths ?? 1) : 1;

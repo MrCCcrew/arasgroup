@@ -26,13 +26,14 @@ export default async function TrialBalancePrintPage({ params, searchParams }: Pr
   });
 
   const rows = fiscalYear ? await getTrialBalance(companyId, fiscalYear.id) : [];
+  type TrialBalanceRow = typeof rows[number];
 
-  const totalOpeningDebit = rows.reduce((s, r) => s + r.openingDebit, 0);
-  const totalOpeningCredit = rows.reduce((s, r) => s + r.openingCredit, 0);
-  const totalPeriodDebit = rows.reduce((s, r) => s + r.periodDebit, 0);
-  const totalPeriodCredit = rows.reduce((s, r) => s + r.periodCredit, 0);
-  const totalClosingDebit = rows.reduce((s, r) => s + r.closingDebit, 0);
-  const totalClosingCredit = rows.reduce((s, r) => s + r.closingCredit, 0);
+  const totalOpeningDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.openingDebit, 0);
+  const totalOpeningCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.openingCredit, 0);
+  const totalPeriodDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.periodDebit, 0);
+  const totalPeriodCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.periodCredit, 0);
+  const totalClosingDebit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.closingDebit, 0);
+  const totalClosingCredit = rows.reduce((s: number, r: TrialBalanceRow) => s + r.closingCredit, 0);
   const isBalanced = Math.abs(totalClosingDebit - totalClosingCredit) < 0.001;
   const printDate = new Date().toLocaleDateString("ar-KW", { year: "numeric", month: "long", day: "numeric" });
 
@@ -106,7 +107,7 @@ export default async function TrialBalancePrintPage({ params, searchParams }: Pr
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {rows.map((row: TrialBalanceRow) => (
                   <tr key={row.accountId} className={row.isHeader ? "header-row" : ""}>
                     <td style={{ fontFamily: "monospace", fontSize: "0.78rem" }}>{row.code}</td>
                     <td style={{ paddingRight: `${row.level * 0.8 + 0.5}rem`, fontWeight: row.isHeader ? 700 : 400 }}>{row.nameAr}</td>

@@ -66,8 +66,9 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
       : [],
   ]);
 
-  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price) * delivery.count, 0);
-  const totalOrders = deliveries.reduce((sum, delivery) => sum + delivery.count, 0);
+  type DeliveryPrintRow = typeof deliveries[number];
+  const grandTotal = deliveries.reduce((sum: number, delivery: DeliveryPrintRow) => sum + Number(delivery.price) * delivery.count, 0);
+  const totalOrders = deliveries.reduce((sum: number, delivery: DeliveryPrintRow) => sum + delivery.count, 0);
 
   const byDriver = new Map<string, { name: string; count: number; total: number }>();
   for (const delivery of deliveries) {
@@ -139,7 +140,7 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
             </tr>
           </thead>
           <tbody>
-            {[...byDriver.values()].sort((a, b) => b.total - a.total).map((row) => (
+            {[...byDriver.values()].sort((a: { name: string; count: number; total: number }, b: { name: string; count: number; total: number }) => b.total - a.total).map((row: { name: string; count: number; total: number }) => (
               <tr key={row.name}>
                 <td>{row.name}</td>
                 <td>{row.count}</td>
@@ -170,7 +171,7 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
             </tr>
           </thead>
           <tbody>
-            {deliveries.map((delivery) => (
+            {deliveries.map((delivery: DeliveryPrintRow) => (
               <tr key={delivery.id}>
                 <td>{formatDate(delivery.date, "ar-KW")}</td>
                 <td>{delivery.driver.employee.nameAr}</td>

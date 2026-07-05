@@ -167,7 +167,9 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     }),
   ]);
 
-  const driverIds = [...new Set(orders.map((order) => order.driverId))];
+  type SummaryOrder = typeof orders[number];
+  type SummaryDriver = typeof driverRows[number];
+  const driverIds = [...new Set(orders.map((order: SummaryOrder) => order.driverId))];
 
   const [charges, totalInvoicesAmount] = await Promise.all([
     driverIds.length > 0
@@ -209,8 +211,8 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     chargeByKey.set(key, (chargeByKey.get(key) ?? 0) + amount);
   }
 
-  const invoiceByDriverId = new Map(totalInvoicesAmount.map((row) => [row.driverId ?? "", Number(row._sum.amount ?? 0)]));
-  const driverById = new Map(driverRows.map((driver) => [driver.id, driver]));
+  const invoiceByDriverId = new Map<string, number>(totalInvoicesAmount.map((row: typeof totalInvoicesAmount[number]) => [row.driverId ?? "", Number(row._sum.amount ?? 0)]));
+  const driverById = new Map<string, SummaryDriver>(driverRows.map((driver: SummaryDriver) => [driver.id, driver]));
 
   const summaryMap = new Map<
     string,
@@ -252,8 +254,9 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
   }
 
   const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.driverName.localeCompare(b.driverName, isEnglish ? "en" : "ar"));
+  type SummaryRow = typeof summaryRows[number];
   const totals = summaryRows.reduce(
-    (acc, row) => {
+    (acc: { walletBalance: number; totalCollected: number; totalInvoices: number; netBalance: number; totalOrders: number }, row: SummaryRow) => {
       acc.walletBalance += row.walletBalance;
       acc.totalCollected += row.totalCollected;
       acc.totalInvoices += row.totalInvoices;
@@ -360,7 +363,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
                 <td colSpan={6} style={{ textAlign: "center" }}>-</td>
               </tr>
             ) : (
-              summaryRows.map((row) => (
+              summaryRows.map((row: SummaryRow) => (
                 <tr key={row.driverName}>
                   <td>{row.driverName}</td>
                   <td className="number">{row.walletBalance.toFixed(3)} {t.kwd}</td>

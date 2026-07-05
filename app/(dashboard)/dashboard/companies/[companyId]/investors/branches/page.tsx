@@ -41,8 +41,10 @@ export default async function InvestorBranchesPage({ params }: Props) {
     orderBy: [{ isMainLicense: "desc" }, { commercialNameAr: "asc" }],
   });
 
-  const mainLicenses = allLicenses.filter((l) => l.isMainLicense);
-  const subLicenses  = allLicenses.filter((l) => !l.isMainLicense);
+  type LicenseRow = typeof allLicenses[number];
+
+  const mainLicenses = allLicenses.filter((l: LicenseRow) => l.isMainLicense);
+  const subLicenses  = allLicenses.filter((l: LicenseRow) => !l.isMainLicense);
 
   // فهرسة التراخيص الفرعية حسب mainLicenseId
   const subsByMain = new Map<string, typeof subLicenses>();
@@ -93,7 +95,7 @@ export default async function InvestorBranchesPage({ params }: Props) {
             </tr>
           </thead>
           <tbody>
-            {subs.map((sub) => (
+            {subs.map((sub: LicenseRow) => (
               <tr key={sub.id} className="hover:bg-muted/30">
                 <td className="font-medium">{sub.commercialNameAr}</td>
                 <td className="font-mono text-sm" dir="ltr">{sub.licenseNumber}</td>
@@ -158,7 +160,7 @@ export default async function InvestorBranchesPage({ params }: Props) {
         ) : (
           <>
             {/* مجمّعة حسب الترخيص الرئيسي */}
-            {mainLicenses.map((main) => {
+            {mainLicenses.map((main: LicenseRow) => {
               const subs = subsByMain.get(main.id) ?? [];
               if (subs.length === 0) return null;
               return (

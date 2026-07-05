@@ -88,9 +88,12 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
         orderBy: [{ date: "desc" }, { createdAt: "asc" }],
       })
     : [];
+  type DeliveryReportRow = typeof deliveries[number];
+  type DeliveryDriverRow = typeof driverRows[number];
+  type DeliveryContractRow = typeof contracts[number];
 
-  const grandTotal = deliveries.reduce((sum, delivery) => sum + Number(delivery.price) * delivery.count, 0);
-  const totalOrders = deliveries.reduce((sum, delivery) => sum + delivery.count, 0);
+  const grandTotal = deliveries.reduce((sum: number, delivery: DeliveryReportRow) => sum + Number(delivery.price) * delivery.count, 0);
+  const totalOrders = deliveries.reduce((sum: number, delivery: DeliveryReportRow) => sum + delivery.count, 0);
 
   // count = عدد الطلبات (مجموع counts)، total = العدد × السعر
   const byDriver = new Map<string, { name: string; count: number; total: number }>();
@@ -152,7 +155,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">{en ? "Contract" : AR.contract}</label>
                 <select name="contractId" defaultValue={contractId} className="input-field w-full sm:w-56">
-                  {contracts.map((contract) => (
+                  {contracts.map((contract: DeliveryContractRow) => (
                     <option key={contract.id} value={contract.id}>
                       {en ? contract.nameEn ?? contract.nameAr : contract.nameAr}
                     </option>
@@ -164,7 +167,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                 <label className="mb-1 block text-xs text-muted-foreground">{en ? "Driver" : AR.driver}</label>
                 <select name="driverId" defaultValue={sp.driverId ?? ""} className="input-field w-full sm:w-56">
                   <option value="">{en ? "All drivers" : AR.allDrivers}</option>
-                  {driverRows.map((driver) => (
+                  {driverRows.map((driver: DeliveryDriverRow) => (
                     <option key={driver.id} value={driver.id}>
                       {driverName(driver)}
                     </option>
@@ -228,7 +231,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                         <td colSpan={3} className="py-4 text-center text-muted-foreground">—</td>
                       </tr>
                     ) : (
-                      [...byDriver.values()].sort((a, b) => b.total - a.total).map((row) => (
+                      [...byDriver.values()].sort((a: { name: string; count: number; total: number }, b: { name: string; count: number; total: number }) => b.total - a.total).map((row: { name: string; count: number; total: number }) => (
                         <tr key={row.name}>
                           <td className="font-medium">{row.name}</td>
                           <td className="number text-center">{row.count}</td>
@@ -256,7 +259,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                         <td colSpan={3} className="py-4 text-center text-muted-foreground">—</td>
                       </tr>
                     ) : (
-                      [...byRestaurant.values()].sort((a, b) => b.total - a.total).map((row) => (
+                      [...byRestaurant.values()].sort((a: { name: string; count: number; total: number }, b: { name: string; count: number; total: number }) => b.total - a.total).map((row: { name: string; count: number; total: number }) => (
                         <tr key={row.name}>
                           <td className="font-medium">{row.name}</td>
                           <td className="number text-center">{row.count}</td>
@@ -292,7 +295,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
                         </td>
                       </tr>
                     ) : (
-                      deliveries.map((delivery) => (
+                      deliveries.map((delivery: DeliveryReportRow) => (
                         <tr key={delivery.id} className="hover:bg-muted/30">
                           <td className="text-sm">{formatDate(delivery.date, numberLocale)}</td>
                           <td className="font-medium">{en ? delivery.driver.employee.nameEn ?? delivery.driver.employee.nameAr : delivery.driver.employee.nameAr}</td>

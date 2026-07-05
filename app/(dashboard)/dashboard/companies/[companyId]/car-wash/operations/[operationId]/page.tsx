@@ -91,7 +91,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
             { label: "إجمالي KNET", value: Number(operation.totalKnet), color: "text-purple-600" },
             { label: "إجمالي المصروفات", value: Number(operation.totalExpenses), color: "text-red-600" },
             { label: "صافي الإيراد", value: Number(operation.netRevenue), color: "text-green-600" },
-          ].map((item) => (
+          ].map((item: { label: string; value: number; color: string }) => (
             <div key={item.label} className="rounded-xl border bg-card p-4">
               <p className="mb-1 text-xs text-muted-foreground">{item.label}</p>
               <p className={`number text-xl font-bold ${item.color}`}>{item.value.toFixed(3)}</p>
@@ -113,7 +113,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {operation.revenues.map((revenue) => (
+                  {operation.revenues.map((revenue: typeof operation.revenues[number]) => (
                     <tr key={revenue.id}>
                       <td>
                         <span
@@ -146,7 +146,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {operation.expenses.map((expense) => (
+                  {operation.expenses.map((expense: typeof operation.expenses[number]) => (
                     <tr key={expense.id}>
                       <td className="text-sm">{expense.description}</td>
                       <td className="number font-bold text-red-600">{Number(expense.amount).toFixed(3)}</td>
@@ -171,7 +171,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {operation.knetTransactions.map((transaction) => (
+                  {operation.knetTransactions.map((transaction: typeof operation.knetTransactions[number]) => (
                     <tr key={transaction.id}>
                       <td className="number text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString("ar-KW")}</td>
                       <td className="number text-sm">{transaction.transactionRef ?? "-"}</td>
