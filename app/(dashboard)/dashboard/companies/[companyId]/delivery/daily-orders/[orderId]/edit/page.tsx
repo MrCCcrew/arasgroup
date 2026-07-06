@@ -51,7 +51,7 @@ export default function EditDailyOrderPage() {
   const [driverOptions, setDriverOptions] = useState<DriverOption[]>([]);
 
   const [ordersCount, setOrdersCount] = useState("");
-  const [tips, setRating] = useState("");
+  const [tips, setTips] = useState("");
   const [notes, setNotes] = useState("");
   const [walletAmount, setWalletAmount] = useState("");
   const [workStatus, setWorkStatus] = useState<WorkStatus>("WORKED");
@@ -71,7 +71,7 @@ export default function EditDailyOrderPage() {
         const currentOrder = orderPayload.data as Order;
         setOrder(currentOrder);
         setOrdersCount(String(currentOrder.ordersCount ?? 0));
-        setRating(currentOrder.tips != null ? String(Number(currentOrder.tips)) : "");
+        setTips(currentOrder.tips != null ? String(Number(currentOrder.tips)) : "");
         setNotes(currentOrder.notes ?? "");
         setWalletAmount(currentOrder.walletAmount != null ? String(currentOrder.walletAmount) : "");
         setWorkStatus(currentOrder.workStatus ?? "WORKED");
@@ -185,8 +185,8 @@ export default function EditDailyOrderPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">التقييم (1-5)</label>
-            <input type="number" min="1" max="5" step="0.1" value={tips} onChange={(event) => setRating(event.target.value)} className="input-field w-full" dir="ltr" />
+            <label className="mb-1.5 block text-sm font-medium">إكراميات (1-5)</label>
+            <input type="number" min="1" max="5" step="0.1" value={tips} onChange={(event) => setTips(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>

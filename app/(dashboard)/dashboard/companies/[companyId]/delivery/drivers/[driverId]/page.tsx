@@ -506,7 +506,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                   <th>{locale === "en" ? "Date" : "التاريخ"}</th>
                   <th>{locale === "en" ? "Platform" : "المنصة"}</th>
                   <th>{locale === "en" ? "Orders count" : "عدد الأوردرات"}</th>
-                  <th>{locale === "en" ? "Rating" : "التقييم"}</th>
+                  <th>{locale === "en" ? "Tips" : "إكراميات"}</th>
                 </tr>
               </thead>
               <tbody>

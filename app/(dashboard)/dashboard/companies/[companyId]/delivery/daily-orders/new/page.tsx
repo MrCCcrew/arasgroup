@@ -475,7 +475,7 @@ export default function NewDailyOrdersPage() {
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
-                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.tips}</th>
+                      <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Tips" : AR.tips}</th>
                       <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                     </tr>
                   </thead>
@@ -556,7 +556,7 @@ export default function NewDailyOrdersPage() {
                           <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rate" : AR.rate}</th>
                           <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Gross" : AR.gross}</th>
                           <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Wallet" : AR.wallet}</th>
-                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Rating" : AR.tips}</th>
+                          <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Tips" : AR.tips}</th>
                           <th className="px-2 py-2 text-center font-medium text-muted-foreground">{locale === "en" ? "Cash" : AR.cash}</th>
                         </tr>
                       </thead>

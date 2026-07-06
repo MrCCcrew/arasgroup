@@ -156,7 +156,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                   <th>{locale === "en" ? "Gross total" : "الإجمالي (د.ك)"}</th>
                   <th>{locale === "en" ? "Wallet deduction" : "خصم المحفظة"}</th>
                   <th>{locale === "en" ? "Net payment" : "صافي الدفع"}</th>
-                  <th>{locale === "en" ? "Rating" : "التقييم"}</th>
+                  <th>{locale === "en" ? "Tips" : "إكراميات"}</th>
                 </tr>
               </thead>
               <tbody>
