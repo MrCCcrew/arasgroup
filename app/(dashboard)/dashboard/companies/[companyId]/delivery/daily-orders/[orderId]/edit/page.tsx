@@ -185,8 +185,8 @@ export default function EditDailyOrderPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">إكراميات (1-5)</label>
-            <input type="number" min="1" max="5" step="0.1" value={tips} onChange={(event) => setTips(event.target.value)} className="input-field w-full" dir="ltr" />
+            <label className="mb-1.5 block text-sm font-medium">إكراميات (د.ك)</label>
+            <input type="number" min="0" step="0.001" value={tips} onChange={(event) => setTips(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>
