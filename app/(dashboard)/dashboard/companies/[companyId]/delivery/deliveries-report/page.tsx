@@ -59,8 +59,18 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
   });
 
   const contractId = sp.contractId || contracts[0]?.id || "";
-  const fromDate = sp.from ? new Date(`${sp.from}T00:00:00.000`) : undefined;
-  const toDate = sp.to ? new Date(`${sp.to}T23:59:59.999`) : undefined;
+
+  // Default to current month if no date filters
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const fromDate = sp.from ? new Date(`${sp.from}T00:00:00.000`) : currentMonthStart;
+  const toDate = sp.to ? new Date(`${sp.to}T23:59:59.999`) : currentMonthEnd;
+
+  // For input fields
+  const fromString = sp.from || currentMonthStart.toISOString().split('T')[0];
+  const toString = sp.to || currentMonthEnd.toISOString().split('T')[0];
 
   const driverRows = await prisma.driver.findMany({
     where: { employee: { companyId, isDeleted: false } },
@@ -115,8 +125,8 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
   const qs = (extra: Record<string, string>) => {
     const query = new URLSearchParams({
       ...(contractId ? { contractId } : {}),
-      ...(sp.from ? { from: sp.from } : {}),
-      ...(sp.to ? { to: sp.to } : {}),
+      from: fromString,
+      to: toString,
       ...(sp.driverId ? { driverId: sp.driverId } : {}),
       ...extra,
     });
@@ -177,21 +187,21 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
 
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">{en ? "From" : AR.from}</label>
-                <input type="date" name="from" defaultValue={sp.from ?? ""} className="input-field" dir="ltr" />
+                <input type="date" name="from" defaultValue={fromString} className="input-field" dir="ltr" />
               </div>
 
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">{en ? "To" : AR.to}</label>
-                <input type="date" name="to" defaultValue={sp.to ?? ""} className="input-field" dir="ltr" />
+                <input type="date" name="to" defaultValue={toString} className="input-field" dir="ltr" />
               </div>
 
               <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                 {en ? "Filter" : AR.filter}
               </button>
 
-              {(sp.driverId || sp.from || sp.to) && (
+              {sp.driverId && (
                 <a
-                  href={`/dashboard/companies/${companyId}/delivery/deliveries-report?${qs({ driverId: "", from: "", to: "" })}`}
+                  href={`/dashboard/companies/${companyId}/delivery/deliveries-report?contractId=${contractId}`}
                   className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
                 >
                   {en ? "Clear" : AR.clear}
