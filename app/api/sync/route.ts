@@ -131,7 +131,7 @@ async function processSyncItem(
   switch (`${module}:${entityType}`) {
     case "delivery:DeliveryDailyOrder": {
       if (operation === "CREATE") {
-        const p = payload as { driverId: string; contractId: string; date: string; ordersCount: number; rating?: number };
+        const p = payload as { driverId: string; contractId: string; date: string; ordersCount: number; tips?: number };
         await prisma.deliveryDailyOrder.create({
           data: {
             driverId: p.driverId,
@@ -139,7 +139,7 @@ async function processSyncItem(
             companyId,
             date: new Date(p.date),
             ordersCount: p.ordersCount,
-            rating: p.rating,
+            tips: p.tips,
           },
         });
       }
