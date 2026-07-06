@@ -185,7 +185,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   // Get all filtered orders (no pagination) to calculate total collection
   const allFilteredOrders = await prisma.deliveryDailyOrder.findMany({
     where,
-    select: { id: true, driverId: true, contractId: true, date: true },
+    select: { id: true, driverId: true, contractId: true, date: true, tips: true },
   });
 
   const allDriverIds = [...new Set(allFilteredOrders.map((order: typeof allFilteredOrders[number]) => order.driverId))];
