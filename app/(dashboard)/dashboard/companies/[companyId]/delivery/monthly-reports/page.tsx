@@ -77,7 +77,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
     grossAmount: number;
     walletDeducted: number;
     netAmount: number;
-    rating: number | null;
+    tips: number | null;
   };
 
   const grouped = new Map<string, ReportLine>();
@@ -95,11 +95,11 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
       existing.grossAmount += grossAmount;
       existing.walletDeducted += walletDeducted;
       existing.netAmount += netAmount;
-      // Average rating
-      if (order.rating && existing.rating) {
-        existing.rating = (existing.rating + Number(order.rating)) / 2;
-      } else if (order.rating) {
-        existing.rating = Number(order.rating);
+      // Average tips
+      if (order.tips && existing.tips) {
+        existing.tips = (existing.tips + Number(order.tips)) / 2;
+      } else if (order.tips) {
+        existing.tips = Number(order.tips);
       }
     } else {
       grouped.set(key, {
@@ -116,7 +116,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
         grossAmount,
         walletDeducted,
         netAmount,
-        rating: order.rating ? Number(order.rating) : null,
+        tips: order.tips ? Number(order.tips) : null,
       });
     }
   });
@@ -194,7 +194,7 @@ export default async function MonthlyReportsPage({ params, searchParams }: Props
                         {formatKWD(report.netAmount, numberLocale)}
                       </td>
                       <td className="number text-center">
-                        {report.rating ? report.rating.toFixed(2) : "—"}
+                        {report.tips ? report.tips.toFixed(2) : "—"}
                       </td>
                     </tr>
                   ))

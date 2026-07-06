@@ -1429,7 +1429,7 @@ model DeliveryDailyOrder {
   ratePerOrder      Decimal?                     @db.Decimal(18, 3)
   grossAmount       Decimal?                     @db.Decimal(18, 3)
   walletDeducted    Decimal?                     @db.Decimal(18, 3)
-  rating            Decimal?                     @db.Decimal(5, 2)
+  tips              Decimal?                     @db.Decimal(18, 3) @map("rating")
   workStatus        DeliveryDailyOrderWorkStatus @default(WORKED)
   notes             String?
 

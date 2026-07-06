@@ -12,7 +12,7 @@ const reportLineSchema = z.object({
   grossAmount: z.number().min(0),
   walletDeducted: z.number().min(0).default(0),
   netAmount: z.number().min(0),
-  rating: z.number().optional(),
+  tips: z.number().optional(),
   notes: z.string().optional(),
 });
 
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
               grossAmount: line.grossAmount,
               walletDeducted: line.walletDeducted,
               netAmount: line.netAmount,
-              rating: line.rating,
+              tips: line.tips,
               notes: line.notes,
             })),
           },

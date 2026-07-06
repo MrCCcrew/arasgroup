@@ -62,7 +62,7 @@ const AR = {
   contract: "\u0627\u0644\u0639\u0642\u062f",
   ordersCount: "\u0639\u062f\u062f \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
   collected: "\u0627\u0644\u0645\u062d\u0635\u0644",
-  rating: "\u0627\u0644\u062a\u0642\u064a\u064a\u0645",
+  tips: "\u0625\u0643\u0631\u0627\u0645\u064a\u0627\u062a",
   noRecords: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0633\u062c\u0644\u0627\u062a",
   workedUnder: "\u0639\u0645\u0644 \u0628\u0627\u0633\u0645:",
   deleteFor: "\u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u0633\u0627\u0626\u0642",
@@ -211,11 +211,13 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
   const orderCollection = (order: { id: string; driverId: string; contractId: string; date: Date }) =>
     chargeByOrder.get(order.id) ?? chargeByKey.get(`${order.driverId}|${order.contractId}|${order.date.toISOString().slice(0, 10)}`) ?? null;
 
-  // Calculate total collection for all filtered orders
+  // Calculate total collection and tips for all filtered orders
   let totalCollectionAmount = 0;
+  let totalTipsAmount = 0;
   for (const order of allFilteredOrders) {
     const collection = orderCollection(order) ?? 0;
     totalCollectionAmount += collection;
+    totalTipsAmount += Number(order.tips ?? 0);
   }
 
   const selectedDriver = sp.driverId ? driverRows.find((driver: DriverRowItem) => driver.id === sp.driverId) : null;
@@ -448,13 +450,26 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
               <p className="text-xs text-muted-foreground">
                 {locale === "en" ? "Total collected" : AR.totalCollected}
               </p>
-              <p className="number text-2xl font-bold text-blue-600">{totalCollectionAmount.toFixed(3)} {kwd}</p>
+              <p className="number text-2xl font-bold text-blue-600">{(totalCollectionAmount - totalTipsAmount).toFixed(3)} {kwd}</p>
             </div>
+            {totalTipsAmount > 0 && (
+              <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
+                <p className="text-xs text-muted-foreground">
+                  {locale === "en" ? "Tips" : AR.tips}
+                </p>
+                <p className="number text-2xl font-bold text-amber-600">{totalTipsAmount.toFixed(3)} {kwd}</p>
+              </div>
+            )}
             <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
-              <p className="text-xs text-muted-foreground">
-                {locale === "en" ? "Total invoices" : AR.totalInvoices}
-              </p>
-              <p className="number text-2xl font-bold text-purple-600">{driverInvoicesTotal.toFixed(3)} {kwd}</p>
+              <Link
+                href={`/dashboard/companies/${companyId}/delivery/invoices${selectedDriver ? `?driverId=${selectedDriver.id}` : ''}${effectiveMonth ? `&month=${effectiveMonth}` : ''}${effectiveYear ? `&year=${effectiveYear}` : ''}`}
+                className="block hover:opacity-80 transition-opacity"
+              >
+                <p className="text-xs text-muted-foreground">
+                  {locale === "en" ? "Total invoices" : AR.totalInvoices}
+                </p>
+                <p className="number text-2xl font-bold text-purple-600 underline decoration-dotted">{driverInvoicesTotal.toFixed(3)} {kwd}</p>
+              </Link>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">
@@ -478,7 +493,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Contract" : AR.contract}</th>
                   <th>{locale === "en" ? "Orders count" : AR.ordersCount}</th>
                   <th>{locale === "en" ? "Collected" : AR.collected}</th>
-                  <th>{locale === "en" ? "Rating" : AR.rating}</th>
+                  <th>{locale === "en" ? "Tips" : AR.tips}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -551,7 +566,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                           );
                         })()}
                       </td>
-                      <td className="text-center text-sm">{order.rating ? Number(order.rating).toFixed(1) : "-"}</td>
+                      <td className="text-center text-sm">{order.tips ? Number(order.tips).toFixed(3) + " " + kwd : "-"}</td>
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           {canUpdate && (

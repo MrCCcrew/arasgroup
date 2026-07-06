@@ -12,7 +12,7 @@ interface Order {
   driverId: string;
   date: string;
   ordersCount: number;
-  rating: string | number | null;
+  tips: string | number | null;
   notes: string | null;
   walletAmount: number | null;
   workStatus: WorkStatus;
@@ -51,7 +51,7 @@ export default function EditDailyOrderPage() {
   const [driverOptions, setDriverOptions] = useState<DriverOption[]>([]);
 
   const [ordersCount, setOrdersCount] = useState("");
-  const [rating, setRating] = useState("");
+  const [tips, setRating] = useState("");
   const [notes, setNotes] = useState("");
   const [walletAmount, setWalletAmount] = useState("");
   const [workStatus, setWorkStatus] = useState<WorkStatus>("WORKED");
@@ -71,7 +71,7 @@ export default function EditDailyOrderPage() {
         const currentOrder = orderPayload.data as Order;
         setOrder(currentOrder);
         setOrdersCount(String(currentOrder.ordersCount ?? 0));
-        setRating(currentOrder.rating != null ? String(Number(currentOrder.rating)) : "");
+        setRating(currentOrder.tips != null ? String(Number(currentOrder.tips)) : "");
         setNotes(currentOrder.notes ?? "");
         setWalletAmount(currentOrder.walletAmount != null ? String(currentOrder.walletAmount) : "");
         setWorkStatus(currentOrder.workStatus ?? "WORKED");
@@ -96,7 +96,7 @@ export default function EditDailyOrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ordersCount: Number(ordersCount),
-          rating: rating ? Number(rating) : null,
+          tips: tips ? Number(tips) : null,
           notes: notes || null,
           walletAmount: walletAmount ? Number(walletAmount) : null,
           workStatus,
@@ -186,7 +186,7 @@ export default function EditDailyOrderPage() {
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">التقييم (1-5)</label>
-            <input type="number" min="1" max="5" step="0.1" value={rating} onChange={(event) => setRating(event.target.value)} className="input-field w-full" dir="ltr" />
+            <input type="number" min="1" max="5" step="0.1" value={tips} onChange={(event) => setRating(event.target.value)} className="input-field w-full" dir="ltr" />
           </div>
 
           <div>

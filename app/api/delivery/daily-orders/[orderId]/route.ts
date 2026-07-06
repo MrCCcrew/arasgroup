@@ -17,7 +17,7 @@ const patchSchema = z.object({
   ordersCount: z.number().int().min(0).optional(),
   operatedAsDriverId: z.string().nullable().optional(),
   workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"]).optional(),
-  rating: z.number().min(1).max(5).nullable().optional(),
+  tips: z.number().min(1).max(5).nullable().optional(),
   notes: z.string().nullable().optional(),
   walletAmount: z.number().min(0).nullable().optional(),
 });
@@ -74,7 +74,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   if (orderFields.ordersCount !== undefined) orderData.ordersCount = orderFields.ordersCount;
   if (orderFields.operatedAsDriverId !== undefined) orderData.operatedAsDriverId = orderFields.operatedAsDriverId;
   if (orderFields.workStatus !== undefined) orderData.workStatus = orderFields.workStatus;
-  if (orderFields.rating !== undefined) orderData.rating = orderFields.rating;
+  if (orderFields.tips !== undefined) orderData.tips = orderFields.tips;
   if (orderFields.notes !== undefined) orderData.notes = orderFields.notes;
 
   const result = await prisma.$transaction(async (tx) => {

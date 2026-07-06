@@ -14,7 +14,7 @@ const entrySchema = z.object({
   ratePerOrder: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   walletDeducted: z.number().min(0).optional(),
-  rating: z.number().min(1).max(5).optional(),
+  tips: z.number().min(1).max(5).optional(),
   notes: z.string().optional(),
   walletAmount: z.number().min(0).optional(),
 });
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
               ratePerOrder: entry.ratePerOrder ?? null,
               grossAmount: entry.grossAmount ?? null,
               walletDeducted: entry.walletDeducted ?? null,
-              rating: entry.rating ?? null,
+              tips: entry.tips ?? null,
               notes: entry.notes ?? null,
             },
             update: {
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
               ratePerOrder: entry.ratePerOrder ?? null,
               grossAmount: entry.grossAmount ?? null,
               walletDeducted: entry.walletDeducted ?? null,
-              rating: entry.rating ?? null,
+              tips: entry.tips ?? null,
               notes: entry.notes ?? null,
             },
           });

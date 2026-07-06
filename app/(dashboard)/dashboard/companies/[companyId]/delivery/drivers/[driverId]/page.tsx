@@ -533,7 +533,7 @@ export default async function DriverDetailPage({ params, searchParams }: Props) 
                         </span>
                       </td>
                       <td className="number font-bold">{order.ordersCount}</td>
-                      <td className="number">{order.rating ? Number(order.rating).toFixed(1) : "-"}</td>
+                      <td className="number">{order.tips ? Number(order.tips).toFixed(1) : "-"}</td>
                     </tr>
                   ))
                 )}
