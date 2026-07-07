@@ -205,9 +205,12 @@ export function UserManagement({
   const [activePasswordUserId, setActivePasswordUserId] = useState<string | null>(null);
   const [activePermissionsUserId, setActivePermissionsUserId] = useState<string | null>(null);
   const [activeAccessUserId, setActiveAccessUserId] = useState<string | null>(null);
+  const [activeRolesUserId, setActiveRolesUserId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ password: "", confirmPassword: "" });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [editingRoles, setEditingRoles] = useState<Array<{ roleId: string; companyId: string | null }>>([]);
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [selectedPermissionCompanyIds, setSelectedPermissionCompanyIds] = useState<string[]>([]);
@@ -532,6 +535,32 @@ export function UserManagement({
     }
   }
 
+  async function handleRolesSave(userId: string) {
+    setRoleLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/users/${userId}/roles`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: editingRoles }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? text("تعذر تحديث الأدوار", "Failed to update roles"));
+      }
+
+      setSuccess(text("تم تحديث الأدوار بنجاح. حدّث الصفحة لمراجعة البيانات المحدثة.", "Roles updated successfully. Refresh the page to review updated data."));
+      setActiveRolesUserId(null);
+      setEditingRoles([]);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : text("تعذر تحديث الأدوار", "Failed to update roles"));
+    } finally {
+      setRoleLoading(false);
+    }
+  }
+
   async function handleToggleUserStatus(userId: string, nextIsActive: boolean) {
     const confirmationMessage = nextIsActive
       ? text("هل تريد إعادة تفعيل هذا المستخدم؟", "Do you want to reactivate this user?")
@@ -755,6 +784,7 @@ export function UserManagement({
                 const isPasswordOpen = activePasswordUserId === user.id;
                 const isPermissionsOpen = activePermissionsUserId === user.id;
                 const isAccessOpen = activeAccessUserId === user.id;
+                const isRolesOpen = activeRolesUserId === user.id;
                 return (
                   <Fragment key={user.id}>
                     <tr className="align-top transition-colors hover:bg-muted/30">
@@ -830,14 +860,30 @@ export function UserManagement({
                             </span>
                           )}
                           {!user.isSuperAdmin ? (
-                            <button
-                              type="button"
-                              onClick={() => setActiveAccessUserId(isAccessOpen ? null : user.id)}
-                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
-                            >
-                              <Building2 size={14} />
-                              {text("تعديل الشركات والفروع", "Edit companies & branches")}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isRolesOpen = activeRolesUserId === user.id;
+                                  setActiveRolesUserId(isRolesOpen ? null : user.id);
+                                  if (!isRolesOpen) {
+                                    setEditingRoles(user.roles.map((r) => ({ roleId: r.roleId, companyId: r.companyId })));
+                                  }
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                              >
+                                <Shield size={14} />
+                                {text("تعديل الأدوار", "Edit roles")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveAccessUserId(isAccessOpen ? null : user.id)}
+                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                              >
+                                <Building2 size={14} />
+                                {text("تعديل الشركات والفروع", "Edit companies & branches")}
+                              </button>
+                            </>
                           ) : null}
                         </div>
                       </td>
@@ -1080,6 +1126,138 @@ export function UserManagement({
                               setSuccess(text("تم تحديث صلاحيات الشركات والفروع.", "Company and branch access updated."));
                             }}
                           />
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {isRolesOpen ? (
+                      <tr className="border-b border-border/50 bg-muted/20">
+                        <td colSpan={canManagePasswords ? 8 : 7} className="px-4 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="font-medium">{text("تعديل أدوار المستخدم", "Edit User Roles")}</h3>
+                              <p className="text-sm text-muted-foreground">{text("حدد الأدوار والشركات المرتبطة بكل دور", "Select roles and associated companies for each role")}</p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">{text("الأدوار المتاحة", "Available Roles")}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    roles.forEach((role) => {
+                                      const exists = editingRoles.some((r) => r.roleId === role.id);
+                                      if (!exists) {
+                                        setEditingRoles((prev) => [...prev, { roleId: role.id, companyId: null }]);
+                                      }
+                                    });
+                                  }}
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  {text("إضافة كل الأدوار", "Add all roles")}
+                                </button>
+                              </div>
+
+                              <div className="grid gap-3">
+                                {roles.map((role) => {
+                                  const assignedRoles = editingRoles.filter((r) => r.roleId === role.id);
+                                  const hasRole = assignedRoles.length > 0;
+
+                                  return (
+                                    <div key={role.id} className="rounded-lg border p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={hasRole}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setEditingRoles((prev) => [...prev, { roleId: role.id, companyId: null }]);
+                                              } else {
+                                                setEditingRoles((prev) => prev.filter((r) => r.roleId !== role.id));
+                                              }
+                                            }}
+                                          />
+                                          <label className="font-medium">{role.nameAr}</label>
+                                        </div>
+                                      </div>
+
+                                      {hasRole && assignedRoles.map((assignment, idx) => (
+                                        <div key={idx} className="mt-2 flex items-center gap-2">
+                                          <select
+                                            className="input-field flex-1 text-sm"
+                                            value={assignment.companyId ?? ""}
+                                            onChange={(e) => {
+                                              const value = e.target.value || null;
+                                              setEditingRoles((prev) =>
+                                                prev.map((r, i) =>
+                                                  r.roleId === role.id && prev.indexOf(r) === prev.findIndex((x) => x.roleId === role.id && x === r)
+                                                    ? { ...r, companyId: value }
+                                                    : r
+                                                )
+                                              );
+                                            }}
+                                          >
+                                            <option value="">{text("كل الشركات (عام)", "All companies (global)")}</option>
+                                            {companies.map((company) => (
+                                              <option key={company.id} value={company.id}>
+                                                {company.nameAr}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          {assignedRoles.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const roleIndex = editingRoles.findIndex((r) => r === assignment);
+                                                setEditingRoles((prev) => prev.filter((_, i) => i !== roleIndex));
+                                              }}
+                                              className="rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                                            >
+                                              {text("حذف", "Remove")}
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+
+                                      {hasRole && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingRoles((prev) => [...prev, { roleId: role.id, companyId: null }]);
+                                          }}
+                                          className="mt-2 text-xs text-primary hover:underline"
+                                        >
+                                          + {text("إضافة هذا الدور لشركة أخرى", "Add this role for another company")}
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleRolesSave(user.id)}
+                                disabled={roleLoading}
+                                className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                {roleLoading ? text("جارٍ الحفظ...", "Saving...") : text("حفظ الأدوار", "Save roles")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveRolesUserId(null);
+                                  setEditingRoles([]);
+                                }}
+                                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+                              >
+                                {text("إلغاء", "Cancel")}
+                              </button>
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     ) : null}
