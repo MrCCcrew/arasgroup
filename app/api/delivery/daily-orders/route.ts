@@ -14,7 +14,7 @@ const entrySchema = z.object({
   ratePerOrder: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   walletDeducted: z.number().min(0).optional(),
-  tips: z.number().min(1).max(5).optional(),
+  tips: z.number().min(0).optional(),
   notes: z.string().optional(),
   walletAmount: z.number().min(0).optional(),
 });

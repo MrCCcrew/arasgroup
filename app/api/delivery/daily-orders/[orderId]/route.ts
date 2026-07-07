@@ -17,7 +17,7 @@ const patchSchema = z.object({
   ordersCount: z.number().int().min(0).optional(),
   operatedAsDriverId: z.string().nullable().optional(),
   workStatus: z.enum(["WORKED", "ON_LEAVE", "VEHICLE_BREAKDOWN", "NO_SHIFTS", "MISSED_SHIFT", "LATE_LOGIN", "ABSENT"]).optional(),
-  tips: z.number().min(1).max(5).nullable().optional(),
+  tips: z.number().min(0).nullable().optional(),
   notes: z.string().nullable().optional(),
   walletAmount: z.number().min(0).nullable().optional(),
 });
