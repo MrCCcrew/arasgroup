@@ -40,8 +40,8 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
   const pageSize = 25;
 
   const now = new Date();
-  const startDate = sp.startDate ? new Date(sp.startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
-  const endDate = sp.endDate ? new Date(sp.endDate) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const startDate = sp.startDate ? new Date(`${sp.startDate}T00:00:00`) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const endDate = sp.endDate ? new Date(`${sp.endDate}T23:59:59.999`) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   const where = {
     companyId,
