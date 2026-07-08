@@ -117,6 +117,49 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
       />
 
       <div className="page-container space-y-4">
+        <form method="get" className="section-card">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "From" : "من"}</label>
+              <input
+                type="date"
+                name="startDate"
+                defaultValue={sp.startDate ?? startDate.toISOString().slice(0, 10)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "To" : "إلى"}</label>
+              <input
+                type="date"
+                name="endDate"
+                defaultValue={sp.endDate ?? endDate.toISOString().slice(0, 10)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Category" : "الفئة"}</label>
+              <select name="categoryId" defaultValue={sp.categoryId ?? ""} className="input-field">
+                <option value="">{locale === "en" ? "All categories" : "كل الفئات"}</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nameAr}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              {locale === "en" ? "Filter" : "تصفية"}
+            </button>
+            {(sp.categoryId || sp.startDate || sp.endDate) && (
+              <a
+                href={`/dashboard/companies/${companyId}/expenses`}
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                {locale === "en" ? "Clear" : "مسح"}
+              </a>
+            )}
+          </div>
+        </form>
+
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           <div className="stat-card">
             <p className="text-xs text-muted-foreground">{locale === "en" ? "Total expenses" : "إجمالي المصروفات"}</p>
