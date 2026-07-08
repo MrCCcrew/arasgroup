@@ -130,6 +130,41 @@ export default async function GroupDashboardPage() {
     <div>
       <Header title="لوحة تحكم المجموعة" subtitle="عبد الفتاح راشد سليمان - الكويت" />
 
+      {/* Quick Access - Companies */}
+      <div className="border-b bg-gradient-to-b from-background to-muted/20">
+        <div className="page-container">
+          <div className="flex items-center gap-2 overflow-x-auto py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Building2 size={16} />
+              <span className="whitespace-nowrap">الوصول السريع:</span>
+            </div>
+            <div className="flex gap-2">
+              {companies.map((company) => (
+                <Link
+                  key={company.id}
+                  href={`/dashboard/companies/${company.id}`}
+                  className="group flex items-center gap-2 whitespace-nowrap rounded-full border bg-card px-4 py-1.5 text-sm font-medium transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md"
+                >
+                  <div className={`h-5 w-5 shrink-0 overflow-hidden rounded ${companyTypeColors[company.type] ?? "bg-gray-500"}`}>
+                    {company.logoUrl ? (
+                      <Image src={company.logoUrl} alt={company.nameAr} width={20} height={20} className="h-full w-full object-contain p-0.5" unoptimized />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-white">
+                        {company.nameAr.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <span>{company.nameAr}</span>
+                  <span className="text-xs opacity-60 group-hover:opacity-80">
+                    ({totalMap.get(company.id) ?? 0})
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="page-container">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard icon={<Building2 size={20} className="text-blue-600" />} label="إجمالي الشركات" value={companies.length} bg="bg-blue-50" />
