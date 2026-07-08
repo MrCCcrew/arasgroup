@@ -134,7 +134,8 @@ export default function ViolationsPage() {
     enterAmount: en ? "Please enter the violation amount" : "يرجى إدخال مبلغ المخالفة",
     chooseCategory: en ? "Please select the expense category for the company portion" : "يرجى اختيار فئة المصروف للجزء المحمّل على الشركة",
     errorOccurred: en ? "An error occurred" : "حدث خطأ",
-    modalTitle: editingId ? (en ? "Edit violation" : "تعديل مخالفة") : (en ? "Register a new violation" : "تسجيل مخالفة جديدة"),
+    newViolationTitle: en ? "Register a new violation" : "تسجيل مخالفة جديدة",
+    editViolationTitle: en ? "Edit violation" : "تعديل مخالفة",
     vehicle: en ? "Vehicle" : "السيارة",
     noVehicle: en ? "— No vehicle —" : "— بدون سيارة —",
     autoVehicleHint: en ? "✓ Driver's vehicle on this date — change it manually if they were on another vehicle" : "✓ سيارة السائق في هذا التاريخ — غيّرها يدوياً لو كان راكب سيارة أخرى",
@@ -538,7 +539,7 @@ export default function ViolationsPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-10">
           <div className="w-full max-w-2xl rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-5 py-4">
-              <h2 className="font-semibold">{t.modalTitle}</h2>
+              <h2 className="font-semibold">{editingId ? t.editViolationTitle : t.newViolationTitle}</h2>
               <button onClick={() => setShowForm(false)} className="rounded-lg p-1.5 hover:bg-muted"><X size={16} /></button>
             </div>
             <div className="space-y-4 p-5">
