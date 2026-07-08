@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, Eye, Trash2, XCircle } from "lucide-react";
+import { CheckCircle, Eye } from "lucide-react";
 import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import type { JournalStatus } from "@prisma/client";
 
@@ -232,15 +232,10 @@ export function JournalEntriesTable({
                         </Link>
                         {canDelete && entry.status === "DRAFT" && (
                           <DeleteConfirmButton
-                            endpoint={`/api/accounting/journal-entries/${entry.id}`}
-                            onSuccess={() => router.refresh()}
-                            title={en ? "Delete entry" : "حذف القيد"}
-                            description={en ? "This will permanently delete the journal entry." : "سيتم حذف القيد نهائياً."}
-                          >
-                            <button className="rounded p-1.5 text-destructive hover:bg-destructive/10" title={en ? "Delete" : "حذف نهائي"}>
-                              <Trash2 size={14} />
-                            </button>
-                          </DeleteConfirmButton>
+                            apiUrl={`/api/accounting/journal-entries/${entry.id}`}
+                            confirmMessage={`${en ? "Delete entry" : "حذف القيد"} ${entry.entryNumber}?`}
+                            warningMessage={en ? "This will permanently delete the journal entry." : "سيتم حذف القيد نهائياً."}
+                          />
                         )}
                       </div>
                     </td>
