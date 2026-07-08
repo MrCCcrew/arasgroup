@@ -78,13 +78,23 @@ export function CalcRowActions({ calcId, calcType, status, notes, paidDate }: Pr
     } finally { setDeleting(false); }
   }
 
+  const editLink = calcType === "leave-pay"
+    ? `/dashboard/companies/${window.location.pathname.split('/')[3]}/accounting/leave-pay/${calcId}/edit`
+    : null;
+
   return (
     <>
       <div className="flex items-center gap-1">
-        <button onClick={openEdit} title="تعديل الحالة"
-          className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-          <Pencil size={13} />
-        </button>
+        {editLink ? (
+          <a href={editLink} title="تعديل" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <Pencil size={13} />
+          </a>
+        ) : (
+          <button onClick={openEdit} title="تعديل الحالة"
+            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <Pencil size={13} />
+          </button>
+        )}
         <button onClick={() => { setDeleteError(""); setShowDelete(true); }} title="حذف"
           className="rounded p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600">
           <Trash2 size={13} />

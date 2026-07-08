@@ -67,6 +67,75 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   }
 }
 
+const updateSchema = z.object({
+  driverId: z.string(),
+  vehicleId: z.string().optional().nullable(),
+  date: z.string(),
+  locationAr: z.string().optional().nullable(),
+  locationEn: z.string().optional().nullable(),
+  type: z.string(),
+  descriptionAr: z.string().optional().nullable(),
+  descriptionEn: z.string().optional().nullable(),
+  amount: z.number().positive(),
+  responsibility: z.enum(["DRIVER", "COMPANY", "SPLIT"]),
+  driverSharePct: z.number().min(0).max(100).optional().nullable(),
+  paymentMode: z.enum(["FULL", "INSTALLMENT"]),
+  installmentMonths: z.number().int().min(1).optional().nullable(),
+  notes: z.string().optional().nullable(),
+  expenseCategoryId: z.string().optional().nullable(),
+});
+
+export async function PUT(request: NextRequest, { params }: Ctx) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { violationId } = await params;
+    const body = await request.json();
+    const parsed = updateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+
+    const existing = await prisma.driverViolation.findUnique({
+      where: { id: violationId },
+      select: { companyId: true, status: true },
+    });
+    if (!existing) return NextResponse.json({ success: false, error: "المخالفة غير موجودة" }, { status: 404 });
+
+    const companyAccessError = assertCompanyAccess(session, existing.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    if (existing.status === "SETTLED") {
+      return NextResponse.json({ success: false, error: "لا يمكن تعديل مخالفة تم تسويتها" }, { status: 400 });
+    }
+
+    const data = parsed.data;
+    const updated = await prisma.driverViolation.update({
+      where: { id: violationId },
+      data: {
+        driverId: data.driverId,
+        vehicleId: data.vehicleId || null,
+        date: new Date(data.date),
+        locationAr: data.locationAr || null,
+        locationEn: data.locationEn || null,
+        type: data.type,
+        descriptionAr: data.descriptionAr || null,
+        descriptionEn: data.descriptionEn || null,
+        amount: data.amount,
+        responsibility: data.responsibility,
+        driverSharePct: data.responsibility === "SPLIT" ? data.driverSharePct : null,
+        paymentMode: data.paymentMode,
+        installmentMonths: data.paymentMode === "INSTALLMENT" ? data.installmentMonths : null,
+        notes: data.notes || null,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ success: false, error: "فشل في التحديث" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: Ctx) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;

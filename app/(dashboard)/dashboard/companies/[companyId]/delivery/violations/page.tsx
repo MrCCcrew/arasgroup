@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { AlertTriangle, Car, Plus, Trash2, User, X } from "lucide-react";
+import { AlertTriangle, Car, Pencil, Plus, Trash2, User, X } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 
@@ -134,7 +134,7 @@ export default function ViolationsPage() {
     enterAmount: en ? "Please enter the violation amount" : "يرجى إدخال مبلغ المخالفة",
     chooseCategory: en ? "Please select the expense category for the company portion" : "يرجى اختيار فئة المصروف للجزء المحمّل على الشركة",
     errorOccurred: en ? "An error occurred" : "حدث خطأ",
-    modalTitle: en ? "Register a new violation" : "تسجيل مخالفة جديدة",
+    modalTitle: editingId ? (en ? "Edit violation" : "تعديل مخالفة") : (en ? "Register a new violation" : "تسجيل مخالفة جديدة"),
     vehicle: en ? "Vehicle" : "السيارة",
     noVehicle: en ? "— No vehicle —" : "— بدون سيارة —",
     autoVehicleHint: en ? "✓ Driver's vehicle on this date — change it manually if they were on another vehicle" : "✓ سيارة السائق في هذا التاريخ — غيّرها يدوياً لو كان راكب سيارة أخرى",
@@ -186,6 +186,7 @@ export default function ViolationsPage() {
   const [filterDriverId, setFilterDriverId] = useState("");
 
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -276,8 +277,11 @@ export default function ViolationsPage() {
       expenseCategoryId: form.expenseCategoryId || undefined,
     };
 
-    const res = await fetch("/api/delivery/violations", {
-      method: "POST",
+    const url = editingId ? `/api/delivery/violations/${editingId}` : "/api/delivery/violations";
+    const method = editingId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -285,8 +289,31 @@ export default function ViolationsPage() {
     setSaving(false);
     if (!data.success) { setFormError(data.error ?? "حدث خطأ"); return; }
     setShowForm(false);
+    setEditingId(null);
     setForm(EMPTY_FORM);
     load();
+  }
+
+  function openEdit(violation: Violation) {
+    setEditingId(violation.id);
+    setForm({
+      driverId: violation.driverId,
+      vehicleId: violation.vehicleId || "",
+      date: new Date(violation.date).toISOString().slice(0, 16),
+      locationAr: violation.locationAr || "",
+      locationEn: "",
+      type: violation.type,
+      descriptionAr: violation.descriptionAr || "",
+      descriptionEn: "",
+      amount: violation.amount,
+      responsibility: violation.responsibility,
+      driverSharePct: violation.driverSharePct?.toString() || "50",
+      paymentMode: violation.paymentMode,
+      installmentMonths: violation.installmentMonths?.toString() || "3",
+      notes: violation.notes || "",
+      expenseCategoryId: "",
+    });
+    setShowForm(true);
   }
 
   function closeAction() {
@@ -336,7 +363,7 @@ export default function ViolationsPage() {
         subtitle={t.subtitle}
         companyId={companyId}
         actions={
-          <button onClick={() => { setForm(EMPTY_FORM); setFormError(""); setShowForm(true); }}
+          <button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setFormError(""); setShowForm(true); }}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             <Plus size={16} />
             {t.newViolation}
@@ -460,6 +487,15 @@ export default function ViolationsPage() {
                         </td>
                         <td>
                           <div className="flex items-center gap-1">
+                            {v.status !== "SETTLED" && (
+                              <button
+                                onClick={() => openEdit(v)}
+                                title={en ? "Edit" : "تعديل"}
+                                className="rounded p-1.5 text-primary hover:bg-primary/10"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
                             {v.status === "PENDING" && (
                               <>
                                 <button
