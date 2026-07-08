@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
@@ -8,6 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { JournalEntriesTable } from "@/components/accounting/journal-entries-table";
 import type { JournalStatus } from "@prisma/client";
 
 interface Props {
@@ -89,11 +89,20 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
     ...(statusFilter ? { status: statusFilter } : {}),
   };
 
-  const [total, entries, unpostedCount] = await Promise.all([
+  const [total, rawEntries, unpostedCount] = await Promise.all([
     prisma.journalEntry.count({ where }),
     prisma.journalEntry.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        number: true,
+        date: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        type: true,
+        totalDebit: true,
+        totalCredit: true,
+        status: true,
         createdBy: { select: { nameAr: true, nameEn: true } },
         _count: { select: { lines: true } },
       },
@@ -109,6 +118,8 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
       },
     }),
   ]);
+
+  const entries = rawEntries.map((e) => ({ ...e, entryNumber: e.number }));
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -174,89 +185,18 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           })}
         </div>
 
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <div className="overflow-x-auto">
-            <table className="ar-table">
-              <thead>
-                <tr>
-                  <th>{locale === "en" ? "Entry No." : "رقم القيد"}</th>
-                  <th>{locale === "en" ? "Date" : "التاريخ"}</th>
-                  <th>{locale === "en" ? "Description" : "البيان"}</th>
-                  <th>{locale === "en" ? "Type" : "النوع"}</th>
-                  <th>{locale === "en" ? "Total debit" : "إجمالي المدين"}</th>
-                  <th>{locale === "en" ? "Status" : "الحالة"}</th>
-                  <th>{locale === "en" ? "Created by" : "بواسطة"}</th>
-                  <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                      {locale === "en" ? "No journal entries found" : "لا توجد قيود"}
-                    </td>
-                  </tr>
-                ) : (
-                  entries.map((entry) => (
-                    <tr key={entry.id} className="transition-colors hover:bg-muted/30">
-                      <td className="font-mono text-xs">{entry.number}</td>
-                      <td className="text-sm">{formatDate(entry.date, dateLocale)}</td>
-                      <td className="max-w-48 text-sm">
-                        <p className="truncate">{locale === "en" ? entry.descriptionEn ?? entry.descriptionAr : entry.descriptionAr}</p>
-                      </td>
-                      <td>
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                          {typeLabels[locale][entry.type as keyof typeof typeLabels.ar] ?? entry.type}
-                        </span>
-                      </td>
-                      <td className="font-bold number text-blue-600">{formatKWD(Number(entry.totalDebit), numberLocale)}</td>
-                      <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
-                          {statusLabels[locale][entry.status as keyof typeof statusLabels.ar]}
-                        </span>
-                      </td>
-                      <td className="text-xs text-muted-foreground">
-                        {locale === "en" ? entry.createdBy.nameEn ?? entry.createdBy.nameAr : entry.createdBy.nameAr}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <Link href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}`} className="text-xs text-primary hover:underline">
-                            {locale === "en" ? "View" : "عرض"}
-                          </Link>
-                          {(entry.type === "RECEIPT" || entry.type === "PAYMENT") && (
-                            <Link
-                              href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}/print`}
-                              target="_blank"
-                              className="text-xs text-muted-foreground hover:text-foreground"
-                            >
-                              {locale === "en" ? "Print" : "طباعة"}
-                            </Link>
-                          )}
-                          {canDelete && (
-                            <DeleteConfirmButton
-                              apiUrl={`/api/accounting/journal-entries/${entry.id}`}
-                              confirmMessage={`حذف القيد رقم ${entry.number}؟`}
-                              warningMessage="سيتم عكس القيد وحذفه من السجلات المحاسبية نهائياً"
-                            />
-                          )}
-                          {session?.isSuperAdmin && (
-                            <DeleteConfirmButton
-                              apiUrl={`/api/accounting/journal-entries/${entry.id}?force=true`}
-                              size="md"
-                              label={locale === "en" ? "Permanent delete" : "حذف نهائي"}
-                              confirmMessage={`حذف نهائي للقيد رقم ${entry.number}؟`}
-                              warningMessage="حذف نهائي يزيل القيد من كل التقارير والأرصدة + يمسح حركة المحفظة المرتبطة. للبيانات التجريبية فقط. للأزواج المعكوسة (إيداع + عكس القيد) احذف الاثنين معاً للحفاظ على الرصيد."
-                            />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <JournalEntriesTable
+          entries={entries}
+          companyId={companyId}
+          locale={locale}
+          numberLocale={numberLocale}
+          dateLocale={dateLocale}
+          statusLabels={statusLabels[locale]}
+          typeLabels={typeLabels[locale]}
+          formatKWD={formatKWD}
+          formatDate={formatDate}
+          canDelete={canDelete}
+        />
 
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
