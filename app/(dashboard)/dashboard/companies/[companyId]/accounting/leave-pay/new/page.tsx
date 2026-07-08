@@ -15,6 +15,7 @@ interface Employee {
   employeeNumber?: string;
   joinDate?: string;
   baseSalary?: number;
+  type?: string;
 }
 
 interface BankAccount {
@@ -81,7 +82,10 @@ export default function NewLeavePayPage() {
       };
     }
 
-    const daysOwed = serviceYears >= 5 ? 35 : 30;
+    // Administrative employees: always 30 days
+    // Drivers: 30 days for < 5 years, 35 days for >= 5 years
+    const isAdministrative = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "OFFICE_BOY"].includes(employee.type ?? "");
+    const daysOwed = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
     const daysUsed = Math.max(0, Number.parseFloat(form.leaveDaysUsed) || 0);
     const daysPaid = Math.max(0, daysOwed - daysUsed);
     const dailyWage = Number(employee.baseSalary) / 30;
