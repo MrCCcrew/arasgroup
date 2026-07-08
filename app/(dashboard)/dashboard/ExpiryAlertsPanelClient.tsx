@@ -50,9 +50,9 @@ export function ExpiryAlertsPanelClient({ alerts, maxShown, totals }: Props) {
       <div className="border-b border-red-200 bg-gradient-to-l from-red-50 to-orange-50 px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="relative flex h-4 w-4 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-70" />
-              <span className="relative inline-flex h-4 w-4 rounded-full bg-red-500" />
+            <span className="relative flex h-6 w-6 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-6 w-6 rounded-full bg-red-600 shadow-md" />
             </span>
             <h2 className="text-base font-bold text-red-800">تنبيهات الانتهاء</h2>
             <div className="flex items-center gap-1.5">
