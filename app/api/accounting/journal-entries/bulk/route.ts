@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         companyId,
         isDeleted: false,
       },
-      select: { id: true, status: true, entryNumber: true },
+      select: { id: true, status: true, number: true },
     });
 
     if (entries.length !== entryIds.length) {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (invalidEntries.length > 0) {
-      const invalidNumbers = invalidEntries.map((e) => e.entryNumber).join(", ");
+      const invalidNumbers = invalidEntries.map((e) => e.number).join(", ");
       return NextResponse.json(
         {
           success: false,
