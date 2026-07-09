@@ -163,12 +163,26 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     if (companyAccessError) return companyAccessError;
 
     if (!session.isSuperAdmin) return NextResponse.json({ success: false, error: "يلزم صلاحية المشرف العام للحذف" }, { status: 403 });
-    if (record.status === "PAID") return NextResponse.json({ success: false, error: "لا يمكن حذف سجل مصروف" }, { status: 400 });
+
+    // Check if journal entry is posted (cannot delete if posted)
+    if (record.journalEntryId) {
+      const journalEntry = await prisma.journalEntry.findUnique({
+        where: { id: record.journalEntryId },
+        select: { status: true },
+      });
+
+      if (journalEntry?.status === "POSTED") {
+        return NextResponse.json(
+          { success: false, error: "لا يمكن حذف سجل مرتبط بقيد مرحّل. يجب عكس القيد أولاً." },
+          { status: 400 }
+        );
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await discardLinkedJournalEntry(tx, record.journalEntryId, {
         userId: session.id,
-        reasonAr: "تم حذف سجل بدل الإجازة قبل ترحيل القيد",
+        reasonAr: "تم حذف سجل بدل الإجازة",
       });
       await tx.leavePayCalc.delete({ where: { id: calcId } });
     });
