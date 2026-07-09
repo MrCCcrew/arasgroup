@@ -60,7 +60,12 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             netRevenue: true,
             vehicle: {
               select: {
-                plateNumber: true,
+                nameAr: true,
+                vehicle: {
+                  select: {
+                    plateNumber: true,
+                  },
+                },
               },
             },
             location: {

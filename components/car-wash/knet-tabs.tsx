@@ -18,7 +18,10 @@ interface KnetTransaction {
     totalKnet: any;
     netRevenue: any;
     vehicle: {
-      plateNumber: string;
+      nameAr: string;
+      vehicle: {
+        plateNumber: string;
+      };
     };
     location: {
       nameAr: string;
@@ -306,7 +309,10 @@ export function KnetTabs({
                         </td>
                         <td className="text-sm">{formatDate(transaction.operation.date, numberLocale)}</td>
                         <td className="text-sm">{transaction.operation.location.nameAr}</td>
-                        <td className="text-sm">{transaction.operation.vehicle.plateNumber}</td>
+                        <td className="text-sm">
+                          <div>{transaction.operation.vehicle.vehicle.plateNumber}</div>
+                          <div className="text-xs text-muted-foreground">{transaction.operation.vehicle.nameAr}</div>
+                        </td>
                         <td className="number font-medium text-green-600">{formatKWD(Number(transaction.amount), numberLocale)}</td>
                         <td className="text-xs text-muted-foreground">{transaction.transactionRef ?? "-"}</td>
                       </tr>
