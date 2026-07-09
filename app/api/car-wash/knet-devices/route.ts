@@ -1,40 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { z } from "zod";
 
-export async function POST(request: NextRequest) {
+const updateSchema = z.object({
+  companyId: z.string(),
+  updates: z.array(
+    z.object({
+      vehicleId: z.string(),
+      deviceId: z.string().nullable(),
+    })
+  ),
+});
+
+export async function PATCH(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
 
   try {
-    const formData = await request.formData();
-    const companyId = formData.get("companyId") as string;
+    const body = await request.json();
+    const parsed = updateSchema.safeParse(body);
 
-    if (!companyId) {
-      return NextResponse.json({ success: false, error: "Company ID is required" }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: parsed.error.errors[0].message },
+        { status: 400 }
+      );
     }
+
+    const { companyId, updates } = parsed.data;
 
     const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
 
-    // Get all vehicle IDs from form
-    const vehicleIds: string[] = [];
-    for (const [key, value] of formData.entries()) {
-      if (key.endsWith("_id")) {
-        vehicleIds.push(value as string);
-      }
-    }
-
     // Update each vehicle's knetDeviceId
-    const updates = vehicleIds.map((vehicleId) => {
-      const deviceId = formData.get(`${vehicleId}_deviceId`) as string;
-      return prisma.carWashVehicle.update({
+    const updateOperations = updates.map(({ vehicleId, deviceId }) =>
+      prisma.carWashVehicle.update({
         where: { id: vehicleId },
-        data: { knetDeviceId: deviceId || null },
-      });
-    });
+        data: { knetDeviceId: deviceId },
+      })
+    );
 
-    await prisma.$transaction(updates);
+    await prisma.$transaction(updateOperations);
 
     // Create audit log
     await prisma.auditLog.create({
@@ -45,14 +52,15 @@ export async function POST(request: NextRequest) {
         resourceType: "CarWashVehicle",
         resourceId: companyId,
         newValues: {
-          count: vehicleIds.length,
+          count: updates.length,
+          updates,
         },
         ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "",
         userAgent: request.headers.get("user-agent") ?? "",
       },
     });
 
-    return NextResponse.redirect(new URL(`/dashboard/companies/${companyId}/car-wash/knet`, request.url));
+    return NextResponse.json({ success: true, data: { updated: updates.length } });
   } catch (error) {
     console.error("Update KNET device IDs error:", error);
     const message = error instanceof Error ? error.message : "Failed to save";

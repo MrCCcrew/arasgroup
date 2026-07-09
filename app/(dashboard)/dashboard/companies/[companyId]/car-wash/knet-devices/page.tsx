@@ -1,34 +1,85 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
-import { getLocale } from "@/lib/i18n";
+import { useLocale } from "@/components/providers/locale-provider";
 
-interface Props {
-  params: Promise<{ companyId: string }>;
+interface Vehicle {
+  id: string;
+  code: string;
+  nameAr: string;
+  knetDeviceId: string | null;
+  vehicle: {
+    plateNumber: string;
+  };
 }
 
-export default async function KnetDevicesPage({ params }: Props) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-
-  const { companyId } = await params;
-  const locale = await getLocale();
+export default function KnetDevicesPage() {
+  const router = useRouter();
+  const { companyId } = useParams<{ companyId: string }>();
+  const { locale } = useLocale();
   const en = locale === "en";
 
-  const vehicles = await prisma.carWashVehicle.findMany({
-    where: { companyId, isActive: true },
-    include: {
-      vehicle: {
-        select: {
-          plateNumber: true,
-        },
-      },
-    },
-    orderBy: { code: "asc" },
-  });
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [deviceIds, setDeviceIds] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch(`/api/car-wash/vehicles?companyId=${companyId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setVehicles(data.data);
+          const initialIds: Record<string, string> = {};
+          data.data.forEach((v: Vehicle) => {
+            initialIds[v.id] = v.knetDeviceId || "";
+          });
+          setDeviceIds(initialIds);
+        }
+        setLoading(false);
+      });
+  }, [companyId]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    try {
+      const updates = Object.entries(deviceIds).map(([vehicleId, deviceId]) => ({
+        vehicleId,
+        deviceId: deviceId || null,
+      }));
+
+      const response = await fetch("/api/car-wash/knet-devices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, updates }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to save");
+
+      router.push(`/dashboard/companies/${companyId}/car-wash/knet`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="page-container">
+        <p className="text-muted-foreground">{en ? "Loading..." : "جارٍ التحميل..."}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -48,6 +99,12 @@ export default async function KnetDevicesPage({ params }: Props) {
       />
 
       <div className="page-container max-w-4xl">
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
           <div className="flex items-start gap-3">
             <CreditCard className="mt-0.5 shrink-0 text-blue-600" size={20} />
@@ -62,8 +119,7 @@ export default async function KnetDevicesPage({ params }: Props) {
           </div>
         </div>
 
-        <form action="/api/car-wash/knet-devices" method="POST" className="space-y-4">
-          <input type="hidden" name="companyId" value={companyId} />
+        <form onSubmit={handleSubmit} className="space-y-4">
 
           <div className="rounded-xl border bg-card">
             <div className="border-b bg-muted/30 px-6 py-4">
@@ -94,14 +150,15 @@ export default async function KnetDevicesPage({ params }: Props) {
                       </div>
 
                       <div className="w-80">
-                        <input type="hidden" name={`${vehicle.id}_id`} value={vehicle.id} />
                         <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                           {en ? "KNET Device ID" : "رقم جهاز KNET"}
                         </label>
                         <input
                           type="text"
-                          name={`${vehicle.id}_deviceId`}
-                          defaultValue={vehicle.knetDeviceId ?? ""}
+                          value={deviceIds[vehicle.id] || ""}
+                          onChange={(e) =>
+                            setDeviceIds((prev) => ({ ...prev, [vehicle.id]: e.target.value }))
+                          }
                           placeholder={en ? "Enter device ID..." : "أدخل رقم الجهاز..."}
                           className="input-field w-full"
                         />
@@ -123,10 +180,17 @@ export default async function KnetDevicesPage({ params }: Props) {
               </Link>
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                disabled={saving}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 <Save size={16} />
-                {en ? "Save Changes" : "حفظ التغييرات"}
+                {saving
+                  ? en
+                    ? "Saving..."
+                    : "جارٍ الحفظ..."
+                  : en
+                    ? "Save Changes"
+                    : "حفظ التغييرات"}
               </button>
             </div>
           )}
