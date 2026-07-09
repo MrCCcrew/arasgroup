@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, FileDown, Plus, Settings } from "lucide-react";
+import { Clock, CreditCard, FileDown, Plus, Settings } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { KnetTabs } from "@/components/car-wash/knet-tabs";
 import { getSession } from "@/lib/auth/session";
@@ -61,6 +61,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             vehicle: {
               select: {
                 nameAr: true,
+                knetDeviceId: true,
                 vehicle: {
                   select: {
                     plateNumber: true,
@@ -111,6 +112,13 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
             >
               <Settings size={16} />
               {locale === "en" ? "Commission Settings" : "إعدادات العمولة"}
+            </Link>
+            <Link
+              href={`/dashboard/companies/${companyId}/car-wash/knet-devices`}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+            >
+              <CreditCard size={16} />
+              {locale === "en" ? "KNET Devices" : "أجهزة KNET"}
             </Link>
             <Link
               href={`/dashboard/companies/${companyId}/car-wash/knet/new`}

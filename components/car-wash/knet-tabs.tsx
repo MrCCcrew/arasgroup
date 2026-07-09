@@ -20,6 +20,7 @@ interface KnetTransaction {
     netRevenue: any;
     vehicle: {
       nameAr: string;
+      knetDeviceId: string | null;
       vehicle: {
         plateNumber: string;
       };
@@ -342,6 +343,7 @@ export function KnetTabs({
                     <th>{en ? "Date" : "التاريخ"}</th>
                     <th>{en ? "Location" : "الموقع"}</th>
                     <th>{en ? "Vehicle" : "المركبة"}</th>
+                    <th>{en ? "Device" : "الجهاز"}</th>
                     <th>{en ? "Card Type" : "نوع الكارت"}</th>
                     <th>{en ? "Amount" : "المبلغ"}</th>
                     <th>{en ? "Reference #" : "رقم المرجع"}</th>
@@ -350,7 +352,7 @@ export function KnetTabs({
                 <tbody>
                   {unsettledTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center">
+                      <td colSpan={8} className="py-12 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <CheckCircle size={48} className="text-green-500" />
                           <p className="text-lg font-medium text-green-600">
@@ -378,6 +380,9 @@ export function KnetTabs({
                         <td className="text-sm">
                           <div>{transaction.operation.vehicle.vehicle.plateNumber}</div>
                           <div className="text-xs text-muted-foreground">{transaction.operation.vehicle.nameAr}</div>
+                        </td>
+                        <td className="text-sm font-mono text-muted-foreground">
+                          {transaction.operation.vehicle.knetDeviceId || "-"}
                         </td>
                         <td>
                           <select
