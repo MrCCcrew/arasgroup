@@ -12,8 +12,16 @@ interface KnetTx {
   id: string;
   amount: number;
   date: string;
+  cardType: string;
   transactionRef?: string;
   operation: { date: string; vehicle: { nameAr: string; nameEn?: string } };
+}
+
+interface CommissionSettings {
+  [cardType: string]: {
+    percentage: number;
+    fixed: number;
+  };
 }
 
 interface BankAccount {
@@ -31,6 +39,7 @@ export default function NewKnetSettlementPage() {
 
   const [transactions, setTransactions] = useState<KnetTx[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [commissionSettings, setCommissionSettings] = useState<CommissionSettings>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,7 +48,6 @@ export default function NewKnetSettlementPage() {
   const [form, setForm] = useState({
     bankAccountId: "",
     settlementDate: new Date().toISOString().split("T")[0],
-    commission: "",
     notes: "",
   });
 
@@ -47,9 +55,11 @@ export default function NewKnetSettlementPage() {
     Promise.all([
       fetch(`/api/car-wash/knet-transactions?companyId=${companyId}&unsettled=true`).then((response) => response.json()),
       fetch(`/api/accounting/bank-accounts?companyId=${companyId}`).then((response) => response.json()),
-    ]).then(([transactionPayload, bankPayload]) => {
+      fetch(`/api/car-wash/knet/commission-settings/${companyId}`).then((response) => response.json()),
+    ]).then(([transactionPayload, bankPayload, commissionPayload]) => {
       if (transactionPayload.success) setTransactions(transactionPayload.data);
       if (bankPayload.success) setBankAccounts(bankPayload.data);
+      if (commissionPayload.success) setCommissionSettings(commissionPayload.data);
       setLoading(false);
     });
   }, [companyId]);
@@ -70,8 +80,30 @@ export default function NewKnetSettlementPage() {
     });
   }
 
-  const grossAmount = transactions.filter((transaction) => selected.has(transaction.id)).reduce((sum, transaction) => sum + Number(transaction.amount), 0);
-  const commission = Number.parseFloat(form.commission || "0") || 0;
+  // Calculate commission automatically
+  const selectedTransactions = transactions.filter((tx) => selected.has(tx.id));
+  const grossAmount = selectedTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  // Group by card type and calculate commission
+  const commissionByType: Record<string, { count: number; amount: number; commission: number }> = {};
+  let totalCommission = 0;
+
+  selectedTransactions.forEach((tx) => {
+    const cardType = tx.cardType || "KNET";
+    const amount = Number(tx.amount);
+    const settings = commissionSettings[cardType] || { percentage: 0, fixed: 0 };
+    const txCommission = (amount * settings.percentage) / 100 + settings.fixed;
+
+    if (!commissionByType[cardType]) {
+      commissionByType[cardType] = { count: 0, amount: 0, commission: 0 };
+    }
+    commissionByType[cardType].count++;
+    commissionByType[cardType].amount += amount;
+    commissionByType[cardType].commission += txCommission;
+    totalCommission += txCommission;
+  });
+
+  const commission = totalCommission;
   const netAmount = grossAmount - commission;
 
   async function handleSubmit(event: React.FormEvent) {
@@ -134,7 +166,7 @@ export default function NewKnetSettlementPage() {
 
           <div className="section-card space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{locale === "en" ? "Settlement details" : "بيانات التسوية"}</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Bank account" : "الحساب البنكي"} <span className="text-red-500">*</span></label>
                 <select required value={form.bankAccountId} onChange={(event) => setForm((previous) => ({ ...previous, bankAccountId: event.target.value }))} className="input-field w-full">
@@ -150,15 +182,35 @@ export default function NewKnetSettlementPage() {
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Settlement date" : "تاريخ التسوية"}</label>
                 <input type="date" value={form.settlementDate} onChange={(event) => setForm((previous) => ({ ...previous, settlementDate: event.target.value }))} className="input-field w-full" />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Bank commission (KWD)" : "عمولة البنك (د.ك)"}</label>
-                <input type="number" min="0" step="0.001" value={form.commission} onChange={(event) => setForm((previous) => ({ ...previous, commission: event.target.value }))} className="input-field w-full" placeholder="0.000" dir="ltr" />
-              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Notes" : "ملاحظات"}</label>
               <input type="text" value={form.notes} onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))} className="input-field w-full" />
             </div>
+
+            {/* Commission Breakdown */}
+            {selected.size > 0 && Object.keys(commissionByType).length > 0 && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <h4 className="mb-3 text-sm font-semibold text-primary">{locale === "en" ? "Commission Breakdown" : "تفاصيل العمولة"}</h4>
+                <div className="space-y-2">
+                  {Object.entries(commissionByType).map(([cardType, data]) => (
+                    <div key={cardType} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium">{cardType}</span>
+                        <span className="text-muted-foreground">
+                          {data.count} {locale === "en" ? "transactions" : "معاملة"} × {formatKWD(data.amount / data.count, numberLocale)}
+                        </span>
+                      </div>
+                      <span className="font-medium">{formatKWD(data.commission, numberLocale)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 flex items-center justify-between font-semibold">
+                    <span>{locale === "en" ? "Total Commission" : "إجمالي العمولة"}</span>
+                    <span className="text-red-600">{formatKWD(totalCommission, numberLocale)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-4">
