@@ -46,7 +46,7 @@ interface Settlement {
 interface BankAccount {
   id: string;
   nameAr: string;
-  bankName: string | null;
+  bankName: string;
 }
 
 interface Props {
