@@ -1,13 +1,17 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
-import { getLocale } from "@/lib/i18n";
+import { useLocale } from "@/components/providers/locale-provider";
 
-interface Props {
-  params: Promise<{ companyId: string }>;
+interface Setting {
+  id: string;
+  cardType: string;
+  percentageRate: number;
+  fixedAmount: number;
 }
 
 const CARD_TYPES = [
@@ -18,20 +22,80 @@ const CARD_TYPES = [
   { value: "MASTERCARD_INTL", labelAr: "ماستركارد دولي", labelEn: "Mastercard International" },
 ] as const;
 
-export default async function KnetCommissionSettingsPage({ params }: Props) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-
-  const { companyId } = await params;
-  const locale = await getLocale();
+export default function KnetCommissionSettingsPage() {
+  const router = useRouter();
+  const { companyId } = useParams<{ companyId: string }>();
+  const { locale } = useLocale();
   const en = locale === "en";
 
-  const settings = await prisma.knetCommissionSettings.findMany({
-    where: { companyId },
-    orderBy: { cardType: "asc" },
-  });
+  const [settings, setSettings] = useState<Setting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [formData, setFormData] = useState<Record<string, { percentage: string; fixed: string }>>({});
+
+  useEffect(() => {
+    fetch(`/api/car-wash/knet/commission-settings?companyId=${companyId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setSettings(data.data);
+          const initialData: Record<string, { percentage: string; fixed: string }> = {};
+          data.data.forEach((s: Setting) => {
+            initialData[s.cardType] = {
+              percentage: Number(s.percentageRate).toFixed(3),
+              fixed: Number(s.fixedAmount).toFixed(3),
+            };
+          });
+          setFormData(initialData);
+        }
+        setLoading(false);
+      });
+  }, [companyId]);
 
   const settingsMap = new Map(settings.map((s) => [s.cardType, s]));
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    try {
+      const payload = CARD_TYPES.map((cardType) => {
+        const setting = settingsMap.get(cardType.value);
+        const data = formData[cardType.value] || { percentage: "0", fixed: "0" };
+        return {
+          id: setting?.id,
+          cardType: cardType.value,
+          percentageRate: Number.parseFloat(data.percentage) || 0,
+          fixedAmount: Number.parseFloat(data.fixed) || 0,
+        };
+      });
+
+      const response = await fetch("/api/car-wash/knet/commission-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, settings: payload }),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || "Failed to save");
+
+      router.push(`/dashboard/companies/${companyId}/car-wash/knet`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="page-container">
+        <p className="text-muted-foreground">{en ? "Loading..." : "جارٍ التحميل..."}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -51,6 +115,12 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
       />
 
       <div className="page-container">
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <div className="rounded-xl border bg-card p-6">
           <div className="mb-6">
             <h2 className="text-lg font-bold">{en ? "Commission Calculation" : "حساب العمولة"}</h2>
@@ -61,8 +131,7 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
             </p>
           </div>
 
-          <form action={`/api/car-wash/knet/commission-settings`} method="POST">
-            <input type="hidden" name="companyId" value={companyId} />
+          <form onSubmit={handleSubmit}>
 
             <div className="space-y-4">
               {CARD_TYPES.map((cardType) => {
@@ -76,8 +145,6 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
                       </span>
                     </div>
 
-                    <input type="hidden" name={`${cardType.value}_id`} value={setting?.id ?? ""} />
-
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium">
@@ -85,8 +152,16 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
                         </label>
                         <input
                           type="number"
-                          name={`${cardType.value}_percentage`}
-                          defaultValue={setting ? Number(setting.percentageRate).toFixed(3) : "0"}
+                          value={formData[cardType.value]?.percentage || "0"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              [cardType.value]: {
+                                ...prev[cardType.value],
+                                percentage: e.target.value,
+                              },
+                            }))
+                          }
                           step="0.001"
                           min="0"
                           max="100"
@@ -104,8 +179,16 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
                         </label>
                         <input
                           type="number"
-                          name={`${cardType.value}_fixed`}
-                          defaultValue={setting ? Number(setting.fixedAmount).toFixed(3) : "0"}
+                          value={formData[cardType.value]?.fixed || "0"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              [cardType.value]: {
+                                ...prev[cardType.value],
+                                fixed: e.target.value,
+                              },
+                            }))
+                          }
                           step="0.001"
                           min="0"
                           className="input-field"
@@ -149,10 +232,11 @@ export default async function KnetCommissionSettingsPage({ params }: Props) {
               </Link>
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                disabled={saving}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 <Save size={16} />
-                {en ? "Save Settings" : "حفظ الإعدادات"}
+                {saving ? (en ? "Saving..." : "جارٍ الحفظ...") : en ? "Save Settings" : "حفظ الإعدادات"}
               </button>
             </div>
           </form>
