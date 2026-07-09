@@ -295,6 +295,7 @@ model Company {
   assetItems        AssetItem[]
   assetCustodies    AssetCustody[]
   driverVehicleAssignments DriverVehicleAssignment[]
+  knetCommissionSettings KnetCommissionSettings[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1796,6 +1797,7 @@ model KnetTransaction {
   date           DateTime
   settlementId   String?
   isSettled      Boolean @default(false)
+  cardType       String  @default("KNET") // KNET, VISA_LOCAL, VISA_INTL, MASTERCARD_LOCAL, MASTERCARD_INTL
 
   operation  CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
   settlement KnetSettlement?       @relation(fields: [settlementId], references: [id], onDelete: Restrict)
@@ -1806,7 +1808,26 @@ model KnetTransaction {
   @@index([settlementId])
   @@index([isSettled])
   @@index([date])
+  @@index([cardType])
   @@map("knet_transactions")
+}
+
+model KnetCommissionSettings {
+  id              String  @id @default(cuid())
+  companyId       String
+  cardType        String  // KNET, VISA_LOCAL, VISA_INTL, MASTERCARD_LOCAL, MASTERCARD_INTL
+  percentageRate  Decimal @default(0) @db.Decimal(5, 3) // e.g., 1.750 for 1.75%
+  fixedAmount     Decimal @default(0) @db.Decimal(18, 3)
+  isActive        Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, cardType])
+  @@index([companyId])
+  @@map("knet_commission_settings")
 }
 
 model KnetSettlement {
