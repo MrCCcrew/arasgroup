@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, FileDown, Plus } from "lucide-react";
+import { Clock, FileDown, Plus, Settings } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { KnetTabs } from "@/components/car-wash/knet-tabs";
 import { getSession } from "@/lib/auth/session";
@@ -104,13 +104,22 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
         subtitle={locale === "en" ? "Electronic payment settlement records" : "تسويات مبالغ الدفع الإلكتروني"}
         companyId={companyId}
         actions={
-          <Link
-            href={`/dashboard/companies/${companyId}/car-wash/knet/new`}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus size={16} />
-            {locale === "en" ? "New settlement" : "تسوية جديدة"}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/companies/${companyId}/car-wash/knet/settings`}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+            >
+              <Settings size={16} />
+              {locale === "en" ? "Commission Settings" : "إعدادات العمولة"}
+            </Link>
+            <Link
+              href={`/dashboard/companies/${companyId}/car-wash/knet/new`}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              {locale === "en" ? "New settlement" : "تسوية جديدة"}
+            </Link>
+          </div>
         }
       />
 
