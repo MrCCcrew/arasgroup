@@ -9,6 +9,7 @@ import { formatDate, formatKWD } from "@/lib/utils";
 interface KnetTransaction {
   id: string;
   amount: any;
+  cardType: string;
   transactionRef: string | null;
   date: Date;
   operation: {
@@ -76,6 +77,8 @@ export function KnetTabs({
   const [activeTab, setActiveTab] = useState<"settlements" | "unsettled">("settlements");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [cardTypeChanges, setCardTypeChanges] = useState<Record<string, string>>({});
+  const [savingCardTypes, setSavingCardTypes] = useState(false);
 
   const en = locale === "en";
   const allSelected = unsettledTransactions.length > 0 && selectedIds.length === unsettledTransactions.length;
@@ -107,6 +110,46 @@ export function KnetTabs({
     const params = new URLSearchParams({ transactionIds: selectedIds.join(",") });
     router.push(`/dashboard/companies/${companyId}/car-wash/knet/new?${params}`);
   }
+
+  function handleCardTypeChange(transactionId: string, newCardType: string) {
+    setCardTypeChanges((prev) => ({ ...prev, [transactionId]: newCardType }));
+  }
+
+  async function saveCardTypeChanges() {
+    if (Object.keys(cardTypeChanges).length === 0) return;
+
+    setSavingCardTypes(true);
+    try {
+      const res = await fetch(`/api/car-wash/knet-transactions/bulk-update-card-type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          changes: cardTypeChanges,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? (en ? "Failed to save" : "فشل الحفظ"));
+      }
+
+      setCardTypeChanges({});
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : (en ? "An error occurred" : "حدث خطأ"));
+    } finally {
+      setSavingCardTypes(false);
+    }
+  }
+
+  const CARD_TYPES = [
+    { value: "KNET", labelAr: "كي نت", labelEn: "KNET" },
+    { value: "VISA_LOCAL", labelAr: "فيزا محلي", labelEn: "Visa Local" },
+    { value: "VISA_INTL", labelAr: "فيزا دولي", labelEn: "Visa Intl" },
+    { value: "MASTERCARD_LOCAL", labelAr: "ماستر محلي", labelEn: "MC Local" },
+    { value: "MASTERCARD_INTL", labelAr: "ماستر دولي", labelEn: "MC Intl" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -233,30 +276,52 @@ export function KnetTabs({
         </>
       ) : (
         <>
-          {/* Bulk Actions */}
-          {selectedIds.length > 0 && (
+          {/* Actions Bar */}
+          {(selectedIds.length > 0 || Object.keys(cardTypeChanges).length > 0) && (
             <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">
-                  {en ? `${selectedIds.length} selected` : `${selectedIds.length} محدد`}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {en ? "Total:" : "الإجمالي:"} {formatKWD(selectedTotal, numberLocale)}
-                </span>
-                <button
-                  onClick={() => setSelectedIds([])}
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  {en ? "Clear selection" : "إلغاء التحديد"}
-                </button>
+                {selectedIds.length > 0 && (
+                  <>
+                    <span className="text-sm font-medium">
+                      {en ? `${selectedIds.length} selected` : `${selectedIds.length} محدد`}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {en ? "Total:" : "الإجمالي:"} {formatKWD(selectedTotal, numberLocale)}
+                    </span>
+                    <button
+                      onClick={() => setSelectedIds([])}
+                      className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {en ? "Clear selection" : "إلغاء التحديد"}
+                    </button>
+                  </>
+                )}
+                {Object.keys(cardTypeChanges).length > 0 && (
+                  <span className="text-sm font-medium text-orange-600">
+                    {Object.keys(cardTypeChanges).length} {en ? "unsaved changes" : "تعديل غير محفوظ"}
+                  </span>
+                )}
               </div>
-              <button
-                onClick={handleSettleSelected}
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                <CheckCircle size={16} />
-                {en ? "Settle selected" : "تسوية المحدد"}
-              </button>
+              <div className="flex items-center gap-2">
+                {Object.keys(cardTypeChanges).length > 0 && (
+                  <button
+                    onClick={saveCardTypeChanges}
+                    disabled={savingCardTypes}
+                    className="flex items-center gap-2 rounded-lg border border-orange-600 bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {savingCardTypes ? (en ? "Saving..." : "جارٍ الحفظ...") : (en ? "Save Changes" : "حفظ التغييرات")}
+                  </button>
+                )}
+                {selectedIds.length > 0 && (
+                  <button
+                    onClick={handleSettleSelected}
+                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    <CheckCircle size={16} />
+                    {en ? "Settle selected" : "تسوية المحدد"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -277,6 +342,7 @@ export function KnetTabs({
                     <th>{en ? "Date" : "التاريخ"}</th>
                     <th>{en ? "Location" : "الموقع"}</th>
                     <th>{en ? "Vehicle" : "المركبة"}</th>
+                    <th>{en ? "Card Type" : "نوع الكارت"}</th>
                     <th>{en ? "Amount" : "المبلغ"}</th>
                     <th>{en ? "Reference #" : "رقم المرجع"}</th>
                   </tr>
@@ -284,7 +350,7 @@ export function KnetTabs({
                 <tbody>
                   {unsettledTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center">
+                      <td colSpan={7} className="py-12 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <CheckCircle size={48} className="text-green-500" />
                           <p className="text-lg font-medium text-green-600">
@@ -312,6 +378,21 @@ export function KnetTabs({
                         <td className="text-sm">
                           <div>{transaction.operation.vehicle.vehicle.plateNumber}</div>
                           <div className="text-xs text-muted-foreground">{transaction.operation.vehicle.nameAr}</div>
+                        </td>
+                        <td>
+                          <select
+                            value={cardTypeChanges[transaction.id] ?? transaction.cardType}
+                            onChange={(e) => handleCardTypeChange(transaction.id, e.target.value)}
+                            className={`input-field w-full text-xs ${
+                              cardTypeChanges[transaction.id] ? "border-orange-500 bg-orange-50" : ""
+                            }`}
+                          >
+                            {CARD_TYPES.map((ct) => (
+                              <option key={ct.value} value={ct.value}>
+                                {en ? ct.labelEn : ct.labelAr}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="number font-medium text-green-600">{formatKWD(Number(transaction.amount), numberLocale)}</td>
                         <td className="text-xs text-muted-foreground">{transaction.transactionRef ?? "-"}</td>
