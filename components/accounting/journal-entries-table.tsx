@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Eye } from "lucide-react";
 import { DeleteConfirmButton } from "@/components/ui/delete-confirm-button";
+import { formatDate, formatKWD } from "@/lib/utils";
 import type { JournalStatus } from "@prisma/client";
 
 interface JournalEntry {
@@ -28,8 +29,6 @@ interface Props {
   dateLocale: string;
   statusLabels: Record<string, string>;
   typeLabels: Record<string, string>;
-  formatKWD: (amount: number, locale: string) => string;
-  formatDate: (date: Date, locale: string) => string;
   canDelete: boolean;
 }
 
@@ -50,8 +49,6 @@ export function JournalEntriesTable({
   dateLocale,
   statusLabels,
   typeLabels,
-  formatKWD,
-  formatDate,
   canDelete,
 }: Props) {
   const router = useRouter();

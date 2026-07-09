@@ -193,8 +193,6 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           dateLocale={dateLocale}
           statusLabels={statusLabels[locale]}
           typeLabels={typeLabels[locale]}
-          formatKWD={formatKWD}
-          formatDate={formatDate}
           canDelete={canDelete}
         />
 
