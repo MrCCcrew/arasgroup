@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle, Clock, FileDown, Plus } from "lucide-react";
+import { Clock, FileDown, Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { KnetSettlementRowActions } from "@/components/car-wash/knet-settlement-row-actions";
+import { KnetTabs } from "@/components/car-wash/knet-tabs";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
-import { formatDate, formatKWD } from "@/lib/utils";
+import { formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -33,7 +33,7 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
   const monthStart = new Date(year, month - 1, 1);
   const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-  const [settlements, unsettledTotal, bankAccounts] = await Promise.all([
+  const [settlements, unsettledTransactions, unsettledTotal, bankAccounts] = await Promise.all([
     prisma.knetSettlement.findMany({
       where: {
         companyId,
@@ -44,6 +44,26 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
         transactions: { select: { id: true } },
       },
       orderBy: [{ settlementDate: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.knetTransaction.findMany({
+      where: {
+        isSettled: false,
+        operation: { companyId },
+      },
+      include: {
+        operation: {
+          select: {
+            id: true,
+            operationNumber: true,
+            customerName: true,
+            customerPhone: true,
+            vehiclePlate: true,
+            total: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
     }),
     prisma.knetTransaction.aggregate({
       where: {
@@ -60,10 +80,6 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
     }),
   ]);
 
-  type KnetSettlementItem = typeof settlements[number];
-  const totalGross = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.grossAmount), 0);
-  const totalCommission = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.commission), 0);
-  const totalNet = settlements.reduce((sum: number, settlement: KnetSettlementItem) => sum + Number(settlement.netAmount), 0);
   const pendingAmount = Number(unsettledTotal._sum.amount ?? 0);
   const pendingCount = unsettledTotal._count.id;
 
@@ -132,99 +148,17 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
           </div>
         </form>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Settlements count" : "عدد التسويات"}</span>
-            <span className="text-2xl font-bold">{settlements.length}</span>
-          </div>
-          <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Gross KNET" : "إجمالي KNET"}</span>
-            <span className="number text-2xl font-bold">{formatKWD(totalGross, numberLocale)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Bank commission" : "العمولة البنكية"}</span>
-            <span className="number text-2xl font-bold text-red-600">{formatKWD(totalCommission, numberLocale)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="text-sm text-muted-foreground">{locale === "en" ? "Net received" : "صافي المستلم"}</span>
-            <span className="number text-2xl font-bold text-green-600">{formatKWD(totalNet, numberLocale)}</span>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <div className="overflow-x-auto">
-            <table className="ar-table">
-              <thead>
-                <tr>
-                  <th>{locale === "en" ? "Settlement date" : "تاريخ التسوية"}</th>
-                  <th>{locale === "en" ? "Bank account" : "الحساب البنكي"}</th>
-                  <th>{locale === "en" ? "Transactions count" : "عدد المعاملات"}</th>
-                  <th>{locale === "en" ? "Gross KNET" : "إجمالي KNET"}</th>
-                  <th>{locale === "en" ? "Commission" : "العمولة"}</th>
-                  <th>{locale === "en" ? "Net transfer" : "صافي المحول"}</th>
-                  <th>{locale === "en" ? "Notes" : "ملاحظات"}</th>
-                  <th>{locale === "en" ? "Journal entry" : "القيد"}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {settlements.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-12 text-center text-muted-foreground">
-                      {locale === "en"
-                        ? `No settlements found for ${MONTHS.en[month - 1]} ${year}`
-                        : `لا توجد تسويات في ${MONTHS.ar[month - 1]} ${year}`}
-                    </td>
-                  </tr>
-                ) : (
-                  settlements.map((settlement: KnetSettlementItem) => (
-                    <tr key={settlement.id} className="hover:bg-muted/10">
-                      <td className="text-sm">{formatDate(settlement.settlementDate, numberLocale)}</td>
-                      <td className="text-sm">
-                        {locale === "en" ? settlement.bankAccount.nameEn ?? settlement.bankAccount.nameAr : settlement.bankAccount.nameAr}
-                      </td>
-                      <td className="number text-center">{settlement.transactions.length}</td>
-                      <td className="number font-medium">{formatKWD(Number(settlement.grossAmount), numberLocale)}</td>
-                      <td className="number text-red-600">{formatKWD(Number(settlement.commission), numberLocale)}</td>
-                      <td className="number font-bold text-green-600">{formatKWD(Number(settlement.netAmount), numberLocale)}</td>
-                      <td className="text-sm text-muted-foreground">{settlement.notes ?? "-"}</td>
-                      <td>
-                        {settlement.journalEntryId ? (
-                          <CheckCircle size={16} className="mx-auto text-green-500" />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{locale === "en" ? "None" : "لا يوجد"}</span>
-                        )}
-                      </td>
-                      <td>
-                        <KnetSettlementRowActions
-                          settlementId={settlement.id}
-                          settlementDate={settlement.settlementDate.toISOString()}
-                          grossAmount={settlement.grossAmount.toString()}
-                          commission={settlement.commission.toString()}
-                          netAmount={settlement.netAmount.toString()}
-                          bankAccountId={settlement.bankAccountId}
-                          notes={settlement.notes}
-                          bankAccounts={bankAccounts}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {settlements.length > 0 && (
-                <tfoot className="border-t-2 bg-muted/30 font-bold">
-                  <tr>
-                    <td colSpan={3} className="py-2 text-center">{locale === "en" ? "Total" : "الإجمالي"}</td>
-                    <td className="number">{formatKWD(totalGross, numberLocale)}</td>
-                    <td className="number text-red-600">{formatKWD(totalCommission, numberLocale)}</td>
-                    <td className="number text-green-600">{formatKWD(totalNet, numberLocale)}</td>
-                    <td colSpan={3}></td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </div>
+        <KnetTabs
+          settlements={settlements}
+          unsettledTransactions={unsettledTransactions}
+          bankAccounts={bankAccounts}
+          companyId={companyId}
+          locale={locale}
+          numberLocale={numberLocale}
+          month={month}
+          year={year}
+          monthName={MONTHS[locale][month - 1]}
+        />
       </div>
     </div>
   );
