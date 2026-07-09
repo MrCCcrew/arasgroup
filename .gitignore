@@ -55,3 +55,4 @@ next-env.d.ts
 scanner_linux
 backups/
 logs/
+standalone.tar.gz

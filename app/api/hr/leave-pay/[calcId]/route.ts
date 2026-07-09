@@ -14,6 +14,107 @@ const patchSchema = z.object({
   paidDate: z.string().optional().nullable().transform((v) => (v ? new Date(v) : null)),
 });
 
+const putSchema = z.object({
+  employeeId: z.string(),
+  year: z.number().int(),
+  leaveDaysUsed: z.number().min(0),
+  daysOwed: z.number().min(0),
+  daysPaid: z.number().min(0),
+  dailyWage: z.number().min(0),
+  totalAmount: z.number().min(0),
+  action: z.enum(["CALCULATE", "ACCRUE", "PAY"]),
+  paymentMethod: z.enum(["CASH", "BANK"]).nullable().optional(),
+  bankAccountId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export async function GET(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { calcId } = await params;
+    const record = await prisma.leavePayCalc.findUnique({
+      where: { id: calcId },
+      include: {
+        employee: {
+          select: {
+            nameAr: true,
+            nameEn: true,
+            employeeNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!record) return NextResponse.json({ success: false, error: "السجل غير موجود" }, { status: 404 });
+
+    const companyAccessError = assertCompanyAccess(session, record.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    return NextResponse.json({ success: true, data: record });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في جلب البيانات";
+    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: Props) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+
+  try {
+    const { calcId } = await params;
+    const record = await prisma.leavePayCalc.findUnique({ where: { id: calcId } });
+    if (!record) return NextResponse.json({ success: false, error: "السجل غير موجود" }, { status: 404 });
+
+    const companyAccessError = assertCompanyAccess(session, record.companyId);
+    if (companyAccessError) return companyAccessError;
+
+    if (record.journalEntryId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "لا يمكن تعديل بدل الإجازة بعد إنشاء القيد المرتبط. احذف السجل أولاً أو أنشئ سجلًا جديدًا بعد المراجعة.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (record.status === "PAID") {
+      return NextResponse.json({ success: false, error: "لا يمكن تعديل سجل مصروف" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const parsed = putSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
+
+    const data = parsed.data;
+    const status = data.action === "PAY" ? "PAID" : data.action === "ACCRUE" ? "ACCRUED" : "CALCULATED";
+
+    const updated = await prisma.leavePayCalc.update({
+      where: { id: calcId },
+      data: {
+        leaveDaysUsed: data.leaveDaysUsed,
+        daysOwed: data.daysOwed,
+        daysPaid: data.daysPaid,
+        dailyWage: data.dailyWage,
+        totalAmount: data.totalAmount,
+        status,
+        paymentMethod: data.paymentMethod,
+        bankAccountId: data.bankAccountId,
+        notes: data.notes,
+        paidDate: status === "PAID" ? new Date() : null,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "فشل في التعديل";
+    return NextResponse.json({ success: false, error: msg }, { status: 400 });
+  }
+}
+
 export async function PATCH(request: NextRequest, { params }: Props) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
