@@ -54,11 +54,20 @@ export default async function KnetSettlementsPage({ params, searchParams }: Prop
         operation: {
           select: {
             id: true,
-            operationNumber: true,
-            customerName: true,
-            customerPhone: true,
-            vehiclePlate: true,
-            total: true,
+            date: true,
+            totalCash: true,
+            totalKnet: true,
+            netRevenue: true,
+            vehicle: {
+              select: {
+                plateNumber: true,
+              },
+            },
+            location: {
+              select: {
+                nameAr: true,
+              },
+            },
             createdAt: true,
           },
         },

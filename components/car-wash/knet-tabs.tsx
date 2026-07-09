@@ -9,15 +9,20 @@ import { formatDate, formatKWD } from "@/lib/utils";
 interface KnetTransaction {
   id: string;
   amount: any;
-  transactionDate: Date;
-  referenceNumber: string | null;
+  transactionRef: string | null;
+  date: Date;
   operation: {
     id: string;
-    operationNumber: string;
-    customerName: string | null;
-    customerPhone: string | null;
-    vehiclePlate: string | null;
-    total: any;
+    date: Date;
+    totalCash: any;
+    totalKnet: any;
+    netRevenue: any;
+    vehicle: {
+      plateNumber: string;
+    };
+    location: {
+      nameAr: string;
+    };
     createdAt: Date;
   };
 }
@@ -266,9 +271,8 @@ export function KnetTabs({
                         className="cursor-pointer"
                       />
                     </th>
-                    <th>{en ? "Operation #" : "رقم العملية"}</th>
                     <th>{en ? "Date" : "التاريخ"}</th>
-                    <th>{en ? "Customer" : "العميل"}</th>
+                    <th>{en ? "Location" : "الموقع"}</th>
                     <th>{en ? "Vehicle" : "المركبة"}</th>
                     <th>{en ? "Amount" : "المبلغ"}</th>
                     <th>{en ? "Reference #" : "رقم المرجع"}</th>
@@ -277,7 +281,7 @@ export function KnetTabs({
                 <tbody>
                   {unsettledTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center">
+                      <td colSpan={6} className="py-12 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <CheckCircle size={48} className="text-green-500" />
                           <p className="text-lg font-medium text-green-600">
@@ -300,15 +304,11 @@ export function KnetTabs({
                             className="cursor-pointer"
                           />
                         </td>
-                        <td className="font-mono text-sm">{transaction.operation.operationNumber}</td>
-                        <td className="text-sm">{formatDate(transaction.operation.createdAt, numberLocale)}</td>
-                        <td className="text-sm">
-                          <div>{transaction.operation.customerName ?? "-"}</div>
-                          <div className="text-xs text-muted-foreground">{transaction.operation.customerPhone ?? ""}</div>
-                        </td>
-                        <td className="text-sm">{transaction.operation.vehiclePlate ?? "-"}</td>
+                        <td className="text-sm">{formatDate(transaction.operation.date, numberLocale)}</td>
+                        <td className="text-sm">{transaction.operation.location.nameAr}</td>
+                        <td className="text-sm">{transaction.operation.vehicle.plateNumber}</td>
                         <td className="number font-medium text-green-600">{formatKWD(Number(transaction.amount), numberLocale)}</td>
-                        <td className="text-xs text-muted-foreground">{transaction.referenceNumber ?? "-"}</td>
+                        <td className="text-xs text-muted-foreground">{transaction.transactionRef ?? "-"}</td>
                       </tr>
                     ))
                   )}
