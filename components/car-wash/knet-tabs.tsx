@@ -373,7 +373,7 @@ export function KnetTabs({
                             className="cursor-pointer"
                           />
                         </td>
-                        <td className="text-sm">{formatDate(transaction.operation.date, numberLocale)}</td>
+                        <td className="text-sm">{formatDate(transaction.date, numberLocale)}</td>
                         <td className="text-sm">{transaction.operation.location.nameAr}</td>
                         <td className="text-sm">
                           <div>{transaction.operation.vehicle.vehicle.plateNumber}</div>
