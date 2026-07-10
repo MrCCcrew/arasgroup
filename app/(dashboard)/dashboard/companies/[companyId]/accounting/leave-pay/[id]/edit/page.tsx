@@ -191,28 +191,7 @@ export default function EditLeavePayPage() {
     );
   }
 
-  if (record.status === "PAID" || !!record.bankAccountId) {
-    return (
-      <div className="page-container max-w-2xl">
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-6 text-center">
-          <p className="font-semibold text-yellow-900">
-            {locale === "en" ? "Cannot edit paid records" : "لا يمكن تعديل السجلات المصروفة"}
-          </p>
-          <p className="mt-2 text-sm text-yellow-700">
-            {locale === "en"
-              ? "This record has already been paid or has a linked journal entry. Please delete and create a new one."
-              : "هذا السجل تم صرفه أو له قيد محاسبي مرتبط. يرجى حذف السجل وإنشاء سجل جديد."}
-          </p>
-          <Link
-            href={`/dashboard/companies/${companyId}/accounting/leave-pay`}
-            className="mt-4 inline-block rounded-lg bg-yellow-600 px-4 py-2 text-sm text-white hover:bg-yellow-700"
-          >
-            {locale === "en" ? "Back to list" : "العودة للقائمة"}
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Allow editing - journal entry validation happens on submit
 
   return (
     <div>
