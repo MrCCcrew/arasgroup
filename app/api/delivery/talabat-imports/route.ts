@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
           // Payments (map to old fields for compatibility)
           totalPickupPay: r.pickupPayment,
           totalDropoffPay: r.dropoffPayment,
-          calculatedOrdersRaw: r.totalCompletedDeliveries, // Use ACTUAL deliveries
+          calculatedOrdersRaw: r.totalCompletedDeliveries, // Calculated: (Pickup + Dropoff) / 1.050
           calculatedOrdersRounded: r.totalCompletedDeliveries,
           totalPayment: r.netPayment,
           totalDeductions: r.operatorDeduction,

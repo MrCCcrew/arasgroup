@@ -404,6 +404,12 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
     }
 
     // ── Case 3: Both Rider ID and Rider Name exist → Valid rider row ──
+    const pickupPayment = parseNumber(row["Pickup Payment"]);
+    const dropoffPayment = parseNumber(row["Dropoff Payment"]);
+
+    // Calculate orders: (Pickup Payment + Dropoff Payment) / 1.050 to remove 5% VAT
+    const calculatedOrders = (pickupPayment + dropoffPayment) / 1.050;
+
     const rider: CarriageRiderRow = {
       riderId,
       riderName,
@@ -412,15 +418,15 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
 
       // Productivity
       evaluatedHours: parseNumber(row["Evaluated Hours"]),
-      totalCompletedDeliveries: parseNumber(row["Total Completed Deliveries"]),
+      totalCompletedDeliveries: calculatedOrders, // Use calculated orders instead of CSV value
       pickupsCount: parseNumber(row["Pickups Count"]),
       pickupCancellations: parseNumber(row["Pickup Cancellations"]),
       dropoffsCount: parseNumber(row["Dropoffs Count"]),
       dropoffCancellations: parseNumber(row["Dropoff Cancellations"]),
 
       // Rider settlement
-      pickupPayment: parseNumber(row["Pickup Payment"]),
-      dropoffPayment: parseNumber(row["Dropoff Payment"]),
+      pickupPayment,
+      dropoffPayment,
       achievementPayment: parseNumber(row["Service-Level Based Achievement total Payment"]),
       operatorDeduction: parseNumber(row["Operator Log in & use to the Rider (operator) App Deductions"]),
       riderIncentives: parseNumber(row["Rider Manual Incentives Calc"]),
