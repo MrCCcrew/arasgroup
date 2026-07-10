@@ -121,6 +121,12 @@ export default function NewLeavePayPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
+    if (!preview || "error" in preview) {
+      setError(preview?.error || (locale === "en" ? "Please review the calculation" : "يرجى مراجعة الحساب"));
+      return;
+    }
+
     setError("");
     setSaving(true);
 
