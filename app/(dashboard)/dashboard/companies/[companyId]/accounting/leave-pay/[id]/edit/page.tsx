@@ -119,8 +119,8 @@ export default function EditLeavePayPage() {
       };
     }
 
-    const isAdministrative = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "OFFICE_BOY"].includes(employee.type ?? "");
-    const annualDays = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+    // Kuwaiti labor law: 30 days annual leave for all employees
+    const annualDays = 30;
 
     // Calculate days owed based on period if dates provided
     let autoDaysOwed = annualDays;

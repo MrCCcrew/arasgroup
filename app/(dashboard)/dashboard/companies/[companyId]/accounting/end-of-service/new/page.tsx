@@ -69,7 +69,7 @@ function calculatePreview(
   }
 
   const serviceYears = totalDays / 365;
-  const dailyWage = salary / 26;
+  const dailyWage = salary / 30; // Kuwaiti labor law: monthly salary / 30
   const grossDays = serviceYears <= 5 ? serviceYears * 15 : 5 * 15 + (serviceYears - 5) * 30;
 
   let deductionPct = 100;
