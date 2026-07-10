@@ -261,9 +261,9 @@ export default function PrintVoucherPage() {
           display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 2px solid #1e3a8a;
         }
         .company-info { display: flex; align-items: flex-start; gap: 0.75rem; }
-        .company-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; border: 1px solid #e5e7eb; padding: 3px; background: white; }
-        .company-name { font-size: 1.2rem; font-weight: 700; color: #1e3a8a; }
-        .company-name-en { font-size: 0.85rem; color: #374151; direction: ltr; text-align: left; margin-top: 0.2rem; }
+        .company-logo { width: 70px; height: 70px; object-fit: contain; border-radius: 6px; border: 1.5px solid #1e3a8a; padding: 4px; background: white; }
+        .company-name { font-size: 1.4rem; font-weight: 800; color: #1e3a8a; }
+        .company-name-en { font-size: 0.95rem; font-weight: 600; color: #374151; direction: ltr; text-align: left; margin-top: 0.2rem; }
         .company-detail { font-size: 0.78rem; color: #6b7280; margin-top: 0.15rem; }
         .voucher-title-box { text-align: center; border: 2px solid #1e3a8a; border-radius: 0.5rem; padding: 0.5rem 1.5rem; }
         .voucher-title { font-size: 1.3rem; font-weight: 700; color: #1e3a8a; }
@@ -271,15 +271,15 @@ export default function PrintVoucherPage() {
         .copy-badge { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 600; color: #374151; background: #f3f4f6; border-radius: 0.25rem; padding: 0.1rem 0.5rem; display: inline-block; }
         .voucher-meta { margin-bottom: 1rem; }
         .meta-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; font-size: 0.88rem; }
-        .meta-label { font-weight: 600; color: #374151; white-space: nowrap; }
-        .meta-value { color: #111827; }
+        .meta-label { font-weight: 700; color: #374151; white-space: nowrap; }
+        .meta-value { font-weight: 700; color: #111827; }
         .voucher-field { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.9rem; font-size: 0.9rem; }
-        .field-label { font-weight: 600; color: #374151; white-space: nowrap; min-width: 7rem; }
-        .field-value { flex: 1; color: #111827; }
+        .field-label { font-weight: 700; color: #374151; white-space: nowrap; min-width: 7rem; }
+        .field-value { flex: 1; font-weight: 700; color: #111827; }
         .field-underline { border-bottom: 1px solid #374151; padding-bottom: 0.1rem; min-width: 200px; }
         .amount-box {
-          border: 1.5px solid #1e3a8a; border-radius: 0.25rem; padding: 0.2rem 1rem; font-weight: 700; font-size: 1rem;
-          color: #1e3a8a; direction: ltr; display: inline-block;
+          border: 2px solid #1e3a8a; border-radius: 0.3rem; padding: 0.3rem 1.2rem; font-weight: 800; font-size: 1.1rem;
+          color: #1e3a8a; display: inline-block; text-align: right;
         }
         .amount-words { font-weight: 600; color: #1e3a8a; font-size: 0.92rem; }
         .accounts-section { margin: 1rem 0; }
