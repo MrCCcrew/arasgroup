@@ -65,6 +65,8 @@ export default function EditLeavePayPage() {
     employeeId: "",
     year: new Date().getFullYear(),
     leaveDaysUsed: "0",
+    leaveDaysOwed: "",
+    manualOverride: false,
     action: "CALCULATE",
     paymentMethod: "CASH",
     bankAccountId: "",
@@ -87,6 +89,8 @@ export default function EditLeavePayPage() {
           employeeId: data.employeeId,
           year: data.year,
           leaveDaysUsed: String(data.leaveDaysUsed || 0),
+          leaveDaysOwed: String(data.leaveDaysOwed || 0),
+          manualOverride: true,
           action: data.status === "PAID" ? "PAY" : data.status === "ACCRUED" ? "ACCRUE" : "CALCULATE",
           paymentMethod: data.paymentMethod || "CASH",
           bankAccountId: data.bankAccountId || "",
@@ -112,7 +116,8 @@ export default function EditLeavePayPage() {
     }
 
     const isAdministrative = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "OFFICE_BOY"].includes(employee.type ?? "");
-    const daysOwed = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+    const autoDaysOwed = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+    const daysOwed = form.manualOverride && form.leaveDaysOwed ? Number.parseFloat(form.leaveDaysOwed) : autoDaysOwed;
     const daysUsed = Math.max(0, Number.parseFloat(form.leaveDaysUsed) || 0);
     const daysPaid = Math.max(0, daysOwed - daysUsed);
     const dailyWage = Number(employee.baseSalary) / 30;
@@ -124,8 +129,9 @@ export default function EditLeavePayPage() {
       daysPaid,
       dailyWage,
       total,
+      autoDaysOwed,
     };
-  }, [employee, form.year, form.leaveDaysUsed, locale]);
+  }, [employee, form.year, form.leaveDaysUsed, form.leaveDaysOwed, form.manualOverride, locale]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -277,17 +283,41 @@ export default function EditLeavePayPage() {
               </div>
             </div>
 
-            <div>
-              <label className="form-label">{locale === "en" ? "Leave days used" : "أيام الإجازة المستخدمة"}</label>
-              <input
-                type="number"
-                min={0}
-                max={365}
-                step="0.5"
-                value={form.leaveDaysUsed}
-                onChange={(event) => setForm((previous) => ({ ...previous, leaveDaysUsed: event.target.value }))}
-                className="input-field w-full"
-              />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="form-label">{locale === "en" ? "Leave days owed" : "أيام الإجازة المستحقة"}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  step="0.5"
+                  value={form.leaveDaysOwed}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, leaveDaysOwed: event.target.value, manualOverride: true }))
+                  }
+                  className="input-field w-full"
+                  placeholder={preview?.autoDaysOwed ? String(preview.autoDaysOwed) : ""}
+                />
+                {preview?.autoDaysOwed && !form.manualOverride && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "en" ? "Auto-calculated:" : "محسوبة تلقائياً:"} {preview.autoDaysOwed}{" "}
+                    {locale === "en" ? "days" : "يوم"}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="form-label">{locale === "en" ? "Leave days used" : "أيام الإجازة المستخدمة"}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  step="0.5"
+                  value={form.leaveDaysUsed}
+                  onChange={(event) => setForm((previous) => ({ ...previous, leaveDaysUsed: event.target.value }))}
+                  className="input-field w-full"
+                />
+              </div>
             </div>
           </div>
 
