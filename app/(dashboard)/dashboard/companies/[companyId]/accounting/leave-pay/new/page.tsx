@@ -51,7 +51,11 @@ export default function NewLeavePayPage() {
   const [form, setForm] = useState({
     employeeId: "",
     year: new Date().getFullYear(),
+    periodStartDate: "",
+    periodEndDate: "",
     leaveDaysUsed: "0",
+    leaveDaysOwed: "",
+    manualOverride: false,
     action: "CALCULATE",
     paymentMethod: "CASH",
     bankAccountId: "",
@@ -85,7 +89,18 @@ export default function NewLeavePayPage() {
     // Administrative employees: always 30 days
     // Drivers: 30 days for < 5 years, 35 days for >= 5 years
     const isAdministrative = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "OFFICE_BOY"].includes(employee.type ?? "");
-    const daysOwed = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+    const annualDays = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+
+    // Calculate days owed based on period if dates provided
+    let autoDaysOwed = annualDays;
+    if (form.periodStartDate && form.periodEndDate) {
+      const start = new Date(form.periodStartDate);
+      const end = new Date(form.periodEndDate);
+      const daysInPeriod = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      autoDaysOwed = Math.round((daysInPeriod / 365) * annualDays * 10) / 10; // Round to 1 decimal
+    }
+
+    const daysOwed = form.manualOverride && form.leaveDaysOwed ? Number.parseFloat(form.leaveDaysOwed) : autoDaysOwed;
     const daysUsed = Math.max(0, Number.parseFloat(form.leaveDaysUsed) || 0);
     const daysPaid = Math.max(0, daysOwed - daysUsed);
     const dailyWage = Number(employee.baseSalary) / 30;
@@ -97,8 +112,10 @@ export default function NewLeavePayPage() {
       daysPaid,
       dailyWage,
       total,
+      autoDaysOwed,
+      annualDays,
     };
-  }, [employee?.baseSalary, employee?.joinDate, form.leaveDaysUsed, form.year, locale]);
+  }, [employee?.baseSalary, employee?.joinDate, employee?.type, form.leaveDaysUsed, form.leaveDaysOwed, form.manualOverride, form.periodStartDate, form.periodEndDate, form.year, locale]);
 
   function setField(field: keyof typeof form, value: string | number) {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -114,10 +131,20 @@ export default function NewLeavePayPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
           companyId,
-          leaveDaysUsed: Number.parseFloat(form.leaveDaysUsed) || 0,
+          employeeId: form.employeeId,
           year: Number(form.year),
+          periodStartDate: form.periodStartDate || null,
+          periodEndDate: form.periodEndDate || null,
+          leaveDaysUsed: Number.parseFloat(form.leaveDaysUsed) || 0,
+          daysOwed: preview.daysOwed,
+          daysPaid: preview.daysPaid,
+          dailyWage: preview.dailyWage,
+          totalAmount: preview.total,
+          action: form.action,
+          paymentMethod: form.action === "PAY" ? form.paymentMethod : null,
+          bankAccountId: form.action === "PAY" && form.paymentMethod === "BANK" ? form.bankAccountId : null,
+          notes: form.notes || null,
         }),
       });
 
@@ -235,6 +262,69 @@ export default function NewLeavePayPage() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Period start date" : "تاريخ بداية الفترة"}
+                </label>
+                <input
+                  type="date"
+                  value={form.periodStartDate}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, periodStartDate: event.target.value, manualOverride: false }))
+                  }
+                  className="input-field w-full"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en"
+                    ? "Leave blank to use full year (30 days)"
+                    : "اتركه فارغاً لحساب السنة كاملة (30 يوم)"}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Period end date" : "تاريخ نهاية الفترة"}
+                </label>
+                <input
+                  type="date"
+                  value={form.periodEndDate}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, periodEndDate: event.target.value, manualOverride: false }))
+                  }
+                  className="input-field w-full"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Leave days owed" : "أيام الإجازة المستحقة"}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  step="0.5"
+                  value={form.leaveDaysOwed}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, leaveDaysOwed: event.target.value, manualOverride: true }))
+                  }
+                  className="input-field w-full"
+                  placeholder={preview?.autoDaysOwed ? String(preview.autoDaysOwed) : ""}
+                  dir="ltr"
+                />
+                {preview?.autoDaysOwed && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "en" ? "Auto-calculated:" : "محسوبة تلقائياً:"} {preview.autoDaysOwed}{" "}
+                    {locale === "en" ? "days" : "يوم"}
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
                   {locale === "en" ? "Leave days already used" : "أيام الإجازة المستخدمة"}

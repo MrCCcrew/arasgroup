@@ -28,11 +28,17 @@ const createSchema = z.object({
   companyId: z.string(),
   employeeId: z.string(),
   year: z.number().int(),
+  periodStartDate: z.string().nullable().optional().transform((v) => (v ? new Date(v) : null)),
+  periodEndDate: z.string().nullable().optional().transform((v) => (v ? new Date(v) : null)),
   leaveDaysUsed: z.number().min(0).default(0),
-  notes: z.string().optional(),
+  daysOwed: z.number().min(0),
+  daysPaid: z.number().min(0),
+  dailyWage: z.number().min(0),
+  totalAmount: z.number().min(0),
+  notes: z.string().nullable().optional(),
   action: z.enum(["CALCULATE", "ACCRUE", "PAY"]).default("CALCULATE"),
-  paymentMethod: z.enum(["CASH", "BANK"]).optional(),
-  bankAccountId: z.string().optional(),
+  paymentMethod: z.enum(["CASH", "BANK"]).nullable().optional(),
+  bankAccountId: z.string().nullable().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -47,26 +53,21 @@ export async function POST(request: NextRequest) {
 
     const employee = await prisma.employee.findFirst({ where: { id: data.employeeId, isDeleted: false } });
     if (!employee) return NextResponse.json({ success: false, error: "الموظف غير موجود" }, { status: 404 });
-    if (!employee.baseSalary) return NextResponse.json({ success: false, error: "الراتب الأساسي غير مسجل" }, { status: 400 });
-    if (!employee.joinDate) return NextResponse.json({ success: false, error: "تاريخ الالتحاق غير مسجل" }, { status: 400 });
 
     const asOfDate = new Date(data.year, 11, 31);
-    const leaveDaysOwed = calcLeaveDays(employee.joinDate, asOfDate);
-    const leaveDaysPaid = Math.max(0, leaveDaysOwed - data.leaveDaysUsed);
-    // Daily wage = monthly salary / 30
-    const dailyWage = Number(employee.baseSalary) / 30;
-    const totalAmount = Math.round(leaveDaysPaid * dailyWage * 1000) / 1000;
 
     const record = await prisma.leavePayCalc.create({
       data: {
         companyId: data.companyId,
         employeeId: data.employeeId,
         year: data.year,
-        leaveDaysOwed,
+        periodStartDate: data.periodStartDate,
+        periodEndDate: data.periodEndDate,
+        leaveDaysOwed: data.daysOwed,
         leaveDaysUsed: data.leaveDaysUsed,
-        leaveDaysPaid,
-        dailyWage: Math.round(dailyWage * 1000) / 1000,
-        totalAmount,
+        leaveDaysPaid: data.daysPaid,
+        dailyWage: data.dailyWage,
+        totalAmount: data.totalAmount,
         status: data.action === "CALCULATE" ? "CALCULATED" : data.action === "ACCRUE" ? "ACCRUED" : "PAID",
         notes: data.notes,
         paidDate: data.action === "PAY" ? new Date() : undefined,
@@ -96,8 +97,8 @@ export async function POST(request: NextRequest) {
           refId: record.id,
           isAutomatic: true,
           lines: [
-            { accountId: expenseAcc.id, debit: totalAmount, credit: 0, descriptionAr: `بدل إجازة ${data.year}` },
-            { accountId: liabilityAcc.id, debit: 0, credit: totalAmount, descriptionAr: `مستحقات — ${employee.nameAr}` },
+            { accountId: expenseAcc.id, debit: data.totalAmount, credit: 0, descriptionAr: `بدل إجازة ${data.year}` },
+            { accountId: liabilityAcc.id, debit: 0, credit: data.totalAmount, descriptionAr: `مستحقات — ${employee.nameAr}` },
           ],
         });
         await prisma.leavePayCalc.update({ where: { id: record.id }, data: { journalEntryId: je.id } });
@@ -114,8 +115,8 @@ export async function POST(request: NextRequest) {
             refId: record.id,
             isAutomatic: true,
             lines: [
-              { accountId: expenseAcc.id, debit: totalAmount, credit: 0, descriptionAr: `بدل إجازة ${data.year}` },
-              { accountId: crAccountId, debit: 0, credit: totalAmount, descriptionAr: `صرف لـ ${employee.nameAr}` },
+              { accountId: expenseAcc.id, debit: data.totalAmount, credit: 0, descriptionAr: `بدل إجازة ${data.year}` },
+              { accountId: crAccountId, debit: 0, credit: data.totalAmount, descriptionAr: `صرف لـ ${employee.nameAr}` },
             ],
           });
           await prisma.leavePayCalc.update({ where: { id: record.id }, data: { journalEntryId: je.id } });
