@@ -17,6 +17,8 @@ const patchSchema = z.object({
 const putSchema = z.object({
   employeeId: z.string(),
   year: z.number().int(),
+  periodStartDate: z.string().nullable().optional().transform((v) => (v ? new Date(v) : null)),
+  periodEndDate: z.string().nullable().optional().transform((v) => (v ? new Date(v) : null)),
   leaveDaysUsed: z.number().min(0),
   daysOwed: z.number().min(0),
   daysPaid: z.number().min(0),
@@ -95,6 +97,8 @@ export async function PUT(request: NextRequest, { params }: Props) {
     const updated = await prisma.leavePayCalc.update({
       where: { id: calcId },
       data: {
+        periodStartDate: data.periodStartDate,
+        periodEndDate: data.periodEndDate,
         leaveDaysUsed: data.leaveDaysUsed,
         leaveDaysOwed: data.daysOwed,
         leaveDaysPaid: data.daysPaid,

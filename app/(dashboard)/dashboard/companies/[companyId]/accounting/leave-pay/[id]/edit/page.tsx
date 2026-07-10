@@ -64,6 +64,8 @@ export default function EditLeavePayPage() {
   const [form, setForm] = useState({
     employeeId: "",
     year: new Date().getFullYear(),
+    periodStartDate: "",
+    periodEndDate: "",
     leaveDaysUsed: "0",
     leaveDaysOwed: "",
     manualOverride: false,
@@ -88,9 +90,11 @@ export default function EditLeavePayPage() {
         setForm({
           employeeId: data.employeeId,
           year: data.year,
+          periodStartDate: data.periodStartDate ? new Date(data.periodStartDate).toISOString().split("T")[0] : "",
+          periodEndDate: data.periodEndDate ? new Date(data.periodEndDate).toISOString().split("T")[0] : "",
           leaveDaysUsed: String(data.leaveDaysUsed || 0),
           leaveDaysOwed: String(data.leaveDaysOwed || 0),
-          manualOverride: true,
+          manualOverride: !!data.periodStartDate || !!data.periodEndDate,
           action: data.status === "PAID" ? "PAY" : data.status === "ACCRUED" ? "ACCRUE" : "CALCULATE",
           paymentMethod: data.paymentMethod || "CASH",
           bankAccountId: data.bankAccountId || "",
@@ -116,7 +120,17 @@ export default function EditLeavePayPage() {
     }
 
     const isAdministrative = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "OFFICE_BOY"].includes(employee.type ?? "");
-    const autoDaysOwed = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+    const annualDays = isAdministrative ? 30 : (serviceYears >= 5 ? 35 : 30);
+
+    // Calculate days owed based on period if dates provided
+    let autoDaysOwed = annualDays;
+    if (form.periodStartDate && form.periodEndDate) {
+      const start = new Date(form.periodStartDate);
+      const end = new Date(form.periodEndDate);
+      const daysInPeriod = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      autoDaysOwed = Math.round((daysInPeriod / 365) * annualDays * 10) / 10; // Round to 1 decimal
+    }
+
     const daysOwed = form.manualOverride && form.leaveDaysOwed ? Number.parseFloat(form.leaveDaysOwed) : autoDaysOwed;
     const daysUsed = Math.max(0, Number.parseFloat(form.leaveDaysUsed) || 0);
     const daysPaid = Math.max(0, daysOwed - daysUsed);
@@ -130,8 +144,9 @@ export default function EditLeavePayPage() {
       dailyWage,
       total,
       autoDaysOwed,
+      annualDays,
     };
-  }, [employee, form.year, form.leaveDaysUsed, form.leaveDaysOwed, form.manualOverride, locale]);
+  }, [employee, form.year, form.periodStartDate, form.periodEndDate, form.leaveDaysUsed, form.leaveDaysOwed, form.manualOverride, locale]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -147,6 +162,8 @@ export default function EditLeavePayPage() {
       const payload = {
         employeeId: form.employeeId,
         year: form.year,
+        periodStartDate: form.periodStartDate || null,
+        periodEndDate: form.periodEndDate || null,
         leaveDaysUsed: Number.parseFloat(form.leaveDaysUsed) || 0,
         daysOwed: preview.daysOwed,
         daysPaid: preview.daysPaid,
@@ -256,6 +273,37 @@ export default function EditLeavePayPage() {
                   value={form.year}
                   onChange={(event) =>
                     setForm((previous) => ({ ...previous, year: Number.parseInt(event.target.value) }))
+                  }
+                  className="input-field w-full"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="form-label">{locale === "en" ? "Period start date" : "تاريخ بداية الفترة"}</label>
+                <input
+                  type="date"
+                  value={form.periodStartDate}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, periodStartDate: event.target.value, manualOverride: false }))
+                  }
+                  className="input-field w-full"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en"
+                    ? "Leave blank to use full year calculation"
+                    : "اتركه فارغاً لحساب السنة كاملة"}
+                </p>
+              </div>
+
+              <div>
+                <label className="form-label">{locale === "en" ? "Period end date" : "تاريخ نهاية الفترة"}</label>
+                <input
+                  type="date"
+                  value={form.periodEndDate}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, periodEndDate: event.target.value, manualOverride: false }))
                   }
                   className="input-field w-full"
                 />

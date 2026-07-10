@@ -945,20 +945,22 @@ model EndOfServiceCalc {
 }
 
 model LeavePayCalc {
-  id             String   @id @default(cuid())
-  companyId      String
-  employeeId     String
-  year           Int
-  leaveDaysOwed  Decimal  @db.Decimal(6, 1)
-  leaveDaysUsed  Decimal  @default(0) @db.Decimal(6, 1)
-  leaveDaysPaid  Decimal  @db.Decimal(6, 1)
-  dailyWage      Decimal  @db.Decimal(18, 3)
-  totalAmount    Decimal  @db.Decimal(18, 3)
-  status         String   @default("CALCULATED") // CALCULATED | ACCRUED | PAID
-  notes          String?
-  journalEntryId String?
-  paidDate       DateTime?
-  createdById    String
+  id              String    @id @default(cuid())
+  companyId       String
+  employeeId      String
+  year            Int
+  periodStartDate DateTime? // Start of entitlement period
+  periodEndDate   DateTime? // End of entitlement period
+  leaveDaysOwed   Decimal   @db.Decimal(6, 1)
+  leaveDaysUsed   Decimal   @default(0) @db.Decimal(6, 1)
+  leaveDaysPaid   Decimal   @db.Decimal(6, 1)
+  dailyWage       Decimal   @db.Decimal(18, 3)
+  totalAmount     Decimal   @db.Decimal(18, 3)
+  status          String    @default("CALCULATED") // CALCULATED | ACCRUED | PAID
+  notes           String?
+  journalEntryId  String?
+  paidDate        DateTime?
+  createdById     String
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
