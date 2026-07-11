@@ -30,6 +30,7 @@ interface Props {
   statusLabels: Record<string, string>;
   typeLabels: Record<string, string>;
   canDelete: boolean;
+  isSuperAdmin: boolean;
 }
 
 const statusColors: Record<JournalStatus, string> = {
@@ -50,6 +51,7 @@ export function JournalEntriesTable({
   statusLabels,
   typeLabels,
   canDelete,
+  isSuperAdmin,
 }: Props) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -227,11 +229,21 @@ export function JournalEntriesTable({
                         >
                           <Eye size={14} />
                         </Link>
-                        {canDelete && entry.status === "DRAFT" && (
+                        {canDelete && (isSuperAdmin || entry.status === "DRAFT") && (
                           <DeleteConfirmButton
-                            apiUrl={`/api/accounting/journal-entries/${entry.id}`}
+                            apiUrl={`/api/accounting/journal-entries/${entry.id}${
+                              isSuperAdmin && entry.status !== "DRAFT" ? "?force=true" : ""
+                            }`}
                             confirmMessage={`${en ? "Delete entry" : "حذف القيد"} ${entry.entryNumber}?`}
-                            warningMessage={en ? "This will permanently delete the journal entry." : "سيتم حذف القيد نهائياً."}
+                            warningMessage={
+                              isSuperAdmin && entry.status === "POSTED"
+                                ? en
+                                  ? "⚠️ WARNING: This will force delete a POSTED entry and all linked transactions. Cannot be undone!"
+                                  : "⚠️ تحذير: سيتم حذف قيد مرحّل وكل المعاملات المرتبطة نهائياً. لا يمكن التراجع!"
+                                : en
+                                  ? "This will permanently delete the journal entry."
+                                  : "سيتم حذف القيد نهائياً."
+                            }
                           />
                         )}
                       </div>

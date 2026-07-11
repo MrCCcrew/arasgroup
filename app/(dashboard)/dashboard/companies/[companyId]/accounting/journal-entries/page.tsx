@@ -194,6 +194,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           statusLabels={statusLabels[locale]}
           typeLabels={typeLabels[locale]}
           canDelete={canDelete}
+          isSuperAdmin={session.isSuperAdmin}
         />
 
         {totalPages > 1 && (
