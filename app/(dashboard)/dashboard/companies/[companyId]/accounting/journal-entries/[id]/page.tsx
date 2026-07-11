@@ -110,6 +110,10 @@ export default async function JournalEntryDetailPage({ params }: Props) {
   const canApprove = hasPermission(session, "ACCOUNTING", "APPROVE", { companyId });
   const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
 
+  // Super Admin can delete ANY entry (including POSTED), others restricted to DRAFT/REJECTED/CANCELLED
+  const canDeleteAny = session.isSuperAdmin && canDelete && !entry.isAutomatic;
+  const canDeleteNormal = canDelete && !entry.isAutomatic && ["DRAFT", "REJECTED", "CANCELLED"].includes(entry.status);
+
   const availableActions = {
     submit: canUpdate && (entry.status === "DRAFT" || entry.status === "REJECTED"),
     approve: canApprove && (entry.status === "DRAFT" || entry.status === "PENDING_APPROVAL"),
@@ -117,7 +121,7 @@ export default async function JournalEntryDetailPage({ params }: Props) {
     post: canUpdate && (entry.status === "DRAFT" || entry.status === "PENDING_APPROVAL" || entry.status === "APPROVED"),
     revert: canUpdate && ["PENDING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"].includes(entry.status),
     cancel: canUpdate && ["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"].includes(entry.status),
-    delete: canDelete && !entry.isAutomatic && ["DRAFT", "REJECTED", "CANCELLED"].includes(entry.status),
+    delete: canDeleteAny || canDeleteNormal,
     reverse: canUpdate && entry.status === "POSTED" && !entry.isReversed,
   };
 
@@ -159,6 +163,8 @@ export default async function JournalEntryDetailPage({ params }: Props) {
               isLocked={entry.fiscalYear.isLocked}
               availableActions={availableActions}
               locale={lang}
+              isSuperAdmin={session.isSuperAdmin}
+              entryStatus={entry.status}
             />
           </div>
         </div>

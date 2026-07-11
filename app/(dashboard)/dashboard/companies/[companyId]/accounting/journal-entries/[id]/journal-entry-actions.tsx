@@ -21,6 +21,8 @@ interface Props {
   isLocked: boolean;
   availableActions: AvailableActions;
   locale?: "ar" | "en";
+  isSuperAdmin?: boolean;
+  entryStatus?: string;
 }
 
 type ActionName = "submit" | "approve" | "reject" | "post" | "revert" | "cancel" | "delete" | "reverse";
@@ -67,7 +69,15 @@ const ACTION_CONFIG: Record<
   },
 };
 
-export function JournalEntryActions({ entryId, companyId, isLocked, availableActions, locale = "ar" }: Props) {
+export function JournalEntryActions({
+  entryId,
+  companyId,
+  isLocked,
+  availableActions,
+  locale = "ar",
+  isSuperAdmin = false,
+  entryStatus
+}: Props) {
   const router = useRouter();
   const en = locale === "en";
   const tr = {
@@ -75,6 +85,7 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
     actionFailed: en ? "Failed to perform the action" : "فشل في تنفيذ الإجراء",
     yearLocked: en ? "Year locked" : "السنة مقفلة",
     confirmDelete: en ? "Delete this entry?" : "هل تريد حذف هذا القيد؟",
+    confirmDeletePosted: en ? "⚠️ WARNING: Delete POSTED entry? This will force delete the entry and all linked wallet transactions. This action CANNOT be undone!" : "⚠️ تحذير: حذف قيد مرحّل؟ سيتم حذف القيد وكل حركات المحفظة المرتبطة. لا يمكن التراجع عن هذا الإجراء!",
     confirmReverse: en ? "Are you sure you want to reverse this entry? A reversal entry will be created and this action cannot be undone." : "هل أنت متأكد من عكس هذا القيد؟ سيتم إنشاء قيد عكسي ولا يمكن التراجع عن العملية.",
     reversing: en ? "Reversing..." : "جارٍ العكس...",
     reverse: en ? "Reverse Entry" : "عكس القيد",
@@ -91,7 +102,12 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
 
     try {
       if (action === "delete") {
-        const response = await fetch(`/api/accounting/journal-entries/${entryId}`, { method: "DELETE" });
+        // Super Admin can force delete ANY entry (including POSTED)
+        const needsForce = isSuperAdmin && !["DRAFT", "REJECTED", "CANCELLED"].includes(entryStatus || "");
+        const url = needsForce
+          ? `/api/accounting/journal-entries/${entryId}?force=true`
+          : `/api/accounting/journal-entries/${entryId}`;
+        const response = await fetch(url, { method: "DELETE" });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error ?? tr.deleteFailed);
         router.push(`/dashboard/companies/${companyId}/accounting/journal-entries`);
@@ -138,13 +154,17 @@ export function JournalEntryActions({ entryId, companyId, isLocked, availableAct
 
       {visibleActions.map((action) => {
         if (action === "delete") {
+          // Show warning for force delete (POSTED entries)
+          const isForceDelete = isSuperAdmin && !["DRAFT", "REJECTED", "CANCELLED"].includes(entryStatus || "");
+          const confirmMessage = isForceDelete ? tr.confirmDeletePosted : tr.confirmDelete;
+
           return (
             <button
               key={action}
               type="button"
               disabled={loading !== null}
               onClick={() => {
-                if (confirm(tr.confirmDelete)) doAction("delete");
+                if (confirm(confirmMessage)) doAction("delete");
               }}
               className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
             >
