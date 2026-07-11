@@ -30,7 +30,7 @@ export function WalletDepositButton({
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [descriptionAr, setDescriptionAr] = useState("");
-  const [isBankDeposit, setIsBankDeposit] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH"); // Default: Cash
   const [bankAccountId, setBankAccountId] = useState("");
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
@@ -40,9 +40,9 @@ export function WalletDepositButton({
 
   const remaining = balance - Number(amount || 0);
 
-  // جلب البنوك عند فتح النموذج
+  // جلب البنوك عند فتح النموذج أو تغيير طريقة الدفع
   useEffect(() => {
-    if (open && isBankDeposit && banks.length === 0) {
+    if (open && paymentMethod === "BANK" && banks.length === 0) {
       setLoadingBanks(true);
       fetch(`/api/accounting/bank-accounts?companyId=${companyId}`)
         .then((res) => res.json())
@@ -55,14 +55,14 @@ export function WalletDepositButton({
         .catch(() => {})
         .finally(() => setLoadingBanks(false));
     }
-  }, [open, isBankDeposit, companyId, banks.length]);
+  }, [open, paymentMethod, companyId, banks.length]);
 
   async function handleSave() {
     if (!amount || Number(amount) <= 0) {
       setError("أدخل مبلغاً صحيحاً");
       return;
     }
-    if (isBankDeposit && !bankAccountId) {
+    if (paymentMethod === "BANK" && !bankAccountId) {
       setError("اختر البنك");
       return;
     }
@@ -77,8 +77,8 @@ export function WalletDepositButton({
           companyId,
           amount: Number(amount),
           date,
-          paymentMethod: isBankDeposit ? "BANK" : "CASH",
-          bankAccountId: isBankDeposit ? bankAccountId : null,
+          paymentMethod,
+          bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
           descriptionAr: descriptionAr || "إيداع محفظة سائق",
         }),
       });
@@ -88,7 +88,7 @@ export function WalletDepositButton({
       setBalance((prev) => prev - Number(amount));
       setAmount("");
       setDescriptionAr("");
-      setIsBankDeposit(false);
+      setPaymentMethod("CASH"); // Reset to default
       setBankAccountId("");
       setOpen(false);
       onSuccess?.();
@@ -194,17 +194,36 @@ export function WalletDepositButton({
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isBankDeposit}
-                  onChange={(e) => setIsBankDeposit(e.target.checked)}
-                  className="h-4 w-4 rounded"
-                />
-                إيداع بنكي
-              </label>
+              {/* Payment Method - Radio Buttons */}
+              <div>
+                <label className="mb-2 block text-sm font-medium">طريقة الإيداع</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="CASH"
+                      checked={paymentMethod === "CASH"}
+                      onChange={() => setPaymentMethod("CASH")}
+                      className="h-4 w-4"
+                    />
+                    إيداع نقدي
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="BANK"
+                      checked={paymentMethod === "BANK"}
+                      onChange={() => setPaymentMethod("BANK")}
+                      className="h-4 w-4"
+                    />
+                    إيداع بنكي
+                  </label>
+                </div>
+              </div>
 
-              {isBankDeposit && (
+              {paymentMethod === "BANK" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
                     البنك <span className="text-red-500">*</span>
