@@ -41,7 +41,7 @@ const EMPTY = {
   driverId: "",
   amount: "",
   date: now.toISOString().slice(0, 10),
-  isBankDeposit: false,
+  paymentMethod: "CASH" as "CASH" | "BANK",
   bankAccountId: "",
   descriptionAr: "",
 };
@@ -89,6 +89,8 @@ export default function WalletPage() {
     amountLabel: en ? "Amount (KWD) *" : "المبلغ (د.ك) *",
     dateLabel: en ? "Date *" : "التاريخ *",
     description: en ? "Description" : "الوصف",
+    paymentMethodLabel: en ? "Payment method" : "طريقة الإيداع",
+    cashDeposit: en ? "Cash deposit" : "إيداع نقدي",
     bankDeposit: en ? "Bank deposit" : "إيداع بنكي",
     bankAccount: en ? "Bank account *" : "الحساب البنكي *",
     chooseBank: en ? "— Select bank account —" : "— اختر الحساب البنكي —",
@@ -265,7 +267,7 @@ export default function WalletPage() {
   async function save() {
     if (!form.driverId) { setFormError(t.driverRequired); return; }
     if (!form.amount || Number(form.amount) <= 0) { setFormError(t.amountInvalid); return; }
-    if (form.isBankDeposit && !form.bankAccountId) { setFormError(t.bankRequired); return; }
+    if (form.paymentMethod === "BANK" && !form.bankAccountId) { setFormError(t.bankRequired); return; }
     setSaving(true); setFormError("");
     const res = await fetch("/api/delivery/wallet", {
       method: "POST",
@@ -275,9 +277,8 @@ export default function WalletPage() {
         driverId: form.driverId,
         amount: Number(form.amount),
         date: form.date,
-        isBankDeposit: form.isBankDeposit,
-        paymentMethod: form.isBankDeposit ? "BANK" : "CASH",
-        bankAccountId: form.isBankDeposit ? form.bankAccountId : null,
+        paymentMethod: form.paymentMethod,
+        bankAccountId: form.paymentMethod === "BANK" ? form.bankAccountId : null,
         descriptionAr: form.descriptionAr || undefined,
       }),
     });
@@ -570,12 +571,24 @@ export default function WalletPage() {
               <input className="input-field" value={form.descriptionAr}
                 onChange={(e) => setForm((p) => ({ ...p, descriptionAr: e.target.value }))} />
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="isBankDep" checked={form.isBankDeposit}
-                onChange={(e) => setForm((p) => ({ ...p, isBankDeposit: e.target.checked, bankAccountId: e.target.checked ? p.bankAccountId : "" }))} className="h-4 w-4" />
-              <label htmlFor="isBankDep" className="text-sm">{t.bankDeposit}</label>
+            <div>
+              <label className="form-label">{t.paymentMethodLabel}</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="paymentMethod" value="CASH"
+                    checked={form.paymentMethod === "CASH"}
+                    onChange={() => setForm((p) => ({ ...p, paymentMethod: "CASH" }))} className="h-4 w-4" />
+                  {t.cashDeposit}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="paymentMethod" value="BANK"
+                    checked={form.paymentMethod === "BANK"}
+                    onChange={() => setForm((p) => ({ ...p, paymentMethod: "BANK" }))} className="h-4 w-4" />
+                  {t.bankDeposit}
+                </label>
+              </div>
             </div>
-            {form.isBankDeposit && (
+            {form.paymentMethod === "BANK" && (
               <div>
                 <label className="form-label">{t.bankAccount}</label>
                 <select className="input-field" value={form.bankAccountId}
