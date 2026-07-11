@@ -110,8 +110,8 @@ export default async function JournalEntryDetailPage({ params }: Props) {
   const canApprove = hasPermission(session, "ACCOUNTING", "APPROVE", { companyId });
   const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
 
-  // Super Admin can delete ANY entry (including POSTED), others restricted to DRAFT/REJECTED/CANCELLED
-  const canDeleteAny = session.isSuperAdmin && canDelete && !entry.isAutomatic;
+  // Super Admin can delete ANY entry (including POSTED and AUTOMATIC), others restricted to DRAFT/REJECTED/CANCELLED
+  const canDeleteAny = session.isSuperAdmin && canDelete; // No isAutomatic check for Super Admin
   const canDeleteNormal = canDelete && !entry.isAutomatic && ["DRAFT", "REJECTED", "CANCELLED"].includes(entry.status);
 
   const availableActions = {
