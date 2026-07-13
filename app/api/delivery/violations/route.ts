@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } },
+        employee: { select: { nameAr: true, nameEn: true } },
         vehicle: { select: { id: true, plateNumber: true, make: true, model: true } },
       },
       orderBy: { date: "desc" },
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
 const createSchema = z.object({
   companyId: z.string().min(1),
   branchId: z.string().optional(),
-  driverId: z.string().min(1),
+  driverId: z.string().optional(),
+  employeeId: z.string().optional(),
   vehicleId: z.string().optional(),
   date: z.string().transform((s) => new Date(s)),
   locationAr: z.string().optional(),
@@ -56,6 +58,8 @@ const createSchema = z.object({
   installmentMonths: z.number().int().min(1).optional(),
   notes: z.string().optional(),
   expenseCategoryId: z.string().optional(),
+}).refine((data) => data.driverId || data.employeeId, {
+  message: "يجب تحديد سائق أو موظف",
 });
 
 export async function POST(request: NextRequest) {
@@ -82,10 +86,21 @@ export async function POST(request: NextRequest) {
         const companySharePct = data.responsibility === "COMPANY" ? 100 : (100 - (data.driverSharePct ?? 50));
         const companyAmount = Number(data.amount) * companySharePct / 100;
 
-        const driver = await tx.driver.findUnique({
-          where: { id: data.driverId },
-          select: { employee: { select: { nameAr: true } } },
-        });
+        // جلب اسم الموظف/السائق
+        let employeeName = "";
+        if (data.driverId) {
+          const driver = await tx.driver.findUnique({
+            where: { id: data.driverId },
+            select: { employee: { select: { nameAr: true } } },
+          });
+          employeeName = driver?.employee.nameAr ?? "";
+        } else if (data.employeeId) {
+          const employee = await tx.employee.findUnique({
+            where: { id: data.employeeId },
+            select: { nameAr: true },
+          });
+          employeeName = employee?.nameAr ?? "";
+        }
 
         const expense = await tx.expense.create({
           data: {
@@ -94,7 +109,7 @@ export async function POST(request: NextRequest) {
             categoryId: data.expenseCategoryId,
             date: data.date,
             amount: companyAmount,
-            descriptionAr: `مخالفة مرور — ${driver?.employee.nameAr ?? ""} — ${data.type}`,
+            descriptionAr: `مخالفة مرور — ${employeeName} — ${data.type}`,
             descriptionEn: data.descriptionEn ? `Traffic violation — ${data.type}` : undefined,
             driverId: data.driverId,
             vehicleId: data.vehicleId,
@@ -109,6 +124,7 @@ export async function POST(request: NextRequest) {
           companyId: data.companyId,
           branchId: data.branchId,
           driverId: data.driverId,
+          employeeId: data.employeeId,
           vehicleId: data.vehicleId,
           date: data.date,
           locationAr: data.locationAr,

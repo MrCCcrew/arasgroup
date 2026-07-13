@@ -2862,7 +2862,8 @@ model DriverViolation {
   id                 String @id @default(cuid())
   companyId          String
   branchId           String?
-  driverId           String
+  driverId           String?
+  employeeId         String?
   vehicleId          String?
 
   date               DateTime
@@ -2895,7 +2896,8 @@ model DriverViolation {
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  driver   Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver   Driver?  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   vehicle  Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   expense  Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
 
@@ -2905,6 +2907,7 @@ model DriverViolation {
   @@index([companyId])
   @@index([branchId])
   @@index([driverId])
+  @@index([employeeId])
   @@index([vehicleId])
   @@index([date])
   @@index([status])

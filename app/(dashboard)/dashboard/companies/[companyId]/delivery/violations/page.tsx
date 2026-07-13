@@ -25,7 +25,8 @@ interface ExpenseCategory {
 
 interface Violation {
   id: string;
-  driverId: string;
+  driverId: string | null;
+  employeeId: string | null;
   vehicleId: string | null;
   date: string;
   locationAr: string | null;
@@ -39,7 +40,8 @@ interface Violation {
   installmentsPaid: number;
   status: string;
   notes: string | null;
-  driver: { employee: { nameAr: string; nameEn: string | null } };
+  driver?: { employee: { nameAr: string; nameEn: string | null } };
+  employee?: { nameAr: string; nameEn: string | null };
   vehicle: { plateNumber: string; make: string | null; model: string | null } | null;
   expense: { id: string; amount: string; descriptionAr: string } | null;
 }
@@ -235,26 +237,7 @@ export default function ViolationsPage() {
       setForm((p) => ({ ...p, [key]: e.target.value }));
   }
 
-  // عند اختيار السائق أو تغيير التاريخ، نحدّد سيارته المخصّصة في ذلك الوقت تلقائياً.
-  // يمكن للمستخدم تغييرها يدوياً (مثلاً لو كان راكب سيارة بديلة في ذلك التاريخ).
-  useEffect(() => {
-    if (!form.driverId || !form.date) { setVehicleAutoFilled(false); return; }
-    let cancelled = false;
-    const params = new URLSearchParams({ date: new Date(form.date).toISOString() });
-    fetch(`/api/delivery/drivers/${form.driverId}/vehicle-at?${params}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (cancelled) return;
-        if (res.success && res.data?.id) {
-          setForm((p) => ({ ...p, vehicleId: res.data.id }));
-          setVehicleAutoFilled(true);
-        } else {
-          setVehicleAutoFilled(false);
-        }
-      })
-      .catch(() => { if (!cancelled) setVehicleAutoFilled(false); });
-    return () => { cancelled = true; };
-  }, [form.driverId, form.date]);
+  // تم تعطيل الملء التلقائي للسيارة - الآن نسمح بتسجيل المخالفات لأي موظف (ليس فقط السائقين)
 
   async function save() {
     if (!form.driverId) { setFormError(t.chooseDriver); return; }
@@ -267,7 +250,7 @@ export default function ViolationsPage() {
 
     const body = {
       companyId,
-      driverId: form.driverId,
+      employeeId: form.driverId, // now storing employee ID
       vehicleId: form.vehicleId || undefined,
       date: form.date,
       locationAr: form.locationAr || undefined,
@@ -304,7 +287,7 @@ export default function ViolationsPage() {
   function openEdit(violation: Violation) {
     setEditingId(violation.id);
     setForm({
-      driverId: violation.driverId,
+      driverId: violation.employeeId || violation.driverId || "",
       vehicleId: violation.vehicleId || "",
       date: new Date(violation.date).toISOString().slice(0, 16),
       locationAr: violation.locationAr || "",
@@ -450,7 +433,9 @@ export default function ViolationsPage() {
                         <td>
                           <div className="flex items-center gap-1.5">
                             <User size={13} className="shrink-0 text-muted-foreground" />
-                            <span className="text-sm font-medium">{v.driver.employee.nameAr}</span>
+                            <span className="text-sm font-medium">
+                              {v.driver?.employee.nameAr || v.employee?.nameAr || "—"}
+                            </span>
                           </div>
                         </td>
                         <td className="text-sm">
