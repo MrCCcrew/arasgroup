@@ -824,6 +824,7 @@ model Employee {
   investorAccountAgreements InvestorAccountAgreement[]
   managerSalaryLines     ManagerSalaryLine[]
   deliveryInvoices       DeliveryInvoice[]
+  violations             DriverViolation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
