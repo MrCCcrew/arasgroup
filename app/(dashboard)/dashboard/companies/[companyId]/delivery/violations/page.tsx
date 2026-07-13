@@ -214,11 +214,17 @@ export default function ViolationsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/delivery/drivers?companyId=${companyId}`).then((r) => r.json()),
+      fetch(`/api/hr/employees?companyId=${companyId}&activeOnly=true`).then((r) => r.json()),
       fetch(`/api/vehicles?companyId=${companyId}&groupWide=true&activeOnly=true`).then((r) => r.json()),
       fetch(`/api/expenses/categories?companyId=${companyId}`).then((r) => r.json()),
-    ]).then(([driversRes, vehiclesRes, catsRes]) => {
-      if (driversRes.success) setDrivers(driversRes.data);
+    ]).then(([employeesRes, vehiclesRes, catsRes]) => {
+      // جلب كل الموظفين (مش بس السائقين)
+      if (employeesRes.success) {
+        setDrivers(employeesRes.data.map((emp: any) => ({
+          id: emp.id,
+          employee: { nameAr: emp.nameAr, nameEn: emp.nameEn }
+        })));
+      }
       if (vehiclesRes.success) setVehicles(vehiclesRes.data);
       if (catsRes.success) setCategories(catsRes.data);
     });
