@@ -257,22 +257,36 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
 
         {/* Position filter */}
         {positions.length > 0 && (
-          <form method="GET" className="flex items-center gap-2">
-            <label className="text-sm font-medium">{locale === "en" ? "Position:" : "الوظيفة:"}</label>
-            <select name="positionId" defaultValue={query.positionId || ""} className="input-field" onChange={(e) => e.currentTarget.form?.submit()}>
-              <option value="">{locale === "en" ? "All positions" : "كل الوظائف"}</option>
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {locale === "en" ? p.nameEn || p.nameAr : p.nameAr}
-                </option>
-              ))}
-            </select>
-            {query.group && <input type="hidden" name="group" value={query.group} />}
-            {query.status && <input type="hidden" name="status" value={query.status} />}
-            {query.category && <input type="hidden" name="category" value={query.category} />}
-            {query.search && <input type="hidden" name="search" value={query.search} />}
-            {query.type && <input type="hidden" name="type" value={query.type} />}
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={buildEmployeesHref(companyId, {
+                group: query.group,
+                status: query.status,
+                category: query.category,
+                search: query.search,
+                type: query.type,
+              })}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.positionId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {locale === "en" ? "All positions" : "كل الوظائف"}
+            </Link>
+            {positions.map((p) => (
+              <Link
+                key={p.id}
+                href={buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type: query.type,
+                  positionId: p.id,
+                })}
+                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.positionId === p.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >
+                {locale === "en" ? p.nameEn || p.nameAr : p.nameAr}
+              </Link>
+            ))}
+          </div>
         )}
 
         <div className="overflow-hidden rounded-xl border bg-card">
