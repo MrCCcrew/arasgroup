@@ -144,6 +144,7 @@ interface FormState {
   nameAr: string;
   nameEn: string;
   type: string;
+  positionId: string;
   branchId: string;
   licenseId: string;
   residencyLicenseId: string;
@@ -187,12 +188,14 @@ export default function EditEmployeePage() {
   const [licenses, setLicenses] = useState<LicenseLookup[]>([]);
   const [groupLicenses, setGroupLicenses] = useState<LicenseLookup[]>([]);
   const [investors, setInvestors] = useState<InvestorLookup[]>([]);
+  const [positions, setPositions] = useState<{ id: string; nameAr: string; nameEn?: string | null }[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
   const [form, setForm] = useState<FormState>({
     employeeNumber: "",
     nameAr: "",
     nameEn: "",
     type: "OFFICE_EMPLOYEE",
+    positionId: "",
     branchId: "",
     licenseId: "",
     residencyLicenseId: "",
@@ -243,13 +246,14 @@ export default function EditEmployeePage() {
 
   const load = useCallback(async () => {
     try {
-      const [employeeRes, companyRes, branchesRes, licensesRes, groupRes, investorsRes] = await Promise.all([
+      const [employeeRes, companyRes, branchesRes, licensesRes, groupRes, investorsRes, positionsRes] = await Promise.all([
         fetch(`/api/hr/employees/${employeeId}`),
         fetch(`/api/companies/${companyId}`),
         fetch(`/api/companies/${companyId}/branches`),
         fetch(`/api/licenses?companyId=${companyId}`),
         fetch(`/api/licenses?groupWide=true&excludeCompanyId=${companyId}`),
         fetch(`/api/investors?companyId=${companyId}`),
+        fetch(`/api/hr/positions?companyId=${companyId}`),
       ]);
       const employeePayload = await employeeRes.json();
       const companyPayload = await companyRes.json();
@@ -257,12 +261,14 @@ export default function EditEmployeePage() {
       const licensesPayload = await licensesRes.json();
       const groupPayload = await groupRes.json();
       const investorsPayload = await investorsRes.json();
+      const positionsPayload = await positionsRes.json();
 
       if (companyPayload.success) setCompanyType((companyPayload.data as CompanyLookup).type);
       if (branchesPayload.success) setBranches(branchesPayload.data);
       if (licensesPayload.success) setLicenses(licensesPayload.data);
       if (groupPayload.success) setGroupLicenses(groupPayload.data);
       if (investorsPayload.success) setInvestors(investorsPayload.data);
+      if (positionsPayload.success) setPositions(positionsPayload.data);
 
       if (employeePayload.success) {
         const e = employeePayload.data;
@@ -275,6 +281,7 @@ export default function EditEmployeePage() {
           nameAr: e.nameAr ?? "",
           nameEn: e.nameEn ?? "",
           type: e.type ?? "OFFICE_EMPLOYEE",
+          positionId: e.positionId ?? "",
           branchId: e.branchId ?? "",
           licenseId: e.licenseId ?? "",
           residencyLicenseId: e.residencyLicenseId ?? "",
@@ -325,6 +332,7 @@ export default function EditEmployeePage() {
           employeeNumber: form.employeeNumber || undefined,
           nameAr: form.nameAr,
           nameEn: form.nameEn || undefined,
+          positionId: form.positionId || null,
           branchId: form.branchId || null,
           licenseId: form.licenseId || null,
           residencyLicenseId: form.residencyLicenseId || null,
@@ -528,7 +536,7 @@ export default function EditEmployeePage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
-                  {locale === "en" ? "Employee type" : "الوظيفة"}
+                  {locale === "en" ? "Employee type" : "النوع"}
                 </label>
                 <select
                   value={form.type}
@@ -544,6 +552,26 @@ export default function EditEmployeePage() {
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {locale === "en" ? "Type cannot be changed after creation." : "لا يمكن تغيير نوع الموظف بعد الإنشاء."}
+                </p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Position (Job Title)" : "المسمى الوظيفي"}
+                </label>
+                <select
+                  value={form.positionId}
+                  onChange={(e) => setField("positionId", e.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="">{locale === "en" ? "— No position —" : "— بدون مسمى —"}</option>
+                  {positions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {locale === "en" ? p.nameEn || p.nameAr : p.nameAr}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en" ? "For admin staff, delivery staff, etc." : "لموظفي الإدارة، التوصيل، إلخ."}
                 </p>
               </div>
               <div>
