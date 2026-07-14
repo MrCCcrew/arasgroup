@@ -12,7 +12,7 @@ import type { JournalStatus } from "@prisma/client";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ page?: string; status?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; search?: string }>;
 }
 
 const statusLabels = {
@@ -82,11 +82,19 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
   const allowedStatuses = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED"] as const satisfies readonly JournalStatus[];
   const filters = ["", ...allowedStatuses] as const;
   const statusFilter = allowedStatuses.find((status) => status === query.status);
+  const searchTerm = query.search?.trim();
 
   const where = {
     companyId,
     isDeleted: false,
     ...(statusFilter ? { status: statusFilter } : {}),
+    ...(searchTerm ? {
+      OR: [
+        { number: { contains: searchTerm } },
+        { descriptionAr: { contains: searchTerm } },
+        { descriptionEn: { contains: searchTerm } },
+      ]
+    } : {}),
   };
 
   const [total, rawEntries, unpostedCount] = await Promise.all([
@@ -166,10 +174,33 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           </div>
         )}
 
+        {/* Search box */}
+        <form method="GET" className="flex gap-2">
+          <input
+            type="text"
+            name="search"
+            defaultValue={searchTerm}
+            placeholder={locale === "en" ? "Search by number, date, or description..." : "بحث برقم القيد، التاريخ، أو البيان..."}
+            className="input-field flex-1"
+          />
+          {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+          <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            {locale === "en" ? "Search" : "بحث"}
+          </button>
+          {searchTerm && (
+            <Link
+              href={`/dashboard/companies/${companyId}/accounting/journal-entries${statusFilter ? `?status=${statusFilter}` : ""}`}
+              className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+            >
+              {locale === "en" ? "Clear" : "مسح"}
+            </Link>
+          )}
+        </form>
+
         <div className="flex flex-wrap gap-3">
           {filters.map((status) => {
             const active = statusFilter === status || (!statusFilter && !status);
-            const href = `/dashboard/companies/${companyId}/accounting/journal-entries${status ? `?status=${status}` : ""}`;
+            const href = `/dashboard/companies/${companyId}/accounting/journal-entries${status ? `?status=${status}` : ""}${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""}`;
             const label = status ? statusLabels[locale][status] : locale === "en" ? "All" : "الكل";
             return (
               <Link
