@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
+import { invalidateSessionCache } from "@/lib/auth/session";
 
 const companyAccessSchema = z.object({
   companyId: z.string(),
@@ -132,6 +133,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
       });
     });
+
+    // مسح cache الـ session عشان الصلاحيات الجديدة تظهر فوراً
+    invalidateSessionCache(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
