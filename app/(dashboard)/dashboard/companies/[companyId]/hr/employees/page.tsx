@@ -257,23 +257,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
 
         {/* Position filter */}
         {positions.length > 0 && (
-          <div className="flex items-center gap-2">
+          <form method="GET" className="flex items-center gap-2">
             <label className="text-sm font-medium">{locale === "en" ? "Position:" : "الوظيفة:"}</label>
-            <select
-              value={query.positionId || ""}
-              onChange={(e) => {
-                const positionId = e.target.value;
-                window.location.href = buildEmployeesHref(companyId, {
-                  group: query.group,
-                  status: query.status,
-                  category: query.category,
-                  search: query.search,
-                  type: query.type,
-                  positionId: positionId || undefined,
-                });
-              }}
-              className="input-field"
-            >
+            <select name="positionId" defaultValue={query.positionId || ""} className="input-field" onChange={(e) => e.currentTarget.form?.submit()}>
               <option value="">{locale === "en" ? "All positions" : "كل الوظائف"}</option>
               {positions.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -281,7 +267,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                 </option>
               ))}
             </select>
-          </div>
+            {query.group && <input type="hidden" name="group" value={query.group} />}
+            {query.status && <input type="hidden" name="status" value={query.status} />}
+            {query.category && <input type="hidden" name="category" value={query.category} />}
+            {query.search && <input type="hidden" name="search" value={query.search} />}
+            {query.type && <input type="hidden" name="type" value={query.type} />}
+          </form>
         )}
 
         <div className="overflow-hidden rounded-xl border bg-card">
