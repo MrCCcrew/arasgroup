@@ -13,6 +13,7 @@ interface Props {
   params: Promise<{ companyId: string }>;
   searchParams: Promise<{
     type?: string;
+    positionId?: string;
     search?: string;
     group?: string;
     status?: string;
@@ -57,6 +58,7 @@ function buildEmployeesHref(
   params: {
     group?: string;
     type?: string;
+    positionId?: string;
     status?: string;
     category?: string;
     search?: string;
@@ -65,6 +67,7 @@ function buildEmployeesHref(
   const searchParams = new URLSearchParams();
   if (params.group) searchParams.set("group", params.group);
   if (params.type) searchParams.set("type", params.type);
+  if (params.positionId) searchParams.set("positionId", params.positionId);
   if (params.status) searchParams.set("status", params.status);
   if (params.category) searchParams.set("category", params.category);
   if (params.search) searchParams.set("search", params.search);
@@ -109,23 +112,36 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       }
     : {};
 
-  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, employees] = await Promise.all([
+  const positionFilter = query.positionId
+    ? {
+        positionId: query.positionId,
+      }
+    : {};
+
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
     prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null, type: { in: [...ADMIN_TYPES] } } }),
     prisma.employee.count({ where: deletedWhere }),
+    prisma.employeePosition.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, nameAr: true, nameEn: true },
+      orderBy: { sortOrder: "asc" },
+    }),
     prisma.employee.findMany({
       where: {
         ...baseWhere,
         ...groupFilter,
         ...categoryFilter,
         ...typeFilter,
+        ...positionFilter,
         ...(query.search ? { nameAr: { contains: query.search } } : {}),
       },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
+        position: { select: { nameAr: true, nameEn: true } },
         driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
         carWashWorker: { select: { role: true } },
       },
@@ -238,6 +254,35 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             );
           })}
         </div>
+
+        {/* Position filter */}
+        {positions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">{locale === "en" ? "Position:" : "الوظيفة:"}</label>
+            <select
+              value={query.positionId || ""}
+              onChange={(e) => {
+                const positionId = e.target.value;
+                window.location.href = buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type: query.type,
+                  positionId: positionId || undefined,
+                });
+              }}
+              className="input-field"
+            >
+              <option value="">{locale === "en" ? "All positions" : "كل الوظائف"}</option>
+              {positions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {locale === "en" ? p.nameEn || p.nameAr : p.nameAr}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
