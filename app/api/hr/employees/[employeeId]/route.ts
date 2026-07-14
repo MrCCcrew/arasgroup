@@ -28,6 +28,7 @@ const updateSchema = z.object({
   nameAr: z.string().min(2).optional(),
   nameEn: optionalString,
   employeeNumber: optionalString,
+  positionId: optionalString,
   branchId: optionalString,
   licenseId: optionalString,
   residencyLicenseId: optionalString,
@@ -247,10 +248,13 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
+    const positionId = normalizeOptionalString(parsed.data.positionId);
+
     const updateData: Prisma.EmployeeUpdateInput = {
       ...(normalizedNameAr !== undefined ? { nameAr: normalizedNameAr } : {}),
       ...(parsed.data.nameEn !== undefined ? { nameEn: normalizeOptionalString(parsed.data.nameEn) } : {}),
       ...(parsed.data.employeeNumber !== undefined ? { employeeNumber: normalizeOptionalString(parsed.data.employeeNumber) } : {}),
+      ...(parsed.data.positionId !== undefined ? { positionId } : {}),
       ...(parsed.data.nationality !== undefined ? { nationality: normalizeOptionalString(parsed.data.nationality) } : {}),
       ...(parsed.data.civilId !== undefined ? { civilId: normalizeOptionalString(parsed.data.civilId) } : {}),
       ...(parsed.data.passportNumber !== undefined ? { passportNumber: normalizeOptionalString(parsed.data.passportNumber) } : {}),
