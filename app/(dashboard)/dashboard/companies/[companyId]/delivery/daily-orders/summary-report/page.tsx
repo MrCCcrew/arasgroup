@@ -171,6 +171,21 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
   type SummaryDriver = typeof driverRows[number];
   const driverIds = [...new Set(orders.map((order: SummaryOrder) => order.driverId))];
 
+  // Build invoice date filter
+  let invoiceDateFilter = {};
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+    invoiceDateFilter = { date: { gte: startDate, lte: endDate } };
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+    invoiceDateFilter = { date: { gte: startDate, lte: endDate } };
+  }
+
   const [charges, totalInvoicesAmount] = await Promise.all([
     driverIds.length > 0
       ? prisma.driverWalletTransaction.findMany({
@@ -194,6 +209,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
             targetType: "DRIVER",
             driverId: { in: driverIds },
             deletedAt: null,
+            ...invoiceDateFilter,
           },
           _sum: { amount: true },
         })
