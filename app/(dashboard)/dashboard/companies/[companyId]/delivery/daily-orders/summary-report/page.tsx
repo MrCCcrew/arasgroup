@@ -123,7 +123,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     ...dateFilter,
   };
 
-  const [company, orders, driverRows] = await Promise.all([
+  const [company, orders] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: { nameAr: true, nameEn: true },
@@ -149,27 +149,33 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
       },
       orderBy: [{ driver: { employee: { nameAr: "asc" } } }, { date: "asc" }],
     }),
-    prisma.driver.findMany({
-      where: {
-        employee: { companyId, isDeleted: false },
-      },
-      select: {
-        id: true,
-        walletBalance: true,
-        employee: {
-          select: {
-            nameAr: true,
-            nameEn: true,
-          },
-        },
-      },
-      orderBy: { employee: { nameAr: "asc" } },
-    }),
   ]);
 
   type SummaryOrder = typeof orders[number];
-  type SummaryDriver = typeof driverRows[number];
   const driverIds = [...new Set(orders.map((order: SummaryOrder) => order.driverId))];
+
+  // Fetch only drivers that have orders in the filtered period
+  const driverRows = driverIds.length > 0
+    ? await prisma.driver.findMany({
+        where: {
+          id: { in: driverIds },
+          employee: { companyId, isDeleted: false },
+        },
+        select: {
+          id: true,
+          walletBalance: true,
+          employee: {
+            select: {
+              nameAr: true,
+              nameEn: true,
+            },
+          },
+        },
+        orderBy: { employee: { nameAr: "asc" } },
+      })
+    : [];
+
+  type SummaryDriver = typeof driverRows[number];
 
   // Build invoice date filter
   let invoiceDateFilter = {};
