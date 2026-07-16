@@ -89,6 +89,8 @@ export function ExpiryAlertsClient({
     allStatuses: en ? "All statuses" : "كل الحالات",
     expired: en ? "Expired" : "منتهي",
     allTypes: en ? "All expiry types" : "كل أنواع الانتهاء",
+    dateFrom: en ? "From date" : "من تاريخ",
+    dateTo: en ? "To date" : "إلى تاريخ",
     printPdf: en ? "Print PDF (filtered)" : "طباعة PDF حسب الفلتر",
     clear: en ? "Clear filters" : "مسح الفلاتر",
     result: en ? "result(s)" : "نتيجة",
@@ -110,6 +112,8 @@ export function ExpiryAlertsClient({
     category: "all",
     status: "all",
     expiryType: "all",
+    dateFrom: "",
+    dateTo: "",
   });
 
   const expiryTypeOptions = useMemo(() => getExpiryTypeOptions(alerts), [alerts]);
@@ -157,7 +161,7 @@ export function ExpiryAlertsClient({
       </div>
 
       <div className="rounded-xl border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-7">
           <div className="relative md:col-span-2">
             <Search size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -203,6 +207,22 @@ export function ExpiryAlertsClient({
               </option>
             ))}
           </select>
+
+          <input
+            type="date"
+            className="input-field text-sm"
+            placeholder={t.dateFrom}
+            value={filters.dateFrom}
+            onChange={(e) => setFilters((current) => ({ ...current, dateFrom: e.target.value }))}
+          />
+
+          <input
+            type="date"
+            className="input-field text-sm"
+            placeholder={t.dateTo}
+            value={filters.dateTo}
+            onChange={(e) => setFilters((current) => ({ ...current, dateTo: e.target.value }))}
+          />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -215,7 +235,7 @@ export function ExpiryAlertsClient({
             {t.printPdf}
           </Link>
           <button
-            onClick={() => setFilters({ search: "", category: "all", status: "all", expiryType: "all" })}
+            onClick={() => setFilters({ search: "", category: "all", status: "all", expiryType: "all", dateFrom: "", dateTo: "" })}
             className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
           >
             {t.clear}

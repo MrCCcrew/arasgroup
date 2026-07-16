@@ -43,7 +43,7 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
         .report-title { font-size: 1.1rem; font-weight: 600; margin-top: 0.3rem; }
         .report-sub { font-size: 0.85rem; color: #6b7280; margin-top: 0.2rem; }
         .print-date { font-size: 0.78rem; color: #9ca3af; margin-top: 0.2rem; }
-        .filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; font-size: 0.85rem; }
+        .filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; font-size: 0.85rem; }
         .filter-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem; background: #fafafa; }
         .filter-label { color: #6b7280; margin-bottom: 0.2rem; }
         .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
@@ -101,6 +101,14 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
           <div className="filter-card">
             <div className="filter-label">نوع الانتهاء</div>
             <div>{filters.expiryType === "all" ? "كل الأنواع" : filters.expiryType}</div>
+          </div>
+          <div className="filter-card">
+            <div className="filter-label">من تاريخ</div>
+            <div>{filters.dateFrom ? new Date(filters.dateFrom).toLocaleDateString("ar-KW") : "الكل"}</div>
+          </div>
+          <div className="filter-card">
+            <div className="filter-label">إلى تاريخ</div>
+            <div>{filters.dateTo ? new Date(filters.dateTo).toLocaleDateString("ar-KW") : "الكل"}</div>
           </div>
         </div>
 

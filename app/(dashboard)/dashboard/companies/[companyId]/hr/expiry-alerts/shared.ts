@@ -18,6 +18,8 @@ export type ExpiryAlertFilters = {
   category: "all" | AlertCategory;
   status: "all" | AlertSeverity;
   expiryType: string;
+  dateFrom: string;
+  dateTo: string;
 };
 
 export function severityFromDays(days: number): AlertSeverity {
@@ -48,6 +50,19 @@ export function applyAlertFilters(alerts: ExpiryAlertItem[], filters: ExpiryAler
     if (filters.status !== "all" && severityFromDays(alert.daysLeft) !== filters.status) return false;
     if (filters.expiryType !== "all" && alert.expiryType !== filters.expiryType) return false;
 
+    // Date range filter
+    if (filters.dateFrom) {
+      const alertDate = new Date(alert.expiryDate);
+      const fromDate = new Date(filters.dateFrom);
+      if (alertDate < fromDate) return false;
+    }
+    if (filters.dateTo) {
+      const alertDate = new Date(alert.expiryDate);
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999); // Include the entire day
+      if (alertDate > toDate) return false;
+    }
+
     if (!search) return true;
     const haystack = [alert.title, alert.subtitle, alert.expiryType, alert.category].join(" ").toLowerCase();
     return haystack.includes(search);
@@ -75,6 +90,8 @@ export function filtersFromSearchParams(searchParams: Record<string, string | st
         ? status
         : "all",
     expiryType: value("expiryType") || "all",
+    dateFrom: value("dateFrom"),
+    dateTo: value("dateTo"),
   };
 }
 
@@ -84,5 +101,7 @@ export function buildFilterQuery(filters: ExpiryAlertFilters) {
   if (filters.category !== "all") params.set("category", filters.category);
   if (filters.status !== "all") params.set("status", filters.status);
   if (filters.expiryType !== "all") params.set("expiryType", filters.expiryType);
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
   return params.toString();
 }
