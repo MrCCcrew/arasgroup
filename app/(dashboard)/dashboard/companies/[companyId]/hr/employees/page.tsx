@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/i18n";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { RestoreEmployeeButton } from "@/components/hr/restore-employee-button";
+import { PermanentDeleteEmployeeButton } from "@/components/hr/permanent-delete-employee-button";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -386,7 +387,14 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         ) : null}
                         <td>
                           {showingDeleted ? (
-                            <RestoreEmployeeButton employeeId={employee.id} label={locale === "en" ? "Restore" : "استعادة"} />
+                            <div className="flex items-center gap-2">
+                              <RestoreEmployeeButton employeeId={employee.id} label={locale === "en" ? "Restore" : "استعادة"} />
+                              <PermanentDeleteEmployeeButton
+                                employeeId={employee.id}
+                                employeeName={employee.nameAr}
+                                label={locale === "en" ? "Delete permanently" : "حذف نهائي"}
+                              />
+                            </div>
                           ) : (
                             <div className="flex items-center gap-1">
                               <Link

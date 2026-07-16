@@ -228,7 +228,7 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
   const employeeAlerts = dedupeAlerts(
     employees.flatMap((employee: EmployeeAlertRow) =>
       EMPLOYEE_TYPES.flatMap(({ key, ar, en: enLabel }: TypeDef<EmployeeAlertRow>) => {
-        const date = employee[key];
+        const date = employee[key] as Date | null;
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
         const typeLabel = EMPLOYEE_TYPE_LABELS[employee.type]?.[locale] ?? employee.type;
