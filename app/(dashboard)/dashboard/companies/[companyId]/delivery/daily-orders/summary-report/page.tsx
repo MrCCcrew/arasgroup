@@ -178,12 +178,12 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     const yearNum = Number.parseInt(effectiveYear, 10);
     const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
     const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-    invoiceDateFilter = { date: { gte: startDate, lte: endDate } };
+    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
   } else if (effectiveYear) {
     const yearNum = Number.parseInt(effectiveYear, 10);
     const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
     const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-    invoiceDateFilter = { date: { gte: startDate, lte: endDate } };
+    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
   }
 
   const [charges, totalInvoicesAmount] = await Promise.all([
