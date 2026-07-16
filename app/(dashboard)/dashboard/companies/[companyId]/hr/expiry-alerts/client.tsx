@@ -97,6 +97,7 @@ export function ExpiryAlertsClient({
     colSection: en ? "Section" : "القسم",
     colItem: en ? "Item" : "العنصر",
     colDetail: en ? "Detail" : "التفصيل",
+    colLicense: en ? "License" : "الترخيص",
     colType: en ? "Expiry type" : "نوع الانتهاء",
     colDate: en ? "Expiry date" : "تاريخ الانتهاء",
     colStatus: en ? "Status" : "الحالة",
@@ -254,6 +255,7 @@ export function ExpiryAlertsClient({
                 <th>{t.colSection}</th>
                 <th>{t.colItem}</th>
                 <th>{t.colDetail}</th>
+                <th>{t.colLicense}</th>
                 <th>{t.colType}</th>
                 <th>{t.colDate}</th>
                 <th>{t.colStatus}</th>
@@ -263,7 +265,7 @@ export function ExpiryAlertsClient({
             <tbody>
               {filteredAlerts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
                     {t.noResults}
                   </td>
                 </tr>
@@ -275,6 +277,7 @@ export function ExpiryAlertsClient({
                     </td>
                     <td className="font-medium">{alert.title}</td>
                     <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
+                    <td className="text-sm text-muted-foreground">{alert.licenseName || "—"}</td>
                     <td>{alert.expiryType}</td>
                     <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
                     <td>

@@ -11,6 +11,7 @@ export type ExpiryAlertItem = {
   expiryDate: string;
   daysLeft: number;
   href: string;
+  licenseName?: string;
 };
 
 export type ExpiryAlertFilters = {

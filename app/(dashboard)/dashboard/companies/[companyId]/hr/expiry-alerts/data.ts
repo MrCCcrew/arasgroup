@@ -32,6 +32,9 @@ type EmployeeAlertRow = {
   passportExpiryDate: Date | null;
   municipalityCardExpiryDate: Date | null;
   visaExpiryDate: Date | null;
+  license: { commercialNameAr: string } | null;
+  residencyLicense: { commercialNameAr: string } | null;
+  workPermitLicense: { commercialNameAr: string } | null;
 };
 
 type VehicleAlertRow = {
@@ -118,6 +121,7 @@ function makeAlert(
   expiryDate: Date,
   now: Date,
   href: string,
+  licenseName?: string,
 ): ExpiryAlertItem {
   return {
     id: `${category}-${entityId}-${expiryType}-${expiryDate.toISOString().slice(0, 10)}`,
@@ -129,6 +133,7 @@ function makeAlert(
     expiryDate: expiryDate.toISOString(),
     daysLeft: daysLeft(expiryDate, now),
     href,
+    licenseName,
   };
 }
 
@@ -174,6 +179,9 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
             passportExpiryDate: true,
             municipalityCardExpiryDate: true,
             visaExpiryDate: true,
+            license: { select: { commercialNameAr: true } },
+            residencyLicense: { select: { commercialNameAr: true } },
+            workPermitLicense: { select: { commercialNameAr: true } },
           },
           orderBy: { nameAr: "asc" },
         })
@@ -224,6 +232,17 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
         if (!date || date > in60) return [];
         const expiryDate = ensureDate(date);
         const typeLabel = EMPLOYEE_TYPE_LABELS[employee.type]?.[locale] ?? employee.type;
+
+        // تحديد الترخيص المناسب حسب نوع الانتهاء
+        let licenseName: string | undefined;
+        if (key === "residencyExpiry" && employee.residencyLicense) {
+          licenseName = employee.residencyLicense.commercialNameAr;
+        } else if (employee.license) {
+          licenseName = employee.license.commercialNameAr;
+        } else if (employee.workPermitLicense) {
+          licenseName = employee.workPermitLicense.commercialNameAr;
+        }
+
         return [
           makeAlert(
             "employee",
@@ -236,6 +255,7 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
             canUpdateEmployees
               ? `/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`
               : `/dashboard/companies/${companyId}/hr/employees/${employee.id}`,
+            licenseName,
           ),
         ];
       }),

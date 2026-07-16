@@ -128,6 +128,7 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
                 <th>القسم</th>
                 <th>العنصر</th>
                 <th>التفصيل</th>
+                <th>الترخيص</th>
                 <th>نوع الانتهاء</th>
                 <th>تاريخ الانتهاء</th>
                 <th>الحالة</th>
@@ -142,6 +143,7 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
                     <td>{alert.category === "employee" ? "الموظفون" : alert.category === "vehicle" ? "المركبات" : "التراخيص"}</td>
                     <td>{alert.title}</td>
                     <td>{alert.subtitle}</td>
+                    <td>{alert.licenseName || "—"}</td>
                     <td>{alert.expiryType}</td>
                     <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
                     <td>
