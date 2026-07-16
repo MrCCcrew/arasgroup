@@ -236,6 +236,43 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
   const invoiceByDriverId = new Map<string, number>(totalInvoicesAmount.map((row: typeof totalInvoicesAmount[number]) => [row.driverId ?? "", Number(row._sum.amount ?? 0)]));
   const driverById = new Map<string, SummaryDriver>(driverRows.map((driver: SummaryDriver) => [driver.id, driver]));
 
+  // Calculate wallet balance from transactions in the filtered period (same as main page)
+  // Build wallet date filter matching the orders filter
+  let walletDateFilter = {};
+  if (effectiveMonth && effectiveYear) {
+    const monthNum = Number.parseInt(effectiveMonth, 10);
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+    walletDateFilter = { date: { gte: startDate, lte: endDate } };
+  } else if (effectiveYear) {
+    const yearNum = Number.parseInt(effectiveYear, 10);
+    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+    walletDateFilter = { date: { gte: startDate, lte: endDate } };
+  }
+
+  const walletTransactions = driverIds.length > 0
+    ? await prisma.driverWalletTransaction.findMany({
+        where: {
+          driverId: { in: driverIds },
+          ...walletDateFilter,
+        },
+        select: { driverId: true, type: true, amount: true },
+      })
+    : [];
+
+  const walletBalanceByDriverId = new Map<string, number>();
+  for (const tx of walletTransactions) {
+    const amount = Number(tx.amount);
+    const current = walletBalanceByDriverId.get(tx.driverId) ?? 0;
+    if (tx.type === "CHARGE") {
+      walletBalanceByDriverId.set(tx.driverId, current + amount);
+    } else if (tx.type === "DEPOSIT") {
+      walletBalanceByDriverId.set(tx.driverId, current - amount);
+    }
+  }
+
   const summaryMap = new Map<
     string,
     {
@@ -253,7 +290,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
     if (!driver) continue;
 
     if (!summaryMap.has(order.driverId)) {
-      const walletBalance = Number(driver.walletBalance);
+      const walletBalance = walletBalanceByDriverId.get(order.driverId) ?? 0;
       const totalInvoices = invoiceByDriverId.get(order.driverId) ?? 0;
       summaryMap.set(order.driverId, {
         driverName: isEnglish ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr,
