@@ -40,6 +40,7 @@ model User {
   grantedPermissions     UserPermission[] @relation("UserPermissionGrantedBy")
   createdTalabatImports  TalabatReportImport[]     @relation("TalabatImportCreatedBy")
   talabatAllocations     TalabatReportAllocation[] @relation("TalabatAllocationCreatedBy")
+  activityLogs           EmployeeActivityLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -771,6 +772,39 @@ model CompletedTaskItem {
 
   @@index([taskId, sortOrder])
   @@map("completed_task_items")
+}
+
+enum ActivityType {
+  WINDOW_CHANGE    // تغيير النافذة النشطة
+  WEBSITE_VISIT    // زيارة موقع
+  APPLICATION_USE  // استخدام برنامج
+  IDLE             // عدم نشاط
+  ACTIVE           // نشط
+}
+
+model EmployeeActivityLog {
+  id            String       @id @default(cuid())
+  userId        String
+  activityType  ActivityType
+  windowTitle   String?      // عنوان النافذة
+  applicationName String?    // اسم البرنامج
+  url           String?      // الرابط (للمتصفحات)
+  startTime     DateTime
+  endTime       DateTime?
+  durationSeconds Int?       // المدة بالثواني
+  isIdle        Boolean      @default(false)
+  deviceName    String?      // اسم الجهاز
+  ipAddress     String?      // IP للجهاز
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startTime])
+  @@index([activityType])
+  @@index([startTime])
+  @@index([createdAt])
+  @@map("employee_activity_logs")
 }
 
 // ═══════════════════════════════════════════════════════════
