@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatKWD } from "@/lib/utils";
 import { getExpiryAlertsData } from "../data";
 import { applyAlertFilters, buildStats, buildFilterQuery, filtersFromSearchParams } from "../shared";
 
@@ -122,40 +122,105 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
         {filteredAlerts.length === 0 ? (
           <p style={{ textAlign: "center", color: "#6b7280", padding: "2rem" }}>لا توجد نتائج مطابقة للفلاتر الحالية</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>القسم</th>
-                <th>العنصر</th>
-                <th>التفصيل</th>
-                <th>الترخيص</th>
-                <th>نوع الانتهاء</th>
-                <th>تاريخ الانتهاء</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAlerts.map((alert) => {
-                const severity =
-                  alert.daysLeft < 0 ? "expired" : alert.daysLeft <= 30 ? "critical" : alert.daysLeft <= 60 ? "warning" : "upcoming";
-                return (
-                  <tr key={alert.id}>
-                    <td>{alert.category === "employee" ? "الموظفون" : alert.category === "vehicle" ? "المركبات" : "التراخيص"}</td>
-                    <td>{alert.title}</td>
-                    <td>{alert.subtitle}</td>
-                    <td>{alert.licenseName || "—"}</td>
-                    <td>{alert.expiryType}</td>
-                    <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
-                    <td>
-                      <span className={`badge ${severity}`}>
-                        {severity === "expired" ? "منتهي" : `${alert.daysLeft} يوم`}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <>
+            {filteredAlerts.some((a) => a.category === "employee") ? (
+              <div style={{ marginBottom: "2rem" }}>
+                <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "0.5rem" }}>الموظفون</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>رقم الموظف</th>
+                      <th>الاسم</th>
+                      <th>الرقم المدني</th>
+                      <th>تاريخ الانتهاء</th>
+                      <th>الوظيفة</th>
+                      <th>الراتب</th>
+                      <th>المسؤول</th>
+                      <th>ترخيص الإقامة</th>
+                      <th>ترخيص العمل</th>
+                      <th>التليفون</th>
+                      <th>الترخيص الرئيسي</th>
+                      <th>المفوض بالتوقيع</th>
+                      <th>نوع الانتهاء</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAlerts
+                      .filter((a) => a.category === "employee")
+                      .map((alert) => {
+                        const severity =
+                          alert.daysLeft < 0 ? "expired" : alert.daysLeft <= 30 ? "critical" : alert.daysLeft <= 60 ? "warning" : "upcoming";
+                        return (
+                          <tr key={alert.id}>
+                            <td>{alert.employeeNumber || "—"}</td>
+                            <td>{alert.title}</td>
+                            <td>{alert.civilId || "—"}</td>
+                            <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
+                            <td>{alert.position || "—"}</td>
+                            <td>{alert.salary ? formatKWD(alert.salary, "ar-KW") : "—"}</td>
+                            <td>{alert.investor || "—"}</td>
+                            <td>{alert.residencyLicenseName || "—"}</td>
+                            <td>{alert.workPermitLicenseName || "—"}</td>
+                            <td>{alert.phone || "—"}</td>
+                            <td>{alert.mainLicenseName || "—"}</td>
+                            <td>{alert.authorizedSigner || "—"}</td>
+                            <td>{alert.expiryType}</td>
+                            <td>
+                              <span className={`badge ${severity}`}>
+                                {severity === "expired" ? "منتهي" : `${alert.daysLeft} يوم`}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {filteredAlerts.some((a) => a.category !== "employee") ? (
+              <div>
+                <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "0.5rem" }}>المركبات والتراخيص</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>القسم</th>
+                      <th>العنصر</th>
+                      <th>التفصيل</th>
+                      <th>الترخيص</th>
+                      <th>نوع الانتهاء</th>
+                      <th>تاريخ الانتهاء</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAlerts
+                      .filter((a) => a.category !== "employee")
+                      .map((alert) => {
+                        const severity =
+                          alert.daysLeft < 0 ? "expired" : alert.daysLeft <= 30 ? "critical" : alert.daysLeft <= 60 ? "warning" : "upcoming";
+                        return (
+                          <tr key={alert.id}>
+                            <td>{alert.category === "vehicle" ? "المركبات" : "التراخيص"}</td>
+                            <td>{alert.title}</td>
+                            <td>{alert.subtitle}</td>
+                            <td>{alert.licenseName || "—"}</td>
+                            <td>{alert.expiryType}</td>
+                            <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
+                            <td>
+                              <span className={`badge ${severity}`}>
+                                {severity === "expired" ? "منتهي" : `${alert.daysLeft} يوم`}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </>
