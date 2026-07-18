@@ -363,8 +363,7 @@ export async function POST(request: NextRequest) {
     }
 
     const licenseData = rowToLicense(data);
-    const addressData = licenseData.address;
-    delete (licenseData as { address?: unknown }).address;
+    const { address: addressData, ...licenseDataWithoutAddress } = licenseData;
 
     const payload = {
       companyId,
@@ -372,7 +371,7 @@ export async function POST(request: NextRequest) {
       investorId,
       mainLicenseId,
       isMainLicense: rowIsMain,
-      ...licenseData,
+      ...licenseDataWithoutAddress,
     };
 
     try {
