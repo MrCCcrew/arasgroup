@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const COOKIE_NAME = "rashid_erp_session";
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/push/dispatch"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/push/dispatch",
+  "/api/activity-logs", // Desktop app sends activity logs
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
