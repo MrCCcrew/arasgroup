@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator - نظام التحكم الكامل</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #f0f0f0;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .icons {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .icon-container {
+            text-align: center;
+        }
+
+        .icon-box {
+            width: 256px;
+            height: 256px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 140px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .icon-box::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        }
+
+        .icon-box.small {
+            width: 128px;
+            height: 128px;
+            font-size: 70px;
+            border-radius: 30px;
+        }
+
+        .icon-box.tiny {
+            width: 64px;
+            height: 64px;
+            font-size: 35px;
+            border-radius: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .instructions {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+
+        .instructions p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .instructions a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .instructions a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h3>📝 تعليمات إنشاء الأيقونة</h3>
+        <p><strong>1.</strong> افتح Snipping Tool (Win + Shift + S)</p>
+        <p><strong>2.</strong> اختر المربع الكبير (256x256) وخذ screenshot</p>
+        <p><strong>3.</strong> احفظ الصورة باسم icon-256.png</p>
+        <p><strong>4.</strong> حول PNG إلى ICO على: <a href="https://convertio.co/png-ico/" target="_blank">convertio.co/png-ico</a></p>
+        <p><strong>5.</strong> احفظ الملف باسم icon.ico في مجلد assets</p>
+    </div>
+
+    <div class="icons">
+        <div class="icon-container">
+            <div class="icon-box">⚡</div>
+            <label>256x256 (للتحويل لـ ICO)</label>
+        </div>
+
+        <div class="icon-container">
+            <div class="icon-box small">⚡</div>
+            <label>128x128</label>
+        </div>
+
+        <div class="icon-container">
+            <div class="icon-box tiny">⚡</div>
+            <label>64x64</label>
+        </div>
+    </div>
+</body>
+</html>
