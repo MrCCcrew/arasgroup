@@ -25,7 +25,18 @@ const updateSchema = z.object({
   ownerOrInvestorNameEn: z.string().optional().nullable(),
   ownerOrInvestorPhone: z.string().optional().nullable(),
   managerName: z.string().optional().nullable(),
+  managerCivilId: z.string().optional().nullable(),
   managerPhone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.object({
+    automaticNumber: z.string().optional().nullable(),
+    governorate: z.string().optional().nullable(),
+    area: z.string().optional().nullable(),
+    block: z.string().optional().nullable(),
+    street: z.string().optional().nullable(),
+    plot: z.string().optional().nullable(),
+    unitNumber: z.string().optional().nullable(),
+  }).optional().nullable(),
   fireLicenseExpiryDate: z.string().optional().nullable(),
   healthLicenseExpiryDate: z.string().optional().nullable(),
   advertisingLicenseExpiryDate: z.string().optional().nullable(),
@@ -134,7 +145,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     const existing = await prisma.license.findUnique({
       where: { id: licenseId },
-      select: { companyId: true, branchId: true, investorId: true, isMainLicense: true, mainLicenseId: true },
+      select: { companyId: true, branchId: true, investorId: true, isMainLicense: true, mainLicenseId: true, licenseAddressId: true },
     });
     if (!existing) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
 
@@ -179,6 +190,44 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       nextMainLicenseId = parentLicense.id;
     }
 
+    // تحديث أو إنشاء العنوان
+    let addressId = existing.licenseAddressId;
+    if (d.address) {
+      const hasAddressData = Object.values(d.address).some((v) => v !== null && v !== undefined && v !== "");
+
+      if (hasAddressData) {
+        if (addressId) {
+          // تحديث العنوان الموجود
+          await prisma.licenseAddress.update({
+            where: { id: addressId },
+            data: {
+              ...(d.address.automaticNumber !== undefined ? { automaticNumber: d.address.automaticNumber } : {}),
+              ...(d.address.governorate !== undefined ? { governorate: d.address.governorate } : {}),
+              ...(d.address.area !== undefined ? { area: d.address.area } : {}),
+              ...(d.address.block !== undefined ? { block: d.address.block } : {}),
+              ...(d.address.street !== undefined ? { street: d.address.street } : {}),
+              ...(d.address.plot !== undefined ? { plot: d.address.plot } : {}),
+              ...(d.address.unitNumber !== undefined ? { unitNumber: d.address.unitNumber } : {}),
+            },
+          });
+        } else {
+          // إنشاء عنوان جديد
+          const newAddress = await prisma.licenseAddress.create({
+            data: {
+              automaticNumber: d.address.automaticNumber || null,
+              governorate: d.address.governorate || null,
+              area: d.address.area || null,
+              block: d.address.block || null,
+              street: d.address.street || null,
+              plot: d.address.plot || null,
+              unitNumber: d.address.unitNumber || null,
+            },
+          });
+          addressId = newAddress.id;
+        }
+      }
+    }
+
     const license = await prisma.license.update({
       where: { id: licenseId },
       data: {
@@ -199,7 +248,10 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         ...(d.ownerOrInvestorNameEn !== undefined ? { ownerOrInvestorNameEn: d.ownerOrInvestorNameEn } : {}),
         ...(d.ownerOrInvestorPhone !== undefined ? { ownerOrInvestorPhone: d.ownerOrInvestorPhone } : {}),
         ...(d.managerName !== undefined ? { managerName: d.managerName } : {}),
+        ...(d.managerCivilId !== undefined ? { managerCivilId: d.managerCivilId } : {}),
         ...(d.managerPhone !== undefined ? { managerPhone: d.managerPhone } : {}),
+        ...(d.email !== undefined ? { email: d.email } : {}),
+        ...(addressId !== existing.licenseAddressId ? { licenseAddressId: addressId } : {}),
         ...(d.issueDate !== undefined ? { issueDate: toDate(d.issueDate) } : {}),
         ...(d.licenseExpiryDate !== undefined ? { licenseExpiryDate: toDate(d.licenseExpiryDate) } : {}),
         ...(d.fireLicenseExpiryDate !== undefined ? { fireLicenseExpiryDate: toDate(d.fireLicenseExpiryDate) } : {}),

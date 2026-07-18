@@ -22,7 +22,8 @@ interface LicenseBase {
   customsCertExpiryDate: string | null; importLicenseExpiryDate: string | null;
   issueDate: string | null; unifiedEntityNumber: string | null;
   civilEntityNumber: string | null; fileNumber: string | null;
-  managerName: string | null; managerPhone: string | null; notes: string | null;
+  managerName: string | null; managerCivilId: string | null; managerPhone: string | null;
+  email: string | null; notes: string | null;
   branch: { nameAr: string } | null;
   investor: { nameAr: string } | null;
   mainLicense: { id: string; commercialNameAr: string; licenseNumber: string } | null;
@@ -384,7 +385,18 @@ export default function LicenseDetailPage() {
       legalEntity:         form.legalEntity         || null,
       capital:             form.capital ? Number(form.capital) : null,
       managerName:         form.managerName         || null,
+      managerCivilId:      form.managerCivilId      || null,
       managerPhone:        form.managerPhone        || null,
+      email:               form.email               || null,
+      address: {
+        automaticNumber: form.automaticNumber || null,
+        governorate:     form.governorate     || null,
+        area:            form.area            || null,
+        block:           form.block           || null,
+        street:          form.street          || null,
+        plot:            form.plot            || null,
+        unitNumber:      form.unitNumber      || null,
+      },
       notes:               form.notes               || null,
     });
   }
@@ -619,6 +631,15 @@ export default function LicenseDetailPage() {
               capital:             license.capital ?? "",
               managerName:         license.managerName ?? "",
               managerPhone:        license.managerPhone ?? "",
+              managerCivilId:      license.managerCivilId ?? "",
+              email:               license.email ?? "",
+              automaticNumber:     license.address?.automaticNumber ?? "",
+              governorate:         license.address?.governorate ?? "",
+              area:                license.address?.area ?? "",
+              block:               license.address?.block ?? "",
+              street:              license.address?.street ?? "",
+              plot:                license.address?.plot ?? "",
+              unitNumber:          license.address?.unitNumber ?? "",
               fileUrl:             commercialLicenseAttachment?.filePath ?? "",
               notes:               license.notes ?? "",
             })}
@@ -1313,7 +1334,51 @@ export default function LicenseDetailPage() {
                 <label className="form-label">هاتف المدير</label>
                 <input className="input-field w-full" dir="ltr" value={form.managerPhone as string ?? ""} onChange={f("managerPhone")} />
               </div>
+              <div>
+                <label className="form-label">الرقم المدني للمفوض بالتوقيع</label>
+                <input className="input-field w-full" dir="ltr" value={form.managerCivilId as string ?? ""} onChange={f("managerCivilId")} />
+              </div>
+              <div>
+                <label className="form-label">الايميل</label>
+                <input type="email" className="input-field w-full" dir="ltr" value={form.email as string ?? ""} onChange={f("email")} />
+              </div>
             </div>
+
+            {/* بيانات العنوان */}
+            <div className="border-t pt-3">
+              <h4 className="text-sm font-medium mb-3">بيانات العنوان</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">الرقم الآلي للعنوان</label>
+                  <input className="input-field w-full" dir="ltr" value={form.automaticNumber as string ?? ""} onChange={f("automaticNumber")} />
+                </div>
+                <div>
+                  <label className="form-label">المحافظة</label>
+                  <input className="input-field w-full" value={form.governorate as string ?? ""} onChange={f("governorate")} />
+                </div>
+                <div>
+                  <label className="form-label">المنطقة</label>
+                  <input className="input-field w-full" value={form.area as string ?? ""} onChange={f("area")} />
+                </div>
+                <div>
+                  <label className="form-label">القطعة</label>
+                  <input className="input-field w-full" value={form.block as string ?? ""} onChange={f("block")} />
+                </div>
+                <div>
+                  <label className="form-label">الشارع</label>
+                  <input className="input-field w-full" value={form.street as string ?? ""} onChange={f("street")} />
+                </div>
+                <div>
+                  <label className="form-label">القسيمة</label>
+                  <input className="input-field w-full" value={form.plot as string ?? ""} onChange={f("plot")} />
+                </div>
+                <div>
+                  <label className="form-label">الوحدة</label>
+                  <input className="input-field w-full" value={form.unitNumber as string ?? ""} onChange={f("unitNumber")} />
+                </div>
+              </div>
+            </div>
+
             <FileUploadField
               value={form.fileUrl as string ?? ""}
               onChange={setFileUrl}
