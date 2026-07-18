@@ -34,35 +34,40 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f5f5f5; font-size: 11pt; }
-        .page { max-width: 210mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
-        .report-header { text-align: center; border-bottom: 2px solid #7c2d12; padding-bottom: 1rem; margin-bottom: 1.5rem; }
-        .report-header-inner { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
-        .company-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb; padding: 4px; background: white; }
-        .company-name { font-size: 1.3rem; font-weight: 700; color: #7c2d12; }
-        .report-title { font-size: 1.1rem; font-weight: 600; margin-top: 0.3rem; }
-        .report-sub { font-size: 0.85rem; color: #6b7280; margin-top: 0.2rem; }
-        .print-date { font-size: 0.78rem; color: #9ca3af; margin-top: 0.2rem; }
-        .filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; font-size: 0.85rem; }
-        .filter-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem; background: #fafafa; }
-        .filter-label { color: #6b7280; margin-bottom: 0.2rem; }
-        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
-        .stat { border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem; text-align: center; }
-        .stat-num { font-size: 1.4rem; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 0.5rem; }
-        th { background: #7c2d12; color: white; padding: 0.4rem 0.5rem; text-align: right; border: 1px solid #7c2d12; font-weight: 600; font-size: 0.8rem; }
-        td { padding: 0.35rem 0.5rem; border: 1px solid #d1d5db; }
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: #f5f5f5; font-size: 9pt; }
+        .page { max-width: 297mm; margin: 1rem auto; background: white; padding: 1.5rem; border: 1px solid #d1d5db; }
+        .report-header { text-align: center; border-bottom: 2px solid #7c2d12; padding-bottom: 0.75rem; margin-bottom: 1rem; }
+        .report-header-inner { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .company-logo { width: 48px; height: 48px; object-fit: contain; border-radius: 6px; border: 1px solid #e5e7eb; padding: 3px; background: white; }
+        .company-name { font-size: 1.1rem; font-weight: 700; color: #7c2d12; }
+        .report-title { font-size: 0.95rem; font-weight: 600; margin-top: 0.25rem; }
+        .report-sub { font-size: 0.75rem; color: #6b7280; margin-top: 0.15rem; }
+        .print-date { font-size: 0.7rem; color: #9ca3af; margin-top: 0.15rem; }
+        .filters { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.7rem; }
+        .filter-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.4rem 0.5rem; background: #fafafa; }
+        .filter-label { color: #6b7280; margin-bottom: 0.1rem; font-size: 0.65rem; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
+        .stat { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.4rem; text-align: center; }
+        .stat-num { font-size: 1.1rem; font-weight: 700; }
+        h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #374151; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.62rem; margin-top: 0.3rem; table-layout: fixed; }
+        th { background: #7c2d12; color: white; padding: 0.25rem 0.3rem; text-align: right; border: 1px solid #7c2d12; font-weight: 600; font-size: 0.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        td { padding: 0.25rem 0.3rem; border: 1px solid #d1d5db; font-size: 0.6rem; overflow: hidden; text-overflow: ellipsis; }
         tr:nth-child(even) td { background: #f9fafb; }
-        .badge { display: inline-block; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.75rem; font-weight: 700; }
+        .badge { display: inline-block; border-radius: 999px; padding: 0.1rem 0.35rem; font-size: 0.55rem; font-weight: 700; white-space: nowrap; }
         .expired { background: #fee2e2; color: #b91c1c; }
         .critical { background: #ffedd5; color: #c2410c; }
         .warning { background: #fef3c7; color: #b45309; }
         .upcoming { background: #dbeafe; color: #1d4ed8; }
         @media print {
           .controls { display: none !important; }
-          body { background: white; }
-          .page { border: none; padding: 0; margin: 0; max-width: 100%; }
-          @page { size: A4 portrait; margin: 1.2cm; }
+          body { background: white; font-size: 8pt; }
+          .page { border: none; padding: 0.75cm; margin: 0; max-width: 100%; }
+          @page { size: A4 landscape; margin: 0.75cm; }
+          table { font-size: 0.58rem; }
+          th { font-size: 0.56rem; padding: 0.2rem 0.25rem; }
+          td { font-size: 0.56rem; padding: 0.2rem 0.25rem; }
+          .badge { font-size: 0.52rem; }
         }
       `}</style>
 
