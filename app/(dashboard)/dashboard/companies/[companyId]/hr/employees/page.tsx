@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Plus, Printer } from "lucide-react";
+import { AlertTriangle, Plus, Printer, Search, X } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
@@ -9,7 +9,7 @@ import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { RestoreEmployeeButton } from "@/components/hr/restore-employee-button";
 import { PermanentDeleteEmployeeButton } from "@/components/hr/permanent-delete-employee-button";
-import { EmployeeSearchBox } from "@/components/hr/employee-search-box";
+import { EmployeeQuickSearch } from "@/components/hr/employee-quick-search";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -321,8 +321,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        <EmployeeSearchBox
+        <EmployeeQuickSearch
           companyId={companyId}
+          printHref={printHref}
           currentFilters={{
             group: query.group,
             status: query.status,
