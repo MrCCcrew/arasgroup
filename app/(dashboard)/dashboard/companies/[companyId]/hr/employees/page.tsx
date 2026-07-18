@@ -143,6 +143,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
         position: { select: { nameAr: true, nameEn: true } },
+        license: { select: { commercialNameAr: true, commercialNameEn: true, managerName: true } },
+        residencyLicense: { select: { commercialNameAr: true, commercialNameEn: true } },
+        workPermitLicense: { select: { commercialNameAr: true, commercialNameEn: true } },
         driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
         carWashWorker: { select: { role: true } },
       },
@@ -161,7 +164,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     ? `${deletedCount} ${locale === "en" ? "deleted employee(s)" : "موظف محذوف"}`
     : `${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`;
   const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
-  const tableColSpan = showInvestorColumn ? (showingDeleted ? 10 : 9) : showingDeleted ? 9 : 8;
+  const tableColSpan = showInvestorColumn ? (showingDeleted ? 14 : 13) : showingDeleted ? 13 : 12;
 
   return (
     <div>
@@ -295,14 +298,18 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             <table className="ar-table">
               <thead>
                 <tr>
+                  <th>{locale === "en" ? "Employee No." : "رقم الموظف"}</th>
                   <th>{locale === "en" ? "Name" : "الاسم"}</th>
-                  <th>{locale === "en" ? "Type" : "النوع"}</th>
-                  <th>{locale === "en" ? "Nationality" : "الجنسية"}</th>
-                  <th>{locale === "en" ? "Phone" : "الجوال"}</th>
+                  <th>{locale === "en" ? "Civil ID" : "الرقم المدني"}</th>
+                  <th>{locale === "en" ? "Residency expiry" : "تاريخ انتهاء الإقامة"}</th>
+                  <th>{locale === "en" ? "Position" : "الوظيفة"}</th>
                   <th>{locale === "en" ? "Salary" : "الراتب"}</th>
-                  <th>{locale === "en" ? "Residency expiry" : "انتهاء الإقامة"}</th>
-                  <th>{locale === "en" ? "Branch" : "الفرع"}</th>
                   {showInvestorColumn ? <th>{locale === "en" ? "Investor" : "المسئول"}</th> : null}
+                  <th>{locale === "en" ? "Residency license" : "ترخيص الإقامة"}</th>
+                  <th>{locale === "en" ? "Work permit license" : "ترخيص العمل"}</th>
+                  <th>{locale === "en" ? "Phone" : "التليفون"}</th>
+                  <th>{locale === "en" ? "Main license" : "الترخيص الرئيسي"}</th>
+                  <th>{locale === "en" ? "Authorized signer" : "المفوض بالتوقيع"}</th>
                   {showingDeleted ? <th>{locale === "en" ? "Deleted at" : "تاريخ الحذف"}</th> : null}
                   <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
                 </tr>
@@ -332,45 +339,50 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         key={employee.id}
                         className={`transition-colors hover:bg-muted/20 ${!showingDeleted && isExpiringSoon ? "bg-yellow-50/30" : ""}`}
                       >
+                        {/* 1. رقم الموظف */}
+                        <td className="number text-sm">
+                          {employee.employeeNumber ? (
+                            <span className="font-mono">{employee.employeeNumber}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        {/* 2. اسم الموظف */}
                         <td>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{employee.nameAr}</p>
-                              {employee.employeeNumber ? (
-                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                                  {employee.employeeNumber}
-                                </span>
-                              ) : null}
-                            </div>
+                            <p className="font-medium">{employee.nameAr}</p>
                             {employee.nameEn ? <p className="text-xs text-muted-foreground">{employee.nameEn}</p> : null}
                           </div>
                         </td>
-                        <td>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{getTypeLabel(employee.type)}</span>
-                        </td>
-                        <td className="text-sm">{employee.nationality ?? (locale === "en" ? "Not set" : "غير محدد")}</td>
+
+                        {/* 3. الرقم المدني */}
                         <td className="number text-sm" dir="ltr">
-                          {employee.phone ?? (locale === "en" ? "Not set" : "غير محدد")}
+                          {employee.civilId ?? (locale === "en" ? "Not set" : "غير محدد")}
                         </td>
+
+                        {/* 4. تاريخ انتهاء الإقامة */}
+                        <td className="text-sm">
+                          {employee.residencyExpiry ? formatDate(employee.residencyExpiry, dateLocale) : locale === "en" ? "Not set" : "غير محدد"}
+                        </td>
+
+                        {/* 5. الوظيفة */}
+                        <td className="text-sm">
+                          {employee.position
+                            ? locale === "en"
+                              ? employee.position.nameEn ?? employee.position.nameAr
+                              : employee.position.nameAr
+                            : locale === "en"
+                              ? "Not set"
+                              : "غير محدد"}
+                        </td>
+
+                        {/* 6. الراتب */}
                         <td className="number text-sm">
                           {employee.baseSalary ? formatKWD(Number(employee.baseSalary), numberLocale) : locale === "en" ? "Not set" : "غير محدد"}
                         </td>
-                        <td>
-                          {employee.residencyExpiry ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs">{formatDate(employee.residencyExpiry, dateLocale)}</span>
-                              {!showingDeleted && isExpiringSoon ? (
-                                <AlertTriangle
-                                  size={12}
-                                  className={isExpired || (days !== null && days <= 30) ? "text-red-500" : "text-yellow-500"}
-                                />
-                              ) : null}
-                            </div>
-                          ) : (
-                            locale === "en" ? "Not set" : "غير محدد"
-                          )}
-                        </td>
-                        <td className="text-sm">{branchName}</td>
+
+                        {/* 7. المسؤول (conditional) */}
                         {showInvestorColumn ? (
                           <td className="text-sm">
                             {employee.investor ? (
@@ -382,9 +394,50 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                             )}
                           </td>
                         ) : null}
+
+                        {/* 8. ترخيص الإقامة */}
+                        <td className="text-sm">
+                          {employee.residencyLicense
+                            ? locale === "en"
+                              ? employee.residencyLicense.commercialNameEn ?? employee.residencyLicense.commercialNameAr
+                              : employee.residencyLicense.commercialNameAr
+                            : <span className="text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* 9. ترخيص العمل */}
+                        <td className="text-sm">
+                          {employee.workPermitLicense
+                            ? locale === "en"
+                              ? employee.workPermitLicense.commercialNameEn ?? employee.workPermitLicense.commercialNameAr
+                              : employee.workPermitLicense.commercialNameAr
+                            : <span className="text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* 10. التليفون */}
+                        <td className="number text-sm" dir="ltr">
+                          {employee.phone ?? (locale === "en" ? "Not set" : "غير محدد")}
+                        </td>
+
+                        {/* 11. اسم الترخيص الرئيسي */}
+                        <td className="text-sm">
+                          {employee.license
+                            ? locale === "en"
+                              ? employee.license.commercialNameEn ?? employee.license.commercialNameAr
+                              : employee.license.commercialNameAr
+                            : <span className="text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* 12. المفوض بالتوقيع */}
+                        <td className="text-sm">
+                          {employee.license?.managerName ?? (locale === "en" ? "Not set" : "غير محدد")}
+                        </td>
+
+                        {/* تاريخ الحذف (conditional) */}
                         {showingDeleted ? (
                           <td className="text-sm">{employee.deletedAt ? formatDate(employee.deletedAt, dateLocale) : "—"}</td>
                         ) : null}
+
+                        {/* الإجراءات */}
                         <td>
                           {showingDeleted ? (
                             <div className="flex items-center gap-2">
