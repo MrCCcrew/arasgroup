@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { uploadToR2 } from "@/lib/r2";
+import { uploadToR2 } from "@/lib/storage/r2";
 
 // Schema for activity log from desktop app
 const activityLogSchema = z.object({
@@ -87,8 +87,7 @@ export async function POST(request: NextRequest) {
         const fileName = `screenshots/${firstLog.userId}/${Date.now()}.jpg`;
 
         // Upload to R2
-        const uploadResult = await uploadToR2(imageBuffer, fileName, "image/jpeg");
-        screenshotUrl = uploadResult.url;
+        screenshotUrl = await uploadToR2(fileName, imageBuffer, "image/jpeg");
 
         console.log("Screenshot uploaded:", screenshotUrl);
       } catch (error) {
@@ -183,6 +182,62 @@ export async function GET(request: NextRequest) {
     console.error("Fetch activity logs error:", error);
     return NextResponse.json(
       { success: false, error: "فشل في جلب سجلات النشاط" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Delete activity logs (Admin only)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = request.nextUrl;
+    const logIds = searchParams.get("ids")?.split(",") || [];
+
+    if (logIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "لم يتم تحديد سجلات للحذف" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch logs to get screenshot URLs before deletion
+    const logs = await prisma.employeeActivityLog.findMany({
+      where: { id: { in: logIds } },
+      select: { id: true, screenshotUrl: true },
+    });
+
+    // Delete screenshots from R2
+    const { deleteFromR2 } = await import("@/lib/storage/r2");
+    const deletePromises = logs
+      .filter((log) => log.screenshotUrl)
+      .map(async (log) => {
+        try {
+          // Extract key from URL (format: https://pub-xxx.r2.dev/screenshots/userId/timestamp.jpg)
+          const url = new URL(log.screenshotUrl!);
+          const key = url.pathname.substring(1); // Remove leading slash
+          await deleteFromR2(key);
+          console.log(`Deleted screenshot: ${key}`);
+        } catch (error) {
+          console.error(`Failed to delete screenshot for log ${log.id}:`, error);
+        }
+      });
+
+    await Promise.all(deletePromises);
+
+    // Delete logs from database
+    const deleted = await prisma.employeeActivityLog.deleteMany({
+      where: { id: { in: logIds } },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `تم حذف ${deleted.count} سجل`,
+      count: deleted.count,
+    });
+  } catch (error) {
+    console.error("Delete activity logs error:", error);
+    return NextResponse.json(
+      { success: false, error: "فشل في حذف السجلات" },
       { status: 500 }
     );
   }

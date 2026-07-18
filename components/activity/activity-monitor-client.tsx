@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Clock, Monitor, TrendingUp, Globe, Loader2 } from "lucide-react";
+import { Calendar, Clock, Monitor, TrendingUp, Globe, Loader2, Trash2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -43,6 +43,8 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [selectedLogs, setSelectedLogs] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   // Set default date to today
   useEffect(() => {
@@ -54,6 +56,7 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
   // Fetch logs when filters change
   useEffect(() => {
     if (selectedUserId && startDate) {
+      setSelectedLogs(new Set()); // Clear selection on filter change
       fetchLogs();
       fetchStats();
     }
@@ -106,6 +109,58 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
     } finally {
       setStatsLoading(false);
     }
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedLogs.size === 0) return;
+
+    if (!confirm(`هل أنت متأكد من حذف ${selectedLogs.size} سجل؟\n\nسيتم حذف الصور المرتبطة من Cloudflare R2 أيضاً.`)) {
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const ids = Array.from(selectedLogs).join(",");
+      const res = await fetch(`/api/activity-logs?ids=${ids}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert(`✅ تم حذف ${data.count} سجل بنجاح`);
+        setSelectedLogs(new Set());
+        // Refresh logs
+        fetchLogs();
+        if (selectedUserId) fetchStats();
+      } else {
+        alert(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("❌ حدث خطأ أثناء الحذف");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function toggleSelectAll() {
+    if (selectedLogs.size === logs.length) {
+      setSelectedLogs(new Set());
+    } else {
+      setSelectedLogs(new Set(logs.map((log) => log.id)));
+    }
+  }
+
+  function toggleSelectLog(logId: string) {
+    const newSelected = new Set(selectedLogs);
+    if (newSelected.has(logId)) {
+      newSelected.delete(logId);
+    } else {
+      newSelected.add(logId);
+    }
+    setSelectedLogs(newSelected);
   }
 
   const activityTypeLabels: Record<string, string> = {
@@ -246,7 +301,23 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
       {/* Activity Logs Table */}
       {selectedUserId && (
         <div className="section-card">
-          <h3 className="mb-4 text-sm font-semibold">سجل النشاط التفصيلي</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">سجل النشاط التفصيلي</h3>
+            {selectedLogs.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+                className="btn-danger flex items-center gap-2 text-sm"
+              >
+                {deleting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                حذف المحدد ({selectedLogs.size})
+              </button>
+            )}
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -261,6 +332,14 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
               <table className="ar-table">
                 <thead>
                   <tr>
+                    <th className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedLogs.size === logs.length && logs.length > 0}
+                        onChange={toggleSelectAll}
+                        className="cursor-pointer"
+                      />
+                    </th>
                     <th>الوقت</th>
                     <th>النوع</th>
                     <th>البرنامج</th>
@@ -274,6 +353,14 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id} className={log.isIdle ? "opacity-50" : ""}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedLogs.has(log.id)}
+                          onChange={() => toggleSelectLog(log.id)}
+                          className="cursor-pointer"
+                        />
+                      </td>
                       <td className="whitespace-nowrap text-xs">
                         {new Date(log.startTime).toLocaleTimeString("ar-EG", {
                           hour: "2-digit",
