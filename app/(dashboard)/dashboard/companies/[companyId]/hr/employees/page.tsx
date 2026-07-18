@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Printer } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
@@ -166,6 +166,15 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
   const tableColSpan = showInvestorColumn ? (showingDeleted ? 14 : 13) : showingDeleted ? 13 : 12;
 
+  const printQuery = new URLSearchParams();
+  if (query.type) printQuery.set("type", query.type);
+  if (query.positionId) printQuery.set("positionId", query.positionId);
+  if (query.search) printQuery.set("search", query.search);
+  if (query.group) printQuery.set("group", query.group);
+  if (query.status) printQuery.set("status", query.status);
+  if (query.category) printQuery.set("category", query.category);
+  const printHref = `/dashboard/companies/${companyId}/hr/employees/print${printQuery.toString() ? `?${printQuery.toString()}` : ""}`;
+
   return (
     <div>
       <Header
@@ -174,13 +183,23 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         companyId={companyId}
         actions={
           showingDeleted ? null : (
-            <Link
-              href={`/dashboard/companies/${companyId}/hr/employees/new`}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus size={16} />
-              {locale === "en" ? "New employee" : "موظف جديد"}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={printHref}
+                target="_blank"
+                className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                <Printer size={16} />
+                {locale === "en" ? "Print report" : "طباعة التقرير"}
+              </Link>
+              <Link
+                href={`/dashboard/companies/${companyId}/hr/employees/new`}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus size={16} />
+                {locale === "en" ? "New employee" : "موظف جديد"}
+              </Link>
+            </div>
           )
         }
       />
