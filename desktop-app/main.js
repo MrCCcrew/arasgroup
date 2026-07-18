@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const ActivityTracker = require('./src/activity-tracker');
 const ApiClient = require('./src/api-client');
 
 const store = new Store();
+const ADMIN_PASSWORD = 'Admin@123';
 let mainWindow = null;
 let tray = null;
 let activityTracker = null;
@@ -62,7 +63,7 @@ function createTray() {
       },
     },
     {
-      label: isMonitoring ? 'إيقاف المراقبة' : 'بدء المراقبة',
+      label: isMonitoring ? 'إيقاف التحكم' : 'بدء التحكم',
       click: () => {
         toggleMonitoring();
       },
@@ -83,11 +84,131 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip('Rashid Activity Monitor');
+  tray.setToolTip('نظام التحكم الكامل');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
     mainWindow.show();
+  });
+}
+
+async function verifyAdminPassword(action) {
+  return new Promise((resolve) => {
+    const promptWindow = new BrowserWindow({
+      width: 400,
+      height: 200,
+      modal: true,
+      parent: mainWindow,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+      autoHideMenuBar: true,
+      resizable: false,
+    });
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            direction: rtl;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+          }
+          .container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+          }
+          h3 {
+            margin: 0 0 16px 0;
+            color: #333;
+            font-size: 18px;
+          }
+          input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            font-family: inherit;
+          }
+          input:focus {
+            outline: none;
+            border-color: #667eea;
+          }
+          .buttons {
+            display: flex;
+            gap: 8px;
+          }
+          button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: inherit;
+          }
+          .btn-confirm {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .btn-cancel {
+            background: #e0e0e0;
+            color: #666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h3>⚠️ ${action}</h3>
+          <input type="password" id="password" placeholder="أدخل كلمة مرور المدير" />
+          <div class="buttons">
+            <button class="btn-confirm" onclick="verify()">تأكيد</button>
+            <button class="btn-cancel" onclick="cancel()">إلغاء</button>
+          </div>
+        </div>
+        <script>
+          const { ipcRenderer } = require('electron');
+          document.getElementById('password').focus();
+          document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verify();
+          });
+          function verify() {
+            const password = document.getElementById('password').value;
+            ipcRenderer.send('admin-password-response', password);
+          }
+          function cancel() {
+            ipcRenderer.send('admin-password-response', null);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent));
+
+    ipcMain.once('admin-password-response', (event, password) => {
+      promptWindow.close();
+      resolve(password === ADMIN_PASSWORD);
+    });
+
+    promptWindow.on('closed', () => {
+      resolve(false);
+    });
   });
 }
 
@@ -117,12 +238,16 @@ function stopMonitoring() {
   updateTrayMenu();
 }
 
-function toggleMonitoring() {
+async function toggleMonitoring() {
   const userId = store.get('userId');
   const authToken = store.get('authToken');
 
   if (isMonitoring) {
-    stopMonitoring();
+    // Require admin password to stop monitoring
+    const verified = await verifyAdminPassword('إيقاف التحكم يتطلب كلمة مرور المدير');
+    if (verified) {
+      stopMonitoring();
+    }
   } else if (userId && authToken) {
     startMonitoring(userId, authToken);
   }
@@ -140,7 +265,7 @@ function updateTrayMenu() {
       },
     },
     {
-      label: isMonitoring ? 'إيقاف المراقبة' : 'بدء المراقبة',
+      label: isMonitoring ? 'إيقاف التحكم' : 'بدء التحكم',
       click: () => {
         toggleMonitoring();
       },
@@ -164,7 +289,11 @@ function updateTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
-function logout() {
+async function logout() {
+  // Require admin password to logout
+  const verified = await verifyAdminPassword('تسجيل الخروج يتطلب كلمة مرور المدير');
+  if (!verified) return;
+
   stopMonitoring();
   store.delete('userId');
   store.delete('authToken');

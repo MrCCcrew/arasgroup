@@ -10,8 +10,8 @@
     "build-linux": "electron-builder --linux"
   },
   "build": {
-    "appId": "com.rashidgroup.activitymonitor",
-    "productName": "Rashid Activity Monitor",
+    "appId": "com.rashidgroup.fullcontrol",
+    "productName": "نظام التحكم الكامل",
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
