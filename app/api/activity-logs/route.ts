@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { uploadToR2 } from "@/lib/r2";
 
 // Schema for activity log from desktop app
 const activityLogSchema = z.object({
@@ -18,8 +19,14 @@ const activityLogSchema = z.object({
   authToken: z.string().min(1), // Desktop app authentication token
 });
 
+const screenshotSchema = z.object({
+  timestamp: z.string(),
+  image: z.string(), // base64
+});
+
 const batchLogsSchema = z.object({
   logs: z.array(activityLogSchema),
+  screenshot: screenshotSchema.optional(),
 });
 
 // POST - Desktop App sends activity logs
@@ -31,6 +38,7 @@ export async function POST(request: NextRequest) {
     const isBatch = Array.isArray(body.logs);
 
     let logsToCreate: z.infer<typeof activityLogSchema>[];
+    let screenshot: z.infer<typeof screenshotSchema> | null = null;
 
     if (isBatch) {
       const parsed = batchLogsSchema.safeParse(body);
@@ -41,6 +49,7 @@ export async function POST(request: NextRequest) {
         );
       }
       logsToCreate = parsed.data.logs;
+      screenshot = parsed.data.screenshot || null;
     } else {
       const parsed = activityLogSchema.safeParse(body);
       if (!parsed.success) {
@@ -69,6 +78,25 @@ export async function POST(request: NextRequest) {
     // TODO: Verify authToken matches user's desktop app token
     // For now, we'll accept any valid userId
 
+    // Upload screenshot to R2 if provided
+    let screenshotUrl: string | null = null;
+    if (screenshot) {
+      try {
+        // Convert base64 to buffer
+        const imageBuffer = Buffer.from(screenshot.image, "base64");
+        const fileName = `screenshots/${firstLog.userId}/${Date.now()}.jpg`;
+
+        // Upload to R2
+        const uploadResult = await uploadToR2(imageBuffer, fileName, "image/jpeg");
+        screenshotUrl = uploadResult.url;
+
+        console.log("Screenshot uploaded:", screenshotUrl);
+      } catch (error) {
+        console.error("Failed to upload screenshot:", error);
+        // Continue without screenshot if upload fails
+      }
+    }
+
     // Create activity logs
     const created = await prisma.employeeActivityLog.createMany({
       data: logsToCreate.map((log) => ({
@@ -83,6 +111,7 @@ export async function POST(request: NextRequest) {
         isIdle: log.isIdle,
         deviceName: log.deviceName || null,
         ipAddress: log.ipAddress || null,
+        screenshotUrl: screenshotUrl, // Add screenshot URL to all logs in this batch
       })),
     });
 
@@ -90,6 +119,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `تم حفظ ${created.count} سجل نشاط`,
       count: created.count,
+      screenshotUploaded: !!screenshotUrl,
     });
   } catch (error) {
     console.error("Activity log error:", error);

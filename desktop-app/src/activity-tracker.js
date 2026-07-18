@@ -1,15 +1,18 @@
 const activeWin = require('active-win');
 const os = require('os');
+const screenshot = require('screenshot-desktop');
 
 class ActivityTracker {
   constructor(apiClient) {
     this.apiClient = apiClient;
     this.trackingInterval = null;
     this.sendInterval = null;
+    this.screenshotInterval = null;
     this.activityQueue = [];
     this.currentActivity = null;
     this.lastActiveTime = Date.now();
     this.idleThreshold = 60000; // 1 minute
+    this.lastScreenshot = null;
   }
 
   start() {
@@ -24,6 +27,14 @@ class ActivityTracker {
     this.sendInterval = setInterval(() => {
       this.sendActivities();
     }, 60000);
+
+    // Take screenshot every 3 minutes
+    this.screenshotInterval = setInterval(() => {
+      this.takeScreenshot();
+    }, 180000); // 3 minutes
+
+    // Take first screenshot immediately
+    this.takeScreenshot();
   }
 
   stop() {
@@ -37,6 +48,11 @@ class ActivityTracker {
     if (this.sendInterval) {
       clearInterval(this.sendInterval);
       this.sendInterval = null;
+    }
+
+    if (this.screenshotInterval) {
+      clearInterval(this.screenshotInterval);
+      this.screenshotInterval = null;
     }
 
     // Send remaining activities
@@ -146,8 +162,11 @@ class ActivityTracker {
     console.log(`Sending ${activities.length} activities...`);
 
     try {
-      await this.apiClient.sendActivities(activities);
+      await this.apiClient.sendActivities(activities, this.lastScreenshot);
       console.log('Activities sent successfully');
+
+      // Clear screenshot after successful send
+      this.lastScreenshot = null;
     } catch (error) {
       console.error('Failed to send activities:', error);
       // Re-queue failed activities
@@ -215,6 +234,28 @@ class ActivityTracker {
       }
     }
     return '127.0.0.1';
+  }
+
+  async takeScreenshot() {
+    try {
+      console.log('Taking screenshot...');
+
+      // Take screenshot (returns buffer)
+      const imgBuffer = await screenshot({ format: 'jpg', quality: 60 });
+
+      // Convert buffer to base64
+      const base64Image = imgBuffer.toString('base64');
+
+      // Store screenshot to send with next activity batch
+      this.lastScreenshot = {
+        timestamp: new Date().toISOString(),
+        image: base64Image,
+      };
+
+      console.log('Screenshot captured successfully');
+    } catch (error) {
+      console.error('Failed to take screenshot:', error);
+    }
   }
 }
 

@@ -7,7 +7,7 @@ class ApiClient {
     this.authToken = authToken;
   }
 
-  async sendActivities(activities) {
+  async sendActivities(activities, screenshot = null) {
     const logs = activities.map((activity) => ({
       userId: this.userId,
       activityType: activity.activityType,
@@ -23,12 +23,19 @@ class ApiClient {
       authToken: this.authToken,
     }));
 
+    const payload = { logs };
+
+    // Add screenshot if available
+    if (screenshot) {
+      payload.screenshot = screenshot;
+    }
+
     const response = await fetch(`${this.apiUrl}/api/activity-logs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ logs }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();

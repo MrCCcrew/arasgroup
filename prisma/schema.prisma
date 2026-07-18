@@ -780,6 +780,7 @@ enum ActivityType {
   APPLICATION_USE  // استخدام برنامج
   IDLE             // عدم نشاط
   ACTIVE           // نشط
+  SCREENSHOT       // لقطة شاشة
 }
 
 model EmployeeActivityLog {
@@ -795,6 +796,7 @@ model EmployeeActivityLog {
   isIdle        Boolean      @default(false)
   deviceName    String?      // اسم الجهاز
   ipAddress     String?      // IP للجهاز
+  screenshotUrl String?      // لقطة الشاشة (R2 URL)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
