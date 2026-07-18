@@ -12,6 +12,16 @@ export type ExpiryAlertItem = {
   daysLeft: number;
   href: string;
   licenseName?: string;
+  employeeNumber?: string | null;
+  civilId?: string | null;
+  position?: string | null;
+  salary?: number | null;
+  investor?: string | null;
+  residencyLicenseName?: string | null;
+  workPermitLicenseName?: string | null;
+  phone?: string | null;
+  mainLicenseName?: string | null;
+  authorizedSigner?: string | null;
 };
 
 export type ExpiryAlertFilters = {

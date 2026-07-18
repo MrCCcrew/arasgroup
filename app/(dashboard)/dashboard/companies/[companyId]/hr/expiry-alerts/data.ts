@@ -24,15 +24,21 @@ const EMPLOYEE_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
 
 type EmployeeAlertRow = {
   id: string;
+  employeeNumber: string | null;
   nameAr: string;
+  civilId: string | null;
   type: string;
+  baseSalary: any;
+  phone: string | null;
   residencyExpiry: Date | null;
   licenseExpiry: Date | null;
   healthCardExpiryDate: Date | null;
   passportExpiryDate: Date | null;
   municipalityCardExpiryDate: Date | null;
   visaExpiryDate: Date | null;
-  license: { commercialNameAr: string } | null;
+  position: { nameAr: string; nameEn: string | null } | null;
+  investor: { nameAr: string; nameEn: string | null } | null;
+  license: { commercialNameAr: string; managerName: string | null } | null;
   residencyLicense: { commercialNameAr: string } | null;
   workPermitLicense: { commercialNameAr: string } | null;
 };
@@ -121,7 +127,19 @@ function makeAlert(
   expiryDate: Date,
   now: Date,
   href: string,
-  licenseName?: string,
+  extraData?: {
+    licenseName?: string;
+    employeeNumber?: string | null;
+    civilId?: string | null;
+    position?: string | null;
+    salary?: number | null;
+    investor?: string | null;
+    residencyLicenseName?: string | null;
+    workPermitLicenseName?: string | null;
+    phone?: string | null;
+    mainLicenseName?: string | null;
+    authorizedSigner?: string | null;
+  },
 ): ExpiryAlertItem {
   return {
     id: `${category}-${entityId}-${expiryType}-${expiryDate.toISOString().slice(0, 10)}`,
@@ -133,7 +151,7 @@ function makeAlert(
     expiryDate: expiryDate.toISOString(),
     daysLeft: daysLeft(expiryDate, now),
     href,
-    licenseName,
+    ...extraData,
   };
 }
 
@@ -171,15 +189,21 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
           where: employeeWhere,
           select: {
             id: true,
+            employeeNumber: true,
             nameAr: true,
+            civilId: true,
             type: true,
+            baseSalary: true,
+            phone: true,
             residencyExpiry: true,
             licenseExpiry: true,
             healthCardExpiryDate: true,
             passportExpiryDate: true,
             municipalityCardExpiryDate: true,
             visaExpiryDate: true,
-            license: { select: { commercialNameAr: true } },
+            position: { select: { nameAr: true, nameEn: true } },
+            investor: { select: { nameAr: true, nameEn: true } },
+            license: { select: { commercialNameAr: true, managerName: true } },
             residencyLicense: { select: { commercialNameAr: true } },
             workPermitLicense: { select: { commercialNameAr: true } },
           },
@@ -255,7 +279,19 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
             canUpdateEmployees
               ? `/dashboard/companies/${companyId}/hr/employees/${employee.id}/edit`
               : `/dashboard/companies/${companyId}/hr/employees/${employee.id}`,
-            licenseName,
+            {
+              licenseName,
+              employeeNumber: employee.employeeNumber,
+              civilId: employee.civilId,
+              position: employee.position ? (en ? employee.position.nameEn || employee.position.nameAr : employee.position.nameAr) : null,
+              salary: employee.baseSalary ? Number(employee.baseSalary) : null,
+              investor: employee.investor ? (en ? employee.investor.nameEn || employee.investor.nameAr : employee.investor.nameAr) : null,
+              residencyLicenseName: employee.residencyLicense?.commercialNameAr ?? null,
+              workPermitLicenseName: employee.workPermitLicense?.commercialNameAr ?? null,
+              phone: employee.phone,
+              mainLicenseName: employee.license?.commercialNameAr ?? null,
+              authorizedSigner: employee.license?.managerName ?? null,
+            },
           ),
         ];
       }),

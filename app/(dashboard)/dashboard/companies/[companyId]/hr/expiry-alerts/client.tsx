@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Car, FileText, Printer, Search, Users } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatKWD } from "@/lib/utils";
 import {
   applyAlertFilters,
   buildFilterQuery,
@@ -95,11 +95,21 @@ export function ExpiryAlertsClient({
     clear: en ? "Clear filters" : "مسح الفلاتر",
     result: en ? "result(s)" : "نتيجة",
     colSection: en ? "Section" : "القسم",
+    colEmployeeNo: en ? "Employee No." : "رقم الموظف",
     colItem: en ? "Item" : "العنصر",
+    colCivilId: en ? "Civil ID" : "الرقم المدني",
     colDetail: en ? "Detail" : "التفصيل",
     colLicense: en ? "License" : "الترخيص",
     colType: en ? "Expiry type" : "نوع الانتهاء",
     colDate: en ? "Expiry date" : "تاريخ الانتهاء",
+    colPosition: en ? "Position" : "الوظيفة",
+    colSalary: en ? "Salary" : "الراتب",
+    colInvestor: en ? "Investor" : "المسؤول",
+    colResidencyLicense: en ? "Residency license" : "ترخيص الإقامة",
+    colWorkPermit: en ? "Work permit" : "ترخيص العمل",
+    colPhone: en ? "Phone" : "التليفون",
+    colMainLicense: en ? "Main license" : "الترخيص الرئيسي",
+    colAuthorizedSigner: en ? "Authorized signer" : "المفوض بالتوقيع",
     colStatus: en ? "Status" : "الحالة",
     colAction: en ? "Action" : "الإجراء",
     noResults: en ? "No results match the current filters" : "لا توجد نتائج مطابقة للفلاتر الحالية",
@@ -249,50 +259,117 @@ export function ExpiryAlertsClient({
 
       <div className="section-card overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="ar-table text-sm">
-            <thead>
-              <tr>
-                <th>{t.colSection}</th>
-                <th>{t.colItem}</th>
-                <th>{t.colDetail}</th>
-                <th>{t.colLicense}</th>
-                <th>{t.colType}</th>
-                <th>{t.colDate}</th>
-                <th>{t.colStatus}</th>
-                <th>{t.colAction}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAlerts.length === 0 ? (
+          {filters.category === "employee" || (filters.category === "all" && filteredAlerts.some((a) => a.category === "employee")) ? (
+            <table className="ar-table text-sm">
+              <thead>
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                    {t.noResults}
-                  </td>
+                  <th>{t.colEmployeeNo}</th>
+                  <th>{t.colItem}</th>
+                  <th>{t.colCivilId}</th>
+                  <th>{t.colDate}</th>
+                  <th>{t.colPosition}</th>
+                  <th>{t.colSalary}</th>
+                  <th>{t.colInvestor}</th>
+                  <th>{t.colResidencyLicense}</th>
+                  <th>{t.colWorkPermit}</th>
+                  <th>{t.colPhone}</th>
+                  <th>{t.colMainLicense}</th>
+                  <th>{t.colAuthorizedSigner}</th>
+                  <th>{t.colType}</th>
+                  <th>{t.colStatus}</th>
+                  <th>{t.colAction}</th>
                 </tr>
-              ) : (
-                filteredAlerts.map((alert) => (
-                  <tr key={alert.id} className="hover:bg-muted/20">
-                    <td className="text-xs font-medium text-muted-foreground">
-                      {categoryLabel(alert.category)}
-                    </td>
-                    <td className="font-medium">{alert.title}</td>
-                    <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
-                    <td className="text-sm text-muted-foreground">{alert.licenseName || "—"}</td>
-                    <td>{alert.expiryType}</td>
-                    <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
-                    <td>
-                      <Badge days={alert.daysLeft} en={en} />
-                    </td>
-                    <td>
-                      <Link href={alert.href} className="text-primary hover:underline">
-                        {t.updateData}
-                      </Link>
+              </thead>
+              <tbody>
+                {filteredAlerts.filter((a) => a.category === "employee").length === 0 ? (
+                  <tr>
+                    <td colSpan={15} className="py-8 text-center text-muted-foreground">
+                      {t.noResults}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredAlerts
+                    .filter((a) => a.category === "employee")
+                    .map((alert) => (
+                      <tr key={alert.id} className="hover:bg-muted/20">
+                        <td className="number text-sm">{alert.employeeNumber || "—"}</td>
+                        <td className="font-medium">{alert.title}</td>
+                        <td className="number text-sm" dir="ltr">
+                          {alert.civilId || "—"}
+                        </td>
+                        <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
+                        <td className="text-sm">{alert.position || "—"}</td>
+                        <td className="number text-sm">{alert.salary ? formatKWD(alert.salary, numberLocale) : "—"}</td>
+                        <td className="text-sm">{alert.investor || "—"}</td>
+                        <td className="text-sm">{alert.residencyLicenseName || "—"}</td>
+                        <td className="text-sm">{alert.workPermitLicenseName || "—"}</td>
+                        <td className="number text-sm" dir="ltr">
+                          {alert.phone || "—"}
+                        </td>
+                        <td className="text-sm">{alert.mainLicenseName || "—"}</td>
+                        <td className="text-sm">{alert.authorizedSigner || "—"}</td>
+                        <td>{alert.expiryType}</td>
+                        <td>
+                          <Badge days={alert.daysLeft} en={en} />
+                        </td>
+                        <td>
+                          <Link href={alert.href} className="text-primary hover:underline">
+                            {t.updateData}
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          ) : null}
+
+          {filters.category !== "employee" && filteredAlerts.some((a) => a.category !== "employee") ? (
+            <table className="ar-table text-sm">
+              <thead>
+                <tr>
+                  <th>{t.colSection}</th>
+                  <th>{t.colItem}</th>
+                  <th>{t.colDetail}</th>
+                  <th>{t.colLicense}</th>
+                  <th>{t.colType}</th>
+                  <th>{t.colDate}</th>
+                  <th>{t.colStatus}</th>
+                  <th>{t.colAction}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAlerts.filter((a) => a.category !== "employee").length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      {t.noResults}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAlerts
+                    .filter((a) => a.category !== "employee")
+                    .map((alert) => (
+                      <tr key={alert.id} className="hover:bg-muted/20">
+                        <td className="text-xs font-medium text-muted-foreground">{categoryLabel(alert.category)}</td>
+                        <td className="font-medium">{alert.title}</td>
+                        <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
+                        <td className="text-sm text-muted-foreground">{alert.licenseName || "—"}</td>
+                        <td>{alert.expiryType}</td>
+                        <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
+                        <td>
+                          <Badge days={alert.daysLeft} en={en} />
+                        </td>
+                        <td>
+                          <Link href={alert.href} className="text-primary hover:underline">
+                            {t.updateData}
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          ) : null}
         </div>
       </div>
     </div>
