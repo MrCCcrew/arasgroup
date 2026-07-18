@@ -715,11 +715,17 @@ enum CompletedTaskStatus {
   DEFERRED
 }
 
+enum CompletedTaskType {
+  FIELD  // مهمة خارج الشركة (ميدانية)
+  OFFICE // مهمة داخل الشركة (مكتبية)
+}
+
 model CompletedTask {
   id             String              @id @default(cuid())
   userId         String
   companyId      String?
   branchId       String?
+  taskType       CompletedTaskType   @default(FIELD)
   titleAr        String
   titleEn        String?
   detailsAr      String?
@@ -735,6 +741,7 @@ model CompletedTask {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  items   CompletedTaskItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -743,9 +750,27 @@ model CompletedTask {
   @@index([companyId])
   @@index([branchId])
   @@index([status])
+  @@index([taskType])
   @@index([deferredToDate])
   @@index([createdAt])
   @@map("completed_tasks")
+}
+
+model CompletedTaskItem {
+  id          String   @id @default(cuid())
+  taskId      String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  sortOrder   Int      @default(0)
+
+  task CompletedTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId, sortOrder])
+  @@map("completed_task_items")
 }
 
 // ═══════════════════════════════════════════════════════════
