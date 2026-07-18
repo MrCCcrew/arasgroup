@@ -21,6 +21,7 @@ interface ActivityLog {
   durationSeconds: number | null;
   isIdle: boolean;
   deviceName: string | null;
+  screenshotUrl: string | null;
   user: User;
 }
 
@@ -267,6 +268,7 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
                     <th>الرابط</th>
                     <th>المدة</th>
                     <th>الجهاز</th>
+                    <th>لقطة الشاشة</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -309,6 +311,20 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
                         {log.durationSeconds ? formatSeconds(log.durationSeconds) : "—"}
                       </td>
                       <td className="text-xs text-muted-foreground">{log.deviceName || "—"}</td>
+                      <td>
+                        {log.screenshotUrl ? (
+                          <a
+                            href={log.screenshotUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-xs"
+                          >
+                            عرض 📸
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
