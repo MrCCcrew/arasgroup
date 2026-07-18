@@ -9,6 +9,7 @@ import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { RestoreEmployeeButton } from "@/components/hr/restore-employee-button";
 import { PermanentDeleteEmployeeButton } from "@/components/hr/permanent-delete-employee-button";
+import { EmployeeSearchBox } from "@/components/hr/employee-search-box";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -137,7 +138,15 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         ...categoryFilter,
         ...typeFilter,
         ...positionFilter,
-        ...(query.search ? { nameAr: { contains: query.search } } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { employeeNumber: { contains: query.search } },
+                { nameAr: { contains: query.search } },
+                { civilId: { contains: query.search } },
+              ],
+            }
+          : {}),
       },
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
@@ -311,6 +320,19 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             ))}
           </div>
         )}
+
+        <EmployeeSearchBox
+          companyId={companyId}
+          currentFilters={{
+            group: query.group,
+            status: query.status,
+            category: query.category,
+            type: query.type,
+            positionId: query.positionId,
+          }}
+          initialSearch={query.search || ""}
+          locale={locale}
+        />
 
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
