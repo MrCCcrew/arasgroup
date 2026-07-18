@@ -29,16 +29,28 @@ export async function POST(request: NextRequest) {
 
     // Handle both single log and batch logs
     const isBatch = Array.isArray(body.logs);
-    const parsed = isBatch ? batchLogsSchema.safeParse(body) : activityLogSchema.safeParse(body);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: "بيانات غير صالحة", details: parsed.error.errors },
-        { status: 400 }
-      );
+    let logsToCreate: z.infer<typeof activityLogSchema>[];
+
+    if (isBatch) {
+      const parsed = batchLogsSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, error: "بيانات غير صالحة", details: parsed.error.errors },
+          { status: 400 }
+        );
+      }
+      logsToCreate = parsed.data.logs;
+    } else {
+      const parsed = activityLogSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, error: "بيانات غير صالحة", details: parsed.error.errors },
+          { status: 400 }
+        );
+      }
+      logsToCreate = [parsed.data];
     }
-
-    const logsToCreate = isBatch ? parsed.data.logs : [parsed.data];
 
     // Verify auth token for the first log (all should have same user)
     const firstLog = logsToCreate[0];
