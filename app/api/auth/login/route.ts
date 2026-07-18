@@ -182,17 +182,21 @@ export async function POST(request: NextRequest) {
       console.error("Login audit log error:", error);
     }
 
+    // Return user data (compatible with both web and desktop app)
+    const userData = {
+      id: user.id,
+      email: user.email,
+      nameAr: user.nameAr,
+      nameEn: user.nameEn,
+      isSuperAdmin: user.isSuperAdmin,
+      roles: sessionUser.roles,
+      companyAccess: sessionUser.companyAccess,
+    };
+
     const response = NextResponse.json({
       success: true,
-      data: {
-        id: user.id,
-        email: user.email,
-        nameAr: user.nameAr,
-        nameEn: user.nameEn,
-        isSuperAdmin: user.isSuperAdmin,
-        roles: sessionUser.roles,
-        companyAccess: sessionUser.companyAccess,
-      },
+      data: userData,
+      user: userData, // For desktop app compatibility
     });
 
     response.cookies.set(COOKIE_NAME, token, {
