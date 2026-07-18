@@ -25,7 +25,16 @@ const BASE_COLS: ColDef[] = [
   { header: "اسم صاحب الترخيص",          key: "ownerOrInvestorNameAr",      width: 25, example: "محمد علي الكندي" },
   { header: "هاتف صاحب الترخيص",         key: "ownerOrInvestorPhone",       width: 14, example: "99001234" },
   { header: "اسم المدير",                 key: "managerName",                width: 20, example: "سعد محمد" },
+  { header: "الرقم المدني للمفوض بالتوقيع", key: "managerCivilId",           width: 22, example: "123456789012" },
   { header: "هاتف المدير",                key: "managerPhone",               width: 14, example: "65001234" },
+  { header: "الايميل",                    key: "email",                      width: 25, example: "info@example.com" },
+  { header: "الرقم الآلي للعنوان",        key: "automaticNumber",            width: 18, example: "12345" },
+  { header: "المحافظة",                   key: "governorate",                width: 16, example: "حولي" },
+  { header: "المنطقة",                    key: "area",                       width: 16, example: "السالمية" },
+  { header: "القطعة",                     key: "block",                      width: 12, example: "5" },
+  { header: "الشارع",                     key: "street",                     width: 16, example: "شارع 10" },
+  { header: "القسيمة",                    key: "plot",                       width: 12, example: "123" },
+  { header: "الوحدة",                     key: "unitNumber",                 width: 12, example: "A12" },
   { header: "قيمة الإيجار",              key: "rentAmount",                 width: 14, example: "500.000" },
   { header: "دورة الإيجار",              key: "rentCycle",                  width: 14, example: "شهري" },
   { header: "قيمة الاستثمار",            key: "investmentAmount",           width: 14, example: "1000.000" },
@@ -84,7 +93,18 @@ function rowToLicense(data: Record<string, string>) {
     ownerOrInvestorNameAr:        data.ownerOrInvestorNameAr || null,
     ownerOrInvestorPhone:         data.ownerOrInvestorPhone || null,
     managerName:                  data.managerName || null,
+    managerCivilId:               data.managerCivilId || null,
     managerPhone:                 data.managerPhone || null,
+    email:                        data.email || null,
+    address: {
+      automaticNumber: data.automaticNumber || null,
+      governorate:     data.governorate || null,
+      area:            data.area || null,
+      block:           data.block || null,
+      street:          data.street || null,
+      plot:            data.plot || null,
+      unitNumber:      data.unitNumber || null,
+    },
     rentAmount:                   data.rentAmount ? Number(data.rentAmount) : null,
     rentCycle:                    data.rentCycle || null,
     investmentAmount:             data.investmentAmount ? Number(data.investmentAmount) : null,
@@ -117,7 +137,16 @@ function licenseToRow(lic: Record<string, unknown>): Record<string, unknown> {
     ownerOrInvestorNameAr:        lic.ownerOrInvestorNameAr ?? "",
     ownerOrInvestorPhone:         lic.ownerOrInvestorPhone ?? "",
     managerName:                  lic.managerName ?? "",
+    managerCivilId:               lic.managerCivilId ?? "",
     managerPhone:                 lic.managerPhone ?? "",
+    email:                        lic.email ?? "",
+    automaticNumber:              (lic as { address?: { automaticNumber?: string | null } }).address?.automaticNumber ?? "",
+    governorate:                  (lic as { address?: { governorate?: string | null } }).address?.governorate ?? "",
+    area:                         (lic as { address?: { area?: string | null } }).address?.area ?? "",
+    block:                        (lic as { address?: { block?: string | null } }).address?.block ?? "",
+    street:                       (lic as { address?: { street?: string | null } }).address?.street ?? "",
+    plot:                         (lic as { address?: { plot?: string | null } }).address?.plot ?? "",
+    unitNumber:                   (lic as { address?: { unitNumber?: string | null } }).address?.unitNumber ?? "",
     rentAmount:                   lic.rentAmount ? Number(lic.rentAmount) : "",
     rentCycle:                    lic.rentCycle ?? "",
     investmentAmount:             lic.investmentAmount ? Number(lic.investmentAmount) : "",
@@ -199,6 +228,7 @@ export async function GET(request: NextRequest) {
         branch:   { select: { nameAr: true } },
         investor: { select: { nameAr: true } },
         mainLicense: { select: { licenseNumber: true } },
+        address: true,
       },
       orderBy: isCombinedInvestor
         ? [{ isMainLicense: "desc" }, { commercialNameAr: "asc" }]
@@ -332,18 +362,23 @@ export async function POST(request: NextRequest) {
       mainLicenseId = mainLic.id;
     }
 
+    const licenseData = rowToLicense(data);
+    const addressData = licenseData.address;
+    delete (licenseData as { address?: unknown }).address;
+
     const payload = {
       companyId,
       branchId,
       investorId,
       mainLicenseId,
       isMainLicense: rowIsMain,
-      ...rowToLicense(data),
+      ...licenseData,
     };
 
     try {
       const existing = await prisma.license.findFirst({
         where: { companyId, licenseNumber: data.licenseNumber },
+        select: { id: true, isMainLicense: true, investorId: true, licenseAddressId: true },
       });
       if (existing) {
         const canPromoteInvestorMain =
@@ -360,7 +395,31 @@ export async function POST(request: NextRequest) {
           });
           continue;
         }
-        const updated = await prisma.license.update({ where: { id: existing.id }, data: payload });
+
+        // تحديث أو إنشاء العنوان
+        let addressId = existing.licenseAddressId;
+        if (addressData) {
+          const hasAddressData = Object.values(addressData).some((v) => v !== null && v !== undefined && v !== "");
+
+          if (hasAddressData) {
+            if (addressId) {
+              await prisma.licenseAddress.update({
+                where: { id: addressId },
+                data: addressData as Record<string, unknown>,
+              });
+            } else {
+              const newAddress = await prisma.licenseAddress.create({
+                data: addressData as Record<string, unknown>,
+              });
+              addressId = newAddress.id;
+            }
+          }
+        }
+
+        const updated = await prisma.license.update({
+          where: { id: existing.id },
+          data: { ...payload, ...(addressId !== existing.licenseAddressId ? { licenseAddressId: addressId } : {}) },
+        });
         if (updated.isMainLicense) {
           const mapped = {
             id: updated.id,
@@ -376,7 +435,22 @@ export async function POST(request: NextRequest) {
         }
         result.updated++;
       } else {
-        const created = await prisma.license.create({ data: payload });
+        // إنشاء عنوان جديد إذا كان هناك بيانات
+        let addressId: string | null = null;
+        if (addressData) {
+          const hasAddressData = Object.values(addressData).some((v) => v !== null && v !== undefined && v !== "");
+
+          if (hasAddressData) {
+            const newAddress = await prisma.licenseAddress.create({
+              data: addressData as Record<string, unknown>,
+            });
+            addressId = newAddress.id;
+          }
+        }
+
+        const created = await prisma.license.create({
+          data: { ...payload, ...(addressId ? { licenseAddressId: addressId } : {}) },
+        });
         if (created.isMainLicense) {
           const mapped = {
             id: created.id,
