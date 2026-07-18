@@ -129,6 +129,9 @@ function toggleMonitoring() {
 }
 
 function updateTrayMenu() {
+  // Tray might not be created yet during initialization
+  if (!tray) return;
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'فتح',
