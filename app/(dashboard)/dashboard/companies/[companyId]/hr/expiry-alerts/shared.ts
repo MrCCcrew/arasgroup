@@ -40,6 +40,26 @@ export function severityFromDays(days: number): AlertSeverity {
   return "upcoming";
 }
 
+function parseDateDDMMYYYY(dateStr: string): Date | null {
+  if (!dateStr) return null;
+
+  // Try dd/mm/yyyy format
+  const parts = dateStr.split("/");
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+    const year = parseInt(parts[2], 10);
+
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      return new Date(year, month, day);
+    }
+  }
+
+  // Fallback to standard Date parsing (for ISO dates from URL)
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 export function buildStats(alerts: ExpiryAlertItem[]) {
   return alerts.reduce(
     (acc, alert) => {
@@ -64,14 +84,16 @@ export function applyAlertFilters(alerts: ExpiryAlertItem[], filters: ExpiryAler
     // Date range filter
     if (filters.dateFrom) {
       const alertDate = new Date(alert.expiryDate);
-      const fromDate = new Date(filters.dateFrom);
-      if (alertDate < fromDate) return false;
+      const fromDate = parseDateDDMMYYYY(filters.dateFrom);
+      if (fromDate && alertDate < fromDate) return false;
     }
     if (filters.dateTo) {
       const alertDate = new Date(alert.expiryDate);
-      const toDate = new Date(filters.dateTo);
-      toDate.setHours(23, 59, 59, 999); // Include the entire day
-      if (alertDate > toDate) return false;
+      const toDate = parseDateDDMMYYYY(filters.dateTo);
+      if (toDate) {
+        toDate.setHours(23, 59, 59, 999); // Include the entire day
+        if (alertDate > toDate) return false;
+      }
     }
 
     if (!search) return true;

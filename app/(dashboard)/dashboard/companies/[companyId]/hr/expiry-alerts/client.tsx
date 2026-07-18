@@ -220,19 +220,33 @@ export function ExpiryAlertsClient({
           </select>
 
           <input
-            type="date"
+            type="text"
             className="input-field text-sm"
-            placeholder={t.dateFrom}
+            placeholder="dd/mm/yyyy"
             value={filters.dateFrom}
-            onChange={(e) => setFilters((current) => ({ ...current, dateFrom: e.target.value }))}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Allow only numbers and slashes
+              if (value === "" || /^[\d/]*$/.test(value)) {
+                setFilters((current) => ({ ...current, dateFrom: value }));
+              }
+            }}
+            maxLength={10}
           />
 
           <input
-            type="date"
+            type="text"
             className="input-field text-sm"
-            placeholder={t.dateTo}
+            placeholder="dd/mm/yyyy"
             value={filters.dateTo}
-            onChange={(e) => setFilters((current) => ({ ...current, dateTo: e.target.value }))}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Allow only numbers and slashes
+              if (value === "" || /^[\d/]*$/.test(value)) {
+                setFilters((current) => ({ ...current, dateTo: value }));
+              }
+            }}
+            maxLength={10}
           />
         </div>
 

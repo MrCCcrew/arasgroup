@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, Printer } from "lucide-react";
 import Link from "next/link";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface Props {
   companyId: string;
@@ -22,6 +23,7 @@ interface Props {
 export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
+  const debouncedSearch = useDebounce(search, 300);
 
   const en = locale === "en";
   const t = {
@@ -36,22 +38,31 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
     setSearch(initialSearch);
   }, [initialSearch]);
 
-  function handleSearch(value: string) {
-    const params = new URLSearchParams();
-    if (currentFilters.group) params.set("group", currentFilters.group);
-    if (currentFilters.status) params.set("status", currentFilters.status);
-    if (currentFilters.category) params.set("category", currentFilters.category);
-    if (currentFilters.type) params.set("type", currentFilters.type);
-    if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
-    if (value.trim()) params.set("search", value.trim());
+  const handleSearch = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams();
+      if (currentFilters.group) params.set("group", currentFilters.group);
+      if (currentFilters.status) params.set("status", currentFilters.status);
+      if (currentFilters.category) params.set("category", currentFilters.category);
+      if (currentFilters.type) params.set("type", currentFilters.type);
+      if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
+      if (value.trim()) params.set("search", value.trim());
 
-    const query = params.toString();
-    router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
-  }
+      const query = params.toString();
+      router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
+    },
+    [companyId, currentFilters, router]
+  );
+
+  // Auto-search when debounced value changes
+  useEffect(() => {
+    if (debouncedSearch !== initialSearch) {
+      handleSearch(debouncedSearch);
+    }
+  }, [debouncedSearch, initialSearch, handleSearch]);
 
   function handleClear() {
     setSearch("");
-    handleSearch("");
   }
 
   return (
@@ -64,11 +75,6 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
             placeholder={t.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleSearch(search);
-              }
-            }}
           />
           {search && (
             <button
