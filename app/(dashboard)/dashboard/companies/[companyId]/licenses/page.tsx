@@ -39,9 +39,11 @@ const EMPTY = {
   issueDate: "", licenseExpiryDate: "",
   fireLicenseExpiryDate: "", healthLicenseExpiryDate: "", advertisingLicenseExpiryDate: "",
   investorId: "",
-  managerName: "", managerPhone: "",
+  managerName: "", managerCivilId: "", managerPhone: "", email: "",
   unifiedEntityNumber: "", civilEntityNumber: "",
   legalEntity: "", capital: "", commercialRegNo: "",
+  // Address fields
+  automaticNumber: "", governorate: "", area: "", block: "", street: "", plot: "", unitNumber: "",
   notes: "",
 };
 type Form = typeof EMPTY;
@@ -245,12 +247,23 @@ export default function LicensesPage() {
       fireLicenseExpiryDate:        form.fireLicenseExpiryDate        || null,
       healthLicenseExpiryDate:      form.healthLicenseExpiryDate      || null,
       advertisingLicenseExpiryDate: form.advertisingLicenseExpiryDate || null,
-      managerName: form.managerName || null, managerPhone: form.managerPhone || null,
+      managerName: form.managerName || null,
+      managerCivilId: form.managerCivilId || null,
+      managerPhone: form.managerPhone || null,
+      email: form.email || null,
       unifiedEntityNumber: form.unifiedEntityNumber || null,
       civilEntityNumber:   form.civilEntityNumber   || null,
       legalEntity: form.legalEntity || null,
       capital:     form.capital ? Number(form.capital) : null,
       commercialRegNo: form.commercialRegNo || null,
+      // Address fields
+      automaticNumber: form.automaticNumber || null,
+      governorate: form.governorate || null,
+      area: form.area || null,
+      block: form.block || null,
+      street: form.street || null,
+      plot: form.plot || null,
+      unitNumber: form.unitNumber || null,
       notes: form.notes || null,
     };
     const res  = await fetch("/api/licenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -631,16 +644,45 @@ export default function LicensesPage() {
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">المسؤول والأرقام الرسمية</p>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="form-label">اسم المدير</label>
+                <div><label className="form-label">اسم المفوض بالتوقيع</label>
                   <input className="input-field" placeholder="اسم المدير المسؤول" value={form.managerName} onChange={f("managerName")} /></div>
+                <div><label className="form-label">الرقم المدني للمفوض بالتوقيع</label>
+                  <input className="input-field" dir="ltr" value={form.managerCivilId} onChange={f("managerCivilId")} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div><label className="form-label">هاتف المدير</label>
                   <input className="input-field" dir="ltr" placeholder="+965XXXXXXXX" value={form.managerPhone} onChange={f("managerPhone")} /></div>
+                <div><label className="form-label">الايميل</label>
+                  <input type="email" className="input-field" dir="ltr" placeholder="email@example.com" value={form.email} onChange={f("email")} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="form-label">الرقم الموحد</label>
                   <input className="input-field" dir="ltr" value={form.unifiedEntityNumber} onChange={f("unifiedEntityNumber")} /></div>
                 <div><label className="form-label">رقم الجهة المدني</label>
                   <input className="input-field" dir="ltr" value={form.civilEntityNumber} onChange={f("civilEntityNumber")} /></div>
+              </div>
+            </div>
+
+            {/* بيانات العنوان */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">بيانات العنوان</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className="form-label">الرقم الآلي للعنوان</label>
+                  <input className="input-field" dir="ltr" value={form.automaticNumber} onChange={f("automaticNumber")} /></div>
+                <div><label className="form-label">المحافظة</label>
+                  <input className="input-field" value={form.governorate} onChange={f("governorate")} /></div>
+                <div><label className="form-label">المنطقة</label>
+                  <input className="input-field" value={form.area} onChange={f("area")} /></div>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <div><label className="form-label">القطعة</label>
+                  <input className="input-field" value={form.block} onChange={f("block")} /></div>
+                <div><label className="form-label">الشارع</label>
+                  <input className="input-field" value={form.street} onChange={f("street")} /></div>
+                <div><label className="form-label">القسيمة</label>
+                  <input className="input-field" value={form.plot} onChange={f("plot")} /></div>
+                <div><label className="form-label">الوحدة</label>
+                  <input className="input-field" value={form.unitNumber} onChange={f("unitNumber")} /></div>
               </div>
             </div>
 

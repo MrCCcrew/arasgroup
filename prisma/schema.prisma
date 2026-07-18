@@ -2422,7 +2422,9 @@ model License {
   totalInvestmentCycle       String?
   investmentRenewalDate      DateTime?
   managerName                String?
+  managerCivilId             String?
   managerPhone               String?
+  email                      String?
   fireLicenseExpiryDate      DateTime?
   healthLicenseExpiryDate    DateTime?
   advertisingLicenseExpiryDate DateTime?
