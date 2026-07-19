@@ -362,126 +362,6 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {/* Residency License filter */}
-        {licenses.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildEmployeesHref(companyId, {
-                group: query.group,
-                status: query.status,
-                category: query.category,
-                search: query.search,
-                type: query.type,
-                positionId: query.positionId,
-                workPermitLicenseId: query.workPermitLicenseId,
-                mainLicenseId: query.mainLicenseId,
-              })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.residencyLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-            >
-              {locale === "en" ? "All residency licenses" : "كل تراخيص الإقامة"}
-            </Link>
-            {licenses.map((l) => (
-              <Link
-                key={l.id}
-                href={buildEmployeesHref(companyId, {
-                  group: query.group,
-                  status: query.status,
-                  category: query.category,
-                  search: query.search,
-                  type: query.type,
-                  positionId: query.positionId,
-                  residencyLicenseId: l.id,
-                  workPermitLicenseId: query.workPermitLicenseId,
-                  mainLicenseId: query.mainLicenseId,
-                })}
-                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.residencyLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-              >
-                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {/* Work Permit License filter */}
-        {licenses.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildEmployeesHref(companyId, {
-                group: query.group,
-                status: query.status,
-                category: query.category,
-                search: query.search,
-                type: query.type,
-                positionId: query.positionId,
-                residencyLicenseId: query.residencyLicenseId,
-                mainLicenseId: query.mainLicenseId,
-              })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.workPermitLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-            >
-              {locale === "en" ? "All work permit licenses" : "كل تراخيص العمل"}
-            </Link>
-            {licenses.map((l) => (
-              <Link
-                key={l.id}
-                href={buildEmployeesHref(companyId, {
-                  group: query.group,
-                  status: query.status,
-                  category: query.category,
-                  search: query.search,
-                  type: query.type,
-                  positionId: query.positionId,
-                  residencyLicenseId: query.residencyLicenseId,
-                  workPermitLicenseId: l.id,
-                  mainLicenseId: query.mainLicenseId,
-                })}
-                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.workPermitLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-              >
-                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {/* Main License filter */}
-        {licenses.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildEmployeesHref(companyId, {
-                group: query.group,
-                status: query.status,
-                category: query.category,
-                search: query.search,
-                type: query.type,
-                positionId: query.positionId,
-                residencyLicenseId: query.residencyLicenseId,
-                workPermitLicenseId: query.workPermitLicenseId,
-              })}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.mainLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-            >
-              {locale === "en" ? "All main licenses" : "كل التراخيص الرئيسية"}
-            </Link>
-            {licenses.map((l) => (
-              <Link
-                key={l.id}
-                href={buildEmployeesHref(companyId, {
-                  group: query.group,
-                  status: query.status,
-                  category: query.category,
-                  search: query.search,
-                  type: query.type,
-                  positionId: query.positionId,
-                  residencyLicenseId: query.residencyLicenseId,
-                  workPermitLicenseId: query.workPermitLicenseId,
-                  mainLicenseId: l.id,
-                })}
-                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.mainLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-              >
-                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-              </Link>
-            ))}
-          </div>
-        )}
-
         <EmployeeQuickSearch
           companyId={companyId}
           printHref={printHref}
@@ -494,9 +374,11 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             residencyLicenseId: query.residencyLicenseId,
             workPermitLicenseId: query.workPermitLicenseId,
             mainLicenseId: query.mainLicenseId,
+            search: query.search,
           }}
           initialSearch={query.search || ""}
           locale={locale}
+          licenses={licenses}
         />
 
         <div className="overflow-hidden rounded-xl border bg-card">

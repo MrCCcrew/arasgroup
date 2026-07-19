@@ -21,9 +21,10 @@ interface Props {
   };
   initialSearch: string;
   locale: "ar" | "en";
+  licenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
 }
 
-export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale }: Props) {
+export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, licenses }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 300);
@@ -35,7 +36,41 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
       : "بحث بالاسم أو رقم الموظف أو الرقم المدني...",
     clear: en ? "Clear" : "مسح",
     printPdf: en ? "Print PDF (filtered)" : "طباعة PDF حسب الفلتر",
+    residencyLicense: en ? "Residency License" : "ترخيص الإقامة",
+    workPermitLicense: en ? "Work Permit License" : "ترخيص العمل",
+    mainLicense: en ? "Main License" : "الترخيص الرئيسي",
+    allLicenses: en ? "All" : "الكل",
   };
+
+  const handleLicenseFilter = useCallback(
+    (type: 'residency' | 'workPermit' | 'main', value: string) => {
+      const params = new URLSearchParams();
+      if (currentFilters.group) params.set("group", currentFilters.group);
+      if (currentFilters.status) params.set("status", currentFilters.status);
+      if (currentFilters.category) params.set("category", currentFilters.category);
+      if (currentFilters.type) params.set("type", currentFilters.type);
+      if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
+      if (currentFilters.search) params.set("search", currentFilters.search);
+
+      if (type === 'residency') {
+        if (value) params.set("residencyLicenseId", value);
+        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
+        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
+      } else if (type === 'workPermit') {
+        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
+        if (value) params.set("workPermitLicenseId", value);
+        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
+      } else {
+        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
+        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
+        if (value) params.set("mainLicenseId", value);
+      }
+
+      const query = params.toString();
+      router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
+    },
+    [companyId, currentFilters, router]
+  );
 
   useEffect(() => {
     setSearch(initialSearch);
@@ -91,6 +126,58 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
             </button>
           )}
         </div>
+
+        {licenses.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{t.residencyLicense}</label>
+              <select
+                className="input-field w-full text-sm"
+                value={currentFilters.residencyLicenseId || ""}
+                onChange={(e) => handleLicenseFilter('residency', e.target.value)}
+              >
+                <option value="">{t.allLicenses}</option>
+                {licenses.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{t.workPermitLicense}</label>
+              <select
+                className="input-field w-full text-sm"
+                value={currentFilters.workPermitLicenseId || ""}
+                onChange={(e) => handleLicenseFilter('workPermit', e.target.value)}
+              >
+                <option value="">{t.allLicenses}</option>
+                {licenses.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{t.mainLicense}</label>
+              <select
+                className="input-field w-full text-sm"
+                value={currentFilters.mainLicenseId || ""}
+                onChange={(e) => handleLicenseFilter('main', e.target.value)}
+              >
+                <option value="">{t.allLicenses}</option>
+                {licenses.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
