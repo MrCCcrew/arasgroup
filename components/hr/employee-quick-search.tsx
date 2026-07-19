@@ -18,14 +18,16 @@ interface Props {
     residencyLicenseId?: string;
     workPermitLicenseId?: string;
     mainLicenseId?: string;
+    subLicenseId?: string;
     search?: string;
   };
   initialSearch: string;
   locale: "ar" | "en";
-  licenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
+  mainLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
+  subLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
 }
 
-export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, licenses }: Props) {
+export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, mainLicenses, subLicenses }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 300);
@@ -40,11 +42,12 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
     residencyLicense: en ? "Residency License" : "ترخيص الإقامة",
     workPermitLicense: en ? "Work Permit License" : "ترخيص العمل",
     mainLicense: en ? "Main License" : "الترخيص الرئيسي",
+    subLicense: en ? "Sub License" : "الترخيص الفرعي",
     allLicenses: en ? "All" : "الكل",
   };
 
   const handleLicenseFilter = useCallback(
-    (type: 'residency' | 'workPermit' | 'main', value: string) => {
+    (type: 'residency' | 'workPermit' | 'main' | 'sub', value: string) => {
       const params = new URLSearchParams();
       if (currentFilters.group) params.set("group", currentFilters.group);
       if (currentFilters.status) params.set("status", currentFilters.status);
@@ -57,14 +60,22 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
         if (value) params.set("residencyLicenseId", value);
         if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
         if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
+        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
       } else if (type === 'workPermit') {
         if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
         if (value) params.set("workPermitLicenseId", value);
         if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
-      } else {
+        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
+      } else if (type === 'main') {
         if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
         if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
         if (value) params.set("mainLicenseId", value);
+        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
+      } else {
+        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
+        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
+        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
+        if (value) params.set("subLicenseId", value);
       }
 
       const query = params.toString();
@@ -128,38 +139,40 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
           )}
         </div>
 
-        {licenses.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">{t.residencyLicense}</label>
-              <select
-                className="input-field w-full text-sm"
-                value={currentFilters.residencyLicenseId || ""}
-                onChange={(e) => handleLicenseFilter('residency', e.target.value)}
-              >
-                <option value="">{t.allLicenses}</option>
-                {licenses.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {(mainLicenses.length > 0 || subLicenses.length > 0) && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 col-span-2">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">{t.residencyLicense}</label>
+                <select
+                  className="input-field w-full text-sm"
+                  value={currentFilters.residencyLicenseId || ""}
+                  onChange={(e) => handleLicenseFilter('residency', e.target.value)}
+                >
+                  <option value="">{t.allLicenses}</option>
+                  {mainLicenses.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">{t.workPermitLicense}</label>
-              <select
-                className="input-field w-full text-sm"
-                value={currentFilters.workPermitLicenseId || ""}
-                onChange={(e) => handleLicenseFilter('workPermit', e.target.value)}
-              >
-                <option value="">{t.allLicenses}</option>
-                {licenses.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">{t.workPermitLicense}</label>
+                <select
+                  className="input-field w-full text-sm"
+                  value={currentFilters.workPermitLicenseId || ""}
+                  onChange={(e) => handleLicenseFilter('workPermit', e.target.value)}
+                >
+                  <option value="">{t.allLicenses}</option>
+                  {mainLicenses.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -170,7 +183,23 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
                 onChange={(e) => handleLicenseFilter('main', e.target.value)}
               >
                 <option value="">{t.allLicenses}</option>
-                {licenses.map((l) => (
+                {mainLicenses.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">{t.subLicense}</label>
+              <select
+                className="input-field w-full text-sm"
+                value={currentFilters.subLicenseId || ""}
+                onChange={(e) => handleLicenseFilter('sub', e.target.value)}
+              >
+                <option value="">{t.allLicenses}</option>
+                {subLicenses.map((l) => (
                   <option key={l.id} value={l.id}>
                     {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
                   </option>

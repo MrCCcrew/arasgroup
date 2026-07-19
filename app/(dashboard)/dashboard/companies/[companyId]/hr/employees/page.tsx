@@ -23,6 +23,7 @@ interface Props {
     residencyLicenseId?: string;
     workPermitLicenseId?: string;
     mainLicenseId?: string;
+    subLicenseId?: string;
   }>;
 }
 
@@ -70,6 +71,7 @@ function buildEmployeesHref(
     residencyLicenseId?: string;
     workPermitLicenseId?: string;
     mainLicenseId?: string;
+    subLicenseId?: string;
   } = {},
 ) {
   const searchParams = new URLSearchParams();
@@ -82,6 +84,7 @@ function buildEmployeesHref(
   if (params.residencyLicenseId) searchParams.set("residencyLicenseId", params.residencyLicenseId);
   if (params.workPermitLicenseId) searchParams.set("workPermitLicenseId", params.workPermitLicenseId);
   if (params.mainLicenseId) searchParams.set("mainLicenseId", params.mainLicenseId);
+  if (params.subLicenseId) searchParams.set("subLicenseId", params.subLicenseId);
 
   const query = searchParams.toString();
   return `/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`;
@@ -147,7 +150,13 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       }
     : {};
 
-  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, licenses, employees] = await Promise.all([
+  const subLicenseFilter = query.subLicenseId
+    ? {
+        licenseId: query.subLicenseId,
+      }
+    : {};
+
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, mainLicenses, subLicenses, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
     prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
@@ -159,7 +168,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       orderBy: { sortOrder: "asc" },
     }),
     prisma.license.findMany({
-      where: { companyId },
+      where: { companyId, isMainLicense: true },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true },
+      orderBy: { commercialNameAr: "asc" },
+    }),
+    prisma.license.findMany({
+      where: { companyId, isMainLicense: false },
       select: { id: true, commercialNameAr: true, commercialNameEn: true },
       orderBy: { commercialNameAr: "asc" },
     }),
@@ -173,6 +187,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         ...residencyLicenseFilter,
         ...workPermitLicenseFilter,
         ...mainLicenseFilter,
+        ...subLicenseFilter,
         ...(query.search
           ? {
               OR: [
@@ -335,6 +350,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                 residencyLicenseId: query.residencyLicenseId,
                 workPermitLicenseId: query.workPermitLicenseId,
                 mainLicenseId: query.mainLicenseId,
+                subLicenseId: query.subLicenseId,
               })}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.positionId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
@@ -353,6 +369,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   residencyLicenseId: query.residencyLicenseId,
                   workPermitLicenseId: query.workPermitLicenseId,
                   mainLicenseId: query.mainLicenseId,
+                  subLicenseId: query.subLicenseId,
                 })}
                 className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.positionId === p.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               >
@@ -374,11 +391,13 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             residencyLicenseId: query.residencyLicenseId,
             workPermitLicenseId: query.workPermitLicenseId,
             mainLicenseId: query.mainLicenseId,
+            subLicenseId: query.subLicenseId,
             search: query.search,
           }}
           initialSearch={query.search || ""}
           locale={locale}
-          licenses={licenses}
+          mainLicenses={mainLicenses}
+          subLicenses={subLicenses}
         />
 
         <div className="overflow-hidden rounded-xl border bg-card">
