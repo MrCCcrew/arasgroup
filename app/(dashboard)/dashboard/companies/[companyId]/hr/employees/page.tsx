@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
-import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
+import { daysUntilExpiry, formatDate, formatDateShort, formatKWD } from "@/lib/utils";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { RestoreEmployeeButton } from "@/components/hr/restore-employee-button";
 import { PermanentDeleteEmployeeButton } from "@/components/hr/permanent-delete-employee-button";
@@ -85,7 +85,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   if (!session) redirect("/login");
 
   const locale = await getLocale();
-  const numberLocale = locale === "en" ? "en-US" : "ar-KW";
+  const numberLocale = "en-US"; // Always use English numbers for salary
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
   const getTypeLabel = (type: EmployeeType) => typeLabels[locale][type];
   const showingDeleted = query.status === "deleted";
@@ -345,7 +345,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Civil ID" : "الرقم المدني"}</th>
                   <th>{locale === "en" ? "Residency expiry" : "تاريخ انتهاء الإقامة"}</th>
                   <th>{locale === "en" ? "Position" : "الوظيفة"}</th>
-                  <th>{locale === "en" ? "Salary" : "الراتب"}</th>
+                  <th>{locale === "en" ? "Salary (KD)" : "الراتب (د.ك)"}</th>
                   {showInvestorColumn ? <th>{locale === "en" ? "Investor" : "المسئول"}</th> : null}
                   <th>{locale === "en" ? "Residency license" : "ترخيص الإقامة"}</th>
                   <th>{locale === "en" ? "Work permit license" : "ترخيص العمل"}</th>
@@ -405,7 +405,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
 
                         {/* 4. تاريخ انتهاء الإقامة */}
                         <td className="text-sm">
-                          {employee.residencyExpiry ? formatDate(employee.residencyExpiry, dateLocale) : locale === "en" ? "Not set" : "غير محدد"}
+                          {employee.residencyExpiry ? formatDateShort(employee.residencyExpiry, "en-US") : locale === "en" ? "Not set" : "غير محدد"}
                         </td>
 
                         {/* 5. الوظيفة */}
@@ -476,7 +476,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
 
                         {/* تاريخ الحذف (conditional) */}
                         {showingDeleted ? (
-                          <td className="text-sm">{employee.deletedAt ? formatDate(employee.deletedAt, dateLocale) : "—"}</td>
+                          <td className="text-sm">{employee.deletedAt ? formatDateShort(employee.deletedAt, "en-US") : "—"}</td>
                         ) : null}
 
                         {/* الإجراءات */}
