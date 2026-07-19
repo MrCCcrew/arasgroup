@@ -28,10 +28,10 @@ class ActivityTracker {
       this.sendActivities();
     }, 60000);
 
-    // Take screenshot every 3 minutes
+    // Take screenshot every 1.5 minutes
     this.screenshotInterval = setInterval(() => {
       this.takeScreenshot();
-    }, 180000); // 3 minutes
+    }, 90000); // 1.5 minutes
 
     // Take first screenshot immediately
     this.takeScreenshot();

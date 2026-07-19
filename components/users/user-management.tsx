@@ -613,6 +613,23 @@ export function UserManagement({
     try {
       const response = await fetch(`/api/users/${userId}`, { method: "DELETE" });
       const result = await response.json();
+
+      // إذا كان المستخدم لديه سجلات مرتبطة
+      if (!response.ok && result.hasRelatedRecords) {
+        const recordsList = result.records
+          .map((r: { nameAr: string; count: number }) => `• ${r.nameAr}: ${r.count}`)
+          .join("\n");
+
+        const message = text(
+          `لا يمكن حذف المستخدم لوجود ${result.totalRecords} سجل مرتبط:\n\n${recordsList}\n\nيجب حذف هذه السجلات أولاً من الأقسام المعنية`,
+          `Cannot delete user - ${result.totalRecords} related records found:\n\n${recordsList}\n\nPlease delete these records first from their respective sections`
+        );
+
+        alert(message);
+        setError(result.message);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(result.error ?? text("تعذر حذف المستخدم", "Failed to delete user"));
       }

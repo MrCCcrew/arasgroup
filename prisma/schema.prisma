@@ -527,13 +527,13 @@ model JournalEntry {
   approvedAt   DateTime?
   postedById   String?
   postedAt     DateTime?
-  createdById  String
+  createdById  String?
 
   company    Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   fiscalYear FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
   costCenter CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  createdBy  User         @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy User?        @relation("JournalApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  createdBy  User?        @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy User?        @relation("JournalApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   lines      JournalEntryLine[]
   attachments Attachment[]
   auditLogs  AuditLog[]
@@ -654,7 +654,7 @@ model Attachment {
   filePath       String
   refModule      String
   refId          String
-  uploadedById   String
+  uploadedById   String?
   journalEntryId String?
   mimeType       String?
   storagePath    String?
@@ -666,7 +666,7 @@ model Attachment {
 
   company      Company?       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   branch       Branch?        @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  uploadedBy   User           @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  uploadedBy   User?          @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
   journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -683,7 +683,7 @@ model Attachment {
 
 model AuditLog {
   id             String  @id @default(cuid())
-  userId         String
+  userId         String?
   action         String
   module         String
   resourceId     String
@@ -696,7 +696,7 @@ model AuditLog {
   userAgent      String?
   journalEntryId String?
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -1299,14 +1299,14 @@ model DriverVehicleAssignment {
   assignedTo    DateTime?
   isActive      Boolean  @default(true)
   notes         String?
-  createdById   String
+  createdById   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
   driver    Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  createdBy User    @relation("DriverVehicleAssignmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy User?   @relation("DriverVehicleAssignmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([driverId])
@@ -1997,7 +1997,7 @@ model AssetCustody {
   returnedDate         DateTime?
   conditionOnAssign    AssetCondition?
   conditionOnReturn    AssetCondition?
-  assignedById         String
+  assignedById         String?
   returnedToId         String?
   status               AssetCustodyStatus       @default(ACTIVE)
   notes                String?
@@ -2005,8 +2005,8 @@ model AssetCustody {
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   branch         Branch?         @relation(fields: [branchId], references: [id], onDelete: Restrict)
   assetItem      AssetItem       @relation(fields: [assetItemId], references: [id], onDelete: Restrict)
-  assignedBy     User            @relation("AssetCustodyAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
-  returnedTo     User?           @relation("AssetCustodyReturnedBy", fields: [returnedToId], references: [id], onDelete: Restrict)
+  assignedBy     User?           @relation("AssetCustodyAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  returnedTo     User?           @relation("AssetCustodyReturnedBy", fields: [returnedToId], references: [id], onDelete: SetNull)
   employee       Employee?       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   driver         Driver?         @relation(fields: [driverId], references: [id], onDelete: Restrict)
   vehicle        Vehicle?        @relation("AssetCustodyVehicle", fields: [vehicleId], references: [id], onDelete: Restrict)
@@ -3395,12 +3395,12 @@ model TalabatReportImport {
   totalPayment                Decimal  @default(0) @db.Decimal(12, 3)
   contractSummaryFinalPayment Decimal? @db.Decimal(12, 3)
   notes                       String?
-  createdById                 String
+  createdById                 String?
   postedAt                    DateTime?
 
   company  Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
   contract DeliveryContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
-  createdBy User            @relation("TalabatImportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy User?           @relation("TalabatImportCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   riders   TalabatReportImportRider[]
   fleetItems TalabatReportFleetItem[]
 
@@ -3508,12 +3508,12 @@ model TalabatReportAllocation {
   allocatedOrders      Decimal  @db.Decimal(12, 3)
   percentage           Decimal? @db.Decimal(6, 3)
   notes                String?
-  createdById          String
+  createdById          String?
 
   importRider          TalabatReportImportRider    @relation(fields: [importRiderId], references: [id], onDelete: Cascade)
   platformIdentifier   DriverPlatformIdentifier?   @relation(fields: [platformIdentifierId], references: [id], onDelete: SetNull)
   driver               Driver                      @relation("TalabatAllocationDriver", fields: [driverId], references: [id], onDelete: Restrict)
-  createdBy            User                        @relation("TalabatAllocationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy            User?                       @relation("TalabatAllocationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

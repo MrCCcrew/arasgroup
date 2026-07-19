@@ -12,6 +12,9 @@
   "build": {
     "appId": "com.rashidgroup.fullcontrol",
     "productName": "نظام التحكم الكامل",
+    "directories": {
+      "output": "build-with-icon"
+    },
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"

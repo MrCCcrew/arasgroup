@@ -22,6 +22,7 @@ body {
   padding: 48px 40px 40px;
   width: 100%;
   max-width: 440px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 build/
+build-output/
+build-with-icon/
+final-build/
+release/
 *.log
 .DS_Store
 Thumbs.db

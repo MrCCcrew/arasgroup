@@ -54,6 +54,7 @@ interface NavItem {
   iconColor?: string;
   module?: Module;
   children?: NavItem[];
+  adminOnly?: boolean;
 }
 
 // Section color schemes
@@ -82,7 +83,7 @@ const GROUP_NAV: NavItem[] = [
   { href: "/dashboard/companies", labelKey: "nav.companies", icon: <Building2 size={16} />, iconColor: "teal" },
   { href: "/dashboard/users", labelKey: "nav.users", icon: <Users size={16} />, iconColor: "violet", module: "USERS" },
   { href: "/dashboard/completed-tasks", labelKey: "nav.completedTasks", icon: <ClipboardCheck size={16} />, iconColor: "green", module: "TASKS" },
-  { href: "/dashboard/activity-monitor", labelKey: "nav.activityMonitor", icon: <Monitor size={16} />, iconColor: "purple" },
+  { href: "/dashboard/activity-monitor", labelKey: "nav.activityMonitor", icon: <Monitor size={16} />, iconColor: "purple", adminOnly: true },
   { href: "/dashboard/reminders", labelKey: "nav.reminders", icon: <AlarmClock size={16} />, iconColor: "amber" },
   { href: "/dashboard/settings", labelKey: "nav.settings", icon: <Settings size={16} />, iconColor: "slate", module: "SETTINGS" },
   { href: "/dashboard/notifications", labelKey: "nav.notifications", icon: <Bell size={16} />, iconColor: "rose", module: "NOTIFICATIONS" },
@@ -340,15 +341,17 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          {navItems.map((item) => (
-            <NavItemComponent
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              isExpanded={expandedItems.includes(item.href)}
-              onToggle={() => toggleExpand(item.href)}
-            />
-          ))}
+          {navItems
+            .filter((item) => !item.adminOnly || session.isSuperAdmin)
+            .map((item) => (
+              <NavItemComponent
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                isExpanded={expandedItems.includes(item.href)}
+                onToggle={() => toggleExpand(item.href)}
+              />
+            ))}
         </nav>
 
         <div className="space-y-1 border-t border-sidebar-border p-3">

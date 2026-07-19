@@ -212,10 +212,12 @@ export default async function JournalEntryDetailPage({ params }: Props) {
                 <p className="font-medium">{entry.costCenter.nameAr}</p>
               </div>
             )}
-            <div>
-              <p className="mb-1 text-xs text-muted-foreground">{t.createdBy}</p>
-              <p className="text-sm">{entry.createdBy.nameAr}</p>
-            </div>
+            {entry.createdBy && (
+              <div>
+                <p className="mb-1 text-xs text-muted-foreground">{t.createdBy}</p>
+                <p className="text-sm">{entry.createdBy.nameAr}</p>
+              </div>
+            )}
             {entry.approvedBy && (
               <div>
                 <p className="mb-1 text-xs text-muted-foreground">{t.approvedBy}</p>

@@ -104,6 +104,88 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
   }
 
+  // ── تحقق من السجلات المرتبطة بالمستخدم ────────────────────────
+  const relatedRecords = await prisma.$transaction(async (tx) => {
+    const [
+      journalEntries,
+      attachments,
+      auditLogs,
+      driverAssignments,
+      assetCustodies,
+      talabatImports,
+      talabatAllocations,
+      activityLogs,
+    ] = await Promise.all([
+      tx.journalEntry.count({ where: { createdById: userId } }),
+      tx.attachment.count({ where: { uploadedById: userId } }),
+      tx.auditLog.count({ where: { userId } }),
+      tx.driverVehicleAssignment.count({ where: { createdById: userId } }),
+      tx.assetCustody.count({
+        where: {
+          OR: [
+            { assignedById: userId },
+            { returnedToId: userId }
+          ]
+        }
+      }),
+      tx.talabatReportImport.count({ where: { createdById: userId } }),
+      tx.talabatReportAllocation.count({ where: { createdById: userId } }),
+      tx.employeeActivityLog.count({ where: { userId } }),
+    ]);
+
+    return {
+      journalEntries,
+      attachments,
+      auditLogs,
+      driverAssignments,
+      assetCustodies,
+      talabatImports,
+      talabatAllocations,
+      activityLogs,
+    };
+  });
+
+  // حساب إجمالي السجلات
+  const totalRecords = Object.values(relatedRecords).reduce((sum, count) => sum + count, 0);
+
+  // إذا كان هناك سجلات، أرجع قائمة بها
+  if (totalRecords > 0) {
+    const recordsList = [];
+    if (relatedRecords.journalEntries > 0) {
+      recordsList.push({ type: "journalEntries", nameAr: "قيود يومية", count: relatedRecords.journalEntries });
+    }
+    if (relatedRecords.attachments > 0) {
+      recordsList.push({ type: "attachments", nameAr: "مرفقات", count: relatedRecords.attachments });
+    }
+    if (relatedRecords.auditLogs > 0) {
+      recordsList.push({ type: "auditLogs", nameAr: "سجلات التدقيق", count: relatedRecords.auditLogs });
+    }
+    if (relatedRecords.driverAssignments > 0) {
+      recordsList.push({ type: "driverAssignments", nameAr: "تعيينات سائقين", count: relatedRecords.driverAssignments });
+    }
+    if (relatedRecords.assetCustodies > 0) {
+      recordsList.push({ type: "assetCustodies", nameAr: "عهدة أصول", count: relatedRecords.assetCustodies });
+    }
+    if (relatedRecords.talabatImports > 0) {
+      recordsList.push({ type: "talabatImports", nameAr: "تقارير طلبات", count: relatedRecords.talabatImports });
+    }
+    if (relatedRecords.talabatAllocations > 0) {
+      recordsList.push({ type: "talabatAllocations", nameAr: "توزيعات طلبات", count: relatedRecords.talabatAllocations });
+    }
+    if (relatedRecords.activityLogs > 0) {
+      recordsList.push({ type: "activityLogs", nameAr: "سجلات النشاط", count: relatedRecords.activityLogs });
+    }
+
+    return NextResponse.json({
+      success: false,
+      hasRelatedRecords: true,
+      totalRecords,
+      records: recordsList,
+      message: "لا يمكن حذف المستخدم لوجود سجلات مرتبطة به",
+    }, { status: 400 });
+  }
+
+  // إذا لم يكن هناك سجلات، احذف المستخدم
   try {
     await prisma.$transaction(async (tx) => {
       await tx.user.delete({ where: { id: userId } });

@@ -11,8 +11,8 @@ const COOKIE_NAME = "rashid_erp_session";
 const EXPIRES_IN = 7 * 24 * 60 * 60;
 
 // ── كاش الجلسة في الذاكرة — يمنع query ثقيل عند كل request ─────
-// TTL دقيقتان: سريع + يضمن انعكاس تغييرات الصلاحيات في وقت معقول
-const SESSION_CACHE_TTL = 2 * 60 * 1000; // 2 min in ms
+// TTL 30 ثانية: يضمن تحديث سريع للصلاحيات بعد التعديل
+const SESSION_CACHE_TTL = 30 * 1000; // 30 seconds in ms
 const sessionCache = new Map<string, { data: SessionUser; expiresAt: number }>();
 
 function getCached(userId: string, locale?: string): SessionUser | null {
