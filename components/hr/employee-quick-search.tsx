@@ -18,6 +18,7 @@ interface Props {
     residencyLicenseId?: string;
     workPermitLicenseId?: string;
     mainLicenseId?: string;
+    search?: string;
   };
   initialSearch: string;
   locale: "ar" | "en";
