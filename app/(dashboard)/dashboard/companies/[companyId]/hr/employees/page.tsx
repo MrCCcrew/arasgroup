@@ -64,6 +64,9 @@ function buildEmployeesHref(
     status?: string;
     category?: string;
     search?: string;
+    residencyLicenseId?: string;
+    workPermitLicenseId?: string;
+    mainLicenseId?: string;
   } = {},
 ) {
   const searchParams = new URLSearchParams();
@@ -73,6 +76,9 @@ function buildEmployeesHref(
   if (params.status) searchParams.set("status", params.status);
   if (params.category) searchParams.set("category", params.category);
   if (params.search) searchParams.set("search", params.search);
+  if (params.residencyLicenseId) searchParams.set("residencyLicenseId", params.residencyLicenseId);
+  if (params.workPermitLicenseId) searchParams.set("workPermitLicenseId", params.workPermitLicenseId);
+  if (params.mainLicenseId) searchParams.set("mainLicenseId", params.mainLicenseId);
 
   const query = searchParams.toString();
   return `/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`;
@@ -120,7 +126,25 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       }
     : {};
 
-  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, employees] = await Promise.all([
+  const residencyLicenseFilter = query.residencyLicenseId
+    ? {
+        residencyLicenseId: query.residencyLicenseId,
+      }
+    : {};
+
+  const workPermitLicenseFilter = query.workPermitLicenseId
+    ? {
+        workPermitLicenseId: query.workPermitLicenseId,
+      }
+    : {};
+
+  const mainLicenseFilter = query.mainLicenseId
+    ? {
+        licenseId: query.mainLicenseId,
+      }
+    : {};
+
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, licenses, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
     prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
@@ -131,6 +155,11 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       select: { id: true, nameAr: true, nameEn: true },
       orderBy: { sortOrder: "asc" },
     }),
+    prisma.companyLicense.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true },
+      orderBy: { commercialNameAr: "asc" },
+    }),
     prisma.employee.findMany({
       where: {
         ...baseWhere,
@@ -138,6 +167,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         ...categoryFilter,
         ...typeFilter,
         ...positionFilter,
+        ...residencyLicenseFilter,
+        ...workPermitLicenseFilter,
+        ...mainLicenseFilter,
         ...(query.search
           ? {
               OR: [
@@ -297,6 +329,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                 category: query.category,
                 search: query.search,
                 type: query.type,
+                residencyLicenseId: query.residencyLicenseId,
+                workPermitLicenseId: query.workPermitLicenseId,
+                mainLicenseId: query.mainLicenseId,
               })}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.positionId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
@@ -312,10 +347,133 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   search: query.search,
                   type: query.type,
                   positionId: p.id,
+                  residencyLicenseId: query.residencyLicenseId,
+                  workPermitLicenseId: query.workPermitLicenseId,
+                  mainLicenseId: query.mainLicenseId,
                 })}
                 className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.positionId === p.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               >
                 {locale === "en" ? p.nameEn || p.nameAr : p.nameAr}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Residency License filter */}
+        {licenses.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={buildEmployeesHref(companyId, {
+                group: query.group,
+                status: query.status,
+                category: query.category,
+                search: query.search,
+                type: query.type,
+                positionId: query.positionId,
+                workPermitLicenseId: query.workPermitLicenseId,
+                mainLicenseId: query.mainLicenseId,
+              })}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.residencyLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {locale === "en" ? "All residency licenses" : "كل تراخيص الإقامة"}
+            </Link>
+            {licenses.map((l) => (
+              <Link
+                key={l.id}
+                href={buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type: query.type,
+                  positionId: query.positionId,
+                  residencyLicenseId: l.id,
+                  workPermitLicenseId: query.workPermitLicenseId,
+                  mainLicenseId: query.mainLicenseId,
+                })}
+                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.residencyLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >
+                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Work Permit License filter */}
+        {licenses.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={buildEmployeesHref(companyId, {
+                group: query.group,
+                status: query.status,
+                category: query.category,
+                search: query.search,
+                type: query.type,
+                positionId: query.positionId,
+                residencyLicenseId: query.residencyLicenseId,
+                mainLicenseId: query.mainLicenseId,
+              })}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.workPermitLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {locale === "en" ? "All work permit licenses" : "كل تراخيص العمل"}
+            </Link>
+            {licenses.map((l) => (
+              <Link
+                key={l.id}
+                href={buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type: query.type,
+                  positionId: query.positionId,
+                  residencyLicenseId: query.residencyLicenseId,
+                  workPermitLicenseId: l.id,
+                  mainLicenseId: query.mainLicenseId,
+                })}
+                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.workPermitLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >
+                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Main License filter */}
+        {licenses.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={buildEmployeesHref(companyId, {
+                group: query.group,
+                status: query.status,
+                category: query.category,
+                search: query.search,
+                type: query.type,
+                positionId: query.positionId,
+                residencyLicenseId: query.residencyLicenseId,
+                workPermitLicenseId: query.workPermitLicenseId,
+              })}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!query.mainLicenseId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {locale === "en" ? "All main licenses" : "كل التراخيص الرئيسية"}
+            </Link>
+            {licenses.map((l) => (
+              <Link
+                key={l.id}
+                href={buildEmployeesHref(companyId, {
+                  group: query.group,
+                  status: query.status,
+                  category: query.category,
+                  search: query.search,
+                  type: query.type,
+                  positionId: query.positionId,
+                  residencyLicenseId: query.residencyLicenseId,
+                  workPermitLicenseId: query.workPermitLicenseId,
+                  mainLicenseId: l.id,
+                })}
+                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${query.mainLicenseId === l.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >
+                {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
               </Link>
             ))}
           </div>
@@ -330,6 +488,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             category: query.category,
             type: query.type,
             positionId: query.positionId,
+            residencyLicenseId: query.residencyLicenseId,
+            workPermitLicenseId: query.workPermitLicenseId,
+            mainLicenseId: query.mainLicenseId,
           }}
           initialSearch={query.search || ""}
           locale={locale}

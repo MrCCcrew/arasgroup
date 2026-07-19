@@ -15,6 +15,9 @@ interface Props {
     category?: string;
     type?: string;
     positionId?: string;
+    residencyLicenseId?: string;
+    workPermitLicenseId?: string;
+    mainLicenseId?: string;
   };
   initialSearch: string;
   locale: "ar" | "en";
@@ -46,6 +49,9 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
       if (currentFilters.category) params.set("category", currentFilters.category);
       if (currentFilters.type) params.set("type", currentFilters.type);
       if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
+      if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
+      if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
+      if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
       if (value.trim()) params.set("search", value.trim());
 
       const query = params.toString();
