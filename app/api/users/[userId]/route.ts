@@ -145,10 +145,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     };
   });
 
-  // حساب إجمالي السجلات
-  const totalRecords = Object.values(relatedRecords).reduce((sum, count) => sum + count, 0);
+  // حساب إجمالي السجلات (باستثناء سجلات النظام: audit logs & activity logs)
+  const totalRecords =
+    relatedRecords.journalEntries +
+    relatedRecords.attachments +
+    relatedRecords.driverAssignments +
+    relatedRecords.assetCustodies +
+    relatedRecords.talabatImports +
+    relatedRecords.talabatAllocations;
 
-  // إذا كان هناك سجلات، أرجع قائمة بها
+  // إذا كان هناك سجلات (غير سجلات النظام)، أرجع قائمة بها
   if (totalRecords > 0) {
     const recordsList = [];
     if (relatedRecords.journalEntries > 0) {
@@ -156,9 +162,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     if (relatedRecords.attachments > 0) {
       recordsList.push({ type: "attachments", nameAr: "مرفقات", count: relatedRecords.attachments });
-    }
-    if (relatedRecords.auditLogs > 0) {
-      recordsList.push({ type: "auditLogs", nameAr: "سجلات التدقيق", count: relatedRecords.auditLogs });
     }
     if (relatedRecords.driverAssignments > 0) {
       recordsList.push({ type: "driverAssignments", nameAr: "تعيينات سائقين", count: relatedRecords.driverAssignments });
@@ -171,9 +174,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     if (relatedRecords.talabatAllocations > 0) {
       recordsList.push({ type: "talabatAllocations", nameAr: "توزيعات طلبات", count: relatedRecords.talabatAllocations });
-    }
-    if (relatedRecords.activityLogs > 0) {
-      recordsList.push({ type: "activityLogs", nameAr: "سجلات النشاط", count: relatedRecords.activityLogs });
     }
 
     return NextResponse.json({
