@@ -158,8 +158,8 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       select: { id: true, nameAr: true, nameEn: true },
       orderBy: { sortOrder: "asc" },
     }),
-    prisma.companyLicense.findMany({
-      where: { companyId, isActive: true },
+    prisma.license.findMany({
+      where: { companyId },
       select: { id: true, commercialNameAr: true, commercialNameEn: true },
       orderBy: { commercialNameAr: "asc" },
     }),
