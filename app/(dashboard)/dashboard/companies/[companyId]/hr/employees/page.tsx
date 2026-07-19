@@ -20,6 +20,9 @@ interface Props {
     group?: string;
     status?: string;
     category?: string;
+    residencyLicenseId?: string;
+    workPermitLicenseId?: string;
+    mainLicenseId?: string;
   }>;
 }
 
