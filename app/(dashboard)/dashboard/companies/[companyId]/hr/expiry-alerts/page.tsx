@@ -16,7 +16,7 @@ export default async function ExpiryAlertsPage({ params }: Props) {
   const { companyId } = await params;
   const locale = await getLocale();
   const en = locale === "en";
-  const numberLocale = en ? "en-US" : "ar-KW";
+  const numberLocale = "en-US"; // Always use English numbers
   const alerts = await getExpiryAlertsData(session, companyId, en ? "en" : "ar");
 
   return (

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Car, FileText, Printer, Search, Users } from "lucide-react";
-import { formatDate, formatKWD } from "@/lib/utils";
+import { formatDate, formatDateShort, formatKWD } from "@/lib/utils";
 import {
   applyAlertFilters,
   buildFilterQuery,
@@ -103,7 +103,7 @@ export function ExpiryAlertsClient({
     colType: en ? "Expiry type" : "نوع الانتهاء",
     colDate: en ? "Expiry date" : "تاريخ الانتهاء",
     colPosition: en ? "Position" : "الوظيفة",
-    colSalary: en ? "Salary" : "الراتب",
+    colSalary: en ? "Salary (KD)" : "الراتب (د.ك)",
     colInvestor: en ? "Investor" : "المسؤول",
     colResidencyLicense: en ? "Residency license" : "ترخيص الإقامة",
     colWorkPermit: en ? "Work permit" : "ترخيص العمل",
@@ -311,9 +311,9 @@ export function ExpiryAlertsClient({
                         <td className="number text-sm" dir="ltr">
                           {alert.civilId || "—"}
                         </td>
-                        <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
+                        <td className="number">{formatDateShort(alert.expiryDate, "en-US")}</td>
                         <td className="text-sm">{alert.position || "—"}</td>
-                        <td className="number text-sm">{alert.salary ? formatKWD(alert.salary, numberLocale) : "—"}</td>
+                        <td className="number text-sm">{alert.salary ? formatKWD(alert.salary, "en-US") : "—"}</td>
                         <td className="text-sm">{alert.investor || "—"}</td>
                         <td className="text-sm">{alert.residencyLicenseName || "—"}</td>
                         <td className="text-sm">{alert.workPermitLicenseName || "—"}</td>
@@ -369,7 +369,7 @@ export function ExpiryAlertsClient({
                         <td className="text-sm text-muted-foreground">{alert.subtitle}</td>
                         <td className="text-sm text-muted-foreground">{alert.licenseName || "—"}</td>
                         <td>{alert.expiryType}</td>
-                        <td className="number">{formatDate(alert.expiryDate, numberLocale)}</td>
+                        <td className="number">{formatDateShort(alert.expiryDate, "en-US")}</td>
                         <td>
                           <Badge days={alert.daysLeft} en={en} />
                         </td>

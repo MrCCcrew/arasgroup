@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { formatDate, formatKWD } from "@/lib/utils";
+import { formatDate, formatDateShort, formatKWD } from "@/lib/utils";
 import { getExpiryAlertsData } from "../data";
 import { applyAlertFilters, buildStats, buildFilterQuery, filtersFromSearchParams } from "../shared";
 
@@ -161,9 +161,9 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
                             <td>{alert.employeeNumber || "—"}</td>
                             <td>{alert.title}</td>
                             <td>{alert.civilId || "—"}</td>
-                            <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
+                            <td>{formatDateShort(alert.expiryDate, "en-US")}</td>
                             <td>{alert.position || "—"}</td>
-                            <td>{alert.salary ? formatKWD(alert.salary, "ar-KW") : "—"}</td>
+                            <td>{alert.salary ? formatKWD(alert.salary, "en-US") : "—"}</td>
                             <td>{alert.investor || "—"}</td>
                             <td>{alert.residencyLicenseName || "—"}</td>
                             <td>{alert.workPermitLicenseName || "—"}</td>
@@ -212,7 +212,7 @@ export default async function ExpiryAlertsPrintPage({ params, searchParams }: Pr
                             <td>{alert.subtitle}</td>
                             <td>{alert.licenseName || "—"}</td>
                             <td>{alert.expiryType}</td>
-                            <td>{formatDate(alert.expiryDate, "ar-KW")}</td>
+                            <td>{formatDateShort(alert.expiryDate, "en-US")}</td>
                             <td>
                               <span className={`badge ${severity}`}>
                                 {severity === "expired" ? "منتهي" : `${alert.daysLeft} يوم`}
