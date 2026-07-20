@@ -190,6 +190,7 @@ export default function EditEmployeePage() {
   const [investors, setInvestors] = useState<InvestorLookup[]>([]);
   const [positions, setPositions] = useState<{ id: string; nameAr: string; nameEn?: string | null }[]>([]);
   const [additionalLicenseIds, setAdditionalLicenseIds] = useState<string[]>([]);
+  const [employmentEntity, setEmploymentEntity] = useState<"company" | "investor">("company");
   const [form, setForm] = useState<FormState>({
     employeeNumber: "",
     nameAr: "",
@@ -281,6 +282,7 @@ export default function EditEmployeePage() {
         if (e.licenseAssignments?.length) {
           setAdditionalLicenseIds(e.licenseAssignments.map((a: { licenseId: string }) => a.licenseId));
         }
+        setEmploymentEntity(e.investorId ? "investor" : "company");
         setForm({
           employeeNumber: e.employeeNumber ?? "",
           nameAr: e.nameAr ?? "",
@@ -558,9 +560,11 @@ export default function EditEmployeePage() {
                   {locale === "en" ? "Employment Entity" : "جهة العمل"}
                 </label>
                 <select
-                  value={form.investorId ? "investor" : "company"}
+                  value={employmentEntity}
                   onChange={(e) => {
-                    if (e.target.value === "company") {
+                    const value = e.target.value as "company" | "investor";
+                    setEmploymentEntity(value);
+                    if (value === "company") {
                       setField("investorId", "");
                     }
                   }}
@@ -573,7 +577,7 @@ export default function EditEmployeePage() {
                   {locale === "en" ? "Who manages this employee?" : "من يدير هذا الموظف؟"}
                 </p>
               </div>
-              {form.investorId || (!form.investorId && investors.length > 0) ? (
+              {employmentEntity === "investor" ? (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
                     {locale === "en" ? "Investor/Manager" : "المسئول"}
