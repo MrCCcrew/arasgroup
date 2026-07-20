@@ -244,6 +244,11 @@ export default function EditEmployeePage() {
       : []),
   ];
 
+  const investorOptions = investors.map((inv) => ({
+    id: inv.id,
+    label: locale === "en" ? inv.nameEn ?? inv.nameAr : inv.nameAr,
+  }));
+
   const load = useCallback(async () => {
     try {
       const [employeeRes, companyRes, branchesRes, licensesRes, groupRes, investorsRes, positionsRes] = await Promise.all([
@@ -443,19 +448,6 @@ export default function EditEmployeePage() {
                   options={selectableLicenseOptions}
                 />
               </div>
-              {investors.length > 0 && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Investor / Manager" : "المسئول / المدير"}</label>
-                  <select value={form.investorId} onChange={(e) => setField("investorId", e.target.value)} className="input-field w-full">
-                    <option value="">{locale === "en" ? "— No investor —" : "— بدون مسئول (موظف شركة) —"}</option>
-                    {investors.map((inv) => (
-                      <option key={inv.id} value={inv.id}>
-                        {locale === "en" ? inv.nameEn ?? inv.nameAr : inv.nameAr}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {showAdditionalLicenses && (
                 <div className="md:col-span-2">
@@ -561,6 +553,43 @@ export default function EditEmployeePage() {
                   </p>
                 )}
               </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {locale === "en" ? "Employment Entity" : "جهة العمل"}
+                </label>
+                <select
+                  value={form.investorId ? "investor" : "company"}
+                  onChange={(e) => {
+                    if (e.target.value === "company") {
+                      setField("investorId", "");
+                    }
+                  }}
+                  className="input-field w-full"
+                >
+                  <option value="company">{locale === "en" ? "Company Administration" : "إدارة الشركة"}</option>
+                  <option value="investor">{locale === "en" ? "Investor/Manager" : "المسئولين"}</option>
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === "en" ? "Who manages this employee?" : "من يدير هذا الموظف؟"}
+                </p>
+              </div>
+              {form.investorId || (!form.investorId && investors.length > 0) ? (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    {locale === "en" ? "Investor/Manager" : "المسئول"}
+                    {form.investorId && <span className="text-red-500"> *</span>}
+                  </label>
+                  <SearchableSelect
+                    options={investorOptions}
+                    value={form.investorId}
+                    onChange={(id) => setField("investorId", id)}
+                    placeholder={locale === "en" ? "— Select investor —" : "— اختر المسئول —"}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "en" ? "Required if employment entity is Investor/Manager" : "إجباري إذا كانت جهة العمل هي المسئولين"}
+                  </p>
+                </div>
+              ) : null}
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
                   {locale === "en" ? "Position (Job Title)" : "المسمى الوظيفي"}
