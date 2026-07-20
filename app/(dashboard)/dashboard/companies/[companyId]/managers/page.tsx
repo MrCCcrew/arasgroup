@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 
@@ -250,12 +250,33 @@ function ChargesTab({
   const [showForm, setShowForm] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const filteredCharges = useMemo(() => {
+    if (!search.trim()) return charges;
+    const q = search.toLowerCase();
+    return charges.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.investorName.toLowerCase().includes(q) ||
+        c.notes?.toLowerCase().includes(q)
+    );
+  }, [charges, search]);
+
+  const paginatedCharges = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredCharges.slice(start, start + itemsPerPage);
+  }, [filteredCharges, currentPage]);
+
+  const totalPages = Math.ceil(filteredCharges.length / itemsPerPage);
 
   const totals = useMemo(() => {
-    const due = charges.reduce((s, c) => s + c.amount, 0);
-    const paid = charges.reduce((s, c) => s + c.paid, 0);
+    const due = filteredCharges.reduce((s, c) => s + c.amount, 0);
+    const paid = filteredCharges.reduce((s, c) => s + c.paid, 0);
     return { due, paid, remaining: due - paid };
-  }, [charges]);
+  }, [filteredCharges]);
 
   function openAdd() {
     setEditId(null);
@@ -317,6 +338,33 @@ function ChargesTab({
 
   return (
     <div className="space-y-4">
+      {/* Search Box */}
+      <div className="rounded-xl border bg-card p-4">
+        <div className="relative">
+          <Search size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            className="input-field w-full pr-8 text-sm"
+            placeholder={en ? "Search by title, investor, or notes..." : "بحث بالبيان، المسئول، أو ملاحظات..."}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setCurrentPage(1);
+              }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full p-1 hover:bg-muted"
+            >
+              <X size={14} className="text-muted-foreground" />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-4 text-sm">
           <span>{en ? "Due: " : "المستحق: "}<b>{money(totals.due)}</b></span>
@@ -377,16 +425,48 @@ function ChargesTab({
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">...</td></tr>
-            ) : charges.length === 0 ? (
-              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{en ? "No items" : "لا توجد سجلات"}</td></tr>
+            ) : filteredCharges.length === 0 ? (
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{en ? "No items found" : "لا توجد نتائج"}</td></tr>
             ) : (
-              charges.map((c) => (
+              paginatedCharges.map((c) => (
                 <ChargeRow key={c.id} charge={c} expanded={expanded === c.id} toggle={() => setExpanded(expanded === c.id ? null : c.id)} reload={reload} setError={setError} money={money} monthLabel={monthLabel} onEdit={() => openEdit(c)} onDelete={() => del(c.id)} en={en} />
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+          <p className="text-sm text-muted-foreground">
+            {en
+              ? `Showing ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredCharges.length)} of ${filteredCharges.length}`
+              : `عرض ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredCharges.length)} من ${filteredCharges.length}`}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={14} />
+              {en ? "Previous" : "السابق"}
+            </button>
+            <span className="text-sm font-medium">
+              {en ? `Page ${currentPage} of ${totalPages}` : `صفحة ${currentPage} من ${totalPages}`}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {en ? "Next" : "التالي"}
+              <ChevronLeft size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
