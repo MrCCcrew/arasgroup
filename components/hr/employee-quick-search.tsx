@@ -24,28 +24,52 @@ interface Props {
   };
   initialSearch: string;
   locale: "ar" | "en";
+  residencyLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
+  workPermitLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
   mainLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null }[];
   subLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
 }
 
-export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, mainLicenses, subLicenses }: Props) {
+export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 300);
 
   // Filtered lists based on selections
+  const [filteredResidencyLicenses, setFilteredResidencyLicenses] = useState(residencyLicenses);
+  const [filteredWorkPermitLicenses, setFilteredWorkPermitLicenses] = useState(workPermitLicenses);
   const [filteredSubLicenses, setFilteredSubLicenses] = useState(subLicenses);
 
-  // Filter sub licenses when main license is selected
+  // Filter licenses when main license is selected
   useEffect(() => {
     if (currentFilters.mainLicenseId) {
+      setFilteredResidencyLicenses(residencyLicenses.filter(l => l.mainLicenseId === currentFilters.mainLicenseId));
+      setFilteredWorkPermitLicenses(workPermitLicenses.filter(l => l.mainLicenseId === currentFilters.mainLicenseId));
       setFilteredSubLicenses(subLicenses.filter(l => l.mainLicenseId === currentFilters.mainLicenseId));
     } else {
+      setFilteredResidencyLicenses(residencyLicenses);
+      setFilteredWorkPermitLicenses(workPermitLicenses);
       setFilteredSubLicenses(subLicenses);
     }
-  }, [currentFilters.mainLicenseId, subLicenses]);
+  }, [currentFilters.mainLicenseId, residencyLicenses, workPermitLicenses, subLicenses]);
 
   // Convert licenses to options format
+  const residencyLicenseOptions = useMemo(() =>
+    filteredResidencyLicenses.map(l => ({
+      value: l.id,
+      label: `${locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}${l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}`
+    })),
+    [filteredResidencyLicenses, locale]
+  );
+
+  const workPermitLicenseOptions = useMemo(() =>
+    filteredWorkPermitLicenses.map(l => ({
+      value: l.id,
+      label: `${locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}${l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}`
+    })),
+    [filteredWorkPermitLicenses, locale]
+  );
+
   const mainLicenseOptions = useMemo(() =>
     mainLicenses.map(l => ({
       value: l.id,
@@ -169,14 +193,14 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
           )}
         </div>
 
-        {(mainLicenses.length > 0 || subLicenses.length > 0) && (
+        {(residencyLicenses.length > 0 || workPermitLicenses.length > 0 || mainLicenses.length > 0 || subLicenses.length > 0) && (
           <div className="grid grid-cols-2 gap-3">
             <div className="grid grid-cols-2 gap-3 col-span-2">
               <SearchableSelect
                 label={t.residencyLicense}
                 value={currentFilters.residencyLicenseId || ""}
                 onChange={(value) => handleLicenseFilter('residency', value)}
-                options={mainLicenseOptions}
+                options={residencyLicenseOptions}
                 placeholder={t.allLicenses}
               />
 
@@ -184,7 +208,7 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
                 label={t.workPermitLicense}
                 value={currentFilters.workPermitLicenseId || ""}
                 onChange={(value) => handleLicenseFilter('workPermit', value)}
-                options={mainLicenseOptions}
+                options={workPermitLicenseOptions}
                 placeholder={t.allLicenses}
               />
             </div>

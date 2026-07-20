@@ -158,26 +158,35 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       }
     : {};
 
-  // Get only licenses that are actually used by employees
-  const usedLicenseIds = await prisma.employee.findMany({
-    where: activeWhere,
-    select: {
-      residencyLicenseId: true,
-      workPermitLicenseId: true,
-      licenseId: true,
-    },
-    distinct: ['residencyLicenseId', 'workPermitLicenseId', 'licenseId'],
-  }).then(employees => {
-    const ids = new Set<string>();
-    employees.forEach(emp => {
-      if (emp.residencyLicenseId) ids.add(emp.residencyLicenseId);
-      if (emp.workPermitLicenseId) ids.add(emp.workPermitLicenseId);
-      if (emp.licenseId) ids.add(emp.licenseId);
-    });
-    return Array.from(ids);
-  });
+  // Get only licenses that are actually used by employees (separated by type)
+  const [usedResidencyLicenseIds, usedWorkPermitLicenseIds, usedMainLicenseIds, usedSubLicenseIds] = await Promise.all([
+    // Residency licenses
+    prisma.employee.findMany({
+      where: { ...activeWhere, residencyLicenseId: { not: null } },
+      select: { residencyLicenseId: true },
+      distinct: ['residencyLicenseId'],
+    }).then(emps => emps.map(e => e.residencyLicenseId!)),
+    // Work permit licenses
+    prisma.employee.findMany({
+      where: { ...activeWhere, workPermitLicenseId: { not: null } },
+      select: { workPermitLicenseId: true },
+      distinct: ['workPermitLicenseId'],
+    }).then(emps => emps.map(e => e.workPermitLicenseId!)),
+    // Main licenses (licenseId where license.isMainLicense = true)
+    prisma.employee.findMany({
+      where: { ...activeWhere, licenseId: { not: null }, license: { isMainLicense: true } },
+      select: { licenseId: true },
+      distinct: ['licenseId'],
+    }).then(emps => emps.map(e => e.licenseId!)),
+    // Sub licenses (licenseId where license.isMainLicense = false)
+    prisma.employee.findMany({
+      where: { ...activeWhere, licenseId: { not: null }, license: { isMainLicense: false } },
+      select: { licenseId: true },
+      distinct: ['licenseId'],
+    }).then(emps => emps.map(e => e.licenseId!)),
+  ]);
 
-  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, mainLicenses, subLicenses, employees] = await Promise.all([
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
     prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
@@ -188,21 +197,27 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       select: { id: true, nameAr: true, nameEn: true },
       orderBy: { sortOrder: "asc" },
     }),
+    // Residency licenses
     prisma.license.findMany({
-      where: {
-        companyId,
-        isMainLicense: true,
-        id: { in: usedLicenseIds }
-      },
+      where: { companyId, id: { in: usedResidencyLicenseIds } },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
+      orderBy: { commercialNameAr: "asc" },
+    }),
+    // Work permit licenses
+    prisma.license.findMany({
+      where: { companyId, id: { in: usedWorkPermitLicenseIds } },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
+      orderBy: { commercialNameAr: "asc" },
+    }),
+    // Main licenses
+    prisma.license.findMany({
+      where: { companyId, isMainLicense: true, id: { in: usedMainLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true },
       orderBy: { commercialNameAr: "asc" },
     }),
+    // Sub licenses
     prisma.license.findMany({
-      where: {
-        companyId,
-        isMainLicense: false,
-        id: { in: usedLicenseIds }
-      },
+      where: { companyId, isMainLicense: false, id: { in: usedSubLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
@@ -425,6 +440,8 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           }}
           initialSearch={query.search || ""}
           locale={locale}
+          residencyLicenses={residencyLicenses}
+          workPermitLicenses={workPermitLicenses}
           mainLicenses={mainLicenses}
           subLicenses={subLicenses}
         />
