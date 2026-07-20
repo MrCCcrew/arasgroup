@@ -23,14 +23,26 @@ interface Props {
   };
   initialSearch: string;
   locale: "ar" | "en";
-  mainLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
-  subLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null }[];
+  mainLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null }[];
+  subLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
 }
 
 export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, mainLicenses, subLicenses }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 300);
+
+  // Filtered lists based on selections
+  const [filteredSubLicenses, setFilteredSubLicenses] = useState(subLicenses);
+
+  // Filter sub licenses when main license is selected
+  useEffect(() => {
+    if (currentFilters.mainLicenseId) {
+      setFilteredSubLicenses(subLicenses.filter(l => l.mainLicenseId === currentFilters.mainLicenseId));
+    } else {
+      setFilteredSubLicenses(subLicenses);
+    }
+  }, [currentFilters.mainLicenseId, subLicenses]);
 
   const en = locale === "en";
   const t = {
@@ -153,6 +165,7 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
                   {mainLicenses.map((l) => (
                     <option key={l.id} value={l.id}>
                       {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                      {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
                     </option>
                   ))}
                 </select>
@@ -169,6 +182,7 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
                   {mainLicenses.map((l) => (
                     <option key={l.id} value={l.id}>
                       {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                      {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
                     </option>
                   ))}
                 </select>
@@ -197,11 +211,13 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
                 className="input-field w-full text-sm"
                 value={currentFilters.subLicenseId || ""}
                 onChange={(e) => handleLicenseFilter('sub', e.target.value)}
+                disabled={currentFilters.mainLicenseId ? false : false}
               >
                 <option value="">{t.allLicenses}</option>
-                {subLicenses.map((l) => (
+                {filteredSubLicenses.map((l) => (
                   <option key={l.id} value={l.id}>
                     {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
+                    {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
                   </option>
                 ))}
               </select>

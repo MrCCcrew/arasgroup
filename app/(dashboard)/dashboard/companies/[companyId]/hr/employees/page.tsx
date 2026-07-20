@@ -169,12 +169,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     }),
     prisma.license.findMany({
       where: { companyId, isMainLicense: true },
-      select: { id: true, commercialNameAr: true, commercialNameEn: true },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     prisma.license.findMany({
       where: { companyId, isMainLicense: false },
-      select: { id: true, commercialNameAr: true, commercialNameEn: true },
+      select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     prisma.employee.findMany({
