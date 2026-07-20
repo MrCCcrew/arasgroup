@@ -152,6 +152,49 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ success: false, error: "نوع الموظف غير مسموح لهذه الشركة" }, { status: 400 });
     }
 
+    // Check if type is being changed
+    if (parsed.data.type && parsed.data.type !== existingEmployee.type) {
+      // Block type changes in DELIVERY and CAR_WASH companies (they have complex accounting)
+      if (company.type === "DELIVERY" || company.type === "CAR_WASH") {
+        return NextResponse.json(
+          { success: false, error: "لا يمكن تغيير نوع الموظف في شركات التوصيل والغسيل" },
+          { status: 400 }
+        );
+      }
+
+      // For other companies, check if employee has financial records
+      const [salaryPaymentsCount, endOfServiceCount, leavePayCount, ticketsCount] = await Promise.all([
+        // Check salary payments
+        prisma.salaryPayment.count({
+          where: { employeeId },
+        }),
+        // Check end of service calculations
+        prisma.endOfServiceCalc.count({
+          where: { employeeId },
+        }),
+        // Check leave pay calculations
+        prisma.leavePayCalc.count({
+          where: { employeeId },
+        }),
+        // Check tickets
+        prisma.employeeTicket.count({
+          where: { employeeId },
+        }),
+      ]);
+
+      const totalFinancialRecords = salaryPaymentsCount + endOfServiceCount + leavePayCount + ticketsCount;
+
+      if (totalFinancialRecords > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `لا يمكن تغيير نوع الموظف لوجود ${totalFinancialRecords} سجل مالي مرتبط به (رواتب، نهاية خدمة، تذاكر)`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     if (!allowsCrossCompanyLicenses(company.type) && parsed.data.additionalLicenseIds?.length) {
       return NextResponse.json(
         { success: false, error: "لا يمكن ربط موظفي شركة الغسيل بتراخيص شركات أخرى" },

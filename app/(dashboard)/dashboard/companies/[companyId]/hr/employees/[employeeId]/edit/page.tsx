@@ -540,9 +540,10 @@ export default function EditEmployeePage() {
                 </label>
                 <select
                   value={form.type}
-                  disabled
-                  className="input-field w-full cursor-not-allowed opacity-60"
-                  title={locale === "en" ? "Type cannot be changed after creation" : "لا يمكن تغيير النوع بعد الإنشاء"}
+                  disabled={companyType === "DELIVERY" || companyType === "CAR_WASH"}
+                  onChange={(e) => setField("type", e.target.value)}
+                  className={`input-field w-full ${companyType === "DELIVERY" || companyType === "CAR_WASH" ? "cursor-not-allowed opacity-60" : ""}`}
+                  title={companyType === "DELIVERY" || companyType === "CAR_WASH" ? (locale === "en" ? "Type cannot be changed in delivery/car wash companies" : "لا يمكن تغيير النوع في شركات التوصيل والغسيل") : ""}
                 >
                   {employeeTypes[locale].map((t) => (
                     <option key={t.value} value={t.value}>
@@ -550,9 +551,15 @@ export default function EditEmployeePage() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {locale === "en" ? "Type cannot be changed after creation." : "لا يمكن تغيير نوع الموظف بعد الإنشاء."}
-                </p>
+                {companyType === "DELIVERY" || companyType === "CAR_WASH" ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "en" ? "Type cannot be changed in delivery/car wash companies." : "لا يمكن تغيير النوع في شركات التوصيل والغسيل."}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "en" ? "Type can be changed only if there are no financial records." : "يمكن تغيير النوع فقط إذا لم توجد سجلات محاسبية."}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
