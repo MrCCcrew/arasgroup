@@ -34,7 +34,8 @@ const typeLabels = {
     DELIVERY_ADMIN: "إداري توصيل",
     CAR_WASH_DRIVER: "سائق غسيل",
     CAR_WASH_WORKER: "عامل غسيل",
-    OFFICE_EMPLOYEE: "موظف مكتب",
+    OFFICE_EMPLOYEE: "موظف إداري (شركة)",
+    INVESTOR_EMPLOYEE: "موظف إداري (مسئول)",
     ACCOUNTANT: "محاسب",
     MANDOUB: "مندوب",
     OFFICE_BOY: "فراش",
@@ -46,7 +47,8 @@ const typeLabels = {
     DELIVERY_ADMIN: "Delivery Admin",
     CAR_WASH_DRIVER: "Car Wash Driver",
     CAR_WASH_WORKER: "Car Wash Worker",
-    OFFICE_EMPLOYEE: "Office Employee",
+    OFFICE_EMPLOYEE: "Office Employee (Company)",
+    INVESTOR_EMPLOYEE: "Office Employee (Investor)",
     ACCOUNTANT: "Accountant",
     MANDOUB: "Mandoub",
     OFFICE_BOY: "Office Boy",
@@ -55,7 +57,7 @@ const typeLabels = {
 } as const;
 
 const DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER", "CAR_WASH_DRIVER"] as const;
-const ADMIN_TYPES = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] as const;
+const ADMIN_TYPES = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "INVESTOR_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] as const;
 
 type EmployeeType = keyof typeof typeLabels.ar;
 
