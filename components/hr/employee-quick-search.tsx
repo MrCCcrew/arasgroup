@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, Printer } from "lucide-react";
 import Link from "next/link";
 import { useDebounce } from "@/hooks/use-debounce";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Props {
   companyId: string;
@@ -43,6 +44,23 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
       setFilteredSubLicenses(subLicenses);
     }
   }, [currentFilters.mainLicenseId, subLicenses]);
+
+  // Convert licenses to options format
+  const mainLicenseOptions = useMemo(() =>
+    mainLicenses.map(l => ({
+      value: l.id,
+      label: `${locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}${l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}`
+    })),
+    [mainLicenses, locale]
+  );
+
+  const subLicenseOptions = useMemo(() =>
+    filteredSubLicenses.map(l => ({
+      value: l.id,
+      label: `${locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}${l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}`
+    })),
+    [filteredSubLicenses, locale]
+  );
 
   const en = locale === "en";
   const t = {
@@ -154,74 +172,38 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
         {(mainLicenses.length > 0 || subLicenses.length > 0) && (
           <div className="grid grid-cols-2 gap-3">
             <div className="grid grid-cols-2 gap-3 col-span-2">
-              <div>
-                <label className="mb-1 block text-xs text-muted-foreground">{t.residencyLicense}</label>
-                <select
-                  className="input-field w-full text-sm"
-                  value={currentFilters.residencyLicenseId || ""}
-                  onChange={(e) => handleLicenseFilter('residency', e.target.value)}
-                >
-                  <option value="">{t.allLicenses}</option>
-                  {mainLicenses.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                      {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSelect
+                label={t.residencyLicense}
+                value={currentFilters.residencyLicenseId || ""}
+                onChange={(value) => handleLicenseFilter('residency', value)}
+                options={mainLicenseOptions}
+                placeholder={t.allLicenses}
+              />
 
-              <div>
-                <label className="mb-1 block text-xs text-muted-foreground">{t.workPermitLicense}</label>
-                <select
-                  className="input-field w-full text-sm"
-                  value={currentFilters.workPermitLicenseId || ""}
-                  onChange={(e) => handleLicenseFilter('workPermit', e.target.value)}
-                >
-                  <option value="">{t.allLicenses}</option>
-                  {mainLicenses.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                      {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSelect
+                label={t.workPermitLicense}
+                value={currentFilters.workPermitLicenseId || ""}
+                onChange={(value) => handleLicenseFilter('workPermit', value)}
+                options={mainLicenseOptions}
+                placeholder={t.allLicenses}
+              />
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">{t.mainLicense}</label>
-              <select
-                className="input-field w-full text-sm"
-                value={currentFilters.mainLicenseId || ""}
-                onChange={(e) => handleLicenseFilter('main', e.target.value)}
-              >
-                <option value="">{t.allLicenses}</option>
-                {mainLicenses.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              label={t.mainLicense}
+              value={currentFilters.mainLicenseId || ""}
+              onChange={(value) => handleLicenseFilter('main', value)}
+              options={mainLicenseOptions}
+              placeholder={t.allLicenses}
+            />
 
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">{t.subLicense}</label>
-              <select
-                className="input-field w-full text-sm"
-                value={currentFilters.subLicenseId || ""}
-                onChange={(e) => handleLicenseFilter('sub', e.target.value)}
-                disabled={currentFilters.mainLicenseId ? false : false}
-              >
-                <option value="">{t.allLicenses}</option>
-                {filteredSubLicenses.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {locale === "en" ? l.commercialNameEn || l.commercialNameAr : l.commercialNameAr}
-                    {l.civilEntityNumber ? ` - ${l.civilEntityNumber}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              label={t.subLicense}
+              value={currentFilters.subLicenseId || ""}
+              onChange={(value) => handleLicenseFilter('sub', value)}
+              options={subLicenseOptions}
+              placeholder={t.allLicenses}
+            />
           </div>
         )}
       </div>

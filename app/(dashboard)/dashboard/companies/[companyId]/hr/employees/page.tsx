@@ -156,6 +156,25 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       }
     : {};
 
+  // Get only licenses that are actually used by employees
+  const usedLicenseIds = await prisma.employee.findMany({
+    where: activeWhere,
+    select: {
+      residencyLicenseId: true,
+      workPermitLicenseId: true,
+      licenseId: true,
+    },
+    distinct: ['residencyLicenseId', 'workPermitLicenseId', 'licenseId'],
+  }).then(employees => {
+    const ids = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.residencyLicenseId) ids.add(emp.residencyLicenseId);
+      if (emp.workPermitLicenseId) ids.add(emp.workPermitLicenseId);
+      if (emp.licenseId) ids.add(emp.licenseId);
+    });
+    return Array.from(ids);
+  });
+
   const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, mainLicenses, subLicenses, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
@@ -168,12 +187,20 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       orderBy: { sortOrder: "asc" },
     }),
     prisma.license.findMany({
-      where: { companyId, isMainLicense: true },
+      where: {
+        companyId,
+        isMainLicense: true,
+        id: { in: usedLicenseIds }
+      },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     prisma.license.findMany({
-      where: { companyId, isMainLicense: false },
+      where: {
+        companyId,
+        isMainLicense: false,
+        id: { in: usedLicenseIds }
+      },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
