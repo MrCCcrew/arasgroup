@@ -246,7 +246,16 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
         position: { select: { nameAr: true, nameEn: true } },
-        license: { select: { commercialNameAr: true, commercialNameEn: true, managerName: true } },
+        license: {
+          select: {
+            commercialNameAr: true,
+            commercialNameEn: true,
+            managerName: true,
+            isMainLicense: true,
+            mainLicenseId: true,
+            mainLicense: { select: { commercialNameAr: true, commercialNameEn: true, managerName: true } },
+          },
+        },
         residencyLicense: { select: { commercialNameAr: true, commercialNameEn: true } },
         workPermitLicense: { select: { commercialNameAr: true, commercialNameEn: true } },
         driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, walletBalance: true } },
@@ -267,7 +276,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     ? `${deletedCount} ${locale === "en" ? "deleted employee(s)" : "موظف محذوف"}`
     : `${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`;
   const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
-  const tableColSpan = showInvestorColumn ? (showingDeleted ? 14 : 13) : showingDeleted ? 13 : 12;
+  const tableColSpan = showInvestorColumn ? (showingDeleted ? 15 : 14) : showingDeleted ? 14 : 13;
 
   const printQuery = new URLSearchParams();
   if (query.type) printQuery.set("type", query.type);
@@ -462,6 +471,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   <th>{locale === "en" ? "Work permit license" : "ترخيص العمل"}</th>
                   <th>{locale === "en" ? "Phone" : "التليفون"}</th>
                   <th>{locale === "en" ? "Main license" : "الترخيص الرئيسي"}</th>
+                  <th>{locale === "en" ? "Sub license" : "الترخيص الفرعي"}</th>
                   <th>{locale === "en" ? "Authorized signer" : "المفوض بالتوقيع"}</th>
                   {showingDeleted ? <th>{locale === "en" ? "Deleted at" : "تاريخ الحذف"}</th> : null}
                   <th>{locale === "en" ? "Actions" : "إجراءات"}</th>
@@ -573,16 +583,41 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
 
                         {/* 11. اسم الترخيص الرئيسي */}
                         <td className="text-sm">
-                          {employee.license
+                          {employee.license ? (
+                            employee.license.isMainLicense ? (
+                              locale === "en"
+                                ? employee.license.commercialNameEn ?? employee.license.commercialNameAr
+                                : employee.license.commercialNameAr
+                            ) : employee.license.mainLicense ? (
+                              locale === "en"
+                                ? employee.license.mainLicense.commercialNameEn ?? employee.license.mainLicense.commercialNameAr
+                                : employee.license.mainLicense.commercialNameAr
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        {/* 12. اسم الترخيص الفرعي */}
+                        <td className="text-sm">
+                          {employee.license && !employee.license.isMainLicense
                             ? locale === "en"
                               ? employee.license.commercialNameEn ?? employee.license.commercialNameAr
                               : employee.license.commercialNameAr
                             : <span className="text-muted-foreground">—</span>}
                         </td>
 
-                        {/* 12. المفوض بالتوقيع */}
+                        {/* 13. المفوض بالتوقيع */}
                         <td className="text-sm">
-                          {employee.license?.managerName ?? (locale === "en" ? "Not set" : "غير محدد")}
+                          {employee.license
+                            ? employee.license.isMainLicense
+                              ? employee.license.managerName ?? (locale === "en" ? "Not set" : "غير محدد")
+                              : employee.license.mainLicense?.managerName ?? (locale === "en" ? "Not set" : "غير محدد")
+                            : locale === "en"
+                              ? "Not set"
+                              : "غير محدد"}
                         </td>
 
                         {/* تاريخ الحذف (conditional) */}
