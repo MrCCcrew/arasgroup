@@ -551,7 +551,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                                 {locale === "en" ? employee.investor.nameEn ?? employee.investor.nameAr : employee.investor.nameAr}
                               </span>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                                {locale === "en" ? "Company Administration" : "إدارة الشركة"}
+                              </span>
                             )}
                           </td>
                         ) : null}
