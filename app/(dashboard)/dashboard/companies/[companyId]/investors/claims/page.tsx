@@ -9,6 +9,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { ClaimsList, type ClaimListItem } from "@/components/investors/claims-list";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -96,7 +97,6 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
   const claims = await prisma.investorClaim.findMany({
     where: {
       companyId,
-      ...(query.status ? { status: query.status as never } : {}),
     },
     include: {
       investor: { select: { nameAr: true, nameEn: true, phone: true } },
@@ -110,6 +110,17 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
   type ClaimRow = typeof claims[number];
   type ClaimLineRow = ClaimRow["lines"][number];
   type BeneficiaryRow = ClaimRow["beneficiaries"][number];
+  const claimList: ClaimListItem[] = claims.map((claim: ClaimRow) => ({
+    id: claim.id, status: claim.status, type: claim.type, description: claim.descriptionAr, notes: claim.notes ?? null,
+    investorName: locale === "en" ? claim.investor.nameEn ?? claim.investor.nameAr : claim.investor.nameAr,
+    investorPhone: claim.investor.phone ?? null,
+    branchName: claim.branch ? (locale === "en" ? claim.branch.nameEn ?? claim.branch.nameAr : claim.branch.nameAr) : (locale === "en" ? "No branch" : "بدون فرع"),
+    claimDate: claim.claimDate.toISOString(), dueDate: claim.dueDate?.toISOString() ?? null,
+    totalActual: claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + Number(line.actualAmount), 0),
+    totalCollected: claim.lines.reduce((sum: number, line: ClaimLineRow) => sum + Number(line.collectedAmount), 0),
+    lines: claim.lines.map((line: ClaimLineRow) => ({ id: line.id, descriptionAr: line.descriptionAr, actualAmount: Number(line.actualAmount), collectedAmount: Number(line.collectedAmount) })),
+    beneficiaries: claim.beneficiaries.map((beneficiary: BeneficiaryRow) => ({ id: beneficiary.id, name: locale === "en" ? beneficiary.nameEn ?? beneficiary.nameAr : beneficiary.nameAr, isInvestor: beneficiary.isInvestor })),
+  }));
   const getTypeLabel = (type: keyof typeof typeLabels.ar) => typeLabels[locale][type];
   const getStatusLabel = (status: keyof typeof statusLabels.ar) => statusLabels[locale][status];
 
@@ -147,8 +158,17 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
         {/* ── تجديدات مطلوبة ── */}
         <RenewalAlertsPanel companyId={companyId} locale={locale} />
 
+        <ClaimsList
+          claims={claimList}
+          locale={locale}
+          canCollect={canCollect}
+          canAdmin={canAdmin}
+          initialStatus={query.status}
+        />
+
         {/* ── فلاتر الحالة ── */}
-        <div className="flex flex-wrap gap-2">
+        {false && <>
+        <div className="hidden">
           {filters.map((status) => {
             const active = query.status === status || (!query.status && !status);
             const href   = `/dashboard/companies/${companyId}/investors/claims${status ? `?status=${status}` : ""}`;
@@ -171,7 +191,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
           })}
         </div>
 
-        <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="hidden overflow-hidden rounded-xl border bg-card">
           <div className="overflow-x-auto">
             <table className="ar-table">
               <thead>
@@ -277,6 +297,7 @@ export default async function ClaimsPage({ params, searchParams }: Props) {
             </table>
           </div>
         </div>
+        </>}
       </div>
     </div>
   );
