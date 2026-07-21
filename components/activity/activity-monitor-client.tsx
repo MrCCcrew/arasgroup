@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Clock, Monitor, TrendingUp, Globe, Loader2, Trash2 } from "lucide-react";
+import { Calendar, Clock, Monitor, TrendingUp, Globe, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -111,6 +111,12 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
     }
   }
 
+  async function refreshData() {
+    if (!selectedUserId) return;
+    // Do not change the filters here: the selected employee and date range stay in place.
+    await Promise.all([fetchLogs(), fetchStats()]);
+  }
+
   async function handleDeleteSelected() {
     if (selectedLogs.size === 0) return;
 
@@ -211,6 +217,17 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
+        </div>
+        <div className="mt-4 flex justify-start">
+          <button
+            type="button"
+            onClick={() => void refreshData()}
+            disabled={!selectedUserId || loading || statsLoading}
+            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={loading || statsLoading ? "animate-spin" : ""} />
+            تحديث البيانات
+          </button>
         </div>
       </div>
 
