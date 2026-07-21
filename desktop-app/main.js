@@ -322,6 +322,7 @@ async function logout() {
   stopMonitoring();
   store.delete('userId');
   store.delete('authToken');
+  app.setLoginItemSettings({ openAtLogin: false });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.show();
 }
@@ -352,6 +353,10 @@ ipcMain.handle('login', async (event, { email, password, apiUrl }) => {
       store.set('apiUrl', apiUrl);
       store.set('userName', data.user.nameAr);
 
+      // Keep ARASGROUP Control running after Windows restarts once this device
+      // has been signed in for the first time.
+      app.setLoginItemSettings({ openAtLogin: true });
+
       mainWindow.hide();
       startMonitoring(data.user.id, data.user.id);
 
@@ -372,6 +377,10 @@ ipcMain.handle('getStatus', async () => {
 });
 
 app.whenReady().then(() => {
+  // Also enable autostart for users already signed in before this version.
+  if (store.get('userId') && store.get('authToken')) {
+    app.setLoginItemSettings({ openAtLogin: true });
+  }
   createWindow();
   createTray();
 });
