@@ -1,7 +1,7 @@
 {
-  "name": "rashid-activity-monitor",
+  "name": "arasgroup-control",
   "version": "1.0.0",
-  "description": "Employee Activity Monitor - Desktop App",
+  "description": "ARASGROUP Control Desktop Client",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -11,7 +11,7 @@
   },
   "build": {
     "appId": "com.rashidgroup.fullcontrol",
-    "productName": "نظام التحكم الكامل",
+    "productName": "ARASGROUP Control",
     "files": [
       "main.js",
       "preload.js",

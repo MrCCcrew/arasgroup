@@ -83,7 +83,7 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip('نظام التحكم الكامل');
+  tray.setToolTip('ARASGROUP Control');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
