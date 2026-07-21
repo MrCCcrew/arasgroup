@@ -9,6 +9,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { RenewalAlertsClient, type RenewalAlertListItem } from "@/components/investors/renewal-alerts-client";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -469,6 +470,20 @@ async function RenewalAlertsPanel({
   alerts.sort((a, b) => a.daysLeft - b.daysLeft);
 
   if (alerts.length === 0) return null;
+
+  const renewalAlerts: RenewalAlertListItem[] = alerts.map((alert) => ({
+    key: alert.key,
+    entityType: alert.entityType,
+    name: locale === "en" ? alert.nameEn ?? alert.nameAr : alert.nameAr,
+    branch: locale === "en" ? alert.branchNameEn ?? alert.branchNameAr : alert.branchNameAr,
+    documentType: locale === "en" ? alert.docTypeEn : alert.docTypeAr,
+    expiryDate: alert.expiryDate.toISOString(),
+    daysLeft: alert.daysLeft,
+    existingClaim: alert.existingClaim,
+    newClaimHref: alert.newClaimHref,
+  }));
+
+  return <RenewalAlertsClient alerts={renewalAlerts} locale={locale} />;
 
   const urgentCount = alerts.filter((a) => a.daysLeft <= 30 && !a.existingClaim).length;
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
