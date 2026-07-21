@@ -101,10 +101,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
   const getTypeLabel = (type: EmployeeType) => typeLabels[locale][type];
   const showingDeleted = query.status === "deleted";
+  const showingInactive = query.status === "inactive";
 
   const activeWhere = { companyId, isActive: true, isDeleted: false };
+  const inactiveWhere = { companyId, isActive: false, isDeleted: false };
   const deletedWhere = { companyId, isDeleted: true };
-  const baseWhere = showingDeleted ? deletedWhere : activeWhere;
+  const baseWhere = showingDeleted ? deletedWhere : showingInactive ? inactiveWhere : activeWhere;
 
   const categoryFilter =
     query.category === "drivers"
@@ -184,11 +186,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     }).then(emps => emps.map(e => e.licenseId!)),
   ]);
 
-  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, deletedCount, positions, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses, employees] = await Promise.all([
+  const [investorEmployeeCount, companyEmployeeCount, driverCount, adminCount, inactiveCount, deletedCount, positions, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses, employees] = await Promise.all([
     prisma.employee.count({ where: { ...activeWhere, investorId: { not: null } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null } }),
     prisma.employee.count({ where: { ...activeWhere, type: { in: [...DRIVER_TYPES] } } }),
     prisma.employee.count({ where: { ...activeWhere, investorId: null, type: { in: [...ADMIN_TYPES] } } }),
+    prisma.employee.count({ where: inactiveWhere }),
     prisma.employee.count({ where: deletedWhere }),
     prisma.employeePosition.findMany({
       where: { companyId, isActive: true },
@@ -270,6 +273,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   }, {});
 
   const totalCount = investorEmployeeCount + companyEmployeeCount;
+  const inactiveSubtitle = `${inactiveCount} ${locale === "en" ? "inactive employee(s)" : "موظف غير نشط"}`;
   const subtitle = showingDeleted
     ? `${deletedCount} ${locale === "en" ? "deleted employee(s)" : "موظف محذوف"}`
     : `${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`;
@@ -289,7 +293,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     <div>
       <Header
         title={locale === "en" ? "Employees" : "الموظفون"}
-        subtitle={subtitle}
+        subtitle={showingInactive ? inactiveSubtitle : subtitle}
         companyId={companyId}
         actions={
           showingDeleted ? null : (
@@ -318,7 +322,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         <div className="flex flex-wrap gap-2">
           <Link
             href={buildEmployeesHref(companyId)}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && !query.group && !query.category ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && !showingInactive && !query.group && !query.category ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "All active" : "كل النشطين"} ({totalCount})
           </Link>
@@ -345,6 +349,12 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.group === "company" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "Company employees" : "موظفو الشركة"} ({companyEmployeeCount})
+          </Link>
+          <Link
+            href={buildEmployeesHref(companyId, { status: "inactive" })}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${showingInactive ? "bg-orange-600 text-white" : "border-orange-300 text-orange-700 hover:bg-orange-50"}`}
+          >
+            {locale === "en" ? "Inactive" : "غير النشطين"} ({inactiveCount})
           </Link>
           <Link
             href={buildEmployeesHref(companyId, { status: "deleted" })}
