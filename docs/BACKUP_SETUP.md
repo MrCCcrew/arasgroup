@@ -19,7 +19,25 @@
 
 ### خطوات الإعداد
 
-#### 1. إضافة CRON_SECRET في `.env` على السيرفر
+#### 1. توليد CRON_SECRET عشوائي
+
+**على Windows PowerShell:**
+
+```powershell
+-join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | ForEach-Object {[char]$_})
+```
+
+**على Linux/Mac:**
+
+```bash
+openssl rand -base64 32
+```
+
+**مثال على النتيجة:** `FNMWQ0rxncCuZviGDOkIhX2Rj6JLH1mo`
+
+**احفظ هذا الرمز!** ستحتاجه في الخطوتين التاليتين.
+
+#### 2. إضافة CRON_SECRET في `.env` على السيرفر
 
 ```bash
 ssh root@arasgroup.app
@@ -27,20 +45,20 @@ cd /var/www/arasgroup.app
 nano .env
 ```
 
-أضف السطر التالي:
+أضف السطر التالي (استبدل بالرمز الذي ولدته):
 ```env
-CRON_SECRET=your-random-secure-secret-here-123456
+CRON_SECRET=FNMWQ0rxncCuZviGDOkIhX2Rj6JLH1mo
 ```
 
 احفظ واخرج (Ctrl+X ثم Y ثم Enter)
 
-#### 2. إعادة تشغيل PM2 لتحميل المتغير الجديد
+#### 3. إعادة تشغيل PM2 لتحميل المتغير الجديد
 
 ```bash
 pm2 reload arasgroup --update-env
 ```
 
-#### 3. إضافة Cron Job
+#### 4. إضافة Cron Job
 
 ```bash
 crontab -e
@@ -56,7 +74,7 @@ crontab -e
 
 احفظ واخرج
 
-#### 4. التحقق من Cron Jobs
+#### 5. التحقق من Cron Jobs
 
 ```bash
 crontab -l
@@ -64,7 +82,7 @@ crontab -l
 
 يجب أن ترى السطر المضاف
 
-#### 5. اختبار يدوياً
+#### 6. اختبار يدوياً
 
 ```bash
 curl -H "Authorization: Bearer your-random-secure-secret-here-123456" http://localhost:3000/api/cron/daily-backup
@@ -82,7 +100,7 @@ curl -H "Authorization: Bearer your-random-secure-secret-here-123456" http://loc
 }
 ```
 
-#### 6. مراقبة الـ logs
+#### 7. مراقبة الـ logs
 
 ```bash
 tail -f /var/log/backup-cron.log
