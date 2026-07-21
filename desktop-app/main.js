@@ -100,8 +100,9 @@ async function verifyAdminPassword(action) {
       resolve(result);
     };
     const promptWindow = new BrowserWindow({
-      width: 400,
-      height: 200,
+      width: 460,
+      height: 330,
+      title: 'ARASGROUP Control',
       modal: true,
       parent: mainWindow,
       webPreferences: {
@@ -120,60 +121,78 @@ async function verifyAdminPassword(action) {
         <style>
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
+            padding: 24px;
             direction: rtl;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f3f6fb;
             margin: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
+            min-height: calc(100vh - 48px);
+            color: #172033;
           }
           .container {
+            width: 100%;
             background: white;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            padding: 25px;
+            border: 1px solid #dbe3ef;
+            border-radius: 14px;
+            box-shadow: 0 14px 36px rgba(20, 51, 93, 0.12);
+          }
+          .container::before {
+            content: 'ARASGROUP CONTROL';
+            display: block;
+            margin-bottom: 8px;
+            color: #1d5fbf;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
           }
           h3 {
-            margin: 0 0 16px 0;
-            color: #333;
-            font-size: 18px;
+            margin: 0 0 18px 0;
+            color: #172033;
+            font-size: 17px;
+            line-height: 1.55;
           }
           input {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            box-sizing: border-box;
+            padding: 13px 14px;
+            border: 1px solid #cbd7e6;
+            border-radius: 9px;
             font-size: 14px;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
             font-family: inherit;
+            background: #f8fafd;
           }
           input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #1d5fbf;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(29, 95, 191, 0.12);
           }
           .buttons {
             display: flex;
-            gap: 8px;
+            gap: 10px;
           }
           button {
             flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
+            padding: 11px;
+            border: 1px solid transparent;
+            border-radius: 9px;
             font-size: 14px;
             cursor: pointer;
             font-weight: 600;
             font-family: inherit;
           }
           .btn-confirm {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #1d5fbf;
             color: white;
           }
           .btn-cancel {
-            background: #e0e0e0;
-            color: #666;
+            background: #f3f6fb;
+            border-color: #dbe3ef;
+            color: #44536a;
           }
         </style>
       </head>
