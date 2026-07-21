@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Clock, Monitor, TrendingUp, Globe, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Clock, Monitor, TrendingUp, Globe, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 
 interface User {
   id: string;
@@ -45,6 +45,14 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [selectedLogs, setSelectedLogs] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  const screenshotLogs = logs.filter(
+    (log, index, allLogs) =>
+      log.screenshotUrl && allLogs.findIndex((item) => item.screenshotUrl === log.screenshotUrl) === index,
+  );
+  const activeScreenshot = screenshotLogs[galleryIndex];
 
   // Set default date to today
   useEffect(() => {
@@ -167,6 +175,13 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
       newSelected.add(logId);
     }
     setSelectedLogs(newSelected);
+  }
+
+  function openScreenshot(logId: string) {
+    const index = screenshotLogs.findIndex((log) => log.id === logId);
+    if (index < 0) return;
+    setGalleryIndex(index);
+    setGalleryOpen(true);
   }
 
   const activityTypeLabels: Record<string, string> = {
@@ -417,14 +432,13 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
                       <td className="text-xs text-muted-foreground">{log.deviceName || "—"}</td>
                       <td>
                         {log.screenshotUrl ? (
-                          <a
-                            href={log.screenshotUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => openScreenshot(log.id)}
                             className="text-primary hover:underline text-xs"
                           >
                             عرض 📸
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
@@ -441,6 +455,57 @@ export function ActivityMonitorClient({ users }: { users: User[] }) {
       {!selectedUserId && (
         <div className="section-card text-center text-muted-foreground">
           <p>اختر موظف لعرض سجل نشاطه</p>
+        </div>
+      )}
+      {galleryOpen && activeScreenshot?.screenshotUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="معرض لقطات الشاشة"
+          onClick={() => setGalleryOpen(false)}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <h3 className="font-semibold">لقطات الشاشة</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {galleryIndex + 1} من {screenshotLogs.length} · {new Date(activeScreenshot.startTime).toLocaleString("ar-EG")}
+                </p>
+              </div>
+              <button type="button" onClick={() => setGalleryOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="إغلاق">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="relative flex min-h-0 flex-1 items-center justify-center bg-slate-950 p-4">
+              <img src={activeScreenshot.screenshotUrl} alt={`لقطة شاشة ${galleryIndex + 1}`} className="max-h-[72vh] max-w-full rounded-md object-contain" />
+              <button
+                type="button"
+                onClick={() => setGalleryIndex((index) => Math.min(screenshotLogs.length - 1, index + 1))}
+                disabled={galleryIndex === screenshotLogs.length - 1}
+                className="absolute right-4 rounded-full bg-black/50 p-3 text-white transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="اللقطة الأحدث"
+              >
+                <ChevronRight size={24} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setGalleryIndex((index) => Math.max(0, index - 1))}
+                disabled={galleryIndex === 0}
+                className="absolute left-4 rounded-full bg-black/50 p-3 text-white transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="اللقطة الأقدم"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
+              <span>{activeScreenshot.applicationName || "—"}</span>
+              <span className="max-w-[60%] truncate">{activeScreenshot.windowTitle || "—"}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
