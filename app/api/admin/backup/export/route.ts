@@ -1,37 +1,21 @@
-import { getSession } from "@/lib/auth/session";
 import { NextResponse } from "next/server";
-import { generateSQLDump } from "@/lib/backup/sql-generator";
 
+/**
+ * @deprecated هذا الـ endpoint تم تعطيله
+ *
+ * النسخ الاحتياطي تم نقله إلى خدمة مستقلة على السيرفر.
+ * لعرض النسخ المتاحة: /api/admin/backups/list
+ * لتحميل نسخة: /api/admin/backups/[filename]/download
+ */
 export async function POST() {
-  try {
-    const session = await getSession();
-    if (!session?.isSuperAdmin) {
-      return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
-    }
-
-    // توليد SQL dump
-    const sqlDump = await generateSQLDump();
-    const buffer = Buffer.from(sqlDump, 'utf-8');
-
-    // إنشاء اسم ملف فريد بالتاريخ والوقت
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    const filename = `backup_${timestamp}.sql`;
-
-    // إرجاع الملف
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/sql',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': buffer.length.toString(),
-      },
-    });
-
-  } catch (error) {
-    console.error("خطأ في تصدير النسخة الاحتياطية:", error);
-    return NextResponse.json(
-      { error: "فشل إنشاء النسخة الاحتياطية" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: "Gone",
+      message:
+        "تم نقل النسخ الاحتياطي إلى خدمة السيرفر المستقلة. لعرض النسخ المتاحة، انتقل إلى إعدادات النظام.",
+      deprecatedAt: "2026-07-22",
+      newEndpoint: "/api/admin/backups/list",
+    },
+    { status: 410 }
+  );
 }
