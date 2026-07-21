@@ -46,6 +46,26 @@ class ApiClient {
 
     return data;
   }
+
+  async sendScreenshot(screenshot, activity = {}) {
+    const timestamp = screenshot.timestamp;
+    return this.sendActivities([
+      {
+        userId: this.userId,
+        activityType: 'ACTIVE',
+        windowTitle: activity.windowTitle || null,
+        applicationName: activity.applicationName || null,
+        url: activity.url || null,
+        startTime: timestamp,
+        endTime: timestamp,
+        durationSeconds: 0,
+        isIdle: false,
+        deviceName: activity.deviceName || null,
+        ipAddress: activity.ipAddress || null,
+        authToken: this.authToken,
+      },
+    ], screenshot);
+  }
 }
 
 module.exports = ApiClient;

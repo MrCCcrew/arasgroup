@@ -94,6 +94,12 @@ function createTray() {
 
 async function verifyAdminPassword(action) {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     const promptWindow = new BrowserWindow({
       width: 400,
       height: 200,
@@ -202,12 +208,14 @@ async function verifyAdminPassword(action) {
     promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent));
 
     ipcMain.once('admin-password-response', (event, password) => {
-      promptWindow.close();
-      resolve(password === ADMIN_PASSWORD);
+      // Resolve first: closing the window also emits "closed", which previously
+      // resolved this prompt as false before the entered password was checked.
+      finish(password === ADMIN_PASSWORD);
+      if (!promptWindow.isDestroyed()) promptWindow.close();
     });
 
     promptWindow.on('closed', () => {
-      resolve(false);
+      finish(false);
     });
   });
 }

@@ -28,10 +28,10 @@ class ActivityTracker {
       this.sendActivities();
     }, 60000);
 
-    // Take screenshot every 1.5 minutes
+    // Take and upload a screenshot every minute.
     this.screenshotInterval = setInterval(() => {
       this.takeScreenshot();
-    }, 90000); // 1.5 minutes
+    }, 60000);
 
     // Take first screenshot immediately
     this.takeScreenshot();
@@ -246,13 +246,24 @@ class ActivityTracker {
       // Convert buffer to base64
       const base64Image = imgBuffer.toString('base64');
 
-      // Store screenshot to send with next activity batch
-      this.lastScreenshot = {
+      const capturedScreenshot = {
         timestamp: new Date().toISOString(),
         image: base64Image,
       };
 
-      console.log('Screenshot captured successfully');
+      // Upload immediately. Previously it waited for an activity batch, so a
+      // screenshot was lost whenever the activity queue was empty.
+      this.lastScreenshot = capturedScreenshot;
+      const current = this.currentActivity || {};
+      await this.apiClient.sendScreenshot(capturedScreenshot, {
+        windowTitle: current.windowTitle,
+        applicationName: current.applicationName,
+        url: current.url,
+        deviceName: os.hostname(),
+        ipAddress: this.getLocalIP(),
+      });
+      this.lastScreenshot = null;
+      console.log('Screenshot captured and uploaded successfully');
     } catch (error) {
       console.error('Failed to take screenshot:', error);
     }
