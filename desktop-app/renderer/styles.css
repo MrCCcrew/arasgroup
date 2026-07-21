@@ -1,5 +1,6 @@
 :root { --navy: #14335d; --blue: #1d5fbf; --ink: #172033; --muted: #697386; --line: #dbe3ef; --surface: #ffffff; --soft: #f5f8fc; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+.hidden { display: none !important; }
 body { min-height: 100vh; overflow: hidden; background: #edf2f8; color: var(--ink); font-family: "Segoe UI", Tahoma, Arial, sans-serif; }
 .shell { display: grid; grid-template-columns: 42% 58%; width: 100vw; min-height: 100vh; background: var(--surface); }
 .brand-panel { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 46px 34px; overflow: hidden; color: #fff; background: linear-gradient(145deg, #102b50 0%, #1d5fbf 100%); }
