@@ -306,7 +306,7 @@ type RenewalAlert = {
 
 const LICENSE_DOC_TYPES = [
   { field: "licenseExpiryDate",          ar: "الرخصة التجارية",      en: "Commercial License",   threshold: 60 },
-  { field: "fireLicenseExpiryDate",       ar: "رخصة الدفاع المدني",   en: "Fire Safety License",  threshold: 60 },
+  { field: "fireLicenseExpiryDate",       ar: "رخصة مطافي",           en: "Fire Safety License",  threshold: 60 },
   { field: "healthLicenseExpiryDate",     ar: "الرخصة الصحية",        en: "Health License",       threshold: 60 },
   { field: "advertisingLicenseExpiryDate",ar: "رخصة الإعلانات",       en: "Advertising License",  threshold: 60 },
   { field: "trafficCertExpiryDate",       ar: "شهادة المرور",          en: "Traffic Certificate",  threshold: 60 },
