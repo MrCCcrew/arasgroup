@@ -6,6 +6,7 @@ import { Building2, Users, Shield, Plus, Link2 } from "lucide-react";
 import Link from "next/link";
 import { GroupLogoUpload } from "@/components/group/GroupLogoUpload";
 import { ThemeSettings } from "@/components/settings/theme-settings";
+import { DatabaseBackup } from "@/components/settings/database-backup";
 
 const companyTypeLabels: Record<string, string> = {
   DELIVERY: "توصيل",
@@ -99,6 +100,12 @@ export default async function SettingsPage() {
         <div className="mb-6">
           <ThemeSettings />
         </div>
+
+        {canManageSystemSettings ? (
+          <div className="mb-6">
+            <DatabaseBackup />
+          </div>
+        ) : null}
 
         {canManageSystemSettings ? (
           <div className="space-y-4">
