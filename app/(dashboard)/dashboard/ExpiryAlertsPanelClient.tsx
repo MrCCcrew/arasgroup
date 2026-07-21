@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, Building2, ChevronLeft, FileText, ShieldUser, UserRound } from "lucide-react";
+import { AlertTriangle, Building2, ChevronLeft, ChevronRight, FileText, ShieldUser, UserRound } from "lucide-react";
 import type { AlertItem } from "./ExpiryAlertsPanel";
 
 interface Props {
@@ -40,10 +40,11 @@ function buildMeta(item: AlertItem) {
 export function ExpiryAlertsPanelClient({ alerts, maxShown, totals }: Props) {
   const filterOptions = ["الكل", ...Array.from(new Set(alerts.map((item) => item.expiryLabel)))];
   const [activeFilter, setActiveFilter] = useState("الكل");
+  const [page, setPage] = useState(1);
 
   const filteredAlerts = activeFilter === "الكل" ? alerts : alerts.filter((item) => item.expiryLabel === activeFilter);
-  const shown = filteredAlerts.slice(0, maxShown);
-  const remaining = filteredAlerts.length - shown.length;
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / maxShown));
+  const shown = filteredAlerts.slice((page - 1) * maxShown, page * maxShown);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-red-200 bg-white shadow-sm">
@@ -84,7 +85,10 @@ export function ExpiryAlertsPanelClient({ alerts, maxShown, totals }: Props) {
 
           <select
             value={activeFilter}
-            onChange={(event) => setActiveFilter(event.target.value)}
+            onChange={(event) => {
+              setActiveFilter(event.target.value);
+              setPage(1);
+            }}
             className="input-field w-full border-red-200 bg-white text-sm"
           >
             {filterOptions.map((option) => (
@@ -101,7 +105,10 @@ export function ExpiryAlertsPanelClient({ alerts, maxShown, totals }: Props) {
                 <button
                   key={option}
                   type="button"
-                  onClick={() => setActiveFilter(option)}
+                  onClick={() => {
+                    setActiveFilter(option);
+                    setPage(1);
+                  }}
                   className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                     isActive
                       ? "border-red-300 bg-red-100 font-semibold text-red-700"
@@ -169,9 +176,27 @@ export function ExpiryAlertsPanelClient({ alerts, maxShown, totals }: Props) {
           <div className="px-5 py-6 text-center text-sm text-muted-foreground">لا توجد تنبيهات لهذا النوع حاليًا</div>
         )}
 
-        {remaining > 0 && (
-          <div className="bg-gray-50 px-5 py-3 text-center text-sm text-muted-foreground">
-            و <span className="font-bold text-foreground">{remaining}</span> بندًا آخر قريب الانتهاء
+        {filteredAlerts.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 bg-gray-50 px-5 py-3">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 rounded-lg border bg-white px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronRight size={16} /> السابق
+            </button>
+            <span className="text-sm text-muted-foreground">
+              صفحة <span className="font-bold text-foreground">{page}</span> من {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border bg-white px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              التالي <ChevronLeft size={16} />
+            </button>
           </div>
         )}
       </div>

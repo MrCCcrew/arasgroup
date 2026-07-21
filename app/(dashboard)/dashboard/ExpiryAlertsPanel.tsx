@@ -203,5 +203,5 @@ export async function ExpiryAlertsPanel({ companyIds }: Props) {
     notice: alerts.filter((item) => item.daysLeft > 60).length,
   };
 
-  return <ExpiryAlertsPanelClient alerts={alerts} maxShown={25} totals={totals} />;
+  return <ExpiryAlertsPanelClient alerts={alerts} maxShown={10} totals={totals} />;
 }
