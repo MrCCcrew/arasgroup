@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Upload, Database, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { Download, Database, CheckCircle2, Loader2, Cloud, Clock } from "lucide-react";
 
 export function DatabaseBackup() {
   const [isExporting, setIsExporting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [restorePassword, setRestorePassword] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isAutoBackup, setIsAutoBackup] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const handleExport = async () => {
@@ -41,7 +39,7 @@ export function DatabaseBackup() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      setMessage({ type: "success", text: "تم تصدير النسخة الاحتياطية بنجاح" });
+      setMessage({ type: "success", text: "تم تصدير النسخة الاحتياطية بنجاح بصيغة SQL" });
     } catch (error) {
       console.error("خطأ في التصدير:", error);
       setMessage({
@@ -53,85 +51,46 @@ export function DatabaseBackup() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith(".json")) {
-        setMessage({ type: "error", text: "يجب اختيار ملف بصيغة .json" });
-        return;
-      }
-      setSelectedFile(file);
-      setMessage(null);
-    }
-  };
-
-  const handleRestore = async () => {
-    if (!selectedFile) {
-      setMessage({ type: "error", text: "الرجاء اختيار ملف النسخة الاحتياطية" });
-      return;
-    }
-
-    if (!restorePassword) {
-      setMessage({ type: "error", text: "الرجاء إدخال كلمة السر" });
-      return;
-    }
-
-    // تأكيد الاستعادة
-    const confirmed = window.confirm(
-      "⚠️ تحذير: ستتم استبدال جميع البيانات الحالية بالنسخة الاحتياطية.\n\nهل أنت متأكد من المتابعة؟"
-    );
-
-    if (!confirmed) return;
-
+  const handleAutoBackup = async () => {
     try {
-      setIsRestoring(true);
+      setIsAutoBackup(true);
       setMessage(null);
 
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("password", restorePassword);
-
-      const response = await fetch("/api/admin/backup/restore", {
+      const response = await fetch("/api/admin/backup/auto", {
         method: "POST",
-        body: formData,
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "فشل الاستعادة");
+        throw new Error(result.error || "فشل النسخ الاحتياطي");
       }
 
-      setMessage({ type: "success", text: result.message });
-      setRestorePassword("");
-      setSelectedFile(null);
-
-      // إعادة تحميل الصفحة بعد 2 ثانية
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-
+      setMessage({
+        type: "success",
+        text: `تم رفع النسخة الاحتياطية إلى السحابة بنجاح (${(result.size / 1024 / 1024).toFixed(2)} MB)`
+      });
     } catch (error) {
-      console.error("خطأ في الاستعادة:", error);
+      console.error("خطأ في النسخ الاحتياطي:", error);
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "فشل استعادة النسخة الاحتياطية",
+        text: error instanceof Error ? error.message : "فشل النسخ الاحتياطي",
       });
     } finally {
-      setIsRestoring(false);
+      setIsAutoBackup(false);
     }
   };
 
   return (
     <div className="section-card">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-          <Database size={20} className="text-amber-600" />
+        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+          <Database size={20} className="text-blue-600" />
         </div>
         <div>
-          <h2 className="font-bold text-base">النسخ الاحتياطي والاستعادة</h2>
+          <h2 className="font-bold text-base">النسخ الاحتياطي</h2>
           <p className="text-xs text-muted-foreground">
-            إدارة النسخ الاحتياطية لقاعدة البيانات
+            نسخ احتياطي يدوي وأوتوماتيكي لقاعدة البيانات
           </p>
         </div>
       </div>
@@ -144,29 +103,25 @@ export function DatabaseBackup() {
               : "bg-red-50 text-red-800 border border-red-200"
           }`}
         >
-          {message.type === "success" ? (
-            <CheckCircle2 size={16} />
-          ) : (
-            <AlertTriangle size={16} />
-          )}
+          <CheckCircle2 size={16} />
           {message.text}
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* قسم التصدير */}
-        <div className="p-4 border border-border rounded-lg">
-          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-            <Download size={16} className="text-primary" />
-            تصدير نسخة احتياطية
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* نسخة احتياطية يدوية - تحميل لجهازك */}
+        <div className="p-4 border border-border rounded-lg bg-gradient-to-br from-blue-50/50 to-transparent">
+          <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+            <Download size={16} className="text-blue-600" />
+            نسخة احتياطية يدوية
           </h3>
           <p className="text-xs text-muted-foreground mb-4">
-            قم بتصدير نسخة احتياطية كاملة من قاعدة البيانات إلى جهازك
+            تصدير SQL كامل وتحميله إلى جهازك مباشرة
           </p>
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isExporting ? (
               <>
@@ -176,89 +131,90 @@ export function DatabaseBackup() {
             ) : (
               <>
                 <Download size={16} />
-                تصدير النسخة الاحتياطية
+                تحميل النسخة الاحتياطية
               </>
             )}
           </button>
         </div>
 
-        {/* قسم الاستعادة */}
-        <div className="p-4 border border-border rounded-lg bg-amber-50/50">
-          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-            <Upload size={16} className="text-amber-600" />
-            استعادة نسخة احتياطية
+        {/* نسخة احتياطية أوتوماتيكية - رفع للسحابة */}
+        <div className="p-4 border border-border rounded-lg bg-gradient-to-br from-emerald-50/50 to-transparent">
+          <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+            <Cloud size={16} className="text-emerald-600" />
+            نسخة احتياطية سحابية
           </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            رفع النسخة الاحتياطية إلى Cloudflare R2
+          </p>
+          <button
+            onClick={handleAutoBackup}
+            disabled={isAutoBackup}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isAutoBackup ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                جاري الرفع...
+              </>
+            ) : (
+              <>
+                <Cloud size={16} />
+                رفع إلى السحابة
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="backup-file" className="block text-xs font-medium mb-1">
-                اختر ملف النسخة الاحتياطية (.json)
-              </label>
-              <input
-                id="backup-file"
-                type="file"
-                accept=".json"
-                onChange={handleFileChange}
-                className="input-field w-full text-sm"
-              />
-              {selectedFile && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  الملف المحدد: {selectedFile.name}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="restore-password" className="block text-xs font-medium mb-1">
-                كلمة السر للاستعادة
-              </label>
-              <input
-                id="restore-password"
-                type="password"
-                placeholder="أدخل كلمة السر"
-                value={restorePassword}
-                onChange={(e) => setRestorePassword(e.target.value)}
-                className="input-field w-full"
-              />
-            </div>
-
-            <div className="bg-amber-100 border border-amber-300 rounded p-2 flex items-start gap-2">
-              <AlertTriangle size={14} className="text-amber-700 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-800">
-                <strong>تحذير:</strong> ستتم استبدال جميع البيانات الحالية
+      {/* معلومات النسخ الاحتياطي الأوتوماتيكي */}
+      <div className="mt-4 p-4 bg-gradient-to-br from-purple-50/50 to-transparent border border-purple-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <Clock size={18} className="text-purple-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-purple-900 mb-2">
+              نسخ احتياطي يومي تلقائي
+            </h4>
+            <p className="text-xs text-purple-800 mb-3">
+              يتم إنشاء نسخة احتياطية تلقائياً كل يوم الساعة 2:00 صباحاً ورفعها إلى Cloudflare R2
+            </p>
+            <div className="bg-purple-100 rounded p-2">
+              <p className="text-xs text-purple-900 font-mono">
+                <strong>Cron:</strong> 0 2 * * * curl http://localhost:3000/api/cron/daily-backup
               </p>
             </div>
-
-            <button
-              onClick={handleRestore}
-              disabled={isRestoring || !selectedFile || !restorePassword}
-              className="w-full flex items-center justify-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isRestoring ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  جاري الاستعادة...
-                </>
-              ) : (
-                <>
-                  <Upload size={16} />
-                  استعادة النسخة الاحتياطية
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>
 
+      {/* ملاحظات مهمة */}
       <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-        <h4 className="text-xs font-semibold mb-2">ملاحظات مهمة:</h4>
+        <h4 className="text-xs font-semibold mb-2">📋 ملاحظات مهمة:</h4>
         <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-          <li>يتم تصدير جميع الجداول والبيانات بالكامل</li>
-          <li>احفظ النسخة الاحتياطية في مكان آمن</li>
-          <li>يُنصح بإنشاء نسخة احتياطية قبل أي تحديثات كبيرة</li>
-          <li>عملية الاستعادة ستحذف جميع البيانات الحالية وتستبدلها بالنسخة الاحتياطية</li>
-          <li>كلمة السر المطلوبة للاستعادة هي: <code className="bg-muted px-1 rounded">T@mer2026</code></li>
+          <li>النسخ الاحتياطية بصيغة SQL القياسية (متوافقة مع MySQL)</li>
+          <li>احفظ النسخة المحلية في مكان آمن ومشفر</li>
+          <li>النسخ السحابية تُحفظ في مجلد <code className="bg-muted px-1 rounded">backups/</code> على R2</li>
+          <li>للاستعادة: استخدم phpMyAdmin أو MySQL CLI على السيرفر مباشرة</li>
+          <li>⚠️ <strong>الاستعادة الأوتوماتيكية معطلة للأمان</strong> - تتم يدوياً فقط</li>
         </ul>
+      </div>
+
+      {/* تعليمات الاستعادة اليدوية */}
+      <div className="mt-4 p-4 border border-amber-200 bg-amber-50/50 rounded-lg">
+        <h4 className="text-sm font-semibold text-amber-900 mb-2">
+          🔧 كيفية استعادة النسخة الاحتياطية (يدوياً على السيرفر):
+        </h4>
+        <div className="space-y-2 text-xs text-amber-800">
+          <p><strong>1.</strong> إيقاف التطبيق مؤقتاً:</p>
+          <code className="block bg-amber-100 p-2 rounded font-mono">pm2 stop arasgroup</code>
+
+          <p className="pt-2"><strong>2.</strong> استعادة النسخة الاحتياطية:</p>
+          <code className="block bg-amber-100 p-2 rounded font-mono">
+            mysql -u username -p database_name &lt; backup.sql
+          </code>
+
+          <p className="pt-2"><strong>3.</strong> إعادة تشغيل التطبيق:</p>
+          <code className="block bg-amber-100 p-2 rounded font-mono">pm2 start arasgroup</code>
+        </div>
       </div>
     </div>
   );
