@@ -3,64 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>نظام التحكم الكامل - تسجيل الدخول</title>
+    <title>نظام التحكم الكامل | تسجيل الدخول</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="container">
-      <div class="header">
-        <div class="logo">⚡</div>
-        <h1>نظام التحكم الكامل</h1>
-        <p>مجموعة عبد الفتاح رشيد سليمان</p>
-      </div>
+    <main class="shell">
+      <section class="brand-panel" aria-label="هوية النظام">
+        <div class="brand-mark" aria-hidden="true"><span>R</span></div>
+        <div>
+          <p class="eyebrow">RASHID GROUP</p>
+          <h1>نظام التحكم الكامل</h1>
+          <p class="brand-description">منصة متابعة النشاط المؤسسي</p>
+        </div>
+        <div class="brand-note"><span class="status-dot"></span>اتصال آمن ومشفّر</div>
+      </section>
 
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="apiUrl">عنوان السيرفر</label>
-          <input
-            type="text"
-            id="apiUrl"
-            value="http://localhost:3000"
-            placeholder="http://localhost:3000"
-            required
-          />
+      <section class="login-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">تسجيل الدخول</p>
+          <h2>مرحبًا بك</h2>
+          <p>أدخل بيانات حسابك لبدء المتابعة على هذا الجهاز.</p>
         </div>
 
-        <div class="form-group">
-          <label for="email">البريد الإلكتروني</label>
-          <input
-            type="email"
-            id="email"
-            placeholder="أدخل بريدك الإلكتروني"
-            required
-            autocomplete="email"
-          />
-        </div>
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label for="apiUrl">عنوان الخادم</label>
+            <div class="input-wrap"><span class="field-icon">⌘</span><input type="url" id="apiUrl" value="http://localhost:3000" placeholder="https://arasgroup.app" required /></div>
+          </div>
 
-        <div class="form-group">
-          <label for="password">كلمة المرور</label>
-          <input
-            type="password"
-            id="password"
-            placeholder="أدخل كلمة المرور"
-            required
-            autocomplete="current-password"
-          />
-        </div>
+          <div class="form-group">
+            <label for="email">البريد الإلكتروني</label>
+            <div class="input-wrap"><span class="field-icon">@</span><input type="email" id="email" placeholder="name@company.com" required autocomplete="email" /></div>
+          </div>
 
-        <div id="error" class="error" style="display: none"></div>
+          <div class="form-group">
+            <label for="password">كلمة المرور</label>
+            <div class="input-wrap"><span class="field-icon">●</span><input type="password" id="password" placeholder="أدخل كلمة المرور" required autocomplete="current-password" /></div>
+          </div>
 
-        <button type="submit" id="loginBtn" class="btn-primary">
-          <span id="loginBtnText">تسجيل الدخول</span>
-          <span id="loginSpinner" class="spinner" style="display: none"></span>
-        </button>
-      </form>
+          <div id="error" class="error" role="alert" style="display: none"></div>
 
-      <div class="footer">
-        <p>سيعمل التطبيق في الخلفية بعد تسجيل الدخول</p>
-      </div>
-    </div>
+          <button type="submit" id="loginBtn" class="btn-primary"><span id="loginBtnText">تسجيل الدخول</span><span id="loginSpinner" class="spinner" style="display: none"></span></button>
+        </form>
 
+        <p class="security-note"><span>🔒</span>يستمر التطبيق في الخلفية بعد تسجيل الدخول.</p>
+      </section>
+    </main>
     <script src="renderer.js"></script>
   </body>
 </html>

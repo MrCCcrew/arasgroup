@@ -14,8 +14,8 @@ let isMonitoring = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 400,
-    height: 500,
+    width: 520,
+    height: 650,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -78,8 +78,7 @@ function createTray() {
     {
       label: 'إنهاء',
       click: () => {
-        app.isQuiting = true;
-        app.quit();
+        quitApplication();
       },
     },
   ]);
@@ -288,8 +287,7 @@ function updateTrayMenu() {
     {
       label: 'إنهاء',
       click: () => {
-        app.isQuiting = true;
-        app.quit();
+        quitApplication();
       },
     },
   ]);
@@ -307,6 +305,14 @@ async function logout() {
   store.delete('authToken');
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.show();
+}
+
+async function quitApplication() {
+  const verified = await verifyAdminPassword('إنهاء التطبيق يتطلب كلمة مرور المدير');
+  if (!verified) return;
+
+  app.isQuiting = true;
+  app.quit();
 }
 
 // IPC Handlers
