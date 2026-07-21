@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   BarChart3,
   BookOpen,
+  Calculator,
   Car,
   FileText,
   Scale,
@@ -163,6 +164,15 @@ export default async function ReportsPage({ params }: Props) {
       color: "text-indigo-600",
       bg: "bg-indigo-50",
       badges: [filterBadge],
+    },
+    {
+      title: locale === "en" ? "Cost Center" : "مركز التكلفة",
+      description: locale === "en" ? "Driver costs, salaries, orders and shared expenses" : "تكلفة السائقين والرواتب والطلبات والمصروفات المشتركة",
+      href: `${base}/delivery/cost-center`,
+      icon: Calculator,
+      color: "text-rose-600",
+      bg: "bg-rose-50",
+      badges: [filterBadge, detailBadge],
     },
   ];
 
