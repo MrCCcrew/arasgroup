@@ -66,11 +66,19 @@ crontab -e
 
 أضف السطر التالي (يشتغل كل يوم الساعة 2:00 صباحاً بتوقيت السيرفر):
 
+**خيار 1 (الأسهل والأضمن) - استخدام الدومين:**
+
 ```cron
-0 2 * * * curl -H "Authorization: Bearer your-random-secure-secret-here-123456" http://localhost:3000/api/cron/daily-backup >> /var/log/backup-cron.log 2>&1
+0 2 * * * curl -H "Authorization: Bearer MrCCcrew1985_1986" https://arasgroup.app/api/cron/daily-backup >> /var/log/backup-cron.log 2>&1
 ```
 
-**ملاحظة:** استبدل `your-random-secure-secret-here-123456` بنفس القيمة في `.env`
+**خيار 2 (أسرع) - استخدام localhost:**
+
+```cron
+0 2 * * * curl -H "Authorization: Bearer MrCCcrew1985_1986" http://localhost:3000/api/cron/daily-backup >> /var/log/backup-cron.log 2>&1
+```
+
+**ملاحظة:** إذا التطبيق على بورت غير 3000، غيّر البورت في الأمر
 
 احفظ واخرج
 
@@ -84,8 +92,16 @@ crontab -l
 
 #### 6. اختبار يدوياً
 
+**عبر الدومين (مضمون):**
+
 ```bash
-curl -H "Authorization: Bearer your-random-secure-secret-here-123456" http://localhost:3000/api/cron/daily-backup
+curl -H "Authorization: Bearer MrCCcrew1985_1986" https://arasgroup.app/api/cron/daily-backup
+```
+
+**أو عبر localhost (أسرع):**
+
+```bash
+curl -H "Authorization: Bearer MrCCcrew1985_1986" http://localhost:3000/api/cron/daily-backup
 ```
 
 يجب أن ترى:
