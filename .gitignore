@@ -54,5 +54,7 @@ next-env.d.ts
 *.backup*
 scanner_linux
 backups/
+!app/api/admin/backups/
+!app/api/admin/backups/**
 logs/
 standalone.tar.gz

@@ -48,6 +48,7 @@ export function getBackupDirectory(): string {
  * - يجب أن يطابق النمط المحدد
  * - لا يحتوي على path separators
  * - لا يحتوي على ..
+ * - التحقق من صحة التاريخ والوقت
  */
 export function validateBackupFilename(filename: string): boolean {
   // 1. تحقق من النمط
@@ -68,6 +69,42 @@ export function validateBackupFilename(filename: string): boolean {
   // 3. تحقق من أن basename مطابق للاسم الأصلي
   if (path.basename(filename) !== filename) {
     return false;
+  }
+
+  // 4. التحقق من صحة التاريخ والوقت
+  // استخراج الأجزاء: rashidgroup_db_YYYY-MM-DD_HH-MM-SS.sql.gz
+  const match = filename.match(/^rashidgroup_db_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.sql\.gz$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr] = match;
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  const second = parseInt(secondStr, 10);
+
+  // التحقق من النطاقات
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (hour < 0 || hour > 23) return false;
+  if (minute < 0 || minute > 59) return false;
+  if (second < 0 || second > 59) return false;
+
+  // التحقق من صحة التاريخ عبر إنشاء Date والتأكد من المطابقة
+  const date = new Date(year, month - 1, day, hour, minute, second);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hour ||
+    date.getMinutes() !== minute ||
+    date.getSeconds() !== second
+  ) {
+    return false; // التاريخ غير صحيح (مثلاً 31 فبراير)
   }
 
   return true;
