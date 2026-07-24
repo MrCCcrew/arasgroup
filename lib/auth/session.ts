@@ -48,6 +48,8 @@ export async function createSession(user: SessionUser): Promise<string> {
     nameEn: user.nameEn,
     locale,
     isSuperAdmin: user.isSuperAdmin,
+    employeeId: user.employeeId,
+    accountType: user.accountType,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -132,6 +134,8 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
     nameEn: user.nameEn,
     locale,
     isSuperAdmin: user.isSuperAdmin,
+    employeeId: user.employeeId,
+    accountType: user.accountType,
     roles: user.roles.map((ur: any) => ({
       name: ur.role.name,
       companyId: ur.companyId,

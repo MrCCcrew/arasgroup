@@ -24,6 +24,8 @@ export interface SessionUser {
   nameEn?: string | null;
   locale?: "ar" | "en";
   isSuperAdmin: boolean;
+  employeeId?: string | null;
+  accountType?: "ADMIN" | "DRIVER" | "CAR_WASH_WORKER";
   roles: SessionRole[];
   groupAccess: SessionGroupAccess[];
   companyAccess: string[]; // company IDs
