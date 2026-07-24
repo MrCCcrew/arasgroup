@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
 import { hasPermission } from '@/lib/auth/permissions';
+import { EmployeeType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -22,6 +23,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بإنشاء حسابات' }, { status: 403 });
     }
 
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { type: true },
+    });
+
+    if (!company || (company.type !== 'DELIVERY' && company.type !== 'CAR_WASH')) {
+      return NextResponse.json({ error: 'هذه الشركة لا تدعم حسابات السائقين' }, { status: 400 });
+    }
+
+    const eligibleTypes: EmployeeType[] = company.type === 'DELIVERY'
+      ? ['DRIVER', 'DELIVERY_DRIVER']
+      : ['CAR_WASH_DRIVER', 'CAR_WASH_WORKER'];
+
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
       include: { user: true },
@@ -35,12 +49,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'الموظف ليس في هذه الشركة' }, { status: 400 });
     }
 
+    if (!employee.isActive || employee.isDeleted || employee.deletedAt) {
+      return NextResponse.json({ error: 'السائق غير نشط أو محذوف' }, { status: 400 });
+    }
+
     if (employee.user) {
       return NextResponse.json({ error: 'الموظف لديه حساب بالفعل' }, { status: 400 });
     }
 
-    if (employee.type !== 'DRIVER' && employee.type !== 'CAR_WASH_WORKER') {
-      return NextResponse.json({ error: 'الموظف ليس سائقاً أو عامل غسيل' }, { status: 400 });
+    if (!eligibleTypes.includes(employee.type)) {
+      return NextResponse.json({ error: 'نوع الموظف غير مؤهل لحساب السائق في هذه الشركة' }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -62,7 +80,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         isSuperAdmin: false,
         employeeId: employee.id,
-        accountType: employee.type === 'DRIVER' ? 'DRIVER' : 'CAR_WASH_WORKER',
+        accountType: company.type === 'DELIVERY' ? 'DRIVER' : 'CAR_WASH_WORKER',
         mustChangePassword: mustChangePassword ?? true,
       },
     });

@@ -18,6 +18,7 @@ import {
 interface Employee {
   id: string;
   nameAr: string;
+  nameEn: string | null;
   type: string;
   employeeNumber: string | null;
 }
@@ -35,6 +36,9 @@ export default function CreateDriverAccountPage(props: {
   }, [props.params]);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [employeeError, setEmployeeError] = useState('');
+  const [companyType, setCompanyType] = useState<'DELIVERY' | 'CAR_WASH' | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     employeeId: preSelectedEmployeeId || '',
@@ -45,13 +49,31 @@ export default function CreateDriverAccountPage(props: {
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/companies/${companyId}/employees?withoutAccounts=true&types=DRIVER,CAR_WASH_WORKER`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setEmployees(data.data || []);
-        }
-      });
+    const controller = new AbortController();
+    setLoadingEmployees(true);
+    setEmployeeError('');
+
+    fetch(`/api/companies/${companyId}/employees?availableForDriverAccount=true`, { signal: controller.signal })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'فشل تحميل السائقين');
+        setCompanyType(data.companyType === 'DELIVERY' || data.companyType === 'CAR_WASH' ? data.companyType : null);
+        return data.data as Employee[];
+      })
+      .then((availableEmployees) => {
+        setEmployees(availableEmployees);
+        setFormData((current) => availableEmployees.some((employee) => employee.id === current.employeeId)
+          ? current
+          : { ...current, employeeId: '' });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setEmployees([]);
+        setEmployeeError(error instanceof Error ? error.message : 'فشل تحميل السائقين');
+      })
+      .finally(() => setLoadingEmployees(false));
+
+    return () => controller.abort();
   }, [companyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,24 +131,28 @@ export default function CreateDriverAccountPage(props: {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="employeeId">الموظف *</Label>
+              <Label htmlFor="employeeId">{companyType === 'CAR_WASH' ? 'اختر السائق أو عامل الغسيل' : 'اختر السائق'} *</Label>
               <Select
                 value={formData.employeeId}
                 onValueChange={(value) => setFormData({ ...formData, employeeId: value })}
-                required
+                disabled={loadingEmployees || employees.length === 0}
               >
                 <SelectTrigger id="employeeId">
-                  <SelectValue placeholder="اختر الموظف" />
+                  <SelectValue placeholder={loadingEmployees ? 'جاري تحميل السائقين...' : 'اختر من قائمة السائقين المتاحين'} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[60]">
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
-                      {emp.nameAr} ({emp.type === 'DRIVER' ? 'سائق' : 'غسيل'})
+                      {emp.nameAr} ({emp.type === 'DRIVER' || emp.type === 'DELIVERY_DRIVER' || emp.type === 'CAR_WASH_DRIVER' ? 'سائق' : 'عامل غسيل'})
                       {emp.employeeNumber && ` - ${emp.employeeNumber}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {employeeError && <p className="text-sm text-destructive">{employeeError}</p>}
+              {!loadingEmployees && !employeeError && employees.length === 0 && (
+                <p className="text-sm text-muted-foreground">لا يوجد سائقون متاحون لإنشاء حساب جديد. أضف السائق أولاً في قسم الموظفين/السائقين وتأكد من عدم وجود حساب مرتبط به.</p>
+              )}
             </div>
           </CardContent>
         </Card>
