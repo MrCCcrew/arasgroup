@@ -22,6 +22,7 @@ const permissionSeeds = [
   ["HR", "CREATE", "COMPANY"],
   ["HR", "UPDATE", "COMPANY"],
   ["HR", "EXPORT", "COMPANY"],
+  ["DELIVERY_INVOICES", "APPROVE", "COMPANY"],
   ["DELIVERY_HR", "VIEW", "COMPANY"],
   ["DELIVERY_HR", "CREATE", "COMPANY"],
   ["DELIVERY_HR", "UPDATE", "COMPANY"],

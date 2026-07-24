@@ -117,6 +117,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { module: "SALARIES", action: "APPROVE", scope: "COMPANY" },
   { module: "SALARIES", action: "EXPORT", scope: "COMPANY" },
   { module: "SALARIES", action: "PRINT", scope: "COMPANY" },
+  { module: "DELIVERY_INVOICES", action: "APPROVE", scope: "COMPANY" },
   { module: "DELIVERY_HR", action: "VIEW", scope: "COMPANY" },
   { module: "DELIVERY_HR", action: "CREATE", scope: "COMPANY" },
   { module: "DELIVERY_HR", action: "UPDATE", scope: "COMPANY" },

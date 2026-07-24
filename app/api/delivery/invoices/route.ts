@@ -30,11 +30,15 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const search = searchParams.get("search")?.trim();
+  const reviewStatus = searchParams.get("reviewStatus");
+  const uploadSource = searchParams.get("uploadSource");
 
   const where: Record<string, unknown> = {
     companyId,
     deletedAt: null,
     ...(targetType === "DRIVER" || targetType === "EMPLOYEE" ? { targetType } : {}),
+    ...(reviewStatus === "PENDING_REVIEW" || reviewStatus === "APPROVED" || reviewStatus === "REJECTED" ? { reviewStatus } : {}),
+    ...(uploadSource === "ADMIN" || uploadSource === "DRIVER_WEB" || uploadSource === "DRIVER_MOBILE" ? { uploadSource } : {}),
     ...(driverId ? { driverId } : {}),
     ...(employeeId ? { employeeId } : {}),
     ...(from || to
@@ -75,6 +79,11 @@ export async function GET(request: NextRequest) {
       imagePath: inv.imagePath,
       originalFileName: inv.originalFileName,
       notes: inv.notes,
+      reviewStatus: inv.reviewStatus,
+      uploadSource: inv.uploadSource,
+      reviewedAt: inv.reviewedAt,
+      rejectionReason: inv.rejectionReason,
+      createdAt: inv.createdAt,
     })),
   });
 }

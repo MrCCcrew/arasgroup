@@ -26,6 +26,11 @@ interface Invoice {
   imagePath: string;
   originalFileName?: string | null;
   notes: string | null;
+  reviewStatus: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  uploadSource: "ADMIN" | "DRIVER_WEB" | "DRIVER_MOBILE";
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
 }
 
 interface Row {
@@ -91,9 +96,15 @@ export default function DeliveryInvoicesPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [fType, setFType] = useState("");
   const [search, setSearch] = useState("");
+  const [reviewStatus, setReviewStatus] = useState("");
+  const [uploadSource, setUploadSource] = useState("");
   const [viewImg, setViewImg] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [rejectingInvoice, setRejectingInvoice] = useState<Invoice | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,12 +132,14 @@ export default function DeliveryInvoicesPage() {
       ...(effectiveTo ? { to: effectiveTo } : {}),
       ...(fType ? { targetType: fType } : {}),
       ...(search ? { search } : {}),
+      ...(reviewStatus ? { reviewStatus } : {}),
+      ...(uploadSource ? { uploadSource } : {}),
     });
     const res = await fetch(`/api/delivery/invoices?${qs}`);
     const p = await res.json();
     if (p.success) setInvoices(p.data);
     setLoading(false);
-  }, [companyId, from, to, month, year, fType, search]);
+  }, [companyId, from, to, month, year, fType, search, reviewStatus, uploadSource]);
 
   useEffect(() => {
     load();
@@ -137,6 +150,43 @@ export default function DeliveryInvoicesPage() {
     total: invoices.reduce((sum, invoice) => sum + invoice.amount, 0),
     people: new Set(invoices.map((invoice) => invoice.name)).size,
   }), [invoices]);
+
+  const review = async (invoice: Invoice, status: "APPROVED" | "REJECTED", reason?: string) => {
+    setReviewingId(invoice.id);
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/driver/invoices/${invoice.id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(status === "REJECTED" ? { status, rejectionReason: reason } : { status }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error ?? "Review failed");
+      setMessage(en ? "Invoice review saved" : "تم حفظ مراجعة الفاتورة");
+      setRejectingInvoice(null);
+      setRejectionReason("");
+      await load();
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : (en ? "Review failed" : "فشلت المراجعة"));
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const statusBadge = (status: Invoice["reviewStatus"]) => {
+    const colors = {
+      PENDING_REVIEW: "bg-amber-100 text-amber-800",
+      APPROVED: "bg-emerald-100 text-emerald-800",
+      REJECTED: "bg-red-100 text-red-800",
+    };
+    const labels = {
+      PENDING_REVIEW: en ? "Pending review" : "قيد المراجعة",
+      APPROVED: en ? "Approved" : "معتمدة",
+      REJECTED: en ? "Rejected" : "مرفوضة",
+    };
+    return <span className={`rounded-full px-2 py-0.5 text-xs ${colors[status]}`}>{labels[status]}</span>;
+  };
 
   return (
     <div>
@@ -161,6 +211,11 @@ export default function DeliveryInvoicesPage() {
         {message && (
           <div className="rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
             {message}
+          </div>
+        )}
+        {error && (
+          <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+            {error}
           </div>
         )}
 
@@ -217,12 +272,29 @@ export default function DeliveryInvoicesPage() {
               <option value="EMPLOYEE">{en ? "Employee" : "موظف"}</option>
             </select>
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Review" : "المراجعة"}</label>
+            <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)} className="input-field w-40">
+              <option value="">{en ? "All" : "الكل"}</option>
+              <option value="PENDING_REVIEW">{en ? "Pending review" : "قيد المراجعة"}</option>
+              <option value="APPROVED">{en ? "Approved" : "معتمدة"}</option>
+              <option value="REJECTED">{en ? "Rejected" : "مرفوضة"}</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Source" : "المصدر"}</label>
+            <select value={uploadSource} onChange={(e) => setUploadSource(e.target.value)} className="input-field w-36">
+              <option value="">{en ? "All" : "الكل"}</option>
+              <option value="DRIVER_WEB">DRIVER_WEB</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+          </div>
           <div className="min-w-40 flex-1">
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
           </div>
-          {(from || to || month || year || fType || search) && (
-            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setSearch(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+          {(from || to || month || year || fType || search || reviewStatus || uploadSource) && (
+            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setSearch(""); setReviewStatus(""); setUploadSource(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
               {en ? "Clear" : "مسح"}
             </button>
           )}
@@ -240,14 +312,15 @@ export default function DeliveryInvoicesPage() {
                   <th>{en ? "Currency" : "العملة"}</th>
                   <th className="text-center">{en ? "Image" : "الصورة"}</th>
                   <th>{en ? "Notes" : "ملاحظات"}</th>
+                  <th>{en ? "Review" : "المراجعة"}</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{en ? "Loading..." : "جاري التحميل..."}</td></tr>
+                  <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">{en ? "Loading..." : "جاري التحميل..."}</td></tr>
                 ) : invoices.length === 0 ? (
-                  <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{en ? "No invoices" : "لا توجد فواتير"}</td></tr>
+                  <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">{en ? "No invoices" : "لا توجد فواتير"}</td></tr>
                 ) : invoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-muted/30">
                     <td className="text-sm">{new Date(inv.invoiceDate).toLocaleDateString(nl)}</td>
@@ -261,6 +334,19 @@ export default function DeliveryInvoicesPage() {
                       </button>
                     </td>
                     <td className="max-w-40 truncate text-xs text-muted-foreground">{inv.notes ?? "-"}</td>
+                    <td>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1">{statusBadge(inv.reviewStatus)}<span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">{inv.uploadSource}</span></div>
+                        <div className="text-[11px] text-muted-foreground">{en ? "Uploaded" : "رُفعت"} {new Date(inv.createdAt).toLocaleDateString(nl)}</div>
+                        {inv.reviewStatus === "REJECTED" && inv.rejectionReason && <div className="max-w-40 text-[11px] text-red-700">{inv.rejectionReason}</div>}
+                        {inv.reviewStatus === "PENDING_REVIEW" && inv.uploadSource !== "ADMIN" && (
+                          <div className="flex gap-1 pt-1">
+                            <button disabled={reviewingId === inv.id} onClick={() => review(inv, "APPROVED")} className="rounded bg-emerald-600 px-2 py-1 text-xs text-white disabled:opacity-50">{en ? "Approve" : "اعتماد"}</button>
+                            <button disabled={reviewingId === inv.id} onClick={() => { setError(""); setRejectingInvoice(inv); }} className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50">{en ? "Reject" : "رفض"}</button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => { setMessage(""); setEditingInvoice(inv); }} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-blue-50 hover:text-blue-600" title={en ? "Edit" : "تعديل"}>
@@ -291,6 +377,20 @@ export default function DeliveryInvoicesPage() {
           }}
           onViewImage={setViewImg}
         />
+      )}
+
+      {rejectingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold">{en ? "Reject invoice" : "رفض الفاتورة"}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{en ? "Provide a clear reason for the driver or employee." : "أدخل سبباً واضحاً للسائق أو الموظف."}</p>
+            <textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} maxLength={500} className="input-field mt-4 min-h-28 w-full" placeholder={en ? "Rejection reason" : "سبب الرفض"} />
+            <div className="mt-4 flex justify-end gap-2">
+              <button disabled={reviewingId === rejectingInvoice.id} onClick={() => { setRejectingInvoice(null); setRejectionReason(""); }} className="rounded border px-3 py-2 text-sm disabled:opacity-50">{en ? "Cancel" : "إلغاء"}</button>
+              <button disabled={reviewingId === rejectingInvoice.id || rejectionReason.trim().length < 3} onClick={() => review(rejectingInvoice, "REJECTED", rejectionReason)} className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50">{reviewingId === rejectingInvoice.id ? (en ? "Saving..." : "جارٍ الحفظ...") : (en ? "Reject" : "رفض")}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {viewImg && (
