@@ -118,7 +118,7 @@ export default function CreateDriverAccountPage(props: {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="page-container max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">إنشاء حساب سائق جديد</h1>
         <p className="text-sm text-gray-500 mt-1">إنشاء حساب دخول لسائق أو عامل غسيل</p>
