@@ -149,6 +149,7 @@ function buildCompanyNav(base: string): NavItem[] {
       children: [
         { href: `${base}/delivery/contracts`, labelKey: "nav.deliveryContracts", icon: <FileText size={14} />, iconColor: "indigo" },
         { href: `${base}/delivery/drivers`, labelKey: "nav.deliveryDrivers", icon: <Users size={14} />, iconColor: "indigo" },
+        { href: `${base}/driver-tracking`, labelKey: "nav.driverTracking", icon: <MapPin size={14} />, iconColor: "indigo", module: "DELIVERY_OPERATIONS" },
         { href: `${base}/driver-accounts`, labelKey: "nav.driverAccounts", icon: <UserRoundPlus size={14} />, iconColor: "indigo", module: "EMPLOYEES" },
         { href: `${base}/delivery/daily-orders`, labelKey: "nav.dailyOrders", icon: <Receipt size={14} />, iconColor: "indigo" },
         { href: `${base}/delivery/invoices`, labelKey: "nav.deliveryInvoices", icon: <Receipt size={14} />, iconColor: "emerald" },
@@ -172,6 +173,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/car-wash/locations`, labelKey: "nav.carWashLocations", icon: <MapPin size={14} />, iconColor: "cyan" },
         { href: `${base}/car-wash/vehicles`, labelKey: "nav.carWashVehicles", icon: <Car size={14} />, iconColor: "cyan" },
         { href: `${base}/car-wash/operations`, labelKey: "nav.carWashDailyOperations", icon: <Receipt size={14} />, iconColor: "cyan" },
+        { href: `${base}/driver-tracking`, labelKey: "nav.driverTracking", icon: <MapPin size={14} />, iconColor: "cyan", module: "CAR_WASH_OPERATIONS" },
         { href: `${base}/driver-accounts`, labelKey: "nav.driverAccounts", icon: <UserRoundPlus size={14} />, iconColor: "cyan", module: "EMPLOYEES" },
         { href: `${base}/car-wash/knet`, labelKey: "nav.knet", icon: <Wallet size={14} />, iconColor: "cyan" },
         { href: `${base}/car-wash/profitability`, labelKey: "nav.profitability", icon: <TrendingUp size={14} />, iconColor: "cyan" },
