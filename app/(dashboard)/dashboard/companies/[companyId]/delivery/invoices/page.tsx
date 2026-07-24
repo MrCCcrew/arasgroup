@@ -7,6 +7,7 @@ import { Eye, FileBarChart, Image as ImageIcon, Pencil, Plus, Trash2, X } from "
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 import { parseInvoiceText } from "@/lib/delivery/invoice-parse";
+import { readInvoiceImage } from "@/lib/delivery/invoice-ocr";
 
 interface Person {
   id: string;
@@ -63,17 +64,7 @@ function fileKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`;
 }
 
-async function runOcr(file: File): Promise<string> {
-  try {
-    const mod = await import("tesseract.js");
-    const Tesseract = (mod as { default?: { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> } }).default
-      ?? (mod as unknown as { recognize: (img: File, langs: string) => Promise<{ data: { text: string } }> });
-    const result = await Tesseract.recognize(file, "ara+eng");
-    return result.data.text || "";
-  } catch {
-    return "";
-  }
-}
+async function runOcr(file: File): Promise<string> { try { return (await readInvoiceImage(file)).text; } catch { return ""; } }
 
 async function loadPeople(companyId: string, type: "DRIVER" | "EMPLOYEE"): Promise<Person[]> {
   const response = await fetch(`/api/delivery/invoices/people?companyId=${companyId}&type=${type}`);

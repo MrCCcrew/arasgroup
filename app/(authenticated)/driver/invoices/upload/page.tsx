@@ -10,6 +10,7 @@ import { Camera, Upload, Check, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
 import Image from 'next/image';
+import { readInvoiceImage } from '@/lib/delivery/invoice-ocr';
 
 export default function UploadInvoicePage() {
   const router = useRouter();
@@ -17,6 +18,9 @@ export default function UploadInvoicePage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [ocr, setOcr] = useState<{ text: string; amount: number | null; date: string | null } | null>(null);
+  const [reading, setReading] = useState(false);
+  const [ocrMessage, setOcrMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -25,7 +29,7 @@ export default function UploadInvoicePage() {
     notes: '',
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -40,11 +44,22 @@ export default function UploadInvoicePage() {
     }
 
     setFile(selectedFile);
+    setOcr(null);
+    setOcrMessage(null);
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result as string);
     };
     reader.readAsDataURL(selectedFile);
+    setReading(true);
+    try {
+      const result = await readInvoiceImage(selectedFile);
+      setOcr(result);
+      setFormData((current) => ({ ...current, amount: result.amount !== null ? result.amount.toFixed(3) : current.amount, invoiceDate: result.date ?? current.invoiceDate }));
+      setOcrMessage(result.amount !== null || result.date ? 'تم استخراج بيانات الفاتورة. راجعها قبل الحفظ.' : 'لم يتم العثور على قيمة أو تاريخ واضح. أدخل البيانات يدويًا.');
+    } catch {
+      setOcrMessage('تعذر قراءة الفاتورة تلقائيًا. يمكنك إدخال البيانات يدويًا.');
+    } finally { setReading(false); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +87,9 @@ export default function UploadInvoicePage() {
       if (formData.notes) {
         formDataToSend.append('notes', formData.notes);
       }
+      if (ocr?.text) formDataToSend.append('ocrText', ocr.text);
+      if (ocr?.amount !== null && ocr?.amount !== undefined) formDataToSend.append('ocrAmount', String(ocr.amount));
+      if (ocr?.date) formDataToSend.append('ocrDate', ocr.date);
 
       const res = await fetch('/api/driver/invoices', {
         method: 'POST',
@@ -162,6 +180,9 @@ export default function UploadInvoicePage() {
                 </Button>
               </div>
             )}
+            {reading && <p className="text-sm text-muted-foreground">جارٍ قراءة الفاتورة...</p>}
+            {ocrMessage && <p className="text-sm text-muted-foreground">{ocrMessage}</p>}
+            {file && !reading && <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>إعادة المحاولة</Button>}
           </CardContent>
         </Card>
 

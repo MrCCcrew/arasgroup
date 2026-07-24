@@ -61,6 +61,10 @@ export async function POST(request: NextRequest) {
     const amount = Number(formData.get('amount'));
     const currency = (formData.get('currency') as string) || 'KWD';
     const notes = (formData.get('notes') as string) || null;
+    const ocrText = (formData.get('ocrText') as string) || null;
+    const ocrAmountRaw = formData.get('ocrAmount');
+    const ocrAmount = ocrAmountRaw ? Number(ocrAmountRaw) : null;
+    const ocrDate = (formData.get('ocrDate') as string) || null;
 
     if (!file) {
       return NextResponse.json({ error: 'صورة الفاتورة مطلوبة' }, { status: 400 });
@@ -121,6 +125,9 @@ export async function POST(request: NextRequest) {
           originalFileName: file.name,
           mimeType: file.type,
           fileSize: file.size,
+          ocrText,
+          ocrAmount: ocrAmount !== null && Number.isFinite(ocrAmount) && ocrAmount > 0 ? ocrAmount : null,
+          ocrDate: ocrDate ? new Date(`${ocrDate}T12:00:00.000Z`) : null,
           notes,
           uploadSource: 'DRIVER_WEB',
           reviewStatus: 'PENDING_REVIEW',
@@ -128,9 +135,9 @@ export async function POST(request: NextRequest) {
           createdById: session.id,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle unique constraint violation (race condition)
-      if (error.code === 'P2002' && clientGeneratedId) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002' && clientGeneratedId) {
         const existingInvoice = await prisma.deliveryInvoice.findFirst({
           where: {
             clientGeneratedId,
