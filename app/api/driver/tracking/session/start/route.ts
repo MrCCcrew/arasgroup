@@ -3,6 +3,21 @@ import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
 import { validateDriverSession } from '@/lib/auth/driver-auth';
 
+export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { error, employee } = await validateDriverSession(session);
+  if (error || !employee) return error ?? NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const activeSession = await prisma.driverTrackingSession.findFirst({
+    where: { userId: session.id, companyId: employee.companyId, status: 'ACTIVE' },
+    orderBy: { startedAt: 'desc' },
+    include: { locationPoints: { orderBy: { recordedAt: 'desc' }, take: 1 }, _count: { select: { locationPoints: true } } },
+  });
+  if (!activeSession) return NextResponse.json({ success: true, data: null });
+  const point = activeSession.locationPoints[0];
+  return NextResponse.json({ success: true, data: { id: activeSession.id, status: activeSession.status, startedAt: activeSession.startedAt, locationCount: activeSession._count.locationPoints, lastLocation: point ? { lat: Number(point.latitude), lng: Number(point.longitude) } : null } });
+}
+
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
