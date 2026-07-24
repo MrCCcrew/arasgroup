@@ -127,28 +127,51 @@ export async function POST(request: NextRequest) {
     const key = `driver-invoices/${employee.companyId}/${clientGeneratedId || nanoid(14)}.${ext}`;
     const imagePath = await uploadToR2(key, buffer, file.type);
 
-    // Create invoice
-    const invoice = await prisma.deliveryInvoice.create({
-      data: {
-        companyId: employee.companyId,
-        targetType: employee.driver ? 'DRIVER' : 'EMPLOYEE',
-        driverId: employee.driver?.id || null,
-        employeeId: employee.id,
-        invoiceDate: new Date(`${invoiceDate}T12:00:00.000Z`),
-        amount,
-        currency,
-        imagePath,
-        storageKey: key,
-        originalFileName: file.name,
-        mimeType: file.type,
-        fileSize: file.size,
-        notes,
-        uploadSource: 'DRIVER_WEB',
-        reviewStatus: 'PENDING_REVIEW',
-        clientGeneratedId: clientGeneratedId || null,
-        createdById: session.id,
-      },
-    });
+    // Create invoice (handle race condition)
+    let invoice;
+    try {
+      invoice = await prisma.deliveryInvoice.create({
+        data: {
+          companyId: employee.companyId,
+          targetType: employee.driver ? 'DRIVER' : 'EMPLOYEE',
+          driverId: employee.driver?.id || null,
+          employeeId: employee.id,
+          invoiceDate: new Date(`${invoiceDate}T12:00:00.000Z`),
+          amount,
+          currency,
+          imagePath,
+          storageKey: key,
+          originalFileName: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+          notes,
+          uploadSource: 'DRIVER_WEB',
+          reviewStatus: 'PENDING_REVIEW',
+          clientGeneratedId: clientGeneratedId || null,
+          createdById: session.id,
+        },
+      });
+    } catch (error: any) {
+      // Handle unique constraint violation (race condition)
+      if (error.code === 'P2002' && clientGeneratedId) {
+        const existingInvoice = await prisma.deliveryInvoice.findFirst({
+          where: {
+            clientGeneratedId,
+            employeeId: employee.id,
+            companyId: employee.companyId,
+          },
+        });
+
+        if (existingInvoice) {
+          return NextResponse.json({
+            success: true,
+            data: { id: existingInvoice.id },
+            message: 'الفاتورة موجودة مسبقًا',
+          });
+        }
+      }
+      throw error;
+    }
 
     // Audit log
     await prisma.auditLog.create({

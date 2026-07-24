@@ -1477,7 +1477,7 @@ model DeliveryInvoice {
   reviewedAt        DateTime?
   rejectionReason   String?
   uploadSource      InvoiceUploadSource       @default(ADMIN)
-  clientGeneratedId String?                   @unique
+  clientGeneratedId String?
 
   driver     Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
   employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
@@ -1495,6 +1495,7 @@ model DeliveryInvoice {
   @@index([reviewStatus])
   @@index([uploadSource])
   @@index([clientGeneratedId])
+  @@unique([companyId, employeeId, clientGeneratedId], map: "delivery_invoices_scope_client_id_key")
   @@map("delivery_invoices")
 }
 
