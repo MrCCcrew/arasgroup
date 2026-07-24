@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, MapPin, Play, RotateCcw, Square } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, MapPin, Play, RotateCcw, Square } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface TrackingSession { id: string; status: 'ACTIVE' | 'PAUSED' | 'ENDED'; startedAt: string; }
 interface TrackingPoint { clientGeneratedId: string; latitude: number; longitude: number; accuracy: number | null; altitude: number | null; heading: number | null; speed: number | null; recordedAt: string; }
@@ -49,6 +50,11 @@ export default function DriverTrackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationCount, setLocationCount] = useState(0);
+  const [stopOpen, setStopOpen] = useState(false);
+  const [stopPassword, setStopPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const locationQueueRef = useRef<TrackingPoint[]>([]);
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,8 +66,8 @@ export default function DriverTrackingPage() {
     flushIntervalRef.current = null;
   };
 
-  const endRemoteSession = async (sessionId: string) => {
-    await fetch('/api/driver/tracking/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+  const endRemoteSession = async (sessionId: string, masterPassword: string) => {
+    return fetch('/api/driver/tracking/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, masterPassword }) });
   };
 
   const sendPoints = async (sessionId: string, points: TrackingPoint[]) => {
@@ -88,7 +94,7 @@ export default function DriverTrackingPage() {
     setLastLocation(null);
     setLocationCount(0);
     setError(geolocationMessage(locationError));
-    if (activeSession) await endRemoteSession(activeSession.id);
+    if (activeSession) setError('تم إيقاف تتبع الموقع. أدخل كلمة مرور الإيقاف لإنهاء الجلسة.');
   };
 
   const startWatch = () => {
@@ -135,13 +141,22 @@ export default function DriverTrackingPage() {
     } finally { setStarting(false); }
   };
 
+  const closeStopModal = () => { setStopOpen(false); setStopPassword(''); setShowPassword(false); setStopError(null); };
   const handleEndSession = async () => {
     if (!session) return;
+    if (!stopPassword) { setStopOpen(true); setStopError(null); return; }
+    setStopping(true); setStopError(null);
+    const response = await endRemoteSession(session.id, stopPassword);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ code: 'STOP_FAILED' }));
+      const messages: Record<string, string> = { INCORRECT_PASSWORD: 'كلمة مرور إيقاف التتبع غير صحيحة', PASSWORD_REQUIRED: 'أدخل كلمة مرور الإيقاف', TOO_MANY_ATTEMPTS: 'تم تجاوز عدد المحاولات المسموح بها، حاول مرة أخرى لاحقًا' };
+      setStopError(messages[payload.code] ?? 'تعذر إيقاف التتبع حاليًا.'); setStopPassword(''); setStopping(false); return;
+    }
     stopWatch();
     await flushLocations();
-    await endRemoteSession(session.id);
     locationQueueRef.current = [];
     setTracking(false); setSession(null); setLastLocation(null); setLocationCount(0);
+    closeStopModal(); setStopping(false);
   };
 
   return <div className="space-y-6">
@@ -150,5 +165,6 @@ export default function DriverTrackingPage() {
     <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-5 w-5" />حالة التتبع</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><span className="text-sm text-gray-600">الحالة:</span><span className={`rounded-full px-3 py-1 text-sm font-medium ${tracking ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{tracking ? 'جارٍ التتبع' : 'متوقف'}</span></div>{tracking && session && <><div className="flex items-center justify-between"><span className="text-sm text-gray-600">بدأت في:</span><span className="text-sm font-medium">{new Date(session.startedAt).toLocaleTimeString('ar-KW')}</span></div><div className="flex items-center justify-between"><span className="text-sm text-gray-600">النقاط المرسلة:</span><span className="text-sm font-medium">{locationCount}</span></div>{lastLocation && <div className="rounded bg-gray-50 p-2 text-xs text-gray-500">آخر موقع: {lastLocation.lat.toFixed(6)}, {lastLocation.lng.toFixed(6)}</div>}</>}</CardContent></Card>
     {!tracking ? <Button className="h-14 w-full" size="lg" onClick={handleStartSession} disabled={starting}><Play className="ms-2 h-5 w-5" />{starting ? 'جارٍ التحقق من الموقع...' : 'بدء التتبع'}</Button> : <Button variant="destructive" className="h-14 w-full" size="lg" onClick={handleEndSession}><Square className="ms-2 h-5 w-5" />إيقاف التتبع</Button>}
     <Card><CardHeader><CardTitle className="text-sm">معلومات مهمة</CardTitle></CardHeader><CardContent className="space-y-2 text-xs text-gray-600"><p>• يجب السماح للمتصفح بالوصول إلى موقعك قبل بدء التتبع.</p><p>• لا تبدأ جلسة التتبع إلا بعد إرسال أول موقع بنجاح.</p><p>• التتبع يعمل فقط عند بقاء الصفحة مفتوحة.</p></CardContent></Card>
+    {stopOpen && <div className="fixed inset-0 z-50 flex items-end bg-black/50 p-4 sm:items-center sm:justify-center" role="dialog" aria-modal="true"><Card className="w-full max-w-md"><CardHeader><CardTitle>إيقاف التتبع</CardTitle></CardHeader><CardContent className="space-y-4"><label className="text-sm font-medium" htmlFor="stop-password">كلمة مرور الإيقاف</label><div className="relative"><Input id="stop-password" autoFocus type={showPassword ? 'text' : 'password'} value={stopPassword} onChange={(event) => setStopPassword(event.target.value)} placeholder="أدخل كلمة المرور" disabled={stopping} /><Button type="button" variant="ghost" size="sm" className="absolute end-1 top-1" onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div>{stopError && <p className="text-sm text-destructive">{stopError}</p>}<div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" onClick={closeStopModal} disabled={stopping}>إلغاء</Button><Button type="button" variant="destructive" onClick={handleEndSession} disabled={stopping}>{stopping ? 'جارٍ التحقق...' : 'تأكيد الإيقاف'}</Button></div></CardContent></Card></div>}
   </div>;
 }
