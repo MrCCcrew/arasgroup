@@ -10,6 +10,7 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   const { error, employee } = await validateDriverSession(session);
   if (error) return error;
 
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   const { error, employee } = await validateDriverSession(session);
   if (error) return error;
 

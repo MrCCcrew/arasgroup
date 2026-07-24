@@ -5,6 +5,7 @@ import { validateDriverSession } from '@/lib/auth/driver-auth';
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   const { error, employee } = await validateDriverSession(session);
   if (error) return error;
 
