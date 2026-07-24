@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { DriverBottomNav } from '@/components/driver/bottom-nav';
+import { DriverPortalHeader } from '@/components/driver/portal-header';
 
 export default async function DriverLayout({
   children,
@@ -20,6 +21,7 @@ export default async function DriverLayout({
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
       <main className="container mx-auto p-4 max-w-2xl">
+        <DriverPortalHeader />
         {children}
       </main>
       <DriverBottomNav />
