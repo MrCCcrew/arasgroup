@@ -11,8 +11,10 @@ import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
 import Image from 'next/image';
 import { readInvoiceImage } from '@/lib/delivery/invoice-ocr';
+import { useLocale } from '@/components/providers/locale-provider';
 
 export default function UploadInvoicePage() {
+  const { t } = useLocale();
   const router = useRouter();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -35,12 +37,12 @@ export default function UploadInvoicePage() {
     if (!selectedFile) return;
 
     if (!selectedFile.type.startsWith('image/')) {
-      alert('الرجاء اختيار صورة');
+      alert(t('driver.error.imageOnly'));
       return;
     }
 
     if (selectedFile.size > 10 * 1024 * 1024) {
-      alert('حجم الصورة يتجاوز 10 ميجابايت');
+      alert(t('driver.error.imageTooLarge'));
       return;
     }
 
@@ -57,9 +59,9 @@ export default function UploadInvoicePage() {
       const result = await readInvoiceImage(selectedFile);
       setOcr(result);
       setFormData((current) => ({ ...current, amount: result.amount !== null ? result.amount.toFixed(3) : current.amount, invoiceDate: result.date ?? current.invoiceDate }));
-      setOcrMessage(result.amount !== null || result.date ? 'تم استخراج بيانات الفاتورة. راجعها قبل الحفظ.' : 'لم يتم العثور على قيمة أو تاريخ واضح. أدخل البيانات يدويًا.');
+      setOcrMessage(result.amount !== null || result.date ? t('driver.ocrSuccess') : t('driver.ocrNotFound'));
     } catch {
-      setOcrMessage('تعذر قراءة الفاتورة تلقائيًا. يمكنك إدخال البيانات يدويًا.');
+      setOcrMessage(t('driver.ocrFailed'));
     } finally { setReading(false); }
   };
 
@@ -67,12 +69,12 @@ export default function UploadInvoicePage() {
     e.preventDefault();
 
     if (!file) {
-      alert('الرجاء اختيار صورة الفاتورة');
+      alert(t('driver.error.chooseInvoiceImage'));
       return;
     }
 
     if (!formData.invoiceDate || !formData.amount || Number(formData.amount) <= 0) {
-      alert('الرجاء إكمال البيانات المطلوبة');
+      alert(t('driver.error.completeRequired'));
       return;
     }
 
@@ -100,7 +102,7 @@ export default function UploadInvoicePage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        alert(data.error || 'فشل رفع الفاتورة');
+        alert(data.error || t('driver.error.uploadFailed'));
         setLoading(false);
         return;
       }
@@ -108,7 +110,7 @@ export default function UploadInvoicePage() {
       router.push('/driver/invoices?uploaded=1');
     } catch (error) {
       console.error(error);
-      alert('حدث خطأ أثناء رفع الفاتورة');
+      alert(t('driver.error.generic'));
       setLoading(false);
     }
   };
@@ -116,13 +118,16 @@ export default function UploadInvoicePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">رفع فاتورة جديدة</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t('driver.uploadInvoice')}</h1>
+          <p className="text-sm text-muted-foreground">{t('driver.uploadInvoiceDescription')}</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">صورة الفاتورة</CardTitle>
+            <CardTitle className="text-base">{t('driver.invoiceImage')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <input
@@ -140,7 +145,7 @@ export default function UploadInvoicePage() {
                 <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
                   <Image
                     src={preview}
-                    alt="معاينة الفاتورة"
+                    alt={t('driver.invoicePreview')}
                     fill
                     className="object-contain"
                   />
@@ -156,7 +161,7 @@ export default function UploadInvoicePage() {
                   }}
                 >
                   <X className="w-4 h-4 ml-1" />
-                  إزالة
+                  {t('driver.remove')}
                 </Button>
               </div>
             ) : (
@@ -168,7 +173,7 @@ export default function UploadInvoicePage() {
                   onClick={() => cameraInputRef.current?.click()}
                 >
                   <Camera className="w-6 h-6 ml-2" />
-                  التقاط بالكاميرا
+                  {t('driver.takePhoto')}
                 </Button>
 
                 <Button
@@ -178,23 +183,23 @@ export default function UploadInvoicePage() {
                   onClick={() => galleryInputRef.current?.click()}
                 >
                   <Upload className="w-6 h-6 ml-2" />
-                  اختيار من المعرض
+                  {t('driver.chooseFromGallery')}
                 </Button>
               </div>
             )}
-            {reading && <p className="text-sm text-muted-foreground">جارٍ قراءة الفاتورة...</p>}
+            {reading && <p className="text-sm text-muted-foreground">{t('driver.readingInvoice')}</p>}
             {ocrMessage && <p className="text-sm text-muted-foreground">{ocrMessage}</p>}
-            {file && !reading && <div className="space-y-2"><p className="truncate text-sm text-muted-foreground">{file.name}</p><div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()}>تغيير الصورة</Button><Button type="button" variant="destructive" onClick={() => { setFile(null); setPreview(null); setOcr(null); setOcrMessage(null); }}>حذف الصورة</Button></div></div>}
+            {file && !reading && <div className="space-y-2"><p className="truncate text-sm text-muted-foreground">{file.name}</p><div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()}>{t('driver.changeImage')}</Button><Button type="button" variant="destructive" onClick={() => { setFile(null); setPreview(null); setOcr(null); setOcrMessage(null); }}>{t('driver.removeImage')}</Button></div></div>}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">بيانات الفاتورة</CardTitle>
+            <CardTitle className="text-base">{t('driver.manualEntry')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="invoiceDate">تاريخ الفاتورة *</Label>
+              <Label htmlFor="invoiceDate">{t('driver.invoiceDateRequired')}</Label>
               <Input
                 id="invoiceDate"
                 type="date"
@@ -205,7 +210,7 @@ export default function UploadInvoicePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amount">المبلغ (KWD) *</Label>
+              <Label htmlFor="amount">{t('driver.amountRequired')}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -218,11 +223,11 @@ export default function UploadInvoicePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">ملاحظات (اختياري)</Label>
+              <Label htmlFor="notes">{t('driver.notesOptional')}</Label>
               <Textarea
                 id="notes"
                 rows={3}
-                placeholder="أضف ملاحظات إضافية..."
+                placeholder={t('driver.notesPlaceholder')}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               />
@@ -237,16 +242,16 @@ export default function UploadInvoicePage() {
             onClick={() => router.back()}
             disabled={loading}
           >
-            إلغاء
+            {t('driver.cancel')}
           </Button>
 
           <Button type="submit" disabled={loading || !file}>
             {loading ? (
-              'جارٍ الرفع...'
+              t('driver.uploading')
             ) : (
               <>
                 <Check className="w-4 h-4 ml-1" />
-                رفع الفاتورة
+                {t('driver.uploadInvoice')}
               </>
             )}
           </Button>
