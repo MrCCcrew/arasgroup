@@ -46,7 +46,7 @@ export async function POST(
 
     if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
 
-    const canReview = hasPermission(session, 'DELIVERY_INVOICES', 'APPROVE', {
+    const canReview = hasPermission(session, 'DRIVER_INVOICES', status === 'APPROVED' ? 'APPROVE' : 'REJECT', {
       companyId: invoice.companyId,
     });
     if (!canReview) return NextResponse.json({ error: 'Invoice review is not permitted' }, { status: 403 });

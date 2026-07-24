@@ -3,9 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 
-function canViewTracking(session: NonNullable<Awaited<ReturnType<typeof getSession>>>, companyId: string, companyType: string) {
-  const module = companyType === "CAR_WASH" ? "CAR_WASH_OPERATIONS" : "DELIVERY_OPERATIONS";
-  return hasPermission(session, module, "VIEW", { companyId });
+function canViewTracking(session: NonNullable<Awaited<ReturnType<typeof getSession>>>, companyId: string) {
+  return hasPermission(session, "DRIVER_TRACKING", "VIEW", { companyId });
 }
 
 export async function GET(_: NextRequest, props: { params: Promise<{ companyId: string }> }) {
@@ -17,7 +16,7 @@ export async function GET(_: NextRequest, props: { params: Promise<{ companyId: 
   if (!company || (company.type !== "DELIVERY" && company.type !== "CAR_WASH")) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
-  if (!canViewTracking(session, companyId, company.type)) {
+  if (!canViewTracking(session, companyId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

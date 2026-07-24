@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { uploadToR2 } from "@/lib/storage/r2";
 
 interface Ctx {
@@ -121,6 +121,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     const accessError = assertCompanyAccess(session, invoice.companyId);
     if (accessError) return accessError;
+    const permissionError = assertPermission(session, "DRIVER_INVOICES", "UPDATE", { companyId: invoice.companyId });
+    if (permissionError) return permissionError;
 
     const rawPayload = await parsePatchPayload(request);
     const parsed = patchSchema.safeParse(rawPayload);
@@ -252,6 +254,8 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
 
     const accessError = assertCompanyAccess(session, invoice.companyId);
     if (accessError) return accessError;
+    const permissionError = assertPermission(session, "DRIVER_INVOICES", "DELETE", { companyId: invoice.companyId });
+    if (permissionError) return permissionError;
 
     await prisma.deliveryInvoice.update({
       where: { id: invoiceId },

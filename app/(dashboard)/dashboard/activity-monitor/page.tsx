@@ -3,14 +3,13 @@ import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { ActivityMonitorClient } from "@/components/activity/activity-monitor-client";
-import { isOwnerOrAdminSession } from "@/lib/auth/access";
+import { hasPermission } from "@/lib/auth/permissions";
 
 export default async function ActivityMonitorPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // Only admins/owners can view activity logs
-  const canViewAll = isOwnerOrAdminSession(session);
+  const canViewAll = hasPermission(session, "AUDIT_LOGS", "VIEW");
 
   if (!canViewAll) {
     return (

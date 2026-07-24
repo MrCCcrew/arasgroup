@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { prisma } from "@/lib/db";
-import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
+import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { uploadToR2 } from "@/lib/storage/r2";
 
 const IMAGE_EXT: Record<string, string> = {
@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
   if (!companyId) return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
   const accessError = assertCompanyAccess(session, companyId);
   if (accessError) return accessError;
+  const permissionError = assertPermission(session, "DRIVER_INVOICES", "VIEW", { companyId });
+  if (permissionError) return permissionError;
 
   const targetType = searchParams.get("targetType");
   const driverId = searchParams.get("driverId");
@@ -111,6 +113,8 @@ export async function POST(request: NextRequest) {
     if (!companyId) return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
     const accessError = assertCompanyAccess(session, companyId);
     if (accessError) return accessError;
+    const permissionError = assertPermission(session, "DRIVER_INVOICES", "UPDATE", { companyId });
+    if (permissionError) return permissionError;
 
     if (targetType !== "DRIVER" && targetType !== "EMPLOYEE") {
       return NextResponse.json({ success: false, error: "النوع غير صالح" }, { status: 400 });

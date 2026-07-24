@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { assertPermission, requireRequestSession } from "@/lib/auth/access";
 
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+  const permissionError = assertPermission(session, "AUDIT_LOGS", "VIEW");
+  if (permissionError) return permissionError;
   try {
     const { searchParams } = request.nextUrl;
     const userId = searchParams.get("userId");

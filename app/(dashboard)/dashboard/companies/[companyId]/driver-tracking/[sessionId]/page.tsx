@@ -15,8 +15,7 @@ export default async function DriverTrackingSessionPage(props: { params: Promise
   const { companyId, sessionId } = await props.params;
   const [locale, company] = await Promise.all([getLocale(), prisma.company.findUnique({ where: { id: companyId }, select: { type: true } })]);
   const en = locale === "en";
-  const module = company?.type === "CAR_WASH" ? "CAR_WASH_OPERATIONS" : "DELIVERY_OPERATIONS";
-  if (!company || (company.type !== "DELIVERY" && company.type !== "CAR_WASH") || !hasPermission(session, module, "VIEW", { companyId })) notFound();
+  if (!company || (company.type !== "DELIVERY" && company.type !== "CAR_WASH") || !hasPermission(session, "DRIVER_TRACKING", "VIEW_HISTORY", { companyId })) notFound();
 
   const trackingSession = await prisma.driverTrackingSession.findFirst({
     where: { id: sessionId, companyId },

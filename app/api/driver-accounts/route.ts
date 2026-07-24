@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 });
     }
 
-    const canCreate = await hasPermission(session, 'EMPLOYEES', 'CREATE', { companyId });
+    const canCreate = hasPermission(session, 'DRIVER_ACCOUNTS', 'CREATE', { companyId });
     if (!canCreate) {
       return NextResponse.json({ error: 'غير مصرح بإنشاء حسابات' }, { status: 403 });
     }

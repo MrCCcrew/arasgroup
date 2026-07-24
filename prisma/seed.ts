@@ -76,12 +76,28 @@ const permissionSeeds = [
   ["USERS", "CREATE", "GROUP"],
   ["USERS", "UPDATE", "GROUP"],
   ["AUDIT_LOGS", "VIEW", "GROUP"],
+  ["DRIVER_ACCOUNTS", "VIEW", "COMPANY"],
+  ["DRIVER_ACCOUNTS", "CREATE", "COMPANY"],
+  ["DRIVER_ACCOUNTS", "UPDATE", "COMPANY"],
+  ["DRIVER_ACCOUNTS", "DISABLE", "COMPANY"],
+  ["DRIVER_ACCOUNTS", "RESET_PASSWORD", "COMPANY"],
+  ["DRIVER_INVOICES", "VIEW", "COMPANY"],
+  ["DRIVER_INVOICES", "APPROVE", "COMPANY"],
+  ["DRIVER_INVOICES", "REJECT", "COMPANY"],
+  ["DRIVER_INVOICES", "UPDATE", "COMPANY"],
+  ["DRIVER_INVOICES", "DELETE", "COMPANY"],
+  ["DRIVER_TRACKING", "VIEW", "COMPANY"],
+  ["DRIVER_TRACKING", "VIEW_HISTORY", "COMPANY"],
+  ["DRIVER_TRACKING", "END_SESSION", "COMPANY"],
+  ["DRIVER_TRACKING", "DELETE", "COMPANY"],
 ] as const;
 
 // This permission must be explicitly assigned through the permissions UI.
 // Do not add it to any built-in role merely by running the seed.
 const rolePermissionSeeds = permissionSeeds.filter(
-  ([module, action]) => !(module === "DELIVERY_INVOICES" && action === "APPROVE")
+  ([module, action]) =>
+    !(module === "DELIVERY_INVOICES" && action === "APPROVE") &&
+    !["DRIVER_ACCOUNTS", "DRIVER_INVOICES", "DRIVER_TRACKING"].includes(module),
 );
 
 const rolePermissionMap: Record<string, ReadonlyArray<readonly [string, string, string]>> = {

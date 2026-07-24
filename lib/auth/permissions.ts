@@ -40,7 +40,9 @@ export type Module =
   | "SETTINGS"
   | "USERS"
   | "AUDIT_LOGS"
-  | "DRIVER_ACCOUNTS";
+  | "DRIVER_ACCOUNTS"
+  | "DRIVER_INVOICES"
+  | "DRIVER_TRACKING";
 
 export type Action =
   | "VIEW"
@@ -56,7 +58,12 @@ export type Action =
   | "RETURN"
   | "COLLECT"
   | "PAY"
-  | "RESOLVE";
+  | "RESOLVE"
+  | "REJECT"
+  | "DISABLE"
+  | "RESET_PASSWORD"
+  | "END_SESSION"
+  | "VIEW_HISTORY";
 
 export type Scope = "GROUP" | "COMPANY" | "BRANCH" | "OWN";
 export type PermissionDefinition = { module: Module; action: Action; scope: Scope };
@@ -218,6 +225,20 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { module: "USERS", action: "DELETE", scope: "GROUP" },
   { module: "AUDIT_LOGS", action: "VIEW", scope: "GROUP" },
   { module: "AUDIT_LOGS", action: "EXPORT", scope: "GROUP" },
+  { module: "DRIVER_ACCOUNTS", action: "VIEW", scope: "COMPANY" },
+  { module: "DRIVER_ACCOUNTS", action: "CREATE", scope: "COMPANY" },
+  { module: "DRIVER_ACCOUNTS", action: "UPDATE", scope: "COMPANY" },
+  { module: "DRIVER_ACCOUNTS", action: "DISABLE", scope: "COMPANY" },
+  { module: "DRIVER_ACCOUNTS", action: "RESET_PASSWORD", scope: "COMPANY" },
+  { module: "DRIVER_INVOICES", action: "VIEW", scope: "COMPANY" },
+  { module: "DRIVER_INVOICES", action: "APPROVE", scope: "COMPANY" },
+  { module: "DRIVER_INVOICES", action: "REJECT", scope: "COMPANY" },
+  { module: "DRIVER_INVOICES", action: "UPDATE", scope: "COMPANY" },
+  { module: "DRIVER_INVOICES", action: "DELETE", scope: "COMPANY" },
+  { module: "DRIVER_TRACKING", action: "VIEW", scope: "COMPANY" },
+  { module: "DRIVER_TRACKING", action: "VIEW_HISTORY", scope: "COMPANY" },
+  { module: "DRIVER_TRACKING", action: "END_SESSION", scope: "COMPANY" },
+  { module: "DRIVER_TRACKING", action: "DELETE", scope: "COMPANY" },
 ];
 
 type GrantFlags = Pick<
@@ -270,6 +291,9 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     SETTINGS: ["VIEW", "CREATE", "UPDATE", "DELETE"],
     USERS: ["VIEW", "CREATE", "UPDATE", "DELETE"],
     AUDIT_LOGS: ["VIEW", "EXPORT"],
+    DRIVER_ACCOUNTS: ["VIEW", "CREATE", "UPDATE", "DISABLE", "RESET_PASSWORD"],
+    DRIVER_INVOICES: ["VIEW", "APPROVE", "REJECT", "UPDATE", "DELETE"],
+    DRIVER_TRACKING: ["VIEW", "VIEW_HISTORY", "END_SESSION", "DELETE"],
   },
   GROUP_OWNER: {
     DASHBOARD: ["VIEW"],
@@ -540,6 +564,9 @@ export function companyTypeAllowsModule(companyType: string | undefined, module:
     "INVESTOR_CLAIMS",
     "INVESTOR_STATEMENTS",
     "SALARIES",
+    "DRIVER_ACCOUNTS",
+    "DRIVER_INVOICES",
+    "DRIVER_TRACKING",
   ];
   if (shared.includes(module)) return true;
 
@@ -551,6 +578,9 @@ export function companyTypeAllowsModule(companyType: string | undefined, module:
       "DELIVERY_REPORTS",
       "DELIVERY_EXPENSES",
       "BANKS",
+      "DRIVER_ACCOUNTS",
+      "DRIVER_INVOICES",
+      "DRIVER_TRACKING",
     ].includes(module);
   }
 
@@ -562,6 +592,9 @@ export function companyTypeAllowsModule(companyType: string | undefined, module:
       "CAR_WASH_REPORTS",
       "CAR_WASH_EXPENSES",
       "BANKS",
+      "DRIVER_ACCOUNTS",
+      "DRIVER_INVOICES",
+      "DRIVER_TRACKING",
     ].includes(module);
   }
 

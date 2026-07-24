@@ -118,6 +118,9 @@ const MODULE_GROUPS: Record<string, string[]> = {
   "المحاسبة والمالية":    ["ACCOUNTING", "OWNER_ACCOUNTING", "INVESTOR_ACCOUNTING", "BANKS", "EXPENSES"],
   "المسئولون والمديرون":  ["INVESTORS", "INVESTOR_CLAIMS", "INVESTOR_STATEMENTS"],
   "التوصيل":              ["DELIVERY_HR", "DELIVERY_OPERATIONS", "DELIVERY_REPORTS", "DELIVERY_EXPENSES"],
+  "بوابة السائق وحساباته": ["DRIVER_ACCOUNTS"],
+  "فواتير السائقين": ["DRIVER_INVOICES"],
+  "تتبع السائقين": ["DRIVER_TRACKING"],
   "غسيل السيارات":        ["CAR_WASH_HR", "CAR_WASH_OPERATIONS", "CAR_WASH_REPORTS", "CAR_WASH_EXPENSES"],
   "الأصول والمركبات":     ["VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "LICENSES"],
   "تقارير ومهام":         ["REPORTS", "TASKS"],
@@ -163,6 +166,9 @@ const moduleLabelMap: Record<string, { ar: string; en: string }> = {
   SETTINGS: { ar: "الإعدادات", en: "Settings" },
   USERS: { ar: "المستخدمون", en: "Users" },
   AUDIT_LOGS: { ar: "سجل العمليات", en: "Audit Logs" },
+  DRIVER_ACCOUNTS: { ar: "حسابات السائقين", en: "Driver Accounts" },
+  DRIVER_INVOICES: { ar: "فواتير السائقين", en: "Driver Invoices" },
+  DRIVER_TRACKING: { ar: "تتبع السائقين", en: "Driver Tracking" },
 };
 
 const actionLabelMap: Record<string, { ar: string; en: string }> = {
@@ -180,6 +186,11 @@ const actionLabelMap: Record<string, { ar: string; en: string }> = {
   COLLECT: { ar: "تحصيل", en: "Collect" },
   PAY: { ar: "دفع", en: "Pay" },
   RESOLVE: { ar: "معالجة", en: "Resolve" },
+  REJECT: { ar: "رفض", en: "Reject" },
+  DISABLE: { ar: "تعطيل", en: "Disable" },
+  RESET_PASSWORD: { ar: "إعادة تعيين كلمة المرور", en: "Reset password" },
+  VIEW_HISTORY: { ar: "عرض سجل التتبع", en: "View tracking history" },
+  END_SESSION: { ar: "إنهاء جلسة تتبع", en: "End tracking session" },
 };
 
 function permissionLabel(permission: PermissionOption, locale: "ar" | "en") {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { uploadToR2 } from "@/lib/storage/r2";
+import { assertPermission, requireRequestSession } from "@/lib/auth/access";
 
 // Schema for activity log from desktop app
 const activityLogSchema = z.object({
@@ -131,6 +132,10 @@ export async function POST(request: NextRequest) {
 
 // GET - Fetch activity logs for dashboard
 export async function GET(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+  const permissionError = assertPermission(session, "AUDIT_LOGS", "VIEW");
+  if (permissionError) return permissionError;
   try {
     const { searchParams } = request.nextUrl;
     const userId = searchParams.get("userId");
@@ -189,6 +194,10 @@ export async function GET(request: NextRequest) {
 
 // DELETE - Delete activity logs (Admin only)
 export async function DELETE(request: NextRequest) {
+  const session = await requireRequestSession(request);
+  if (session instanceof NextResponse) return session;
+  const permissionError = assertPermission(session, "AUDIT_LOGS", "DELETE");
+  if (permissionError) return permissionError;
   try {
     const { searchParams } = request.nextUrl;
     const logIds = searchParams.get("ids")?.split(",") || [];

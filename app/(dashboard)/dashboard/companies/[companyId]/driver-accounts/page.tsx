@@ -15,8 +15,8 @@ export default async function DriverAccountsPage(props: { params: Promise<{ comp
   const { companyId } = await props.params;
   const locale = await getLocale();
   const en = locale === "en";
-  const canView = hasPermission(session, "EMPLOYEES", "VIEW", { companyId });
-  const canCreate = hasPermission(session, "EMPLOYEES", "CREATE", { companyId });
+  const canView = hasPermission(session, "DRIVER_ACCOUNTS", "VIEW", { companyId });
+  const canCreate = hasPermission(session, "DRIVER_ACCOUNTS", "CREATE", { companyId });
 
   if (!canView) return <div className="page-container py-6 text-sm text-muted-foreground">{en ? "You are not authorized to view driver accounts." : "غير مصرح لك بعرض حسابات السائقين."}</div>;
 

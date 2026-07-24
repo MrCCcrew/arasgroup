@@ -12,8 +12,7 @@ export default async function DriverTrackingPage(props: { params: Promise<{ comp
   const { companyId } = await props.params;
   const [locale, company] = await Promise.all([getLocale(), prisma.company.findUnique({ where: { id: companyId }, select: { type: true } })]);
   const en = locale === "en";
-  const module = company?.type === "CAR_WASH" ? "CAR_WASH_OPERATIONS" : "DELIVERY_OPERATIONS";
-  if (!company || (company.type !== "DELIVERY" && company.type !== "CAR_WASH") || !hasPermission(session, module, "VIEW", { companyId })) {
+  if (!company || (company.type !== "DELIVERY" && company.type !== "CAR_WASH") || !hasPermission(session, "DRIVER_TRACKING", "VIEW", { companyId })) {
     return <div className="page-container py-6 text-sm text-muted-foreground">{en ? "You are not authorized to view driver tracking." : "غير مصرح لك بعرض تتبع السائقين."}</div>;
   }
   return <div><Header title={en ? "Driver Tracking" : "تتبع السائقين"} subtitle={en ? "View the latest locations and routes reported by drivers" : "عرض آخر المواقع وخطوط السير التي أرسلها السائقون"} companyId={companyId} /><main className="page-container py-6"><DriverTrackingOverview companyId={companyId} /></main></div>;
