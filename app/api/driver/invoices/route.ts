@@ -3,29 +3,17 @@ import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
 import { uploadToR2 } from '@/lib/storage/r2';
 import { nanoid } from 'nanoid';
+import { validateDriverSession } from '@/lib/auth/driver-auth';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  if (!session?.employeeId) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  }
-
-  if (session.accountType !== 'DRIVER' && session.accountType !== 'CAR_WASH_WORKER') {
-    return NextResponse.json({ error: 'هذا الحساب غير مصرح' }, { status: 403 });
-  }
+  const { error, employee } = await validateDriverSession(session);
+  if (error) return error;
 
   try {
-    const employee = await prisma.employee.findUnique({
-      where: { id: session.employeeId },
-      include: { driver: true, carWashWorker: true },
-    });
-
-    if (!employee) {
-      return NextResponse.json({ error: 'الموظف غير موجود' }, { status: 404 });
-    }
 
     const invoices = await prisma.deliveryInvoice.findMany({
       where: {
@@ -59,23 +47,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session?.employeeId) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  }
-
-  if (session.accountType !== 'DRIVER' && session.accountType !== 'CAR_WASH_WORKER') {
-    return NextResponse.json({ error: 'هذا الحساب غير مصرح برفع الفواتير' }, { status: 403 });
-  }
+  const { error, employee } = await validateDriverSession(session);
+  if (error) return error;
 
   try {
-    const employee = await prisma.employee.findUnique({
-      where: { id: session.employeeId },
-      include: { driver: true, carWashWorker: true },
-    });
-
-    if (!employee) {
-      return NextResponse.json({ error: 'الموظف غير موجود' }, { status: 404 });
-    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
+import { validateDriverSession } from '@/lib/auth/driver-auth';
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session?.employeeId) {
-    return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-  }
+  const { error } = await validateDriverSession(session);
+  if (error) return error;
 
   try {
     const { sessionId, locations } = await request.json();

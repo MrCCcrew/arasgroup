@@ -12,6 +12,11 @@ export async function POST(
     return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   }
 
+  // Block driver/worker accounts from reviewing
+  if (session.accountType === 'DRIVER' || session.accountType === 'CAR_WASH_WORKER') {
+    return NextResponse.json({ error: 'السائقون لا يمكنهم مراجعة الفواتير' }, { status: 403 });
+  }
+
   try {
     const { action, rejectionReason } = await request.json();
     const { id } = await props.params;

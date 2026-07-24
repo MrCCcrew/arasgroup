@@ -109,6 +109,8 @@ export async function POST(request: NextRequest) {
       nameAr: user.nameAr,
       nameEn: user.nameEn,
       isSuperAdmin: user.isSuperAdmin,
+      employeeId: user.employeeId || null,
+      accountType: user.accountType || "ADMIN",
       roles: user.roles.map((ur: any) => ({
         name: ur.role.name,
         companyId: ur.companyId,
