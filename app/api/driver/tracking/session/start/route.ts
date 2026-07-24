@@ -10,35 +10,60 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   try {
+    const body = await request.json() as {
+      deviceInfo?: string;
+      initialLocation?: { clientGeneratedId?: string; latitude?: number; longitude?: number; accuracy?: number | null; altitude?: number | null; heading?: number | null; speed?: number | null; recordedAt?: string };
+    };
+    const initialLocation = body.initialLocation;
+    const clientGeneratedId = initialLocation?.clientGeneratedId;
+    const latitude = initialLocation?.latitude;
+    const longitude = initialLocation?.longitude;
+    const recordedAt = initialLocation?.recordedAt ? new Date(initialLocation.recordedAt) : null;
 
-    const { deviceInfo } = await request.json();
+    if (!clientGeneratedId || typeof latitude !== 'number' || !Number.isFinite(latitude) || typeof longitude !== 'number' || !Number.isFinite(longitude) || !recordedAt || Number.isNaN(recordedAt.getTime())) {
+      return NextResponse.json({ error: 'يجب إرسال أول موقع صالح قبل بدء التتبع' }, { status: 400 });
+    }
 
-    // End any active sessions first
-    await prisma.driverTrackingSession.updateMany({
-      where: {
-        userId: session.id,
-        status: 'ACTIVE',
-      },
-      data: {
-        status: 'ENDED',
-        endedAt: new Date(),
-      },
-    });
+    const trackingSession = await prisma.$transaction(async (tx) => {
+      await tx.driverTrackingSession.updateMany({
+        where: { userId: session.id, status: 'ACTIVE' },
+        data: { status: 'ENDED', endedAt: new Date() },
+      });
 
-    // Create new session
-    const trackingSession = await prisma.driverTrackingSession.create({
-      data: {
-        userId: session.id,
-        employeeId: employee.id,
-        companyId: employee.companyId,
-        driverId: employee.driver?.id || null,
-        carWashWorkerId: employee.carWashWorker?.id || null,
-        status: 'ACTIVE',
-        deviceInfo,
-        consentedAt: new Date(),
-        consentVersion: '1.0',
-        consentLocale: 'ar',
-      },
+      const createdSession = await tx.driverTrackingSession.create({
+        data: {
+          userId: session.id,
+          employeeId: employee.id,
+          companyId: employee.companyId,
+          driverId: employee.driver?.id || null,
+          carWashWorkerId: employee.carWashWorker?.id || null,
+          status: 'ACTIVE',
+          deviceInfo: body.deviceInfo,
+          consentedAt: new Date(),
+          consentVersion: '1.0',
+          consentLocale: 'ar',
+        },
+      });
+
+      await tx.driverLocationPoint.create({
+        data: {
+          sessionId: createdSession.id,
+          companyId: employee.companyId,
+          employeeId: employee.id,
+          driverId: employee.driver?.id || null,
+          carWashWorkerId: employee.carWashWorker?.id || null,
+          clientGeneratedId,
+          latitude,
+          longitude,
+          accuracy: initialLocation.accuracy,
+          altitude: initialLocation.altitude,
+          heading: initialLocation.heading,
+          speed: initialLocation.speed,
+          recordedAt,
+        },
+      });
+
+      return createdSession;
     });
 
     return NextResponse.json({
