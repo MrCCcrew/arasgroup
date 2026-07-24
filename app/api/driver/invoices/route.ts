@@ -93,10 +93,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'بيانات الفاتورة غير كاملة' }, { status: 400 });
     }
 
-    // Check for duplicate
+    // Check for duplicate (must belong to same user)
     if (clientGeneratedId) {
-      const existing = await prisma.deliveryInvoice.findUnique({
-        where: { clientGeneratedId },
+      const existing = await prisma.deliveryInvoice.findFirst({
+        where: {
+          clientGeneratedId,
+          employeeId: employee.id,
+          companyId: employee.companyId,
+        },
       });
 
       if (existing) {

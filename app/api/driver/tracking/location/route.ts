@@ -15,6 +15,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'بيانات غير صحيحة' }, { status: 400 });
     }
 
+    // Limit batch size
+    if (locations.length > 50) {
+      return NextResponse.json({ error: 'Batch size too large (max 50)' }, { status: 400 });
+    }
+
     const trackingSession = await prisma.driverTrackingSession.findUnique({
       where: { id: sessionId },
     });
@@ -31,21 +36,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'الجلسة غير نشطة' }, { status: 400 });
     }
 
-    const points = locations.map((loc: any) => ({
-      sessionId,
-      companyId: trackingSession.companyId,
-      employeeId: trackingSession.employeeId,
-      driverId: trackingSession.driverId,
-      carWashWorkerId: trackingSession.carWashWorkerId,
-      latitude: loc.latitude,
-      longitude: loc.longitude,
-      accuracy: loc.accuracy,
-      altitude: loc.altitude,
-      heading: loc.heading,
-      speed: loc.speed,
-      recordedAt: new Date(loc.recordedAt),
-      clientGeneratedId: loc.clientGeneratedId,
-    }));
+    // Validate and sanitize locations
+    const now = Date.now();
+    const points = locations.map((loc: any) => {
+      const recordedAt = new Date(loc.recordedAt);
+
+      // Reject future timestamps (more than 1 minute ahead)
+      if (recordedAt.getTime() > now + 60000) {
+        throw new Error('Invalid recordedAt: timestamp in future');
+      }
+
+      // Reject very old timestamps (more than 24 hours old)
+      if (recordedAt.getTime() < now - 86400000) {
+        throw new Error('Invalid recordedAt: timestamp too old');
+      }
+
+      return {
+        sessionId,
+        companyId: trackingSession.companyId,
+        employeeId: trackingSession.employeeId,
+        driverId: trackingSession.driverId,
+        carWashWorkerId: trackingSession.carWashWorkerId,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        accuracy: loc.accuracy,
+        altitude: loc.altitude,
+        heading: loc.heading,
+        speed: loc.speed,
+        recordedAt,
+        clientGeneratedId: loc.clientGeneratedId,
+      };
+    });
 
     // Use createMany with skipDuplicates for idempotency
     const result = await prisma.driverLocationPoint.createMany({
