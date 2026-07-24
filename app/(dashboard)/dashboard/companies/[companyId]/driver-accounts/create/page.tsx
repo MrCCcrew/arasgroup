@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,19 +17,22 @@ import {
 
 interface Employee {
   id: string;
-  fullNameAr: string;
+  nameAr: string;
   type: string;
   employeeNumber: string | null;
 }
 
-export default function CreateDriverAccountPage({
-  params,
-}: {
-  params: { companyId: string };
+export default function CreateDriverAccountPage(props: {
+  params: Promise<{ companyId: string }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [companyId, setCompanyId] = React.useState<string>('');
   const preSelectedEmployeeId = searchParams.get('employeeId');
+
+  React.useEffect(() => {
+    props.params.then(p => setCompanyId(p.companyId));
+  }, [props.params]);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,14 +44,15 @@ export default function CreateDriverAccountPage({
   });
 
   useEffect(() => {
-    fetch(`/api/companies/${params.companyId}/employees?withoutAccounts=true&types=DRIVER,CAR_WASH_WORKER`)
+    if (!companyId) return;
+    fetch(`/api/companies/${companyId}/employees?withoutAccounts=true&types=DRIVER,CAR_WASH_WORKER`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
           setEmployees(data.data || []);
         }
       });
-  }, [params.companyId]);
+  }, [companyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +74,7 @@ export default function CreateDriverAccountPage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyId: params.companyId,
+          companyId,
           ...formData,
         }),
       });
@@ -82,7 +87,7 @@ export default function CreateDriverAccountPage({
         return;
       }
 
-      router.push(`/dashboard/companies/${params.companyId}/driver-accounts?created=1`);
+      router.push(`/dashboard/companies/${companyId}/driver-accounts?created=1`);
     } catch (error) {
       console.error(error);
       alert('حدث خطأ');
@@ -116,7 +121,7 @@ export default function CreateDriverAccountPage({
                 <SelectContent>
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
-                      {emp.fullNameAr} ({emp.type === 'DRIVER' ? 'سائق' : 'غسيل'})
+                      {emp.nameAr} ({emp.type === 'DRIVER' ? 'سائق' : 'غسيل'})
                       {emp.employeeNumber && ` - ${emp.employeeNumber}`}
                     </SelectItem>
                   ))}

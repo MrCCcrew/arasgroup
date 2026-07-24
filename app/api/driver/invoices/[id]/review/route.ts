@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
-import { hasPermission } from '@/lib/rbac/rbac';
+import { hasPermission } from '@/lib/auth/permissions';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
   if (!session) {
@@ -14,7 +14,7 @@ export async function POST(
 
   try {
     const { action, rejectionReason } = await request.json();
-    const { id } = params;
+    const { id } = await props.params;
 
     if (!['APPROVE', 'REJECT'].includes(action)) {
       return NextResponse.json({ error: 'إجراء غير صحيح' }, { status: 400 });
@@ -26,7 +26,6 @@ export async function POST(
 
     const invoice = await prisma.deliveryInvoice.findUnique({
       where: { id },
-      include: { company: true },
     });
 
     if (!invoice) {
@@ -38,7 +37,7 @@ export async function POST(
       session,
       'DELIVERY_INVOICES',
       'APPROVE',
-      invoice.companyId
+      { companyId: invoice.companyId }
     );
 
     if (!canApprove) {

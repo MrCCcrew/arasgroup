@@ -1,23 +1,21 @@
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
-import { hasPermission } from '@/lib/rbac/rbac';
+import { hasPermission } from '@/lib/auth/permissions';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 
-export default async function DriverAccountsPage({
-  params,
-}: {
-  params: { companyId: string };
+export default async function DriverAccountsPage(props: {
+  params: Promise<{ companyId: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const { companyId } = params;
+  const { companyId } = await props.params;
 
-  const canView = await hasPermission(session, 'EMPLOYEES', 'VIEW', companyId);
+  const canView = await hasPermission(session, 'EMPLOYEES', 'VIEW', { companyId });
   if (!canView) {
     return <div className="p-6">غير مصرح لك بعرض الموظفين</div>;
   }
@@ -44,7 +42,7 @@ export default async function DriverAccountsPage({
       driver: true,
       carWashWorker: true,
     },
-    orderBy: { fullNameAr: 'asc' },
+    orderBy: { nameAr: 'asc' },
   });
 
   return (
@@ -75,7 +73,7 @@ export default async function DriverAccountsPage({
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-base">{employee.fullNameAr}</CardTitle>
+                    <CardTitle className="text-base">{employee.nameAr}</CardTitle>
                     <p className="text-sm text-gray-500">
                       {employee.type === 'DRIVER' ? 'سائق' : 'عامل غسيل سيارات'}
                     </p>

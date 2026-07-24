@@ -16,9 +16,11 @@ export type Module =
   | "INVESTOR_ACCOUNTING"
   | "BANKS"
   | "HR"
+  | "EMPLOYEES"
   | "SALARIES"
   | "DELIVERY_HR"
   | "DELIVERY_OPERATIONS"
+  | "DELIVERY_INVOICES"
   | "DELIVERY_REPORTS"
   | "DELIVERY_EXPENSES"
   | "CAR_WASH_HR"
@@ -37,7 +39,8 @@ export type Module =
   | "TASKS"
   | "SETTINGS"
   | "USERS"
-  | "AUDIT_LOGS";
+  | "AUDIT_LOGS"
+  | "DRIVER_ACCOUNTS";
 
 export type Action =
   | "VIEW"

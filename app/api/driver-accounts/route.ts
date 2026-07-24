@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
-import { hasPermission } from '@/lib/rbac/rbac';
+import { hasPermission } from '@/lib/auth/permissions';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 });
     }
 
-    const canCreate = await hasPermission(session, 'EMPLOYEES', 'CREATE', companyId);
+    const canCreate = await hasPermission(session, 'EMPLOYEES', 'CREATE', { companyId });
     if (!canCreate) {
       return NextResponse.json({ error: 'غير مصرح بإنشاء حسابات' }, { status: 403 });
     }
@@ -56,10 +56,9 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.create({
       data: {
         email,
-        password: hashedPassword,
-        nameAr: employee.fullNameAr,
-        nameEn: employee.fullNameEn,
-        locale: 'ar',
+        passwordHash: hashedPassword,
+        nameAr: employee.nameAr,
+        nameEn: employee.nameEn,
         isActive: true,
         isSuperAdmin: false,
         employeeId: employee.id,

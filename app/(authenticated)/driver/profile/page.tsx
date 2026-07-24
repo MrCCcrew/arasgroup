@@ -38,7 +38,7 @@ export default async function DriverProfilePage() {
         <CardContent className="space-y-3">
           <div>
             <div className="text-sm text-gray-500">الاسم</div>
-            <div className="font-medium">{employee.fullNameAr}</div>
+            <div className="font-medium">{employee.nameAr}</div>
           </div>
 
           <div>

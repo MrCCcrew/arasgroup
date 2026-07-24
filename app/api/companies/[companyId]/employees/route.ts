@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
-import { hasPermission } from '@/lib/rbac/rbac';
+import { hasPermission } from '@/lib/auth/permissions';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { companyId: string } }
+  props: { params: Promise<{ companyId: string }> }
 ) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   }
 
-  const { companyId } = params;
+  const { companyId } = await props.params;
   const { searchParams } = new URL(request.url);
   const withoutAccounts = searchParams.get('withoutAccounts') === 'true';
   const typesParam = searchParams.get('types');
 
-  const canView = await hasPermission(session, 'EMPLOYEES', 'VIEW', companyId);
+  const canView = await hasPermission(session, 'EMPLOYEES', 'VIEW', { companyId });
   if (!canView) {
     return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
   }
@@ -41,12 +41,12 @@ export async function GET(
       where,
       select: {
         id: true,
-        fullNameAr: true,
-        fullNameEn: true,
+        nameAr: true,
+        nameEn: true,
         type: true,
         employeeNumber: true,
       },
-      orderBy: { fullNameAr: 'asc' },
+      orderBy: { nameAr: 'asc' },
     });
 
     return NextResponse.json({
