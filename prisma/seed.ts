@@ -78,28 +78,34 @@ const permissionSeeds = [
   ["AUDIT_LOGS", "VIEW", "GROUP"],
 ] as const;
 
+// This permission must be explicitly assigned through the permissions UI.
+// Do not add it to any built-in role merely by running the seed.
+const rolePermissionSeeds = permissionSeeds.filter(
+  ([module, action]) => !(module === "DELIVERY_INVOICES" && action === "APPROVE")
+);
+
 const rolePermissionMap: Record<string, ReadonlyArray<readonly [string, string, string]>> = {
-  SUPER_ADMIN: permissionSeeds,
-  GROUP_OWNER: permissionSeeds.filter(([module]) => !["USERS", "AUDIT_LOGS"].includes(module)),
-  ACCOUNTANT: permissionSeeds.filter(([module]) =>
+  SUPER_ADMIN: rolePermissionSeeds,
+  GROUP_OWNER: rolePermissionSeeds.filter(([module]) => !["USERS", "AUDIT_LOGS"].includes(module)),
+  ACCOUNTANT: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "ACCOUNTING", "BANKS", "EXPENSES", "REPORTS", "DELIVERY_REPORTS", "CAR_WASH_REPORTS", "ATTACHMENTS"].includes(module)
   ),
-  DELIVERY_HR: permissionSeeds.filter(([module]) =>
+  DELIVERY_HR: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "HR", "DELIVERY_HR", "VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "REPORTS"].includes(module)
   ),
-  DELIVERY_OPERATIONS: permissionSeeds.filter(([module]) =>
+  DELIVERY_OPERATIONS: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "DELIVERY_OPERATIONS", "DELIVERY_REPORTS", "VEHICLES", "ATTACHMENTS"].includes(module)
   ),
-  CAR_WASH_SUPERVISOR: permissionSeeds.filter(([module]) =>
+  CAR_WASH_SUPERVISOR: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "CAR_WASH_HR", "CAR_WASH_OPERATIONS", "CAR_WASH_REPORTS", "VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "EXPENSES"].includes(module)
   ),
-  HR_MANDOB: permissionSeeds.filter(([module]) =>
+  HR_MANDOB: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "HR", "INVESTORS", "ATTACHMENTS"].includes(module)
   ),
-  INVESTOR_VIEWER: permissionSeeds.filter(([module]) =>
+  INVESTOR_VIEWER: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "INVESTORS", "REPORTS"].includes(module)
   ),
-  READ_ONLY: permissionSeeds.filter(([module]) =>
+  READ_ONLY: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "REPORTS", "ATTACHMENTS"].includes(module)
   ),
 };
