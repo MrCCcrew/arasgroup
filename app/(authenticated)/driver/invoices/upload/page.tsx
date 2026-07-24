@@ -14,7 +14,8 @@ import { readInvoiceImage } from '@/lib/delivery/invoice-ocr';
 
 export default function UploadInvoicePage() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -125,13 +126,14 @@ export default function UploadInvoicePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               onChange={handleFileChange}
               className="hidden"
             />
+            <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
             {preview ? (
               <div className="relative">
@@ -163,7 +165,7 @@ export default function UploadInvoicePage() {
                   type="button"
                   variant="outline"
                   className="h-20"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => cameraInputRef.current?.click()}
                 >
                   <Camera className="w-6 h-6 ml-2" />
                   التقاط بالكاميرا
@@ -173,7 +175,7 @@ export default function UploadInvoicePage() {
                   type="button"
                   variant="outline"
                   className="h-20"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => galleryInputRef.current?.click()}
                 >
                   <Upload className="w-6 h-6 ml-2" />
                   اختيار من المعرض
@@ -182,7 +184,7 @@ export default function UploadInvoicePage() {
             )}
             {reading && <p className="text-sm text-muted-foreground">جارٍ قراءة الفاتورة...</p>}
             {ocrMessage && <p className="text-sm text-muted-foreground">{ocrMessage}</p>}
-            {file && !reading && <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>إعادة المحاولة</Button>}
+            {file && !reading && <div className="space-y-2"><p className="truncate text-sm text-muted-foreground">{file.name}</p><div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()}>تغيير الصورة</Button><Button type="button" variant="destructive" onClick={() => { setFile(null); setPreview(null); setOcr(null); setOcrMessage(null); }}>حذف الصورة</Button></div></div>}
           </CardContent>
         </Card>
 
