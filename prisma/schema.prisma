@@ -1475,7 +1475,7 @@ model DeliveryInvoice {
   reviewStatus      InvoiceReviewStatus       @default(APPROVED)
   reviewedById      String?
   reviewedAt        DateTime?
-  rejectionReason   String?
+  rejectionReason   String?                   @db.VarChar(500)
   uploadSource      InvoiceUploadSource       @default(ADMIN)
   clientGeneratedId String?
 
@@ -1486,6 +1486,7 @@ model DeliveryInvoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([companyId, employeeId, clientGeneratedId], map: "delivery_invoices_scope_client_id_key")
   @@index([companyId])
   @@index([driverId])
   @@index([employeeId])
@@ -1495,7 +1496,6 @@ model DeliveryInvoice {
   @@index([reviewStatus])
   @@index([uploadSource])
   @@index([clientGeneratedId])
-  @@unique([companyId, employeeId, clientGeneratedId], map: "delivery_invoices_scope_client_id_key")
   @@map("delivery_invoices")
 }
 
