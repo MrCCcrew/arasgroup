@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { IncomeStatementRow, BalanceSheetRow } from "@/lib/types";
+import { buildAccountLedger } from "@/lib/accounting/account-ledger";
 
 /** Income Statement (P&L) for a company in a period */
 export async function getIncomeStatement(
@@ -252,8 +253,9 @@ export async function getAccountLedger(
     }
   }
 
-  // Calculate period opening balance by adding prior movements
-  let periodOpeningBalance = fiscalYearOpeningBalance;
+  // Get prior movements (before period start)
+  let priorDebit = 0;
+  let priorCredit = 0;
   if (startDate && fiscalYearId) {
     // Get all POSTED movements before the period start date
     const priorMovements = await prisma.journalEntryLine.aggregate({
@@ -273,11 +275,8 @@ export async function getAccountLedger(
       },
     });
 
-    const priorDebit = Number(priorMovements._sum?.debit ?? 0);
-    const priorCredit = Number(priorMovements._sum?.credit ?? 0);
-    const priorNetMovement = priorDebit - priorCredit;
-
-    periodOpeningBalance = fiscalYearOpeningBalance + priorNetMovement;
+    priorDebit = Number(priorMovements._sum?.debit ?? 0);
+    priorCredit = Number(priorMovements._sum?.credit ?? 0);
   }
 
   // Get period movements
@@ -302,30 +301,21 @@ export async function getAccountLedger(
     orderBy: [{ journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }, { id: "asc" }],
   });
 
-  let runningBalance = periodOpeningBalance;
-  const rows = lines.map((line) => {
-    const debit = Number(line.debit);
-    const credit = Number(line.credit);
-    runningBalance += debit - credit;
-    return {
+  // Build ledger using production logic
+  return buildAccountLedger({
+    fiscalYearOpeningBalance,
+    priorDebit,
+    priorCredit,
+    periodLines: lines.map((line) => ({
       lineId: line.id,
       journalNumber: line.journalEntry.number,
       date: line.journalEntry.date,
       description: line.journalEntry.descriptionAr,
       type: line.journalEntry.type,
-      debit,
-      credit,
-      balance: runningBalance,
-    };
+      debit: Number(line.debit),
+      credit: Number(line.credit),
+    })),
   });
-
-  return {
-    openingBalance: periodOpeningBalance,
-    rows,
-    totalDebit: rows.reduce((s, r) => s + r.debit, 0),
-    totalCredit: rows.reduce((s, r) => s + r.credit, 0),
-    closingBalance: runningBalance,
-  };
 }
 
 /** Full General Ledger — all accounts with their transactions for دفتر الأستاذ العام */

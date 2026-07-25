@@ -16,87 +16,17 @@
 
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-
-// Mock types matching Prisma
-type MockOpeningBalance = {
-  fiscalYearId: string;
-  accountId: string;
-  debit: number | { toNumber: () => number };
-  credit: number | { toNumber: () => number };
-};
-
-type MockJournalEntryLine = {
-  id: string;
-  accountId: string;
-  debit: number | { toNumber: () => number };
-  credit: number | { toNumber: () => number };
-  journalEntry: {
-    number: string;
-    date: Date;
-    descriptionAr: string | null;
-    type: string;
-  };
-};
-
-type MockAggregate = {
-  _sum: {
-    debit: number | null;
-    credit: number | null;
-  };
-};
-
-// Helper to convert Decimal-like to number
-function toNum(val: number | { toNumber: () => number }): number {
-  return typeof val === "number" ? val : val.toNumber();
-}
-
-/**
- * Build account ledger with production logic
- * This is the ACTUAL production function logic extracted for testability
- */
-export function buildAccountLedger(
-  fiscalYearOpening: number,
-  priorMovements: { debit: number; credit: number } | null,
-  periodLines: Array<{
-    lineId: string;
-    journalNumber: string;
-    date: Date;
-    description: string | null;
-    type: string;
-    debit: number;
-    credit: number;
-  }>
-) {
-  // Calculate period opening balance
-  let periodOpeningBalance = fiscalYearOpening;
-  if (priorMovements) {
-    const priorNetMovement = priorMovements.debit - priorMovements.credit;
-    periodOpeningBalance = fiscalYearOpening + priorNetMovement;
-  }
-
-  // Calculate running balances
-  let runningBalance = periodOpeningBalance;
-  const rows = periodLines.map((line) => {
-    runningBalance += line.debit - line.credit;
-    return {
-      ...line,
-      balance: runningBalance,
-    };
-  });
-
-  return {
-    openingBalance: periodOpeningBalance,
-    rows,
-    totalDebit: rows.reduce((s, r) => s + r.debit, 0),
-    totalCredit: rows.reduce((s, r) => s + r.credit, 0),
-    closingBalance: runningBalance,
-  };
-}
+import { buildAccountLedger } from "@/lib/accounting/account-ledger";
 
 describe("getAccountLedger - Production Code", () => {
   describe("Period Opening Balance Calculation", () => {
     it("Test 57: Opening = fiscal year opening when no prior movements", () => {
-      const result = buildAccountLedger(500, null, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 500,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, 500, "Should equal fiscal year opening");
       assert.equal(result.closingBalance, 500, "Closing should equal opening when no movements");
     });
@@ -105,7 +35,12 @@ describe("getAccountLedger - Production Code", () => {
       // Fiscal year opening: 500 debit
       // Prior movements: 300 debit
       // Expected: 800 debit
-      const result = buildAccountLedger(500, { debit: 300, credit: 0 }, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 500,
+        priorDebit: 300,
+        priorCredit: 0,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, 800);
     });
 
@@ -113,7 +48,12 @@ describe("getAccountLedger - Production Code", () => {
       // Fiscal year opening: 500 debit
       // Prior movements: 300 credit
       // Expected: 200 debit
-      const result = buildAccountLedger(500, { debit: 0, credit: 300 }, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 500,
+        priorDebit: 0,
+        priorCredit: 300,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, 200);
     });
 
@@ -121,7 +61,12 @@ describe("getAccountLedger - Production Code", () => {
       // Fiscal year opening: 200 credit (-200)
       // Prior movements: 50 debit
       // Expected: 150 credit (-150)
-      const result = buildAccountLedger(-200, { debit: 50, credit: 0 }, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: -200,
+        priorDebit: 50,
+        priorCredit: 0,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, -150);
     });
 
@@ -129,7 +74,12 @@ describe("getAccountLedger - Production Code", () => {
       // Fiscal year opening: 0
       // Prior movements: 1000 debit - 200 credit = 800 debit
       // Expected: 800 debit
-      const result = buildAccountLedger(0, { debit: 1000, credit: 200 }, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 0,
+        priorDebit: 1000,
+        priorCredit: 200,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, 800);
     });
   });
@@ -160,7 +110,12 @@ describe("getAccountLedger - Production Code", () => {
         },
       ];
 
-      const result = buildAccountLedger(100, null, periodLines);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 100,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines,
+      });
 
       assert.equal(result.rows.length, 2);
       assert.equal(result.rows[0].balance, 150, "First movement: 100 + 50 = 150");
@@ -190,7 +145,12 @@ describe("getAccountLedger - Production Code", () => {
         },
       ];
 
-      const result = buildAccountLedger(0, null, periodLines);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 0,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines,
+      });
 
       // Order matters: JV001 before JV002
       assert.equal(result.rows[0].balance, 100, "First: 0 + 100 = 100");
@@ -228,7 +188,12 @@ describe("getAccountLedger - Production Code", () => {
         },
       ];
 
-      const result = buildAccountLedger(1000, null, periodLines);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 1000,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines,
+      });
 
       // Opening: 1000
       // Total debit: 700
@@ -247,7 +212,12 @@ describe("getAccountLedger - Production Code", () => {
 
   describe("Edge Cases", () => {
     it("Test 65: No movements at all", () => {
-      const result = buildAccountLedger(250, null, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 250,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines: [],
+      });
       assert.equal(result.rows.length, 0);
       assert.equal(result.openingBalance, 250);
       assert.equal(result.closingBalance, 250);
@@ -256,7 +226,12 @@ describe("getAccountLedger - Production Code", () => {
     });
 
     it("Test 66: Prior movements exist but no period movements", () => {
-      const result = buildAccountLedger(100, { debit: 500, credit: 200 }, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 100,
+        priorDebit: 500,
+        priorCredit: 200,
+        periodLines: [],
+      });
       // Opening: 100 + (500 - 200) = 400
       assert.equal(result.openingBalance, 400);
       assert.equal(result.closingBalance, 400);
@@ -288,7 +263,12 @@ describe("getAccountLedger - Production Code", () => {
         },
       ];
 
-      const result = buildAccountLedger(-500, null, periodLines);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: -500,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines,
+      });
 
       assert.equal(result.rows[0].balance, -400, "After debit: -500 + 100 = -400");
       assert.equal(result.rows[1].balance, -600, "After credit: -400 - 200 = -600");
@@ -296,7 +276,12 @@ describe("getAccountLedger - Production Code", () => {
     });
 
     it("Test 68: Zero opening, zero prior, zero period movements", () => {
-      const result = buildAccountLedger(0, null, []);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 0,
+        priorDebit: 0,
+        priorCredit: 0,
+        periodLines: [],
+      });
       assert.equal(result.openingBalance, 0);
       assert.equal(result.closingBalance, 0);
       assert.equal(result.totalDebit, 0);
@@ -345,7 +330,12 @@ describe("getAccountLedger - Production Code", () => {
         },
       ];
 
-      const result = buildAccountLedger(1000, { debit: 500, credit: 300 }, periodLines);
+      const result = buildAccountLedger({
+        fiscalYearOpeningBalance: 1000,
+        priorDebit: 500,
+        priorCredit: 300,
+        periodLines,
+      });
 
       assert.equal(result.openingBalance, 1200, "Opening = 1000 + (500-300)");
       assert.equal(result.rows[0].balance, 1300, "After 1st: 1200 + 100");
