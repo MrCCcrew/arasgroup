@@ -242,16 +242,45 @@ export async function getAccountLedger(
   endDate?: Date
 ) {
   // Opening balance for the selected fiscal year
-  let openingBalance = 0;
+  let fiscalYearOpeningBalance = 0;
   if (fiscalYearId) {
     const ob = await prisma.openingBalance.findFirst({
       where: { fiscalYearId, accountId },
     });
     if (ob) {
-      openingBalance = Number(ob.debit) - Number(ob.credit);
+      fiscalYearOpeningBalance = Number(ob.debit) - Number(ob.credit);
     }
   }
 
+  // Calculate period opening balance by adding prior movements
+  let periodOpeningBalance = fiscalYearOpeningBalance;
+  if (startDate && fiscalYearId) {
+    // Get all POSTED movements before the period start date
+    const priorMovements = await prisma.journalEntryLine.aggregate({
+      where: {
+        accountId,
+        journalEntry: {
+          companyId,
+          fiscalYearId,
+          status: "POSTED",
+          isDeleted: false,
+          date: { lt: startDate }, // Strictly before startDate
+        },
+      },
+      _sum: {
+        debit: true,
+        credit: true,
+      },
+    });
+
+    const priorDebit = Number(priorMovements._sum?.debit ?? 0);
+    const priorCredit = Number(priorMovements._sum?.credit ?? 0);
+    const priorNetMovement = priorDebit - priorCredit;
+
+    periodOpeningBalance = fiscalYearOpeningBalance + priorNetMovement;
+  }
+
+  // Get period movements
   const lines = await prisma.journalEntryLine.findMany({
     where: {
       accountId,
@@ -270,10 +299,10 @@ export async function getAccountLedger(
         select: { number: true, date: true, descriptionAr: true, type: true },
       },
     },
-    orderBy: [{ journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }],
+    orderBy: [{ journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }, { id: "asc" }],
   });
 
-  let runningBalance = openingBalance;
+  let runningBalance = periodOpeningBalance;
   const rows = lines.map((line) => {
     const debit = Number(line.debit);
     const credit = Number(line.credit);
@@ -291,7 +320,7 @@ export async function getAccountLedger(
   });
 
   return {
-    openingBalance,
+    openingBalance: periodOpeningBalance,
     rows,
     totalDebit: rows.reduce((s, r) => s + r.debit, 0),
     totalCredit: rows.reduce((s, r) => s + r.credit, 0),

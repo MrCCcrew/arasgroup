@@ -46,9 +46,21 @@ node --test --test-reporter=spec tests/accounting/*.test.ts
 - **Trial Balance Period** (Test 51): Document period calculation bug
 - ✅ These document **actual production code** behavior and bugs
 
+### 4. ledger-reports.test.ts (24 tests - Production formatSignedBalance)
+- **Display Formatting** (Tests 32-36e): Format signed balances for display
+- ✅ These test **PRODUCTION code** (formatSignedBalance utility)
+
+### 5. account-ledger-production.test.ts (19 tests - Production getAccountLedger)
+- **Period Opening Balance** (Tests 57-61): Fiscal year opening + prior movements
+- **Running Balance** (Tests 62-64): Sequential balance updates
+- **Edge Cases** (Tests 65-68): Zero balances, no movements, credit accounts
+- **Integration** (Test 69): Full scenario with all components
+- **Query Requirements** (Tests 70-75): Document required Prisma filters
+- ✅ These test **PRODUCTION code** (buildAccountLedger extracted from getAccountLedger)
+
 ## إجمالي التغطية الحالية
 
-**51 test case** تغطي:
+**75 test case** تغطي:
 
 ✅ دقة المبالغ (integer arithmetic بالفلوس)
 ✅ توازن القيد (debit = credit تمامًا)
