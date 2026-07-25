@@ -1,0 +1,20 @@
+﻿62bf810 refactor: group driver tracking by driver and add record deletion
+edb6d89 chore: add isolated driver permission seed
+64e6ce4 feat: add driver modules and audit log permissions
+043fec8 fix: complete driver portal translations
+c975dcc fix: persist driver tracking across portal navigation
+345934f feat: protect driver tracking stop with master password
+026f051 fix: separate camera and gallery invoice upload
+132d933 fix: enable OCR for driver invoice uploads
+2b519b7 feat: add bilingual driver portal
+4027260 feat: add admin driver tracking view
+78deda3 fix: require initial location before tracking
+0563754 fix: integrate driver accounts navigation and layout
+9dc4bb4 fix: restrict driver account employee selection
+a6faa6b fix: align invoice rejection reason length
+35d4231 fix: guard driver portal sessions before use
+a6dca86 fix: keep invoice review permission unassigned by seed
+9f703eb feat: complete admin invoice review workflow
+9183d75 fix: critical security and middleware fixes for driver portal
+a16b281 test: driver portal operational testing scripts
+0f2e2b0 fix: change clientGeneratedId to compound unique constraint

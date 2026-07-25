@@ -1,0 +1,3651 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTH & RBAC
+// ═══════════════════════════════════════════════════════════
+
+model User {
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  nameAr             String
+  nameEn             String?
+  passwordHash       String
+  phone              String?
+  isActive           Boolean         @default(true)
+  isSuperAdmin       Boolean         @default(false)
+  employeeId         String?         @unique
+  accountType        UserAccountType @default(ADMIN)
+  mustChangePassword Boolean         @default(false)
+
+  employee                        Employee?                 @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  roles                           UserRole[]
+  groupAccess                     UserGroupAccess[]
+  companyAccess                   UserCompanyAccess[]
+  branchAccess                    UserBranchAccess[]
+  auditLogs                       AuditLog[]
+  uploadedAttachments             Attachment[]              @relation("AttachmentUploadedBy")
+  createdDriverVehicleAssignments DriverVehicleAssignment[] @relation("DriverVehicleAssignmentCreatedBy")
+  assignedAssetCustodies          AssetCustody[]            @relation("AssetCustodyAssignedBy")
+  returnedAssetCustodies          AssetCustody[]            @relation("AssetCustodyReturnedBy")
+  createdJournalEntries           JournalEntry[]            @relation("JournalCreatedBy")
+  approvedJournalEntries          JournalEntry[]            @relation("JournalApprovedBy")
+  vehicleIncidents                VehicleIncident[]         @relation("VehicleIncidentCreatedBy")
+  completedTasks                  CompletedTask[]
+  reminders                       Reminder[]
+  pushSubscriptions               PushSubscription[]
+  directPermissions               UserPermission[]          @relation("UserDirectPermissions")
+  grantedPermissions              UserPermission[]          @relation("UserPermissionGrantedBy")
+  createdTalabatImports           TalabatReportImport[]     @relation("TalabatImportCreatedBy")
+  talabatAllocations              TalabatReportAllocation[] @relation("TalabatAllocationCreatedBy")
+  activityLogs                    EmployeeActivityLog[]
+  trackingSessions                DriverTrackingSession[]
+  reviewedInvoices                DeliveryInvoice[]         @relation("InvoiceReviewedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([accountType])
+  @@map("users")
+}
+
+enum UserAccountType {
+  ADMIN
+  DRIVER
+  CAR_WASH_WORKER
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  nameAr      String
+  description String?
+
+  permissions              RolePermission[]
+  users                    UserRole[]
+  companyAccessAssignments UserCompanyAccess[]
+
+  createdAt DateTime @default(now())
+
+  @@map("roles")
+}
+
+model Permission {
+  id       String          @id @default(cuid())
+  module   String
+  action   String
+  scope    PermissionScope @default(COMPANY)
+  resource String          @default("GENERAL")
+
+  roles           RolePermission[]
+  userPermissions UserPermission[]
+
+  @@unique([module, action, scope])
+  @@map("permissions")
+}
+
+enum PermissionScope {
+  GROUP
+  COMPANY
+  BRANCH
+  OWN
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  id           String  @id @default(cuid())
+  userId       String
+  permissionId String
+  scopeKey     String
+  companyId    String?
+  branchId     String?
+  isAllowed    Boolean @default(true)
+  grantedById  String?
+
+  user       User       @relation("UserDirectPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  company    Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  grantedBy  User?      @relation("UserPermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, permissionId, scopeKey])
+  @@index([userId])
+  @@index([permissionId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([grantedById])
+  @@map("user_permissions")
+}
+
+model UserRole {
+  id        String  @id @default(cuid())
+  userId    String
+  roleId    String
+  companyId String?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  // MySQL: NULL != NULL in unique indexes, so multiple NULL companyId rows are allowed.
+  // The seed uses findFirst + create instead of upsert for the NULL case.
+  @@unique([userId, roleId, companyId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("user_roles")
+}
+
+model UserGroupAccess {
+  id         String  @id @default(cuid())
+  userId     String
+  groupId    String
+  canView    Boolean @default(true)
+  canCreate  Boolean @default(false)
+  canUpdate  Boolean @default(false)
+  canDelete  Boolean @default(false)
+  canApprove Boolean @default(false)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+  @@map("user_group_access")
+}
+
+model UserCompanyAccess {
+  id         String  @id @default(cuid())
+  userId     String
+  companyId  String
+  roleId     String?
+  canView    Boolean @default(true)
+  canCreate  Boolean @default(false)
+  canUpdate  Boolean @default(false)
+  canDelete  Boolean @default(false)
+  canApprove Boolean @default(false)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("user_company_access")
+}
+
+model UserBranchAccess {
+  id         String  @id @default(cuid())
+  userId     String
+  branchId   String
+  companyId  String
+  canView    Boolean @default(true)
+  canCreate  Boolean @default(false)
+  canUpdate  Boolean @default(false)
+  canDelete  Boolean @default(false)
+  canApprove Boolean @default(false)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, branchId])
+  @@index([userId])
+  @@index([branchId])
+  @@index([companyId])
+  @@map("user_branch_access")
+}
+
+// ═══════════════════════════════════════════════════════════
+// GROUP & COMPANIES
+// ═══════════════════════════════════════════════════════════
+
+model Group {
+  id         String            @id @default(cuid())
+  nameAr     String
+  nameEn     String?
+  address    String?
+  phone      String?
+  email      String?
+  logoUrl    String?
+  companies  Company[]
+  userAccess UserGroupAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("groups")
+}
+
+model Company {
+  id                  String        @id @default(cuid())
+  groupId             String
+  nameAr              String
+  nameEn              String?
+  type                CompanyType
+  ownershipType       OwnershipType @default(OWNER_COMPANY)
+  investorId          String?
+  parentCompanyId     String?
+  unifiedEntityNumber String?
+  mainLicenseNumber   String?
+  isMainLicenseEntity Boolean       @default(true)
+  commercialReg       String?
+  taxNumber           String?
+  address             String?
+  phone               String?
+  email               String?
+  logoUrl             String?
+  isActive            Boolean       @default(true)
+  sortOrder           Int           @default(0)
+
+  group                    Group                     @relation(fields: [groupId], references: [id])
+  investor                 Investor?                 @relation("InvestorOwnedCompanies", fields: [investorId], references: [id], onDelete: SetNull)
+  parentCompany            Company?                  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id], onDelete: SetNull)
+  childCompanies           Company[]                 @relation("CompanyHierarchy")
+  branches                 Branch[]
+  bankAccounts             BankAccount[]
+  fiscalYears              FiscalYear[]
+  chartOfAccounts          ChartOfAccount[]
+  costCenters              CostCenter[]
+  journalEntries           JournalEntry[]
+  employees                Employee[]
+  vehicles                 Vehicle[]
+  deliveryPlatformProfiles DeliveryPlatformProfile[]
+  deliveryAbsences         DeliveryAbsence[]
+  driverEvaluations        DriverEvaluation[]
+  driverViolations         DriverViolation[]
+  driverAccidents          DriverAccident[]
+  vehicleIncidents         VehicleIncident[]
+  deliveryContracts        DeliveryContract[]
+  talabatImports           TalabatReportImport[]
+  carWashVehicles          CarWashVehicle[]
+  carWashWorkers           CarWashWorker[]
+  carWashLocations         CarWashLocation[]
+  investors                Investor[]                @relation("CompanyInvestors")
+  expenseCategories        ExpenseCategory[]
+  expenses                 Expense[]
+  salaryBatches            SalaryBatch[]
+  employeePositions        EmployeePosition[]
+  endOfServiceCalcs        EndOfServiceCalc[]
+  leavePayCalcs            LeavePayCalc[]
+  licenses                 License[]
+  notifications            Notification[]
+  completedTasks           CompletedTask[]
+  userPermissions          UserPermission[]
+  userAccess               UserCompanyAccess[]
+  branchAccesses           UserBranchAccess[]
+  userRoles                UserRole[]
+  attachments              Attachment[]
+  assetItemTypes           AssetItemType[]
+  assetItems               AssetItem[]
+  assetCustodies           AssetCustody[]
+  driverVehicleAssignments DriverVehicleAssignment[]
+  knetCommissionSettings   KnetCommissionSettings[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId])
+  @@index([ownershipType])
+  @@index([investorId])
+  @@index([parentCompanyId])
+  @@index([unifiedEntityNumber])
+  @@map("companies")
+}
+
+enum CompanyType {
+  DELIVERY
+  CAR_WASH
+  GENERAL_TRADING
+  TRADING
+  HOLDING
+  OTHER
+}
+
+enum OwnershipType {
+  OWNER_COMPANY
+  INVESTOR_COMPANY
+  OWNER_BRANCH
+  INVESTOR_BRANCH
+}
+
+model Branch {
+  id                  String        @id @default(cuid())
+  companyId           String
+  nameAr              String
+  nameEn              String?
+  ownershipType       OwnershipType @default(OWNER_BRANCH)
+  investorId          String?
+  unifiedEntityNumber String?
+  mainLicenseId       String?
+  address             String?
+  phone               String?
+  isActive            Boolean       @default(true)
+  sortOrder           Int           @default(0)
+
+  company                       Company                        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  investor                      Investor?                      @relation("InvestorOwnedBranches", fields: [investorId], references: [id], onDelete: SetNull)
+  mainLicense                   License?                       @relation("BranchMainLicense", fields: [mainLicenseId], references: [id], onDelete: SetNull)
+  employees                     Employee[]
+  salaryBatches                 SalaryBatch[]
+  claims                        InvestorClaim[]
+  investorBranches              InvestorBranch[]
+  investorAccountAgreements     InvestorAccountAgreement[]
+  investorSalaryFundingProfiles InvestorSalaryFundingProfile[]
+  userAccess                    UserBranchAccess[]
+  deliveryPlatformProfiles      DeliveryPlatformProfile[]
+  deliveryAbsences              DeliveryAbsence[]
+  driverEvaluations             DriverEvaluation[]
+  driverViolations              DriverViolation[]
+  driverAccidents               DriverAccident[]
+  expenses                      Expense[]
+  vehicles                      Vehicle[]
+  carWashVehicles               CarWashVehicle[]
+  carWashWorkers                CarWashWorker[]
+  attachments                   Attachment[]
+  assetItems                    AssetItem[]
+  assetCustodies                AssetCustody[]
+  licenses                      License[]
+  notifications                 Notification[]
+  completedTasks                CompletedTask[]
+  userPermissions               UserPermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([ownershipType])
+  @@index([investorId])
+  @@index([unifiedEntityNumber])
+  @@index([mainLicenseId])
+  @@map("branches")
+}
+
+model BankAccount {
+  id             String  @id @default(cuid())
+  companyId      String
+  nameAr         String
+  nameEn         String?
+  bankName       String
+  accountNumber  String
+  iban           String?
+  currency       String  @default("KWD")
+  isActive       Boolean @default(true)
+  isDefault      Boolean @default(false)
+  chartAccountId String?
+
+  company                  Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  chartAccount             ChartOfAccount?           @relation(fields: [chartAccountId], references: [id], onDelete: Restrict)
+  knetSettlements          KnetSettlement[]
+  companyPayments          CompanyPayment[]
+  expenses                 Expense[]
+  sourceTransfers          AccountTransfer[]         @relation("TransferSourceBankAccount")
+  destinationTransfers     AccountTransfer[]         @relation("TransferDestinationBankAccount")
+  driverWalletTransactions DriverWalletTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([chartAccountId])
+  @@map("bank_accounts")
+}
+
+model FiscalYear {
+  id        String   @id @default(cuid())
+  companyId String
+  year      Int
+  startDate DateTime
+  endDate   DateTime
+  isLocked  Boolean  @default(false)
+  isCurrent Boolean  @default(false)
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  journalEntries  JournalEntry[]
+  openingBalances OpeningBalance[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, year])
+  @@index([companyId])
+  @@map("fiscal_years")
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART OF ACCOUNTS
+// ═══════════════════════════════════════════════════════════
+
+model ChartOfAccount {
+  id            String        @id @default(cuid())
+  companyId     String
+  code          String
+  nameAr        String
+  nameEn        String?
+  type          AccountType
+  subtype       String?
+  parentId      String?
+  level         Int           @default(1)
+  isHeader      Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  normalBalance NormalBalance @default(DEBIT)
+  notes         String?
+
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  parent          ChartOfAccount?    @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children        ChartOfAccount[]   @relation("AccountHierarchy")
+  journalLines    JournalEntryLine[]
+  bankAccounts    BankAccount[]
+  openingBalances OpeningBalance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([parentId])
+  @@index([type])
+  @@index([isActive])
+  @@map("chart_of_accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+model OpeningBalance {
+  id           String  @id @default(cuid())
+  accountId    String
+  fiscalYearId String
+  debit        Decimal @default(0) @db.Decimal(18, 3)
+  credit       Decimal @default(0) @db.Decimal(18, 3)
+
+  account    ChartOfAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  fiscalYear FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, fiscalYearId])
+  @@index([accountId])
+  @@index([fiscalYearId])
+  @@map("opening_balances")
+}
+
+// ═══════════════════════════════════════════════════════════
+// JOURNAL ENTRIES — Core Double-Entry Accounting
+// ═══════════════════════════════════════════════════════════
+
+model JournalEntry {
+  id            String           @id @default(cuid())
+  companyId     String
+  fiscalYearId  String
+  number        String
+  date          DateTime
+  descriptionAr String
+  descriptionEn String?
+  type          JournalEntryType
+  status        JournalStatus    @default(DRAFT)
+  reference     String?
+  refModule     String?
+  refId         String?
+  isAutomatic   Boolean          @default(false)
+  costCenterId  String?
+  totalDebit    Decimal          @default(0) @db.Decimal(18, 3)
+  totalCredit   Decimal          @default(0) @db.Decimal(18, 3)
+  isDeleted     Boolean          @default(false)
+  deletedAt     DateTime?
+
+  // Reversal tracking fields
+  isReversed      Boolean   @default(false)
+  reversedAt      DateTime?
+  reversedBy      String?
+  reversalEntryId String?
+
+  approvedById String?
+  approvedAt   DateTime?
+  postedById   String?
+  postedAt     DateTime?
+  createdById  String?
+
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  fiscalYear  FiscalYear         @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  costCenter  CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  createdBy   User?              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy  User?              @relation("JournalApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  lines       JournalEntryLine[]
+  attachments Attachment[]
+  auditLogs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([fiscalYearId])
+  @@index([costCenterId])
+  @@index([status])
+  @@index([date])
+  @@index([type])
+  @@index([refModule, refId])
+  @@index([isDeleted])
+  @@index([isReversed])
+  @@index([reversalEntryId])
+  @@index([createdAt])
+  @@map("journal_entries")
+}
+
+enum JournalEntryType {
+  GENERAL
+  RECEIPT
+  PAYMENT
+  TRANSFER
+  SALARY
+  OPENING_BALANCE
+  DEPRECIATION
+  ADJUSTMENT
+  DELIVERY_INCOME
+  DELIVERY_WALLET
+  CAR_WASH_REVENUE
+  KNET_SETTLEMENT
+  INVESTOR_COLLECTION
+  INVESTOR_SALARY_COLLECTION
+  INVESTOR_SALARY_DISBURSEMENT
+  EXPENSE
+  REVERSAL
+}
+
+enum JournalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  REJECTED
+  CANCELLED
+}
+
+model JournalEntryLine {
+  id             String  @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  descriptionAr  String?
+  descriptionEn  String?
+  debit          Decimal @default(0) @db.Decimal(18, 3)
+  credit         Decimal @default(0) @db.Decimal(18, 3)
+  sortOrder      Int     @default(0)
+
+  costCenterId     String?
+  driverId         String?
+  employeeId       String?
+  investorId       String?
+  branchId         String?
+  carWashVehicleId String?
+
+  journalEntry JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      ChartOfAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([costCenterId])
+  @@index([driverId])
+  @@index([employeeId])
+  @@index([investorId])
+  @@index([branchId])
+  @@map("journal_entry_lines")
+}
+
+model CostCenter {
+  id        String  @id @default(cuid())
+  companyId String
+  code      String
+  nameAr    String
+  nameEn    String?
+  type      String
+  isActive  Boolean @default(true)
+
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  journalEntries JournalEntry[]
+  journalLines   JournalEntryLine[]
+  carWashVehicle CarWashVehicle?
+  expenses       Expense[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("cost_centers")
+}
+
+// ═══════════════════════════════════════════════════════════
+// ATTACHMENTS & AUDIT
+// ═══════════════════════════════════════════════════════════
+
+model Attachment {
+  id                String    @id @default(cuid())
+  companyId         String?
+  branchId          String?
+  entityType        String?
+  entityId          String?
+  attachmentType    String?
+  fileName          String
+  originalName      String
+  fileType          String
+  fileSize          Int
+  filePath          String
+  refModule         String
+  refId             String
+  uploadedById      String?
+  journalEntryId    String?
+  mimeType          String?
+  storagePath       String?
+  notes             String?
+  documentCategory  String?
+  languageCode      String?
+  clientGeneratedId String?
+  deletedAt         DateTime?
+
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  uploadedBy   User?         @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([journalEntryId])
+  @@index([entityType, entityId])
+  @@index([attachmentType])
+  @@index([deletedAt])
+  @@index([refModule, refId])
+  @@map("attachments")
+}
+
+model AuditLog {
+  id             String  @id @default(cuid())
+  userId         String?
+  action         String
+  module         String
+  resourceId     String
+  resourceType   String
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  companyId      String?
+  branchId       String?
+  userAgent      String?
+  journalEntryId String?
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([journalEntryId])
+  @@index([module, resourceType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum CompletedTaskStatus {
+  COMPLETED
+  NOT_COMPLETED
+  DEFERRED
+}
+
+enum CompletedTaskType {
+  FIELD // مهمة خارج الشركة (ميدانية)
+  OFFICE // مهمة داخل الشركة (مكتبية)
+}
+
+model CompletedTask {
+  id             String              @id @default(cuid())
+  userId         String
+  companyId      String?
+  branchId       String?
+  taskType       CompletedTaskType   @default(FIELD)
+  titleAr        String
+  titleEn        String?
+  detailsAr      String?
+  detailsEn      String?
+  taskDate       DateTime
+  departedAt     DateTime?
+  returnedAt     DateTime?
+  status         CompletedTaskStatus @default(COMPLETED)
+  deferredToDate DateTime?
+  outcomeNotes   String?
+  location       String?
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  branch  Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  items   CompletedTaskItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, taskDate])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([status])
+  @@index([taskType])
+  @@index([deferredToDate])
+  @@index([createdAt])
+  @@map("completed_tasks")
+}
+
+model CompletedTaskItem {
+  id          String   @id @default(cuid())
+  taskId      String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  sortOrder   Int      @default(0)
+
+  task CompletedTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId, sortOrder])
+  @@map("completed_task_items")
+}
+
+enum ActivityType {
+  WINDOW_CHANGE // تغيير النافذة النشطة
+  WEBSITE_VISIT // زيارة موقع
+  APPLICATION_USE // استخدام برنامج
+  IDLE // عدم نشاط
+  ACTIVE // نشط
+  SCREENSHOT // لقطة شاشة
+}
+
+model EmployeeActivityLog {
+  id              String       @id @default(cuid())
+  userId          String
+  activityType    ActivityType
+  windowTitle     String? // عنوان النافذة
+  applicationName String? // اسم البرنامج
+  url             String? // الرابط (للمتصفحات)
+  startTime       DateTime
+  endTime         DateTime?
+  durationSeconds Int? // المدة بالثواني
+  isIdle          Boolean      @default(false)
+  deviceName      String? // اسم الجهاز
+  ipAddress       String? // IP للجهاز
+  screenshotUrl   String? // لقطة الشاشة (R2 URL)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startTime])
+  @@index([activityType])
+  @@index([startTime])
+  @@index([createdAt])
+  @@map("employee_activity_logs")
+}
+
+// ═══════════════════════════════════════════════════════════
+// HR MODULE
+// ═══════════════════════════════════════════════════════════
+
+model Employee {
+  id                                String                @id @default(cuid())
+  companyId                         String
+  branchId                          String?
+  investorId                        String?
+  licenseId                         String?
+  residencyLicenseId                String?
+  workPermitLicenseId               String?
+  clientGeneratedId                 String?
+  employeeNumber                    String?
+  nameAr                            String
+  nameEn                            String?
+  type                              EmployeeType
+  nationality                       String?
+  dateOfBirth                       DateTime?
+  civilId                           String?
+  passportNumber                    String?
+  passportIssueDate                 DateTime?
+  passportExpiryDate                DateTime?
+  residencyNumber                   String?
+  residencyExpiry                   DateTime?
+  ministryOfInteriorReferenceNumber String?
+  healthCardExpiryDate              DateTime?
+  municipalityCardExpiryDate        DateTime?
+  visaNumber                        String?
+  visaExpiryDate                    DateTime?
+  residencyAlertDays                Int                   @default(60)
+  licenseNumber                     String?
+  licenseExpiry                     DateTime?
+  jobTitle                          String?
+  residentialAddress                String?
+  employmentStatus                  EmploymentStatus      @default(ACTIVE)
+  phone                             String?
+  joinDate                          DateTime?
+  endDate                           DateTime?
+  baseSalary                        Decimal?              @db.Decimal(18, 3)
+  actualSalary                      Decimal?              @db.Decimal(18, 3)
+  bankAccountNumber                 String?
+  passportCustodyStatus             PassportCustodyStatus @default(WITH_DRIVER)
+  passportReceivedDate              DateTime?
+  passportReleasedDate              DateTime?
+  passportReleaseNotes              String?
+  notes                             String?
+  isActive                          Boolean               @default(true)
+  isDeleted                         Boolean               @default(false)
+  deletedAt                         DateTime?
+
+  positionId String?
+
+  company                   Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch                    Branch?                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  investor                  Investor?                   @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  license                   License?                    @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  residencyLicense          License?                    @relation("EmployeeResidencyLicense", fields: [residencyLicenseId], references: [id], onDelete: SetNull)
+  workPermitLicense         License?                    @relation("EmployeeWorkPermitLicense", fields: [workPermitLicenseId], references: [id], onDelete: SetNull)
+  position                  EmployeePosition?           @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  user                      User?
+  driver                    Driver?
+  carWashWorker             CarWashWorker?
+  assetCustodies            AssetCustody[]
+  expenses                  Expense[]
+  salaryPayments            SalaryPayment[]
+  salaryItems               SalaryItem[]
+  tickets                   EmployeeTicket[]
+  endOfServiceCalcs         EndOfServiceCalc[]
+  leavePayCalcs             LeavePayCalc[]
+  assignedVehicles          Vehicle[]                   @relation("VehicleAssignedEmployee")
+  notifications             Notification[]
+  licenseAssignments        EmployeeLicenseAssignment[]
+  claimBeneficiaries        InvestorClaimBeneficiary[]
+  investorAccountAgreements InvestorAccountAgreement[]
+  managerSalaryLines        ManagerSalaryLine[]
+  deliveryInvoices          DeliveryInvoice[]
+  violations                DriverViolation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, clientGeneratedId])
+  @@unique([companyId, civilId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([licenseId])
+  @@index([residencyLicenseId])
+  @@index([workPermitLicenseId])
+  @@index([positionId])
+  @@index([type])
+  @@index([employmentStatus])
+  @@index([passportExpiryDate])
+  @@index([residencyExpiry])
+  @@index([healthCardExpiryDate])
+  @@index([municipalityCardExpiryDate])
+  @@index([licenseExpiry])
+  @@index([isActive])
+  @@index([isDeleted])
+  @@map("employees")
+}
+
+enum EmployeeType {
+  DRIVER
+  DELIVERY_DRIVER
+  DELIVERY_ADMIN
+  CAR_WASH_DRIVER
+  CAR_WASH_WORKER
+  OFFICE_EMPLOYEE
+  ACCOUNTANT
+  MANDOUB
+  OFFICE_BOY
+  OTHER
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+  EXITED
+}
+
+enum PassportCustodyStatus {
+  WITH_COMPANY
+  WITH_DRIVER
+}
+
+model EmployeePosition {
+  id        String  @id @default(cuid())
+  companyId String
+  nameAr    String
+  nameEn    String?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employees Employee[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, nameAr])
+  @@index([companyId])
+  @@map("employee_positions")
+}
+
+model EmployeeTicket {
+  id          String    @id @default(cuid())
+  employeeId  String
+  type        String
+  destination String?
+  travelDate  DateTime?
+  returnDate  DateTime?
+  cost        Decimal?  @db.Decimal(18, 3)
+  paidBy      String?
+  investorId  String?
+  notes       String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId])
+  @@map("employee_tickets")
+}
+
+model EndOfServiceCalc {
+  id              String    @id @default(cuid())
+  companyId       String
+  employeeId      String
+  terminationType String // RESIGNATION | TERMINATION | RETIREMENT | DEATH
+  joinDate        DateTime
+  lastWorkingDay  DateTime
+  serviceYears    Decimal   @db.Decimal(6, 2)
+  serviceDays     Int
+  dailyWage       Decimal   @db.Decimal(18, 3)
+  grossIndemnity  Decimal   @db.Decimal(18, 3)
+  deductionPct    Decimal   @default(100) @db.Decimal(5, 2)
+  netIndemnity    Decimal   @db.Decimal(18, 3)
+  status          String    @default("CALCULATED") // CALCULATED | ACCRUED | PAID
+  notes           String?
+  journalEntryId  String?
+  paidDate        DateTime?
+  createdById     String
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("end_of_service_calcs")
+}
+
+model LeavePayCalc {
+  id              String    @id @default(cuid())
+  companyId       String
+  employeeId      String
+  year            Int
+  periodStartDate DateTime? // Start of entitlement period
+  periodEndDate   DateTime? // End of entitlement period
+  leaveDaysOwed   Decimal   @db.Decimal(6, 1)
+  leaveDaysUsed   Decimal   @default(0) @db.Decimal(6, 1)
+  leaveDaysPaid   Decimal   @db.Decimal(6, 1)
+  dailyWage       Decimal   @db.Decimal(18, 3)
+  totalAmount     Decimal   @db.Decimal(18, 3)
+  status          String    @default("CALCULATED") // CALCULATED | ACCRUED | PAID
+  notes           String?
+  journalEntryId  String?
+  paidDate        DateTime?
+  createdById     String
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("leave_pay_calcs")
+}
+
+model SalaryBatch {
+  id             String          @id @default(cuid())
+  companyId      String
+  branchId       String?
+  investorId     String?
+  cycleType      SalaryCycleType @default(OWNER_STANDARD)
+  month          Int
+  year           Int
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  totalGross     Decimal         @db.Decimal(18, 3)
+  totalNet       Decimal         @db.Decimal(18, 3)
+  status         SalaryStatus    @default(DRAFT)
+  journalEntryId String?
+  notes          String?
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch   Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  investor Investor?       @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  payments SalaryPayment[]
+  items    SalaryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, month, year])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([cycleType])
+  @@index([status])
+  @@map("salary_batches")
+}
+
+enum SalaryCycleType {
+  OWNER_STANDARD
+  ADMINISTRATIVE_26_DAY
+  DELIVERY_28_DAY
+  CAR_WASH_28_DAY
+  INVESTOR_FIXED
+}
+
+enum SalaryStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model SalaryPayment {
+  id                         String   @id @default(cuid())
+  batchId                    String
+  employeeId                 String
+  attendanceDays             Decimal? @db.Decimal(10, 3)
+  evaluationScore            Decimal? @db.Decimal(10, 3)
+  targetOrders               Int?
+  actualOrders               Int?
+  multiOrderAdjustedOrders   Int?
+  walletAmount               Decimal? @db.Decimal(18, 3)
+  amountDeliveredByDriver    Decimal? @db.Decimal(18, 3)
+  remainingWalletBalance     Decimal? @db.Decimal(18, 3)
+  baseAmount                 Decimal  @db.Decimal(18, 3)
+  incentives                 Decimal  @default(0) @db.Decimal(18, 3)
+  additionalEarnings         Decimal  @default(0) @db.Decimal(18, 3)
+  deductions                 Decimal  @default(0) @db.Decimal(18, 3)
+  netAmount                  Decimal  @db.Decimal(18, 3)
+  investorSalaryCollectionId String?
+  notes                      String?
+
+  batch              SalaryBatch               @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  employee           Employee                  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  investorCollection InvestorSalaryCollection? @relation(fields: [investorSalaryCollectionId], references: [id], onDelete: Restrict)
+  items              SalaryItem[]
+
+  @@index([batchId])
+  @@index([employeeId])
+  @@index([investorSalaryCollectionId])
+  @@map("salary_payments")
+}
+
+model SalaryItem {
+  id              String   @id @default(cuid())
+  batchId         String
+  salaryPaymentId String?
+  employeeId      String?
+  type            String
+  category        String
+  titleAr         String
+  titleEn         String?
+  amount          Decimal  @db.Decimal(18, 3)
+  quantity        Decimal? @db.Decimal(10, 3)
+  notes           String?
+  sourceType      String?
+  sourceId        String?
+
+  batch         SalaryBatch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  salaryPayment SalaryPayment? @relation(fields: [salaryPaymentId], references: [id], onDelete: Cascade)
+  employee      Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([batchId])
+  @@index([salaryPaymentId])
+  @@index([employeeId])
+  @@index([type])
+  @@index([category])
+  @@map("salary_items")
+}
+
+// ═══════════════════════════════════════════════════════════
+// DELIVERY MODULE
+// ═══════════════════════════════════════════════════════════
+
+model Driver {
+  id                         String  @id @default(cuid())
+  employeeId                 String  @unique
+  clientGeneratedId          String?
+  talabatId                  String?
+  roPopsId                   String?
+  isRegisteredTalabat        Boolean @default(false)
+  isRegisteredRoPops         Boolean @default(false)
+  walletBalance              Decimal @default(0) @db.Decimal(18, 3)
+  targetOrders               Int     @default(370)
+  assignedVehicleId          String?
+  vehiclePlateNumberSnapshot String?
+  fuelCardNumber             String?
+  isFuelCardLinkedToVehicle  Boolean @default(false)
+  fuelCardLinkedVehicleId    String?
+
+  employee              Employee                       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  assignedVehicle       Vehicle?                       @relation("DriverAssignedVehicle", fields: [assignedVehicleId], references: [id], onDelete: Restrict)
+  fuelCardLinkedVehicle Vehicle?                       @relation("DriverFuelCardVehicle", fields: [fuelCardLinkedVehicleId], references: [id], onDelete: Restrict)
+  dailyOrders           DeliveryDailyOrder[]           @relation("DriverDailyOrders")
+  operatedDailyOrders   DeliveryDailyOrder[]           @relation("DailyOrderOperatedAsDriver")
+  dailyOrderAllocations DeliveryDailyOrderAllocation[] @relation("DailyOrderAllocationDriver")
+  walletTransactions    DriverWalletTransaction[]
+  reportLines           DeliveryMonthlyReportLine[]
+  walletSettlements     DriverWalletSettlement[]
+  vehicleAssignments    DriverVehicleAssignment[]
+  platformProfiles      DeliveryPlatformProfile[]
+  absences              DeliveryAbsence[]
+  evaluations           DriverEvaluation[]
+  orderDeliveries       DeliveryOrderDelivery[]
+  deliveryInvoices      DeliveryInvoice[]
+  violations            DriverViolation[]
+  accidents             DriverAccident[]
+  vehicleIncidents      VehicleIncident[]              @relation("DriverVehicleIncidents")
+  assetCustodies        AssetCustody[]
+  expenses              Expense[]
+  platformIdentifiers   DriverPlatformIdentifier[]
+  talabatRiderMatches   TalabatReportImportRider[]     @relation("TalabatMatchedDriver")
+  talabatAllocations    TalabatReportAllocation[]      @relation("TalabatAllocationDriver")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientGeneratedId])
+  @@index([employeeId])
+  @@index([assignedVehicleId])
+  @@index([fuelCardLinkedVehicleId])
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                         String               @id @default(cuid())
+  companyId                  String
+  branchId                   String?
+  investorId                 String?
+  licenseId                  String?
+  assignedEmployeeId         String?
+  clientGeneratedId          String?
+  plateNumber                String
+  vehicleNumber              String?
+  ownershipModel             VehicleOwnershipType @default(OWNER_OWNED)
+  make                       String?
+  model                      String?
+  year                       Int?
+  chassisNumber              String?
+  registrationBookNumber     String?
+  color                      String?
+  type                       VehicleType
+  vehicleStatus              VehicleStatus        @default(ACTIVE)
+  isActive                   Boolean              @default(true)
+  trackingDeviceId           String?
+  fuelCardNumber             String?
+  municipalityCardNumber     String?
+  municipalityCardExpiryDate DateTime?
+  advertisingCardNumber      String?
+  advertisingCardExpiryDate  DateTime?
+  foodLicenseNumber          String?
+  foodLicenseExpiryDate      DateTime?
+  insuranceExpiryDate        DateTime?
+  insuranceExpiry            DateTime?
+  registrationExpiry         DateTime?
+  notes                      String?
+
+  company              Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch               Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  investor             Investor?                 @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  license              License?                  @relation("LicenseVehicles", fields: [licenseId], references: [id], onDelete: SetNull)
+  assignedEmployee     Employee?                 @relation("VehicleAssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  carWashVehicle       CarWashVehicle?
+  assignedDrivers      Driver[]                  @relation("DriverAssignedVehicle")
+  fuelCardDrivers      Driver[]                  @relation("DriverFuelCardVehicle")
+  driverAssignments    DriverVehicleAssignment[]
+  assetCustodies       AssetCustody[]            @relation("AssetCustodyVehicle")
+  expenses             Expense[]
+  notifications        Notification[]
+  incidents            VehicleIncident[]         @relation("VehicleIncidents")
+  replacementIncidents VehicleIncident[]         @relation("VehicleReplacementIncidents")
+  violations           DriverViolation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, clientGeneratedId])
+  @@unique([companyId, plateNumber])
+  @@unique([companyId, fuelCardNumber])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([licenseId])
+  @@index([assignedEmployeeId])
+  @@index([type])
+  @@index([vehicleStatus])
+  @@index([registrationExpiry])
+  @@index([municipalityCardExpiryDate])
+  @@index([advertisingCardExpiryDate])
+  @@index([foodLicenseExpiryDate])
+  @@index([insuranceExpiryDate])
+  @@index([insuranceExpiry])
+  @@index([isActive])
+  @@map("vehicles")
+}
+
+enum VehicleOwnershipType {
+  OWNER_OWNED
+  RENTED
+}
+
+enum VehicleType {
+  DELIVERY
+  CAR_WASH
+  ADMIN
+}
+
+enum VehicleStatus {
+  ACTIVE
+  IN_MAINTENANCE
+  RENTED
+  SOLD
+  OUT_OF_SERVICE
+}
+
+model DriverVehicleAssignment {
+  id           String    @id @default(cuid())
+  companyId    String
+  driverId     String
+  vehicleId    String
+  assignedFrom DateTime
+  assignedTo   DateTime?
+  isActive     Boolean   @default(true)
+  notes        String?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  driver    Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation("DriverVehicleAssignmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([isActive])
+  @@index([assignedFrom])
+  @@map("driver_vehicle_assignments")
+}
+
+model DeliveryContract {
+  id        String    @id @default(cuid())
+  companyId String
+  platform  String?
+  nameAr    String
+  nameEn    String?
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+  notes     String?
+
+  // نظام تسجيل الطلبات: false = العادي (طلبات/تحصيل)، true = نظام المطاعم والأماكن
+  // (كل توصيلة = مطعم + مكان بسعر، مرجعي فقط بعيد عن الحسابات) — لعقود مثل RoPops
+  usesLocationPricing Boolean @default(false)
+
+  company         Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  monthlyReports  DeliveryMonthlyReport[]
+  dailyOrders     DeliveryDailyOrder[]
+  companyPayments CompanyPayment[]
+  talabatImports  TalabatReportImport[]
+  restaurants     DeliveryRestaurant[]
+  locations       DeliveryLocation[]
+  deliveryPrices  DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([isActive])
+  @@map("delivery_contracts")
+}
+
+// مطعم ضمن عقد (نظام المطاعم والأماكن)
+model DeliveryRestaurant {
+  id         String  @id @default(cuid())
+  contractId String
+  nameAr     String
+  isActive   Boolean @default(true)
+
+  contract        DeliveryContract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  prices          DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+  @@map("delivery_restaurants")
+}
+
+// مكان توصيل ضمن عقد
+model DeliveryLocation {
+  id         String  @id @default(cuid())
+  contractId String
+  nameAr     String
+  isActive   Boolean @default(true)
+
+  contract        DeliveryContract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  prices          DeliveryDeliveryPrice[]
+  orderDeliveries DeliveryOrderDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+  @@map("delivery_locations")
+}
+
+// سعر التوصيل لكل (مطعم + مكان)
+model DeliveryDeliveryPrice {
+  id           String  @id @default(cuid())
+  contractId   String
+  restaurantId String
+  locationId   String
+  price        Decimal @db.Decimal(18, 3)
+
+  contract   DeliveryContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  restaurant DeliveryRestaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  location   DeliveryLocation   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([restaurantId, locationId])
+  @@index([contractId])
+  @@map("delivery_delivery_prices")
+}
+
+// توصيلة مسجّلة لسائق (مرجعي فقط — لا يؤثر على الحسابات/المحافظ)
+model DeliveryOrderDelivery {
+  id           String   @id @default(cuid())
+  companyId    String
+  contractId   String
+  driverId     String
+  date         DateTime
+  restaurantId String
+  locationId   String
+  price        Decimal  @db.Decimal(18, 3) // سعر الوحدة (لكل طلب) المسجّل للمطعم+المكان
+  count        Int      @default(1) // عدد الطلبات؛ إجمالي السطر = count × price
+  notes        String?
+  createdById  String?
+
+  contract   DeliveryContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  driver     Driver             @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  restaurant DeliveryRestaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  location   DeliveryLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([contractId])
+  @@index([driverId])
+  @@index([date])
+  @@map("delivery_order_deliveries")
+}
+
+// ===== فواتير السائقين/الموظفين (أرشفة ومتابعة فقط — لا يؤثر على الحسابات) =====
+
+enum DeliveryInvoiceTargetType {
+  DRIVER
+  EMPLOYEE
+}
+
+model DeliveryInvoice {
+  id                String                    @id @default(cuid())
+  companyId         String
+  targetType        DeliveryInvoiceTargetType
+  driverId          String?
+  employeeId        String?
+  invoiceDate       DateTime
+  amount            Decimal                   @db.Decimal(18, 3)
+  currency          String                    @default("KWD")
+  imagePath         String // رابط الصورة على R2
+  storageKey        String? // مفتاح R2 (للحذف من التخزين)
+  originalFileName  String?
+  mimeType          String?
+  fileSize          Int?
+  ocrText           String?                   @db.Text
+  ocrAmount         Decimal?                  @db.Decimal(18, 3)
+  ocrDate           DateTime?
+  notes             String?
+  createdById       String?
+  deletedAt         DateTime?
+  reviewStatus      InvoiceReviewStatus       @default(APPROVED)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  rejectionReason   String?                   @db.VarChar(500)
+  uploadSource      InvoiceUploadSource       @default(ADMIN)
+  clientGeneratedId String?
+
+  driver     Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  reviewedBy User?     @relation("InvoiceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, employeeId, clientGeneratedId], map: "delivery_invoices_scope_client_id_key")
+  @@index([companyId])
+  @@index([driverId])
+  @@index([employeeId])
+  @@index([invoiceDate])
+  @@index([targetType])
+  @@index([deletedAt])
+  @@index([reviewStatus])
+  @@index([uploadSource])
+  @@index([clientGeneratedId])
+  @@map("delivery_invoices")
+}
+
+enum InvoiceReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum InvoiceUploadSource {
+  ADMIN
+  DRIVER_WEB
+  DRIVER_MOBILE
+}
+
+enum DeliveryDailyOrderWorkStatus {
+  WORKED
+  ON_LEAVE
+  VEHICLE_BREAKDOWN
+  NO_SHIFTS
+  MISSED_SHIFT
+  LATE_LOGIN
+  ABSENT
+}
+
+model DeliveryDailyOrder {
+  id                 String                       @id @default(cuid())
+  driverId           String
+  operatedAsDriverId String?
+  contractId         String
+  companyId          String
+  date               DateTime
+  ordersCount        Int                          @default(0)
+  ratePerOrder       Decimal?                     @db.Decimal(18, 3)
+  grossAmount        Decimal?                     @db.Decimal(18, 3)
+  walletDeducted     Decimal?                     @db.Decimal(18, 3)
+  tips               Decimal?                     @map("rating") @db.Decimal(18, 3)
+  workStatus         DeliveryDailyOrderWorkStatus @default(WORKED)
+  notes              String?
+
+  driver           Driver                         @relation("DriverDailyOrders", fields: [driverId], references: [id], onDelete: Restrict)
+  operatedAsDriver Driver?                        @relation("DailyOrderOperatedAsDriver", fields: [operatedAsDriverId], references: [id], onDelete: SetNull)
+  contract         DeliveryContract               @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  allocations      DeliveryDailyOrderAllocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId, contractId, date])
+  @@index([driverId])
+  @@index([operatedAsDriverId])
+  @@index([contractId])
+  @@index([companyId])
+  @@index([date])
+  @@index([workStatus])
+  @@map("delivery_daily_orders")
+}
+
+// توزيع طلبات سجل يومي على السائق الفعلي (عند العمل بحساب سائق آخر).
+// السجل الأصلي يبقى كما هو؛ هذه طبقة توزيع منفصلة لا تحذف أي بيانات.
+model DeliveryDailyOrderAllocation {
+  id              String   @id @default(cuid())
+  dailyOrderId    String
+  driverId        String
+  allocatedOrders Int
+  walletAmount    Decimal? @db.Decimal(18, 3)
+  notes           String?
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  dailyOrder DeliveryDailyOrder @relation(fields: [dailyOrderId], references: [id], onDelete: Cascade)
+  driver     Driver             @relation("DailyOrderAllocationDriver", fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([dailyOrderId])
+  @@index([driverId])
+  @@map("delivery_daily_order_allocations")
+}
+
+model DeliveryMonthlyReport {
+  id                  String       @id @default(cuid())
+  contractId          String
+  companyId           String
+  month               Int
+  year                Int
+  reportDate          DateTime
+  totalOrdersCount    Int          @default(0)
+  totalGrossAmount    Decimal      @db.Decimal(18, 3)
+  totalWalletDeducted Decimal      @default(0) @db.Decimal(18, 3)
+  netPayment          Decimal      @db.Decimal(18, 3)
+  status              ReportStatus @default(DRAFT)
+  notes               String?
+  journalEntryId      String?
+
+  contract DeliveryContract            @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  lines    DeliveryMonthlyReportLine[]
+  payments CompanyPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contractId, companyId, month, year])
+  @@index([contractId])
+  @@index([companyId])
+  @@index([status])
+  @@map("delivery_monthly_reports")
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  POSTED
+  RECONCILED
+}
+
+model DeliveryMonthlyReportLine {
+  id             String   @id @default(cuid())
+  reportId       String
+  driverId       String
+  ordersCount    Int
+  ratePerOrder   Decimal  @default(0) @db.Decimal(18, 3)
+  grossAmount    Decimal  @db.Decimal(18, 3)
+  walletDeducted Decimal  @default(0) @db.Decimal(18, 3)
+  netAmount      Decimal  @db.Decimal(18, 3)
+  rating         Decimal? @db.Decimal(5, 2)
+  notes          String?
+
+  // Talabat import fields
+  talabatCalculatedOrders Decimal? @db.Decimal(12, 3)
+  talabatPickupPay        Decimal? @db.Decimal(12, 3)
+  talabatDropoffPay       Decimal? @db.Decimal(12, 3)
+  talabatTotalPayment     Decimal? @db.Decimal(12, 3)
+  talabatImportId         String?
+  talabatAllocationNotes  String?
+
+  // NEW: Carriage CSV extended fields
+  actualCompletedDeliveries Int? // From "Total Completed Deliveries" (not calculated)
+  evaluatedHours            Decimal? @db.Decimal(10, 2)
+  achievementPayment        Decimal? @db.Decimal(12, 3)
+  operatorDeduction         Decimal? @db.Decimal(12, 3)
+  netCost                   Decimal? @db.Decimal(12, 3)
+
+  // Flags
+  hasOperatorDeduction   Boolean @default(false)
+  operatorDeductionNotes String?
+
+  report DeliveryMonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  driver Driver                @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([reportId])
+  @@index([driverId])
+  @@map("delivery_monthly_report_lines")
+}
+
+model DriverWalletTransaction {
+  id             String                @id @default(cuid())
+  driverId       String
+  contractId     String?
+  type           WalletTransactionType
+  amount         Decimal               @db.Decimal(18, 3)
+  date           DateTime
+  descriptionAr  String?
+  journalEntryId String?
+  bankAccountId  String?
+  dailyOrderId   String?
+  paymentMethod  String?               @default("CASH")
+  isSettled      Boolean               @default(false)
+  settledAt      DateTime?
+
+  driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([driverId])
+  @@index([isSettled])
+  @@index([date])
+  @@index([bankAccountId])
+  @@map("driver_wallet_transactions")
+}
+
+enum WalletTransactionType {
+  CHARGE
+  DEPOSIT
+  SETTLEMENT
+  DEDUCTION
+  INCENTIVE
+  DEDUCTION_PENALTY
+}
+
+model DriverWalletSettlement {
+  id             String   @id @default(cuid())
+  driverId       String
+  reportId       String
+  amount         Decimal  @db.Decimal(18, 3)
+  date           DateTime
+  journalEntryId String?
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([driverId])
+  @@index([reportId])
+  @@index([date])
+  @@map("driver_wallet_settlements")
+}
+
+model CompanyPayment {
+  id               String   @id @default(cuid())
+  companyId        String
+  contractId       String?
+  reportId         String?
+  platform         String?
+  month            Int
+  year             Int
+  grossAmount      Decimal  @db.Decimal(18, 3)
+  walletDeductions Decimal  @default(0) @db.Decimal(18, 3)
+  netReceived      Decimal  @db.Decimal(18, 3)
+  receivedDate     DateTime
+  bankAccountId    String?
+  journalEntryId   String?
+  notes            String?
+  status           String   @default("RECEIVED")
+
+  contract    DeliveryContract?      @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  report      DeliveryMonthlyReport? @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  bankAccount BankAccount?           @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([contractId])
+  @@index([reportId])
+  @@index([bankAccountId])
+  @@index([status])
+  @@index([receivedDate])
+  @@map("company_payments")
+}
+
+// ═══════════════════════════════════════════════════════════
+// CAR WASH MODULE
+// ═══════════════════════════════════════════════════════════
+
+model CarWashVehicle {
+  id                String  @id @default(cuid())
+  companyId         String
+  branchId          String?
+  clientGeneratedId String?
+  vehicleId         String  @unique
+  code              String
+  nameAr            String
+  nameEn            String?
+  knetDeviceId      String?
+  isActive          Boolean @default(true)
+  costCenterId      String? @unique
+
+  company         Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch          Branch?                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  vehicle         Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  costCenter      CostCenter?             @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  workers         CarWashWorker[]
+  assignedWorkers CarWashWorker[]         @relation("CarWashWorkerAssignedVehicle")
+  operations      CarWashDailyOperation[]
+  assetCustodies  AssetCustody[]          @relation("AssetCustodyCarWashVehicle")
+  expenses        Expense[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, clientGeneratedId])
+  @@index([companyId])
+  @@index([branchId])
+  @@map("car_wash_vehicles")
+}
+
+model CarWashWorker {
+  id                       String            @id @default(cuid())
+  employeeId               String            @unique
+  vehicleId                String?
+  companyId                String?
+  branchId                 String?
+  assignedCarWashVehicleId String?
+  clientGeneratedId        String?
+  role                     CarWashWorkerRole
+
+  vehicle                CarWashVehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  assignedCarWashVehicle CarWashVehicle? @relation("CarWashWorkerAssignedVehicle", fields: [assignedCarWashVehicleId], references: [id], onDelete: Restrict)
+  company                Company?        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch                 Branch?         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  employee               Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([clientGeneratedId])
+  @@index([vehicleId])
+  @@index([assignedCarWashVehicleId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([employeeId])
+  @@map("car_wash_workers")
+}
+
+enum CarWashWorkerRole {
+  DRIVER
+  WASHER
+  CAR_WASH_DRIVER
+  WASHING_WORKER
+  SUPERVISOR
+  OTHER
+}
+
+model CarWashLocation {
+  id           String  @id @default(cuid())
+  companyId    String
+  nameAr       String
+  nameEn       String?
+  address      String?
+  locationType String?
+  isActive     Boolean @default(true)
+
+  company    Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  operations CarWashDailyOperation[]
+
+  @@index([companyId])
+  @@map("car_wash_locations")
+}
+
+model CarWashDailyOperation {
+  id             String   @id @default(cuid())
+  vehicleId      String
+  locationId     String
+  companyId      String
+  date           DateTime
+  totalCash      Decimal  @default(0) @db.Decimal(18, 3)
+  totalKnet      Decimal  @default(0) @db.Decimal(18, 3)
+  totalExpenses  Decimal  @default(0) @db.Decimal(18, 3)
+  netRevenue     Decimal  @default(0) @db.Decimal(18, 3)
+  notes          String?
+  journalEntryId String?
+  status         String   @default("OPEN")
+
+  vehicle          CarWashVehicle    @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  location         CarWashLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  revenues         CarWashRevenue[]
+  expenses         CarWashExpense[]
+  knetTransactions KnetTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([vehicleId, date])
+  @@index([vehicleId])
+  @@index([locationId])
+  @@index([companyId])
+  @@index([date])
+  @@index([status])
+  @@map("car_wash_daily_operations")
+}
+
+model CarWashRevenue {
+  id          String      @id @default(cuid())
+  operationId String
+  type        RevenueType
+  amount      Decimal     @db.Decimal(18, 3)
+  description String?
+  date        DateTime
+
+  operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([operationId])
+  @@index([date])
+  @@map("car_wash_revenues")
+}
+
+enum RevenueType {
+  CASH
+  KNET
+}
+
+model CarWashExpense {
+  id          String   @id @default(cuid())
+  operationId String
+  categoryId  String?
+  amount      Decimal  @db.Decimal(18, 3)
+  description String
+  date        DateTime
+
+  operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([operationId])
+  @@index([date])
+  @@map("car_wash_expenses")
+}
+
+model KnetTransaction {
+  id             String   @id @default(cuid())
+  operationId    String
+  amount         Decimal  @db.Decimal(18, 3)
+  transactionRef String?
+  date           DateTime
+  settlementId   String?
+  isSettled      Boolean  @default(false)
+  cardType       String   @default("KNET") // KNET, VISA_LOCAL, VISA_INTL, MASTERCARD_LOCAL, MASTERCARD_INTL
+
+  operation  CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  settlement KnetSettlement?       @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([operationId])
+  @@index([settlementId])
+  @@index([isSettled])
+  @@index([date])
+  @@index([cardType])
+  @@map("knet_transactions")
+}
+
+model KnetCommissionSettings {
+  id             String  @id @default(cuid())
+  companyId      String
+  cardType       String // KNET, VISA_LOCAL, VISA_INTL, MASTERCARD_LOCAL, MASTERCARD_INTL
+  percentageRate Decimal @default(0) @db.Decimal(5, 3) // e.g., 1.750 for 1.75%
+  fixedAmount    Decimal @default(0) @db.Decimal(18, 3)
+  isActive       Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, cardType])
+  @@index([companyId])
+  @@map("knet_commission_settings")
+}
+
+model KnetSettlement {
+  id             String   @id @default(cuid())
+  companyId      String
+  bankAccountId  String
+  settlementDate DateTime
+  grossAmount    Decimal  @db.Decimal(18, 3)
+  commission     Decimal  @db.Decimal(18, 3)
+  netAmount      Decimal  @db.Decimal(18, 3)
+  journalEntryId String?
+  notes          String?
+
+  bankAccount  BankAccount       @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  transactions KnetTransaction[]
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([bankAccountId])
+  @@index([settlementDate])
+  @@map("knet_settlements")
+}
+
+// ═══════════════════════════════════════════════════════════
+// INVESTORS & BRANCHES MODULE
+// ═══════════════════════════════════════════════════════════
+
+model AssetItemType {
+  id                     String        @id @default(cuid())
+  companyId              String?
+  companyType            CompanyType?
+  nameAr                 String
+  nameEn                 String?
+  requiresSerialNumber   Boolean       @default(false)
+  requiresCondition      Boolean       @default(true)
+  defaultForEmployeeType EmployeeType?
+  isActive               Boolean       @default(true)
+
+  company    Company?    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assetItems AssetItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, nameAr])
+  @@index([companyId])
+  @@index([companyType])
+  @@index([defaultForEmployeeType])
+  @@index([isActive])
+  @@map("asset_item_types")
+}
+
+model AssetItem {
+  id                String         @id @default(cuid())
+  companyId         String
+  branchId          String?
+  clientGeneratedId String?
+  assetItemTypeId   String
+  nameAr            String
+  nameEn            String?
+  serialNumber      String?
+  barcode           String?
+  purchaseDate      DateTime?
+  purchaseCost      Decimal?       @db.Decimal(18, 3)
+  currentCondition  AssetCondition @default(NEW)
+  status            AssetStatus    @default(AVAILABLE)
+  notes             String?
+  deletedAt         DateTime?
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch        Branch?        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  assetItemType AssetItemType  @relation(fields: [assetItemTypeId], references: [id], onDelete: Restrict)
+  custodies     AssetCustody[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, clientGeneratedId])
+  @@unique([companyId, serialNumber])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([assetItemTypeId])
+  @@index([status])
+  @@index([currentCondition])
+  @@index([deletedAt])
+  @@map("asset_items")
+}
+
+model AssetCustody {
+  id                   String                    @id @default(cuid())
+  companyId            String
+  branchId             String?
+  clientGeneratedId    String?
+  assetItemId          String
+  assignmentTargetType AssetAssignmentTargetType
+  assignmentTargetId   String
+  employeeId           String?
+  driverId             String?
+  vehicleId            String?
+  carWashVehicleId     String?
+  assignedDate         DateTime
+  returnedDate         DateTime?
+  conditionOnAssign    AssetCondition?
+  conditionOnReturn    AssetCondition?
+  assignedById         String?
+  returnedToId         String?
+  status               AssetCustodyStatus        @default(ACTIVE)
+  notes                String?
+
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch         Branch?         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  assetItem      AssetItem       @relation(fields: [assetItemId], references: [id], onDelete: Restrict)
+  assignedBy     User?           @relation("AssetCustodyAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  returnedTo     User?           @relation("AssetCustodyReturnedBy", fields: [returnedToId], references: [id], onDelete: SetNull)
+  employee       Employee?       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  driver         Driver?         @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle        Vehicle?        @relation("AssetCustodyVehicle", fields: [vehicleId], references: [id], onDelete: Restrict)
+  carWashVehicle CarWashVehicle? @relation("AssetCustodyCarWashVehicle", fields: [carWashVehicleId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, clientGeneratedId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([assetItemId])
+  @@index([assignmentTargetType, assignmentTargetId])
+  @@index([employeeId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([carWashVehicleId])
+  @@index([status])
+  @@index([assignedDate])
+  @@map("asset_custodies")
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  USED
+  DAMAGED
+  LOST
+  UNDER_MAINTENANCE
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  RETURNED
+  LOST
+  DAMAGED
+  DISPOSED
+}
+
+enum AssetCustodyStatus {
+  ACTIVE
+  RETURNED
+  LOST
+  DAMAGED
+}
+
+enum AssetAssignmentTargetType {
+  EMPLOYEE
+  DRIVER
+  VEHICLE
+  CAR_WASH_VEHICLE
+  BRANCH
+  COMPANY
+}
+
+model Investor {
+  id       String  @id @default(cuid())
+  nameAr   String
+  nameEn   String?
+  phone    String?
+  phone2   String?
+  civilId  String?
+  email    String?
+  address  String?
+  notes    String?
+  isActive Boolean @default(true)
+
+  companies             Company[]                      @relation("CompanyInvestors")
+  ownedCompanies        Company[]                      @relation("InvestorOwnedCompanies")
+  ownedBranches         Branch[]                       @relation("InvestorOwnedBranches")
+  investorBranches      InvestorBranch[]
+  claims                InvestorClaim[]
+  salaryCollections     InvestorSalaryCollection[]
+  accountAgreements     InvestorAccountAgreement[]
+  salaryFundingProfiles InvestorSalaryFundingProfile[]
+  salaryBatches         SalaryBatch[]
+  expenses              Expense[]
+  employees             Employee[]
+  vehicles              Vehicle[]
+  licenses              License[]
+  notifications         Notification[]
+  managerCharges        ManagerCharge[]
+  managerSalaryBatches  ManagerSalaryBatch[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("investors")
+}
+
+// ===== قسم إدارة المسئولين والمديرين (مرجعي بالكامل — لا يؤثر على الحسابات) =====
+
+enum ManagerChargeType {
+  RENT // إيجار
+  EXPENSE // مصروف
+  REVENUE // إيراد
+}
+
+// مستحق (إيجار/مصروف/إيراد) لمسئول عن فترة محددة + تحصيلاته. مرجعي فقط.
+model ManagerCharge {
+  id          String            @id @default(cuid())
+  companyId   String
+  investorId  String
+  type        ManagerChargeType
+  title       String // البيان (اسم المقر / وصف المصروف / مصدر الإيراد)
+  month       Int? // 1-12 (null = سنوي/مرة واحدة)
+  year        Int
+  amount      Decimal           @db.Decimal(18, 3)
+  dueDate     DateTime?
+  notes       String?
+  createdById String?
+
+  investor Investor               @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  payments ManagerChargePayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([type])
+  @@index([year])
+  @@map("manager_charges")
+}
+
+// تحصيل دفعة من مستحق
+model ManagerChargePayment {
+  id          String   @id @default(cuid())
+  chargeId    String
+  amount      Decimal  @db.Decimal(18, 3)
+  paidDate    DateTime
+  notes       String?
+  createdById String?
+
+  charge ManagerCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([chargeId])
+  @@map("manager_charge_payments")
+}
+
+// دفعة تحصيل رواتب لمسئول عن شهر (موظفين مختارين + عمولة بنك ثابتة). مرجعي فقط.
+model ManagerSalaryBatch {
+  id             String  @id @default(cuid())
+  companyId      String
+  investorId     String
+  month          Int // 1-12
+  year           Int
+  bankCommission Decimal @default(0) @db.Decimal(18, 3)
+  notes          String?
+  createdById    String?
+
+  investor Investor               @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  lines    ManagerSalaryLine[]
+  payments ManagerSalaryPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([year])
+  @@map("manager_salary_batches")
+}
+
+// سطر موظف ضمن دفعة الرواتب (لقطة من الراتب وقت الإنشاء)
+model ManagerSalaryLine {
+  id         String  @id @default(cuid())
+  batchId    String
+  employeeId String
+  amount     Decimal @db.Decimal(18, 3)
+
+  batch    ManagerSalaryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employee Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@index([employeeId])
+  @@map("manager_salary_lines")
+}
+
+// تحصيل دفعة من دفعة الرواتب
+model ManagerSalaryPayment {
+  id          String   @id @default(cuid())
+  batchId     String
+  amount      Decimal  @db.Decimal(18, 3)
+  paidDate    DateTime
+  notes       String?
+  createdById String?
+
+  batch ManagerSalaryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([batchId])
+  @@map("manager_salary_payments")
+}
+
+model InvestorBranch {
+  id           String    @id @default(cuid())
+  investorId   String
+  branchId     String
+  ownershipPct Decimal   @default(100) @db.Decimal(5, 2)
+  startDate    DateTime
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  notes        String?
+
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([investorId])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("investor_branches")
+}
+
+model InvestorClaim {
+  id                 String      @id @default(cuid())
+  investorId         String
+  branchId           String?
+  companyId          String
+  type               ClaimType
+  descriptionAr      String
+  descriptionEn      String?
+  claimDate          DateTime
+  dueDate            DateTime?
+  status             ClaimStatus @default(PENDING)
+  sentToAccountantAt DateTime?
+  sentToInvestorAt   DateTime?
+  collectedAt        DateTime?
+  completedAt        DateTime?
+  paidAt             DateTime?
+  renewedAt          DateTime?
+  journalEntryId     String?
+  notes              String?
+
+  investor      Investor                   @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch        Branch?                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines         InvestorClaimLine[]
+  payments      InvestorPayment[]
+  beneficiaries InvestorClaimBeneficiary[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([investorId])
+  @@index([branchId])
+  @@index([companyId])
+  @@index([status])
+  @@index([claimDate])
+  @@map("investor_claims")
+}
+
+enum ClaimType {
+  LICENSE_RENEWAL
+  RESIDENCY_RENEWAL
+  RENT
+  SALARY_FUNDING
+  ADMIN_FEE
+  FINE
+  OTHER
+}
+
+enum ClaimStatus {
+  PENDING
+  SENT_TO_ACCOUNTANT
+  SENT_TO_INVESTOR
+  PARTIALLY_COLLECTED
+  COLLECTED
+  COMPLETED
+  PAID
+  RENEWED
+  OVERDUE
+  SETTLED
+  CANCELLED
+}
+
+model InvestorClaimLine {
+  id              String  @id @default(cuid())
+  claimId         String
+  descriptionAr   String
+  collectedAmount Decimal @db.Decimal(18, 3)
+  actualAmount    Decimal @db.Decimal(18, 3)
+  groupIncome     Decimal @default(0) @db.Decimal(18, 3)
+  notes           String?
+
+  claim InvestorClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([claimId])
+  @@map("investor_claim_lines")
+}
+
+model InvestorClaimBeneficiary {
+  id         String  @id @default(cuid())
+  claimId    String
+  employeeId String?
+  isInvestor Boolean @default(false)
+  nameAr     String
+  nameEn     String?
+
+  claim    InvestorClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  employee Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([claimId])
+  @@index([employeeId])
+  @@map("investor_claim_beneficiaries")
+}
+
+model InvestorPayment {
+  id             String   @id @default(cuid())
+  claimId        String
+  investorId     String
+  amount         Decimal  @db.Decimal(18, 3)
+  paymentDate    DateTime
+  method         String
+  reference      String?
+  journalEntryId String?
+  notes          String?
+
+  claim InvestorClaim @relation(fields: [claimId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([claimId])
+  @@index([investorId])
+  @@index([paymentDate])
+  @@map("investor_payments")
+}
+
+model InvestorSalaryCollection {
+  id              String    @id @default(cuid())
+  investorId      String
+  branchId        String?
+  companyId       String
+  month           Int
+  year            Int
+  collectedAmount Decimal   @db.Decimal(18, 3)
+  collectedDate   DateTime
+  dueDate         DateTime?
+  bankAccountId   String?
+  status          String    @default("COLLECTED")
+  journalEntryId  String?
+  notes           String?
+
+  investor       Investor        @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  salaryPayments SalaryPayment[]
+
+  createdAt DateTime @default(now())
+
+  @@index([investorId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([status])
+  @@map("investor_salary_collections")
+}
+
+enum InvestorAccountChargeCategory {
+  MONTHLY_FEE
+  ANNUAL_FEE
+  RENT
+  LICENSE_ISSUANCE
+  LICENSE_RENEWAL
+  EMPLOYEE_RESIDENCY_RENEWAL
+  INVESTOR_RESIDENCY_RENEWAL
+  SALARY_FUNDING
+  OTHER
+}
+
+enum InvestorAccountBillingCycle {
+  MONTHLY
+  ANNUAL
+  MANUAL
+  ONE_TIME
+}
+
+model InvestorAccountAgreement {
+  id              String                        @id @default(cuid())
+  companyId       String
+  investorId      String
+  branchId        String?
+  licenseId       String?
+  employeeId      String?
+  titleAr         String
+  titleEn         String?
+  chargeCategory  InvestorAccountChargeCategory
+  claimType       ClaimType
+  billingCycle    InvestorAccountBillingCycle   @default(MANUAL)
+  amount          Decimal                       @db.Decimal(18, 3)
+  dueDay          Int?
+  dueMonth        Int?
+  startDate       DateTime?
+  nextDueDate     DateTime?
+  isActive        Boolean                       @default(true)
+  autoCreateClaim Boolean                       @default(false)
+  notes           String?
+
+  investor Investor  @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  license  License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([branchId])
+  @@index([licenseId])
+  @@index([employeeId])
+  @@index([claimType])
+  @@index([billingCycle])
+  @@index([isActive])
+  @@map("investor_account_agreements")
+}
+
+model InvestorSalaryFundingProfile {
+  id                 String  @id @default(cuid())
+  companyId          String
+  investorId         String
+  branchId           String?
+  workersCount       Int     @default(0)
+  monthlyAmount      Decimal @db.Decimal(18, 3)
+  collectionStartDay Int     @default(22)
+  collectionEndDay   Int     @default(31)
+  whatsappTemplateAr String? @db.Text
+  whatsappTemplateEn String? @db.Text
+  isActive           Boolean @default(true)
+  notes              String?
+
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([investorId])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("investor_salary_funding_profiles")
+}
+
+model License {
+  id                           String    @id @default(cuid())
+  companyId                    String
+  branchId                     String?
+  investorId                   String?
+  licenseAddressId             String?   @unique
+  licenseNumber                String
+  issueDate                    DateTime?
+  unifiedEntityNumber          String?
+  civilEntityNumber            String?
+  fileNumber                   String?
+  licenseExpiryDate            DateTime?
+  commercialNameAr             String
+  commercialNameEn             String?
+  isMainLicense                Boolean   @default(true)
+  mainLicenseId                String?
+  legalEntity                  String? // LLC | PARTNERSHIP | JOINT_STOCK | SOLE_PROPRIETORSHIP
+  capital                      Decimal?  @db.Decimal(15, 3)
+  commercialRegNo              String?
+  ownerOrInvestorNameAr        String?
+  ownerOrInvestorNameEn        String?
+  ownerOrInvestorPhone         String?
+  investmentAmount             Decimal?  @db.Decimal(18, 3)
+  investmentCycle              String?
+  rentAmount                   Decimal?  @db.Decimal(18, 3)
+  rentCycle                    String?
+  totalInvestmentAmount        Decimal?  @db.Decimal(18, 3)
+  totalInvestmentCycle         String?
+  investmentRenewalDate        DateTime?
+  managerName                  String?
+  managerCivilId               String?
+  managerPhone                 String?
+  email                        String?
+  fireLicenseExpiryDate        DateTime?
+  healthLicenseExpiryDate      DateTime?
+  advertisingLicenseExpiryDate DateTime?
+  trafficCertExpiryDate        DateTime?
+  customsCertExpiryDate        DateTime?
+  importLicenseExpiryDate      DateTime?
+  status                       String    @default("ACTIVE")
+  notes                        String?
+
+  company                   Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch                    Branch?                     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  investor                  Investor?                   @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  address                   LicenseAddress?             @relation(fields: [licenseAddressId], references: [id], onDelete: SetNull)
+  mainLicense               License?                    @relation("LicenseHierarchy", fields: [mainLicenseId], references: [id], onDelete: SetNull)
+  branchLicenses            License[]                   @relation("LicenseHierarchy")
+  employees                 Employee[]
+  residencyEmployees        Employee[]                  @relation("EmployeeResidencyLicense")
+  workPermitEmployees       Employee[]                  @relation("EmployeeWorkPermitLicense")
+  investorAccountAgreements InvestorAccountAgreement[]
+  employeeAssignments       EmployeeLicenseAssignment[]
+  branchMainFor             Branch[]                    @relation("BranchMainLicense")
+  notifications             Notification[]
+
+  // Document sections
+  establishmentContracts EstablishmentContract[]
+  leaseContracts         LeaseContract[]
+  employerSignatureCert  EmployerSignatureCert?
+  rentReceipts           LicenseRentReceipt[]
+  importLicenseDoc       ImportLicenseDoc?
+  advertisingDetails     LicenseAdvertisingDetails?
+  fireSafetyCert         LicenseFireSafetyCert?
+  trafficCert            LicenseTrafficCert?
+  customsCert            LicenseCustomsCert?
+  licenseVehicles        LicenseVehicle[]
+  vehicles               Vehicle[]                  @relation("LicenseVehicles")
+  managerPOA             ManagerPOA?
+  workInjuryInsurances   WorkInjuryInsurance[]
+  annualBalances         LicenseAnnualBalance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, licenseNumber])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([licenseAddressId])
+  @@index([mainLicenseId])
+  @@index([licenseExpiryDate])
+  @@index([fireLicenseExpiryDate])
+  @@index([healthLicenseExpiryDate])
+  @@index([advertisingLicenseExpiryDate])
+  @@index([trafficCertExpiryDate])
+  @@index([customsCertExpiryDate])
+  @@index([importLicenseExpiryDate])
+  @@index([unifiedEntityNumber])
+  @@index([status])
+  @@map("licenses")
+}
+
+model LicenseAddress {
+  id              String  @id @default(cuid())
+  automaticNumber String?
+  governorate     String?
+  area            String?
+  block           String?
+  plot            String?
+  street          String?
+  buildingName    String?
+  floor           String?
+  unitType        String?
+  unitNumber      String?
+
+  license License?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("license_addresses")
+}
+
+// ربط الموظفين بتراخيص متعددة (للإداريين العابرين للشركات)
+model EmployeeLicenseAssignment {
+  id         String   @id @default(cuid())
+  employeeId String
+  licenseId  String
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  license  License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, licenseId])
+  @@index([employeeId])
+  @@index([licenseId])
+  @@map("employee_license_assignments")
+}
+
+// ═══════════════════════════════════════════════════════════
+// LICENSE DOCUMENT SECTIONS (14 sections per license)
+// ═══════════════════════════════════════════════════════════
+
+// [1] عقد التأسيس — versioned, old versions archived
+model EstablishmentContract {
+  id           String    @id @default(cuid())
+  licenseId    String
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  contractDate DateTime?
+  notes        String?
+  fileUrl      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  license  License           @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  partners ContractPartner[]
+
+  @@index([licenseId])
+  @@index([isActive])
+  @@map("establishment_contracts")
+}
+
+model ContractPartner {
+  id           String  @id @default(cuid())
+  contractId   String
+  nameAr       String
+  nameEn       String?
+  civilId      String?
+  sharePercent Decimal @default(0) @db.Decimal(5, 2)
+  isDirector   Boolean @default(false)
+  sortOrder    Int     @default(0)
+
+  contract EstablishmentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_partners")
+}
+
+// [2] عقد الإيجار — versioned
+model LeaseContract {
+  id           String    @id @default(cuid())
+  licenseId    String
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  holderType   String    @default("INVESTOR") // INVESTOR | GROUP_OWNER | OTHER_KUWAITI
+  holderNameAr String?
+  startDate    DateTime?
+  endDate      DateTime?
+  monthlyRent  Decimal?  @db.Decimal(10, 3)
+  notes        String?
+  fileUrl      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@index([isActive])
+  @@map("lease_contracts")
+}
+
+// [4] اعتماد توقيع صاحب العمل
+model EmployerSignatureCert {
+  id             String    @id @default(cuid())
+  licenseId      String    @unique
+  fileNumber     String?
+  tradeName      String?
+  companyCivilId String?
+  unifiedNumber  String?
+  governorate    String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  fileUrl        String?
+  updatedAt      DateTime  @updatedAt
+
+  license     License            @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  signatories AuthorizedSigner[]
+
+  @@map("employer_signature_certs")
+}
+
+model AuthorizedSigner {
+  id        String  @id @default(cuid())
+  certId    String
+  nameAr    String
+  nameEn    String?
+  sortOrder Int     @default(0)
+
+  cert EmployerSignatureCert @relation(fields: [certId], references: [id], onDelete: Cascade)
+
+  @@index([certId])
+  @@map("authorized_signers")
+}
+
+// [5] إيصالات الإيجار
+model LicenseRentReceipt {
+  id          String    @id @default(cuid())
+  licenseId   String
+  receiptDate DateTime?
+  amount      Decimal?  @db.Decimal(10, 3)
+  fileUrl     String
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@map("license_rent_receipts")
+}
+
+// [6] ترخيص الاستيراد العام
+model ImportLicenseDoc {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  licenseNumber String?
+  startDate     DateTime?
+  endDate       DateTime?
+  fileUrl       String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("import_license_docs")
+}
+
+// [7] ترخيص الإعلان (تفاصيل موسعة)
+model LicenseAdvertisingDetails {
+  id                      String    @id @default(cuid())
+  licenseId               String    @unique
+  adLicenseNumber         String?
+  commercialLicenseNo     String?
+  issueDate               DateTime?
+  expiryDate              DateTime?
+  commercialLicenseExpiry DateTime?
+  municipalityAddress     String?
+  district                String?
+  street                  String?
+  block                   String?
+  fileUrl                 String?
+  updatedAt               DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_advertising_details")
+}
+
+// [8] رخصة الإطفاء (تفاصيل موسعة)
+model LicenseFireSafetyCert {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  licenseNumber String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  fileUrl       String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_fire_safety_certs")
+}
+
+// [9] اعتماد المرور
+model LicenseTrafficCert {
+  id         String    @id @default(cuid())
+  licenseId  String    @unique
+  issueDate  DateTime?
+  expiryDate DateTime?
+  fileUrl    String?
+  updatedAt  DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_traffic_certs")
+}
+
+// [10] اعتماد الجمارك
+model LicenseCustomsCert {
+  id         String    @id @default(cuid())
+  licenseId  String    @unique
+  issueDate  DateTime?
+  expiryDate DateTime?
+  fileUrl    String?
+  updatedAt  DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_customs_certs")
+}
+
+// [11] المركبات المضافة على الترخيص
+model LicenseVehicle {
+  id              String    @id @default(cuid())
+  licenseId       String
+  vehicleType     String
+  plateNumber     String
+  model           String?
+  year            Int?
+  insuranceExpiry DateTime?
+  licenseExpiry   DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@map("license_vehicles")
+}
+
+// [12] وكالة المدير
+model ManagerPOA {
+  id            String    @id @default(cuid())
+  licenseId     String    @unique
+  principalName String?
+  agentName     String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  fileUrl       String?
+  notes         String?
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("manager_poa")
+}
+
+// [13] وثيقة تأمين إصابات العمل — ربع سنوي
+model WorkInjuryInsurance {
+  id            String    @id @default(cuid())
+  licenseId     String
+  year          Int
+  quarter       Int // 1 | 2 | 3 | 4
+  policyNumber  String?
+  certificateNo String?
+  startDate     DateTime?
+  endDate       DateTime?
+  fileUrl       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, year, quarter])
+  @@index([licenseId])
+  @@map("work_injury_insurances")
+}
+
+// [14] الميزانية السنوية
+model LicenseAnnualBalance {
+  id         String   @id @default(cuid())
+  licenseId  String
+  year       Int
+  accountant String?
+  fileUrl    String
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, year])
+  @@index([licenseId])
+  @@map("license_annual_balances")
+}
+
+model DeliveryPlatformProfile {
+  id                  String   @id @default(cuid())
+  companyId           String
+  branchId            String?
+  driverId            String
+  platformName        String
+  platformDriverCode  String?
+  monthlyTargetOrders Int?
+  salaryModel         String   @default("TARGET")
+  ratePerOrder        Decimal? @db.Decimal(18, 3)
+  hourlyRate          Decimal? @db.Decimal(18, 3)
+  isActive            Boolean  @default(true)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([driverId])
+  @@index([platformName])
+  @@map("delivery_platform_profiles")
+}
+
+model DeliveryAbsence {
+  id        String   @id @default(cuid())
+  companyId String
+  branchId  String?
+  driverId  String
+  date      DateTime
+  reason    String?
+  isPaid    Boolean  @default(false)
+  notes     String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([driverId, date])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([date])
+  @@map("delivery_absences")
+}
+
+model DriverEvaluation {
+  id        String  @id @default(cuid())
+  companyId String
+  branchId  String?
+  driverId  String
+  month     Int
+  year      Int
+  score     Decimal @db.Decimal(10, 3)
+  notes     String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId, month, year])
+  @@index([companyId])
+  @@index([branchId])
+  @@map("driver_evaluations")
+}
+
+model DriverViolation {
+  id         String  @id @default(cuid())
+  companyId  String
+  branchId   String?
+  driverId   String?
+  employeeId String?
+  vehicleId  String?
+
+  date          DateTime
+  locationAr    String?
+  locationEn    String?
+  type          String
+  descriptionAr String?
+  descriptionEn String?
+
+  amount Decimal @db.Decimal(18, 3)
+
+  // who pays: DRIVER | COMPANY | SPLIT
+  responsibility String @default("DRIVER")
+  driverSharePct Int?
+
+  // how driver pays: FULL | INSTALLMENT
+  paymentMode       String @default("FULL")
+  installmentMonths Int?
+  installmentsPaid  Int    @default(0)
+
+  status String @default("PENDING")
+
+  // legacy field kept for backward compat
+  driverPays Boolean @default(true)
+
+  // auto-created expense for company portion
+  expenseId String? @unique
+
+  notes String?
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  driver   Driver?   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  expense  Expense?  @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([driverId])
+  @@index([employeeId])
+  @@index([vehicleId])
+  @@index([date])
+  @@index([status])
+  @@map("driver_violations")
+}
+
+model DriverAccident {
+  id                String   @id @default(cuid())
+  companyId         String
+  branchId          String?
+  driverId          String
+  date              DateTime
+  descriptionAr     String
+  descriptionEn     String?
+  causedByDriver    Boolean  @default(false)
+  repairAmount      Decimal? @db.Decimal(18, 3)
+  paymentMode       String?
+  installmentMonths Int?
+  notes             String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([driverId])
+  @@index([date])
+  @@map("driver_accidents")
+}
+
+// ─── Vehicle Incident & Replacement Tracking ───────────────────────────────
+
+enum IncidentType {
+  ACCIDENT
+  BREAKDOWN
+}
+
+enum ReplacementSource {
+  RENTAL_COMPANY
+  OWN_FLEET
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_REPAIR
+  RESOLVED
+}
+
+model VehicleIncident {
+  id        String @id @default(cuid())
+  companyId String
+  driverId  String
+  vehicleId String
+
+  incidentDate  DateTime
+  incidentType  IncidentType
+  descriptionAr String?
+  descriptionEn String?
+
+  // Replacement vehicle
+  replacementSource       ReplacementSource?
+  replacementVehicleId    String? // own-fleet replacement (links to Vehicle)
+  replacementVehiclePlate String? // rental-company replacement plate (free text)
+  replacementStartDate    DateTime?
+  replacementEndDate      DateTime?
+  replacementNotes        String?
+
+  // Repair / garage
+  garageNameAr    String?
+  garagePhone     String?
+  repairStartDate DateTime?
+  repairEndDate   DateTime?
+  repairCost      Decimal?  @db.Decimal(18, 3)
+
+  status       IncidentStatus @default(OPEN)
+  resolvedDate DateTime?
+  notes        String?
+  createdById  String?
+
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  driver             Driver   @relation("DriverVehicleIncidents", fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle            Vehicle  @relation("VehicleIncidents", fields: [vehicleId], references: [id], onDelete: Restrict)
+  replacementVehicle Vehicle? @relation("VehicleReplacementIncidents", fields: [replacementVehicleId], references: [id], onDelete: SetNull)
+  createdBy          User?    @relation("VehicleIncidentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([incidentDate])
+  @@map("vehicle_incidents")
+}
+
+model AccountTransfer {
+  id                       String   @id @default(cuid())
+  sourceBankAccountId      String
+  destinationBankAccountId String
+  companyId                String?
+  branchId                 String?
+  investorId               String?
+  amount                   Decimal  @db.Decimal(18, 3)
+  transferDate             DateTime
+  purposeAr                String
+  purposeEn                String?
+  reference                String?
+  journalEntryId           String?
+  createdById              String?
+  notes                    String?
+
+  sourceBankAccount      BankAccount @relation("TransferSourceBankAccount", fields: [sourceBankAccountId], references: [id], onDelete: Restrict)
+  destinationBankAccount BankAccount @relation("TransferDestinationBankAccount", fields: [destinationBankAccountId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceBankAccountId])
+  @@index([destinationBankAccountId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([transferDate])
+  @@map("account_transfers")
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPENSES MODULE
+// ═══════════════════════════════════════════════════════════
+
+model ExpenseCategory {
+  id        String  @id @default(cuid())
+  companyId String
+  nameAr    String
+  nameEn    String?
+  code      String?
+  type      String
+  parentId  String?
+  isActive  Boolean @default(true)
+
+  company           Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  parent            ExpenseCategory?   @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children          ExpenseCategory[]  @relation("CategoryHierarchy")
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+
+  @@unique([companyId, nameAr])
+  @@index([companyId])
+  @@index([parentId])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  companyId     String
+  categoryId    String
+  date          DateTime
+  amount        Decimal  @db.Decimal(18, 3)
+  descriptionAr String
+  descriptionEn String?
+  paymentMethod String   @default("CASH")
+  bankAccountId String?
+  reference     String?
+  isRecurring   Boolean  @default(false)
+  recurringId   String?
+
+  branchId         String?
+  driverId         String?
+  employeeId       String?
+  vehicleId        String?
+  investorId       String?
+  costCenterId     String?
+  carWashVehicleId String?
+
+  journalEntryId String?
+  status         String  @default("POSTED")
+  isDeleted      Boolean @default(false)
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  category       ExpenseCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bankAccount    BankAccount?     @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  branch         Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  employee       Employee?        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  driver         Driver?          @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle        Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  investor       Investor?        @relation(fields: [investorId], references: [id], onDelete: Restrict)
+  costCenter     CostCenter?      @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  carWashVehicle CarWashVehicle?  @relation(fields: [carWashVehicleId], references: [id], onDelete: Restrict)
+  violation      DriverViolation?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([date])
+  @@index([branchId])
+  @@index([driverId])
+  @@index([employeeId])
+  @@index([vehicleId])
+  @@index([investorId])
+  @@index([costCenterId])
+  @@index([status])
+  @@index([isDeleted])
+  @@map("expenses")
+}
+
+model RecurringExpense {
+  id            String    @id @default(cuid())
+  companyId     String
+  categoryId    String
+  descriptionAr String
+  amount        Decimal   @db.Decimal(18, 3)
+  frequency     String
+  dayOfMonth    Int?
+  startDate     DateTime
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  lastGenerated DateTime?
+  nextDueDate   DateTime?
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("recurring_expenses")
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATIONS & SYNC
+// ═══════════════════════════════════════════════════════════
+
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String?
+  companyId    String?
+  branchId     String?
+  investorId   String?
+  employeeId   String?
+  licenseId    String?
+  vehicleId    String?
+  entityType   String?
+  entityId     String?
+  type         String
+  titleAr      String
+  titleEn      String?
+  messageAr    String?
+  messageEn    String?
+  dueDate      DateTime?
+  severity     String    @default("INFO")
+  status       String    @default("UNREAD")
+  uniqueKey    String    @unique
+  targetRole   String?
+  targetUserId String?
+  refModule    String?
+  refId        String?
+  readAt       DateTime?
+  resolvedAt   DateTime?
+
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  investor Investor? @relation(fields: [investorId], references: [id], onDelete: SetNull)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  license  License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  vehicle  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([investorId])
+  @@index([employeeId])
+  @@index([licenseId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([targetRole])
+  @@index([targetUserId])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model SyncQueue {
+  id              String     @id @default(cuid())
+  clientId        String
+  deviceId        String
+  userId          String
+  companyId       String
+  operation       String
+  module          String
+  entityType      String
+  entityId        String?
+  payload         Json
+  status          SyncStatus @default(PENDING)
+  retryCount      Int        @default(0)
+  error           String?
+  clientTimestamp DateTime
+  syncedAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, companyId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([createdAt])
+  @@map("sync_queue")
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+model OfflineTransaction {
+  id        String    @id @default(cuid())
+  clientId  String    @unique
+  userId    String
+  companyId String
+  type      String
+  data      Json
+  status    String    @default("PENDING")
+  syncedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, companyId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("offline_transactions")
+}
+
+// ═══════════════════════════════════════════════════════════
+// REMINDERS & PUSH NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+
+model Reminder {
+  id              String    @id @default(cuid())
+  userId          String
+  title           String
+  notes           String?   @db.Text
+  dueAt           DateTime
+  reminderMinutes Int       @default(15)
+  isCompleted     Boolean   @default(false)
+  completedAt     DateTime?
+  notifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([dueAt])
+  @@index([isCompleted, dueAt])
+  @@map("reminders")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+// ─── Talabat Report Import ────────────────────────────────────────────────────
+
+model DriverPlatformIdentifier {
+  id               String  @id @default(cuid())
+  driverId         String
+  platform         String // TALABAT | OTHER
+  platformDriverId String
+  isPrimary        Boolean @default(true)
+  isActive         Boolean @default(true)
+  notes            String?
+
+  driver      Driver                    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  allocations TalabatReportAllocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform, platformDriverId])
+  @@index([driverId])
+  @@index([platform, isActive])
+  @@map("driver_platform_identifiers")
+}
+
+model TalabatReportImport {
+  id                          String    @id @default(cuid())
+  companyId                   String
+  contractId                  String?
+  month                       Int
+  year                        Int
+  fileName                    String
+  originalFileUrl             String?
+  status                      String    @default("DRAFT")
+  orderRoundingMode           String    @default("DECIMAL_2")
+  totalRows                   Int       @default(0)
+  totalRiders                 Int       @default(0)
+  totalPickupPay              Decimal   @default(0) @db.Decimal(12, 3)
+  totalDropoffPay             Decimal   @default(0) @db.Decimal(12, 3)
+  totalCalculatedOrders       Decimal   @default(0) @db.Decimal(12, 3)
+  totalPayment                Decimal   @default(0) @db.Decimal(12, 3)
+  contractSummaryFinalPayment Decimal?  @db.Decimal(12, 3)
+  notes                       String?
+  createdById                 String?
+  postedAt                    DateTime?
+
+  company    Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contract   DeliveryContract?          @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  createdBy  User?                      @relation("TalabatImportCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  riders     TalabatReportImportRider[]
+  fleetItems TalabatReportFleetItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, month, year])
+  @@index([status])
+  @@map("talabat_report_imports")
+}
+
+model TalabatReportImportRider {
+  id                         String  @id @default(cuid())
+  importId                   String
+  talabatRiderId             String
+  talabatRiderName           String
+  contractName               String?
+  companyCode                String?
+  rowCount                   Int     @default(0)
+  totalPickupPay             Decimal @default(0) @db.Decimal(12, 3)
+  totalDropoffPay            Decimal @default(0) @db.Decimal(12, 3)
+  calculatedOrdersRaw        Decimal @default(0) @db.Decimal(12, 3)
+  calculatedOrdersRounded    Decimal @default(0) @db.Decimal(12, 3)
+  totalPayment               Decimal @default(0) @db.Decimal(12, 3)
+  totalDeductions            Decimal @default(0) @db.Decimal(12, 3)
+  // Downgraded (Y) rows — substitute driver worked under this Rider ID
+  downgradedRowCount         Int     @default(0)
+  downgradedPickupPay        Decimal @default(0) @db.Decimal(12, 3)
+  downgradedDropoffPay       Decimal @default(0) @db.Decimal(12, 3)
+  downgradedCalculatedOrders Decimal @default(0) @db.Decimal(12, 3)
+  downgradedTotalPayment     Decimal @default(0) @db.Decimal(12, 3)
+  matchingStatus             String  @default("UNMATCHED")
+  matchedDriverId            String?
+
+  // ── NEW: Carriage CSV report fields (additive, backward compatible) ──────
+  reportType String? @default("TALABAT_EXCEL") // TALABAT_EXCEL | CARRIAGE_CSV
+  legalName  String?
+  vehicle    String?
+
+  // Productivity metrics
+  evaluatedHours            Decimal? @db.Decimal(10, 2)
+  actualCompletedDeliveries Int?
+  pickupsCount              Int?
+  pickupCancellations       Int?
+  dropoffsCount             Int?
+  dropoffCancellations      Int?
+
+  // Achievement & incentives
+  achievementPayment      Decimal? @db.Decimal(12, 3)
+  riderIncentives         Decimal? @db.Decimal(12, 3)
+  riderCompensation       Decimal? @db.Decimal(12, 3)
+  riderDeduction          Decimal? @db.Decimal(12, 3)
+  riderPositiveAdjustment Decimal? @db.Decimal(12, 3)
+  riderNegativeAdjustment Decimal? @db.Decimal(12, 3)
+
+  // Operator deduction (IMPORTANT: operational flag for shared accounts)
+  operatorDeduction    Decimal? @db.Decimal(12, 3)
+  hasOperatorDeduction Boolean  @default(false)
+
+  // 3PL level
+  thirdPartyIncentives          Decimal? @db.Decimal(12, 3)
+  thirdPartyDeductions          Decimal? @db.Decimal(12, 3)
+  thirdPartyPositiveAdjustments Decimal? @db.Decimal(12, 3)
+  thirdPartyNegativeAdjustments Decimal? @db.Decimal(12, 3)
+
+  // Net cost (driver productivity before fleet deductions)
+  netCost Decimal? @db.Decimal(12, 3)
+
+  // Fleet-level deductions (usually 0 for individual riders, but may exist)
+  codDeficit                Decimal? @db.Decimal(12, 3)
+  clawbackDeduction         Decimal? @db.Decimal(12, 3)
+  clawbackRefund            Decimal? @db.Decimal(12, 3)
+  inventoryDeduction        Decimal? @db.Decimal(12, 3)
+  inventoryClaim            Decimal? @db.Decimal(12, 3)
+  thirdPartyOtherDeductions Decimal? @db.Decimal(12, 3)
+  contractFees              Decimal? @db.Decimal(12, 3)
+
+  // Net payment (final after all fleet deductions)
+  netPayment Decimal? @db.Decimal(12, 3)
+
+  // Flags
+  isSuspenseItem Boolean @default(false)
+  suspenseReason String?
+
+  import        TalabatReportImport       @relation(fields: [importId], references: [id], onDelete: Cascade)
+  matchedDriver Driver?                   @relation("TalabatMatchedDriver", fields: [matchedDriverId], references: [id], onDelete: SetNull)
+  allocations   TalabatReportAllocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([importId])
+  @@index([talabatRiderId])
+  @@index([matchedDriverId])
+  @@map("talabat_report_import_riders")
+}
+
+model TalabatReportAllocation {
+  id                   String   @id @default(cuid())
+  importRiderId        String
+  platformIdentifierId String?
+  driverId             String
+  allocationType       String // AUTO_MATCH | MANUAL_FIXED | MANUAL_PERCENTAGE | MANUAL_REMAINING
+  allocatedOrders      Decimal  @db.Decimal(12, 3)
+  percentage           Decimal? @db.Decimal(6, 3)
+  notes                String?
+  createdById          String?
+
+  importRider        TalabatReportImportRider  @relation(fields: [importRiderId], references: [id], onDelete: Cascade)
+  platformIdentifier DriverPlatformIdentifier? @relation(fields: [platformIdentifierId], references: [id], onDelete: SetNull)
+  driver             Driver                    @relation("TalabatAllocationDriver", fields: [driverId], references: [id], onDelete: Restrict)
+  createdBy          User?                     @relation("TalabatAllocationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([importRiderId])
+  @@index([driverId])
+  @@map("talabat_report_allocations")
+}
+
+model TalabatReportFleetItem {
+  id          String  @id @default(cuid())
+  importId    String
+  type        String // FLEET_DEDUCTION | FLEET_ADJUSTMENT
+  description String?
+  legalName   String?
+
+  // Fleet-level amounts
+  codDeficit                Decimal @default(0) @db.Decimal(12, 3)
+  inventoryDeduction        Decimal @default(0) @db.Decimal(12, 3)
+  contractFees              Decimal @default(0) @db.Decimal(12, 3)
+  thirdPartyOtherDeductions Decimal @default(0) @db.Decimal(12, 3)
+  clawbackDeduction         Decimal @default(0) @db.Decimal(12, 3)
+  clawbackRefund            Decimal @default(0) @db.Decimal(12, 3)
+  netPayment                Decimal @default(0) @db.Decimal(12, 3)
+
+  import TalabatReportImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([importId])
+  @@map("talabat_report_fleet_items")
+}
+
+// ═══════════════════════════════════════════════════════════
+// DRIVER TRACKING MODULE (GPS)
+// ═══════════════════════════════════════════════════════════
+
+model DriverTrackingSession {
+  id              String                @id @default(cuid())
+  userId          String
+  employeeId      String
+  companyId       String
+  driverId        String?
+  carWashWorkerId String?
+  status          TrackingSessionStatus @default(ACTIVE)
+  startedAt       DateTime              @default(now())
+  endedAt         DateTime?
+  deviceInfo      String?
+  consentedAt     DateTime?
+  consentVersion  String?
+  consentLocale   String?
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationPoints DriverLocationPoint[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([companyId, startedAt])
+  @@index([employeeId])
+  @@map("driver_tracking_sessions")
+}
+
+enum TrackingSessionStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model DriverLocationPoint {
+  id                String   @id @default(cuid())
+  sessionId         String
+  companyId         String
+  employeeId        String
+  driverId          String?
+  carWashWorkerId   String?
+  latitude          Decimal  @db.Decimal(10, 7)
+  longitude         Decimal  @db.Decimal(10, 7)
+  accuracy          Decimal? @db.Decimal(6, 2)
+  altitude          Decimal? @db.Decimal(8, 2)
+  heading           Decimal? @db.Decimal(5, 2)
+  speed             Decimal? @db.Decimal(6, 2)
+  recordedAt        DateTime
+  receivedAt        DateTime @default(now())
+  source            String   @default("WEB_GPS")
+  clientGeneratedId String   @unique
+
+  session DriverTrackingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, employeeId, recordedAt])
+  @@index([sessionId, recordedAt])
+  @@index([clientGeneratedId])
+  @@map("driver_location_points")
+}
