@@ -23,22 +23,32 @@ node --test --test-reporter=spec tests/accounting/*.test.ts
 
 ## هيكل الاختبارات
 
-### 1. journal-engine.test.ts (23 test)
+### 1. journal-engine.test.ts (23 tests - Helper-based)
 - **Balance Validation** (Tests 1-5): التحقق من توازن القيد باستخدام integer arithmetic
 - **Line Validation** (Tests 6-16): التحقق من صحة سطور القيد
 - **Fiscal Year Validation** (Tests 17-21): التحقق من تاريخ القيد والسنة المالية
 - **Integration** (Tests 22-23): اختبارات شاملة
+- ⚠️ These test **helper functions** (expected behavior), not production code
 
-### 2. ledger-reports.test.ts (19 tests)
+### 2. ledger-reports.test.ts (19 tests - Helper-based)
 - **Opening Balance** (Tests 24-28): حساب رصيد أول الفترة
 - **Running Balance** (Tests 29-31): حساب الرصيد الجاري
 - **Display Formatting** (Tests 32-36): عرض الرصيد (مدين/دائن)
 - **Trial Balance** (Tests 37-40): ميزان المراجعة للفترات الجزئية
 - **Edge Cases** (Tests 41-42): حالات خاصة
+- ⚠️ These test **helper functions** (expected behavior), not production code
+
+### 3. production-behavior.test.ts (9 tests - Production-linked)
+- **validateBalance Behavior** (Tests 43-44): Document current bugs in production
+- **getAccountLedger Bug** (Test 45): Document opening balance calculation bug
+- **Force Delete Requirements** (Tests 46-48): Protection, atomicity, isolation
+- **Reversal Fiscal Year** (Tests 49-50): Document fiscal year selection bug
+- **Trial Balance Period** (Test 51): Document period calculation bug
+- ✅ These document **actual production code** behavior and bugs
 
 ## إجمالي التغطية الحالية
 
-**42 test case** تغطي:
+**51 test case** تغطي:
 
 ✅ دقة المبالغ (integer arithmetic بالفلوس)
 ✅ توازن القيد (debit = credit تمامًا)
