@@ -16,6 +16,9 @@
 import assert from "node:assert";
 import { describe, test } from "node:test";
 
+// Import production code
+import { formatSignedBalance, formatSignedBalanceEn, formatBalance } from "@/lib/accounting/balance-format";
+
 // ============================================================================
 // BALANCE CALCULATION UTILITIES (to be moved to lib/accounting/balance.ts)
 // ============================================================================
@@ -63,41 +66,8 @@ function calculateRunningBalances(
   });
 }
 
-/**
- * Format signed balance for display
- *
- * Internal: balance = debit - credit (can be negative)
- * Display:
- *   balance > 0  →  "100.000 مدين"
- *   balance < 0  →  "100.000 دائن" (absolute value)
- *   balance = 0  →  "0.000"
- */
-function formatSignedBalance(
-  balance: number,
-  locale: "ar" | "en" = "ar"
-): { amount: string; direction: string | null } {
-  const absValue = Math.abs(balance);
-  const formatted = absValue.toFixed(3);
-
-  if (balance > 0) {
-    return {
-      amount: formatted,
-      direction: locale === "ar" ? "مدين" : "Debit",
-    };
-  }
-
-  if (balance < 0) {
-    return {
-      amount: formatted,
-      direction: locale === "ar" ? "دائن" : "Credit",
-    };
-  }
-
-  return {
-    amount: "0.000",
-    direction: null,
-  };
-}
+// formatSignedBalance is now imported from production code (lib/accounting/balance-format.ts)
+// The helper function has been removed and replaced with the real production function
 
 /**
  * Calculate trial balance for a period
@@ -257,44 +227,87 @@ describe("Running Balance Calculation Tests", () => {
 // TEST SUITE 7: Balance Display Formatting
 // ============================================================================
 
-describe("Balance Display Formatting Tests", () => {
+describe("Balance Display Formatting Tests (PRODUCTION CODE)", () => {
   test("32. عرض رصيد مدين موجب", () => {
     const balance = 100.000;
-    const formatted = formatSignedBalance(balance, "ar");
+    const formatted = formatSignedBalance(balance);
 
-    assert.strictEqual(formatted.amount, "100.000", "المبلغ");
-    assert.strictEqual(formatted.direction, "مدين", "الاتجاه");
+    assert.strictEqual(formatted.formattedAmount, "100.000", "المبلغ");
+    assert.strictEqual(formatted.sideLabel, "مدين", "الاتجاه");
+    assert.strictEqual(formatted.side, "debit", "Side type");
+    assert.strictEqual(formatted.formatted, "100.000 مدين", "Complete format");
   });
 
   test("33. عرض رصيد دائن سالب", () => {
     const balance = -100.000;
-    const formatted = formatSignedBalance(balance, "ar");
+    const formatted = formatSignedBalance(balance);
 
-    assert.strictEqual(formatted.amount, "100.000", "يجب عرض القيمة المطلقة");
-    assert.strictEqual(formatted.direction, "دائن", "يجب عرض دائن وليس سالب");
+    assert.strictEqual(formatted.formattedAmount, "100.000", "يجب عرض القيمة المطلقة");
+    assert.strictEqual(formatted.sideLabel, "دائن", "يجب عرض دائن وليس سالب");
+    assert.strictEqual(formatted.side, "credit", "Side type");
+    assert.strictEqual(formatted.formatted, "100.000 دائن", "Complete format");
   });
 
   test("34. عرض رصيد صفر", () => {
     const balance = 0;
-    const formatted = formatSignedBalance(balance, "ar");
+    const formatted = formatSignedBalance(balance);
 
-    assert.strictEqual(formatted.amount, "0.000", "المبلغ");
-    assert.strictEqual(formatted.direction, null, "بدون اتجاه");
+    assert.strictEqual(formatted.formattedAmount, "0.000", "المبلغ");
+    assert.strictEqual(formatted.sideLabel, null, "بدون اتجاه");
+    assert.strictEqual(formatted.side, null, "No side");
+    assert.strictEqual(formatted.formatted, "0.000", "Complete format");
   });
 
   test("35. عرض باللغة الإنجليزية", () => {
-    const formatted1 = formatSignedBalance(100, "en");
-    const formatted2 = formatSignedBalance(-100, "en");
+    const formatted1 = formatSignedBalanceEn(100);
+    const formatted2 = formatSignedBalanceEn(-100);
 
-    assert.strictEqual(formatted1.direction, "Debit", "Debit in English");
-    assert.strictEqual(formatted2.direction, "Credit", "Credit in English");
+    assert.strictEqual(formatted1.sideLabel, "Debit", "Debit in English");
+    assert.strictEqual(formatted2.sideLabel, "Credit", "Credit in English");
   });
 
   test("36. عرض أرقام بمنازل عشرية دقيقة", () => {
     const balance = 123.456;
-    const formatted = formatSignedBalance(balance, "ar");
+    const formatted = formatSignedBalance(balance);
 
-    assert.strictEqual(formatted.amount, "123.456", "يجب الحفاظ على 3 منازل");
+    assert.strictEqual(formatted.formattedAmount, "123.456", "يجب الحفاظ على 3 منازل");
+  });
+
+  // Additional production tests
+  test("36a. التعامل مع negative zero", () => {
+    const formatted = formatSignedBalance(-0);
+
+    assert.strictEqual(formatted.formattedAmount, "0.000", "Negative zero");
+    assert.strictEqual(formatted.side, null, "No side for -0");
+  });
+
+  test("36b. التعامل مع قيم صغيرة جدًا تصبح صفرًا", () => {
+    const formatted1 = formatSignedBalance(0.0004); // rounds to 0.000
+    const formatted2 = formatSignedBalance(-0.0004);
+
+    assert.strictEqual(formatted1.side, null, "Tiny positive becomes zero");
+    assert.strictEqual(formatted2.side, null, "Tiny negative becomes zero");
+  });
+
+  test("36c. التعامل مع NaN", () => {
+    const formatted = formatSignedBalance(NaN);
+
+    assert.strictEqual(formatted.formatted, "—", "NaN shows fallback");
+    assert.strictEqual(formatted.side, null, "No side for NaN");
+  });
+
+  test("36d. التعامل مع Infinity", () => {
+    const formatted1 = formatSignedBalance(Infinity);
+    const formatted2 = formatSignedBalance(-Infinity);
+
+    assert.strictEqual(formatted1.formatted, "—", "Infinity shows fallback");
+    assert.strictEqual(formatted2.formatted, "—", "-Infinity shows fallback");
+  });
+
+  test("36e. Quick format helper", () => {
+    assert.strictEqual(formatBalance(100), "100.000 مدين", "Quick format debit");
+    assert.strictEqual(formatBalance(-100), "100.000 دائن", "Quick format credit");
+    assert.strictEqual(formatBalance(0), "0.000", "Quick format zero");
   });
 });
 
@@ -427,9 +440,9 @@ describe("Edge Cases Tests", () => {
     assert.strictEqual(opening, -10000, "رصيد افتتاحي");
     assert.strictEqual(withBalances[0].balance, -9900, "رصيد بعد الحركة");
 
-    const formatted = formatSignedBalance(withBalances[0].balance, "ar");
-    assert.strictEqual(formatted.amount, "9900.000", "القيمة المطلقة");
-    assert.strictEqual(formatted.direction, "دائن", "ما زال دائنًا");
+    const formatted = formatSignedBalance(withBalances[0].balance);
+    assert.strictEqual(formatted.formattedAmount, "9900.000", "القيمة المطلقة");
+    assert.strictEqual(formatted.sideLabel, "دائن", "ما زال دائنًا");
   });
 
   test("42. حركات في آخر يوم من الفترة يجب إدراجها", () => {

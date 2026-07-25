@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { getAccountLedger } from "@/lib/accounting/reports";
 import { getLocale } from "@/lib/i18n";
 import { PrintButton } from "@/components/ui/print-button";
+import { formatSignedBalance, formatSignedBalanceEn } from "@/lib/accounting/balance-format";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -221,30 +222,37 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
                   </thead>
                   <tbody>
                     {/* Opening balance row */}
-                    <tr className="bg-indigo-50/60 font-semibold text-indigo-700">
-                      <td>—</td>
-                      <td>—</td>
-                      <td>{t.opening}</td>
-                      <td className="number text-start">
-                        {ledger.openingBalance > 0
-                          ? ledger.openingBalance.toFixed(3)
-                          : "—"}
-                      </td>
-                      <td className="number text-start">
-                        {ledger.openingBalance < 0
-                          ? Math.abs(ledger.openingBalance).toFixed(3)
-                          : "—"}
-                      </td>
-                      <td
-                        className={`number text-start font-bold ${
-                          ledger.openingBalance >= 0
-                            ? "text-emerald-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {ledger.openingBalance.toFixed(3)}
-                      </td>
-                    </tr>
+                    {(() => {
+                      const formattedOpening = en
+                        ? formatSignedBalanceEn(ledger.openingBalance)
+                        : formatSignedBalance(ledger.openingBalance);
+                      return (
+                        <tr className="bg-indigo-50/60 font-semibold text-indigo-700">
+                          <td>—</td>
+                          <td>—</td>
+                          <td>{t.opening}</td>
+                          <td className="number text-start">
+                            {ledger.openingBalance > 0
+                              ? ledger.openingBalance.toFixed(3)
+                              : "—"}
+                          </td>
+                          <td className="number text-start">
+                            {ledger.openingBalance < 0
+                              ? Math.abs(ledger.openingBalance).toFixed(3)
+                              : "—"}
+                          </td>
+                          <td
+                            className={`number text-start font-bold ${
+                              ledger.openingBalance >= 0
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {formattedOpening.formatted}
+                          </td>
+                        </tr>
+                      );
+                    })()}
 
                     {ledger.rows.length === 0 ? (
                       <tr>
@@ -256,56 +264,68 @@ export default async function AccountLedgerPage({ params, searchParams }: Props)
                         </td>
                       </tr>
                     ) : (
-                      ledger.rows.map((row: typeof ledger.rows[number], i: number) => (
-                        <tr
-                          key={row.lineId}
-                          className={i % 2 === 0 ? "" : "bg-muted/5"}
-                        >
-                          <td className="number">
-                            {new Date(row.date).toLocaleDateString(numberLocale)}
+                      ledger.rows.map((row: typeof ledger.rows[number], i: number) => {
+                        const formattedBalance = en
+                          ? formatSignedBalanceEn(row.balance)
+                          : formatSignedBalance(row.balance);
+                        return (
+                          <tr
+                            key={row.lineId}
+                            className={i % 2 === 0 ? "" : "bg-muted/5"}
+                          >
+                            <td className="number">
+                              {new Date(row.date).toLocaleDateString(numberLocale)}
+                            </td>
+                            <td className="font-mono text-xs">{row.journalNumber}</td>
+                            <td>{row.description ?? "—"}</td>
+                            <td className="number text-start text-blue-600">
+                              {row.debit > 0 ? row.debit.toFixed(3) : "—"}
+                            </td>
+                            <td className="number text-start text-green-600">
+                              {row.credit > 0 ? row.credit.toFixed(3) : "—"}
+                            </td>
+                            <td
+                              className={`number text-start font-bold ${
+                                row.balance >= 0
+                                  ? "text-emerald-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {formattedBalance.formatted}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  <tfoot className="border-t-2 border-border bg-muted/30 font-bold text-sm">
+                    {(() => {
+                      const formattedClosing = en
+                        ? formatSignedBalanceEn(ledger.closingBalance)
+                        : formatSignedBalance(ledger.closingBalance);
+                      return (
+                        <tr>
+                          <td colSpan={3} className="py-2 text-center">
+                            {t.total}
                           </td>
-                          <td className="font-mono text-xs">{row.journalNumber}</td>
-                          <td>{row.description ?? "—"}</td>
                           <td className="number text-start text-blue-600">
-                            {row.debit > 0 ? row.debit.toFixed(3) : "—"}
+                            {ledger.totalDebit.toFixed(3)}
                           </td>
                           <td className="number text-start text-green-600">
-                            {row.credit > 0 ? row.credit.toFixed(3) : "—"}
+                            {ledger.totalCredit.toFixed(3)}
                           </td>
                           <td
-                            className={`number text-start font-bold ${
-                              row.balance >= 0
+                            className={`number text-start ${
+                              ledger.closingBalance >= 0
                                 ? "text-emerald-600"
                                 : "text-red-600"
                             }`}
                           >
-                            {row.balance.toFixed(3)}
+                            {formattedClosing.formatted}
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                  <tfoot className="border-t-2 border-border bg-muted/30 font-bold text-sm">
-                    <tr>
-                      <td colSpan={3} className="py-2 text-center">
-                        {t.total}
-                      </td>
-                      <td className="number text-start text-blue-600">
-                        {ledger.totalDebit.toFixed(3)}
-                      </td>
-                      <td className="number text-start text-green-600">
-                        {ledger.totalCredit.toFixed(3)}
-                      </td>
-                      <td
-                        className={`number text-start ${
-                          ledger.closingBalance >= 0
-                            ? "text-emerald-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {ledger.closingBalance.toFixed(3)}
-                      </td>
-                    </tr>
+                      );
+                    })()}
                   </tfoot>
                 </table>
               </div>
