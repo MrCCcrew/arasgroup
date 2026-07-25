@@ -4,6 +4,7 @@ import type { CreateJournalEntryInput, JournalEntryLineInput } from "@/lib/types
 import { generateNumber } from "@/lib/utils";
 import { recomputeDriverWalletState } from "@/lib/delivery/wallet-state";
 import { buildTrialBalanceRows } from "@/lib/accounting/trial-balance";
+import { validateJournalEntry } from "@/lib/accounting/journal-validation";
 
 type JournalDbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -56,14 +57,8 @@ async function getNextJournalNumber(companyId: string, year: number, type?: stri
   return generateNumber(prefix, year, Number.isFinite(nextSequence) ? nextSequence : 1);
 }
 
-function validateBalance(lines: JournalEntryLineInput[]): void {
-  const totalDebit = lines.reduce((sum, line) => sum + line.debit, 0);
-  const totalCredit = lines.reduce((sum, line) => sum + line.credit, 0);
-
-  if (Math.abs(totalDebit - totalCredit) > 0.001) {
-    throw new Error(`القيد غير متوازن: إجمالي المدين ${totalDebit.toFixed(3)} لا يساوي إجمالي الدائن ${totalCredit.toFixed(3)}`);
-  }
-}
+// Validation moved to lib/accounting/journal-validation.ts
+// Using precise minor units calculation instead of floating point tolerance
 
 async function checkFiscalYearNotLocked(fiscalYearId: string): Promise<void> {
   const fiscalYear = await prisma.fiscalYear.findUnique({ where: { id: fiscalYearId } });
@@ -112,7 +107,7 @@ function buildStatusResetData(status: JournalStatus) {
 }
 
 export async function createJournalEntry(input: CreateJournalEntryInput): Promise<JournalEntry> {
-  validateBalance(input.lines);
+  validateJournalEntry(input.lines);
 
   const fiscalYearId = input.fiscalYearId ?? (await getCurrentFiscalYear(input.companyId));
   await checkFiscalYearNotLocked(fiscalYearId);
