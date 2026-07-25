@@ -3,71 +3,30 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Clock3, MapPinned, Radio, Users } from "lucide-react";
+import { Clock3, MapPinned, Radio, Search, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLocale } from "@/components/providers/locale-provider";
 import type { TrackingMapMarker } from "./tracking-map";
 
 const TrackingMap = dynamic(() => import("./tracking-map").then((module) => module.TrackingMap), { ssr: false, loading: () => <div className="h-[360px] animate-pulse rounded-lg bg-muted" /> });
 
-interface TrackingSession {
-  id: string;
-  status: "ACTIVE" | "PAUSED" | "ENDED";
-  startedAt: string;
-  endedAt: string | null;
-  driver: { nameAr: string; nameEn: string | null; accountType: "DRIVER" | "CAR_WASH_WORKER" };
-  pointCount: number;
-  lastLocation: { latitude: number; longitude: number; recordedAt: string; receivedAt: string } | null;
-}
-
-const statusClass: Record<TrackingSession["status"], string> = {
-  ACTIVE: "bg-emerald-100 text-emerald-800",
-  PAUSED: "bg-amber-100 text-amber-800",
-  ENDED: "bg-slate-100 text-slate-700",
-};
+type OnlineStatus = "ONLINE" | "OFFLINE" | "NOT_STARTED";
+interface DriverSummary { driverId: string; employeeId: string | null; driverName: { ar: string; en: string | null }; accountType: "DRIVER" | "CAR_WASH_WORKER"; accountActive: boolean; activeSession: { id: string; startedAt: string } | null; latestSession: { id: string; startedAt: string } | null; latestLocation: { latitude: number; longitude: number } | null; latestLocationAt: string | null; totalSessions: number; totalPoints: number; onlineStatus: OnlineStatus; }
+interface ApiResult { success: boolean; data: DriverSummary[]; pagination: { page: number; totalPages: number; total: number }; }
 
 export function DriverTrackingOverview({ companyId }: { companyId: string }) {
-  const { locale } = useLocale();
-  const en = locale === "en";
-  const [sessions, setSessions] = useState<TrackingSession[]>([]);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-
-  const loadSessions = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/companies/${companyId}/driver-tracking`, { cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok || !payload.success) throw new Error("Unable to load tracking data");
-      setSessions(payload.data as TrackingSession[]);
-      setUpdatedAt(new Date());
-      setLoadError(false);
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    void loadSessions();
-    const interval = window.setInterval(() => { void loadSessions(); }, 30000);
-    return () => window.clearInterval(interval);
-  }, [loadSessions]);
-
-  const formatDate = (date: string) => new Date(date).toLocaleString(en ? "en-US" : "ar-KW");
-  const isOnline = (location: TrackingSession["lastLocation"]) => location ? Date.now() - new Date(location.receivedAt).getTime() <= 90_000 : false;
-  const markerSessions = sessions.filter((item) => item.lastLocation);
-  const markers: TrackingMapMarker[] = markerSessions.map((item) => ({ id: item.id, label: en ? item.driver.nameEn ?? item.driver.nameAr : item.driver.nameAr, latitude: item.lastLocation!.latitude, longitude: item.lastLocation!.longitude, recordedAt: item.lastLocation!.recordedAt }));
-
-  if (loading) return <div className="page-container py-6 text-sm text-muted-foreground">{en ? "Loading tracking sessions..." : "جارٍ تحميل جلسات التتبع..."}</div>;
-
+  const { locale } = useLocale(); const en = locale === "en";
+  const [drivers, setDrivers] = useState<DriverSummary[]>([]); const [page, setPage] = useState(1); const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [accountType, setAccountType] = useState("ALL"); const [loading, setLoading] = useState(true); const [error, setError] = useState(false);
+  const load = useCallback(async () => { setLoading(true); try { const query = new URLSearchParams({ page: String(page), status, accountType }); if (search) query.set("search", search); const response = await fetch(`/api/companies/${companyId}/driver-tracking?${query}`, { cache: "no-store" }); const payload = await response.json() as ApiResult; if (!response.ok || !payload.success) throw new Error(); setDrivers(payload.data); setPagination(payload.pagination); setError(false); } catch { setError(true); } finally { setLoading(false); } }, [accountType, companyId, page, search, status]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 250); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const interval = window.setInterval(() => { void load(); }, 30_000); return () => window.clearInterval(interval); }, [load]);
+  const date = (value: string | null) => value ? new Date(value).toLocaleString(en ? "en-US" : "ar-KW") : "—";
+  const labels: Record<OnlineStatus, string> = { ONLINE: en ? "Online" : "متصل", OFFLINE: en ? "Offline" : "غير متصل", NOT_STARTED: en ? "Not started" : "لم يبدأ" };
+  const markers: TrackingMapMarker[] = drivers.filter((driver) => driver.latestLocation).map((driver) => ({ id: driver.driverId, label: en ? driver.driverName.en ?? driver.driverName.ar : driver.driverName.ar, status: labels[driver.onlineStatus], latitude: driver.latestLocation!.latitude, longitude: driver.latestLocation!.longitude, recordedAt: driver.latestLocationAt ?? undefined, detailsHref: `/dashboard/companies/${companyId}/driver-tracking/drivers/${driver.driverId}` }));
+  const resetPage = (action: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setPage(1); action(event.target.value); };
   return <div className="space-y-4">
-    <div className="flex items-center justify-between text-sm text-muted-foreground"><span>{updatedAt ? `${en ? "Last updated" : "آخر تحديث"}: ${updatedAt.toLocaleTimeString(en ? "en-US" : "ar-KW")}` : ""}</span><span>{en ? "Refreshes every 30 seconds" : "يتم التحديث كل 30 ثانية"}</span></div>
-    {loadError && <Card className="border-destructive/30"><CardContent className="p-4 text-sm text-destructive">{en ? "Could not refresh tracking data. It will retry automatically." : "تعذر تحديث بيانات التتبع. ستتم إعادة المحاولة تلقائيًا."}</CardContent></Card>}
-    {sessions.length === 0 ? <Card><CardContent className="flex flex-col items-center gap-3 py-16 text-center"><MapPinned className="h-10 w-10 text-muted-foreground" /><div><h2 className="font-semibold">{en ? "No tracking sessions" : "لا توجد جلسات تتبع"}</h2><p className="mt-1 text-sm text-muted-foreground">{en ? "Driver locations will appear here when a tracking session starts." : "ستظهر مواقع السائقين هنا عند بدء جلسة تتبع."}</p></div></CardContent></Card> : <>
-      <Card><CardContent className="p-3"><TrackingMap markers={markers} /></CardContent></Card>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sessions.map((item) => { const online = isOnline(item.lastLocation); const driverName = en ? item.driver.nameEn ?? item.driver.nameAr : item.driver.nameAr; return <Link key={item.id} href={`/dashboard/companies/${companyId}/driver-tracking/${item.id}`} className="block"><Card className="h-full transition-shadow hover:shadow-md"><CardContent className="space-y-3 p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2 font-semibold"><Users className="h-4 w-4" />{driverName}</div><p className="mt-1 text-xs text-muted-foreground">{item.driver.accountType === "CAR_WASH_WORKER" ? (en ? "Car-wash worker" : "عامل غسيل") : (en ? "Driver" : "سائق")}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass[item.status]}`}>{item.status}</span></div><div className="space-y-2 text-sm text-muted-foreground"><div className="flex items-center gap-2"><Clock3 className="h-4 w-4" />{en ? "Started" : "بدأت"}: {formatDate(item.startedAt)}</div><div className="flex items-center gap-2"><MapPinned className="h-4 w-4" />{item.lastLocation ? `${item.lastLocation.latitude.toFixed(5)}, ${item.lastLocation.longitude.toFixed(5)}` : (en ? "No location received" : "لم يُستلم موقع")}</div><div>{en ? "Last update" : "آخر تحديث"}: {item.lastLocation ? formatDate(item.lastLocation.recordedAt) : "—"}</div><div>{en ? "Points" : "النقاط"}: {item.pointCount}</div></div><div className={`flex items-center gap-1 text-xs font-medium ${online ? "text-emerald-700" : "text-muted-foreground"}`}><Radio className="h-3.5 w-3.5" />{online ? (en ? "Online" : "متصل") : (en ? "Offline" : "غير متصل")}</div></CardContent></Card></Link>; })}</div>
-    </>}
-  </div>;
+    <div className="grid gap-3 md:grid-cols-3"><label className="relative"><Search className="absolute start-3 top-3 h-4 w-4 text-muted-foreground" /><input value={search} onChange={resetPage(setSearch)} placeholder={en ? "Search drivers" : "البحث باسم السائق"} className="w-full rounded-lg border bg-background py-2 ps-9 pe-3 text-sm" /></label><select value={status} onChange={resetPage(setStatus)} className="rounded-lg border bg-background px-3 py-2 text-sm"><option value="ALL">{en ? "All statuses" : "كل الحالات"}</option><option value="ONLINE">{labels.ONLINE}</option><option value="OFFLINE">{labels.OFFLINE}</option><option value="NOT_STARTED">{labels.NOT_STARTED}</option></select><select value={accountType} onChange={resetPage(setAccountType)} className="rounded-lg border bg-background px-3 py-2 text-sm"><option value="ALL">{en ? "All account types" : "كل أنواع الحسابات"}</option><option value="DRIVER">{en ? "Driver" : "سائق"}</option><option value="CAR_WASH_WORKER">{en ? "Car-wash worker" : "عامل غسيل"}</option></select></div>
+    {error && <Card className="border-destructive/30"><CardContent className="p-4 text-sm text-destructive">{en ? "Could not refresh tracking data. It will retry automatically." : "تعذر تحديث بيانات التتبّع. ستتم إعادة المحاولة تلقائيًا."}</CardContent></Card>}
+    {loading ? <div className="py-8 text-sm text-muted-foreground">{en ? "Loading drivers..." : "جارٍ تحميل السائقين..."}</div> : drivers.length === 0 ? <Card><CardContent className="flex flex-col items-center gap-3 py-16 text-center"><MapPinned className="h-10 w-10 text-muted-foreground" /><div><h2 className="font-semibold">{en ? "No drivers found" : "لا يوجد سائقون"}</h2><p className="mt-1 text-sm text-muted-foreground">{en ? "Driver accounts and tracking history will appear here." : "ستظهر هنا حسابات السائقين وسجل التتبّع."}</p></div></CardContent></Card> : <><Card><CardContent className="p-3"><TrackingMap markers={markers} /></CardContent></Card><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{drivers.map((driver) => { const name = en ? driver.driverName.en ?? driver.driverName.ar : driver.driverName.ar; const href = `/dashboard/companies/${companyId}/driver-tracking/drivers/${driver.driverId}`; return <Link key={driver.driverId} href={href}><Card className="h-full transition-shadow hover:shadow-md"><CardContent className="space-y-3 p-5"><div className="flex justify-between gap-3"><div><div className="flex items-center gap-2 font-semibold"><Users className="h-4 w-4" />{name}</div><p className="mt-1 text-xs text-muted-foreground">{driver.accountType === "DRIVER" ? (en ? "Driver" : "سائق") : (en ? "Car-wash worker" : "عامل غسيل")}</p></div><span className={`rounded-full px-2 py-1 text-xs ${driver.onlineStatus === "ONLINE" ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}>{labels[driver.onlineStatus]}</span></div><div className="space-y-2 text-sm text-muted-foreground"><div><MapPinned className="me-1 inline h-4 w-4" />{driver.latestLocation ? `${driver.latestLocation.latitude.toFixed(5)}, ${driver.latestLocation.longitude.toFixed(5)}` : (en ? "No location" : "لا يوجد موقع")}</div><div><Clock3 className="me-1 inline h-4 w-4" />{en ? "Last update" : "آخر تحديث"}: {date(driver.latestLocationAt)}</div><div>{en ? "Latest session" : "آخر جلسة"}: {date(driver.latestSession?.startedAt ?? null)}</div><div>{en ? "Sessions" : "الجلسات"}: {driver.totalSessions} · {en ? "Points" : "النقاط"}: {driver.totalPoints}</div></div><div className="text-xs"><Radio className="me-1 inline h-3.5 w-3.5" />{driver.accountActive ? (en ? "Active account" : "حساب نشط") : (en ? "Inactive account" : "حساب غير نشط")}</div></CardContent></Card></Link>; })}</div><div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">{pagination.total} {en ? "drivers" : "سائق"}</span><div className="flex gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border px-3 py-1 disabled:opacity-50">{en ? "Previous" : "السابق"}</button><span className="py-1">{pagination.page}/{pagination.totalPages}</span><button disabled={page >= pagination.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded border px-3 py-1 disabled:opacity-50">{en ? "Next" : "التالي"}</button></div></div></>}</div>;
 }
