@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import type { CreateJournalEntryInput, JournalEntryLineInput } from "@/lib/types";
 import { generateNumber } from "@/lib/utils";
 import { recomputeDriverWalletState } from "@/lib/delivery/wallet-state";
+import { buildTrialBalanceRows } from "@/lib/accounting/trial-balance";
 
 type JournalDbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -526,6 +527,40 @@ export async function getTrialBalance(
     orderBy: { code: "asc" },
   });
 
+  // Get fiscal year opening balances
+  const openingBalances = await prisma.openingBalance.findMany({
+    where: { fiscalYearId, account: { companyId } },
+  });
+
+  // Get prior movements (before startDate) if period is specified
+  let priorMovements: Map<string, { debit: number; credit: number }> = new Map();
+  if (startDate) {
+    const priorLines = await prisma.journalEntryLine.groupBy({
+      by: ["accountId"],
+      where: {
+        journalEntry: {
+          companyId,
+          fiscalYearId,
+          status: "POSTED",
+          isDeleted: false,
+          date: { lt: startDate }, // Strictly before startDate
+        },
+      },
+      _sum: { debit: true, credit: true },
+    });
+
+    priorMovements = new Map(
+      priorLines.map((line) => [
+        line.accountId,
+        {
+          debit: Number(line._sum?.debit ?? 0),
+          credit: Number(line._sum?.credit ?? 0),
+        },
+      ])
+    );
+  }
+
+  // Get period movements
   const dateFilter = {
     ...(startDate ? { gte: startDate } : {}),
     ...(endDate ? { lte: endDate } : {}),
@@ -545,25 +580,30 @@ export async function getTrialBalance(
     _sum: { debit: true, credit: true },
   });
 
-  const openingBalances = await prisma.openingBalance.findMany({
-    where: { fiscalYearId, account: { companyId } },
-  });
+  // Convert to Maps for buildTrialBalanceRows
+  const fiscalOpenings = new Map(
+    openingBalances.map((opening) => [
+      opening.accountId,
+      {
+        debit: Number(opening.debit),
+        credit: Number(opening.credit),
+      },
+    ])
+  );
 
-  const lineMap = new Map(periodLines.map((line) => [line.accountId, line]));
-  const openingMap = new Map(openingBalances.map((opening) => [opening.accountId, opening]));
+  const periodMovements = new Map(
+    periodLines.map((line) => [
+      line.accountId,
+      {
+        debit: Number(line._sum?.debit ?? 0),
+        credit: Number(line._sum?.credit ?? 0),
+      },
+    ])
+  );
 
-  return accounts.map((account) => {
-    const line = lineMap.get(account.id);
-    const opening = openingMap.get(account.id);
-    const openingDebit = Number(opening?.debit ?? 0);
-    const openingCredit = Number(opening?.credit ?? 0);
-    const periodDebit = Number(line?._sum?.debit ?? 0);
-    const periodCredit = Number(line?._sum?.credit ?? 0);
-    const closingDebit = openingDebit + periodDebit;
-    const closingCredit = openingCredit + periodCredit;
-    const net = closingDebit - closingCredit;
-
-    return {
+  // Build trial balance rows using production logic
+  return buildTrialBalanceRows(
+    accounts.map((account) => ({
       accountId: account.id,
       code: account.code,
       nameAr: account.nameAr,
@@ -571,12 +611,11 @@ export async function getTrialBalance(
       type: account.type,
       level: account.level,
       isHeader: account.isHeader,
-      openingDebit,
-      openingCredit,
-      periodDebit,
-      periodCredit,
-      closingDebit: net > 0 ? net : 0,
-      closingCredit: net < 0 ? Math.abs(net) : 0,
-    };
-  });
+    })),
+    {
+      fiscalOpenings,
+      priorMovements,
+      periodMovements,
+    }
+  );
 }

@@ -58,9 +58,19 @@ node --test --test-reporter=spec tests/accounting/*.test.ts
 - **Query Requirements** (Tests 70-75): Document required Prisma filters
 - ✅ These test **PRODUCTION code** (buildAccountLedger extracted from getAccountLedger)
 
+### 6. trial-balance-production.test.ts (19 tests - Production getTrialBalance)
+- **Period Opening Balance** (Tests 76-80): Fiscal year opening + prior movements
+- **Period Movements** (Tests 81-83): Debit/credit shown separately, no netting
+- **Closing Balance** (Tests 84-86): Opening + period, negative conversion
+- **Edge Cases** (Tests 87-88): Zero balances, equal debit/credit
+- **Multiple Accounts** (Test 89): Multiple accounts processing
+- **Trial Balance Totals** (Tests 90-93): Debit=Credit validation, header exclusion
+- **Integration** (Test 94): Full scenario with all components
+- ✅ These test **PRODUCTION code** (buildTrialBalanceRows used by getTrialBalance)
+
 ## إجمالي التغطية الحالية
 
-**75 test case** تغطي:
+**94 test case** تغطي:
 
 ✅ دقة المبالغ (integer arithmetic بالفلوس)
 ✅ توازن القيد (debit = credit تمامًا)
