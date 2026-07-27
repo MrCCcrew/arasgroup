@@ -23,13 +23,14 @@ export default async function GroupDashboardPage({ searchParams }: { searchParam
     select: { id: true, nameAr: true },
     orderBy: { createdAt: "asc" },
   });
+  const canViewAllGroups = session.isSuperAdmin || session.hasGlobalGroupAccess;
   const currentGroupId = requestedGroupId && accessibleGroups.some((group) => group.id === requestedGroupId)
     ? requestedGroupId
-    : accessibleGroups[0]?.id;
-  if (!currentGroupId) redirect("/dashboard/settings");
+    : canViewAllGroups ? undefined : accessibleGroups[0]?.id;
+  if (!currentGroupId && !canViewAllGroups) redirect("/dashboard/settings");
 
-  const groupCompanyIds = (await prisma.company.findMany({ where: { groupId: currentGroupId }, select: { id: true } })).map((company) => company.id);
-  const scopedCompanyIds = session.isSuperAdmin || session.hasGlobalGroupAccess
+  const groupCompanyIds = (await prisma.company.findMany({ where: currentGroupId ? { groupId: currentGroupId } : { groupId: { in: accessibleGroups.map((group) => group.id) } }, select: { id: true } })).map((company) => company.id);
+  const scopedCompanyIds = canViewAllGroups
     ? groupCompanyIds
     : groupCompanyIds.filter((companyId) => session.companyAccess.includes(companyId));
   const companyFilter = { id: { in: scopedCompanyIds } };

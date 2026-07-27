@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       include: { companies: { orderBy: { sortOrder: "asc" } } },
       orderBy: { createdAt: "asc" },
     });
-    return NextResponse.json({ success: true, data: groups });
+    return NextResponse.json({ success: true, data: groups, hasGlobalAccess: session.isSuperAdmin || session.hasGlobalGroupAccess });
   } catch {
     return NextResponse.json({ success: false, error: "فشل في جلب المجموعات" }, { status: 500 });
   }

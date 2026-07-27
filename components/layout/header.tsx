@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { useSyncStatus } from "@/lib/offline/sync-status";
 import { useLocale } from "@/components/providers/locale-provider";
+import { GroupSwitcher } from "@/components/layout/group-switcher";
 
 interface HeaderProps {
   title: string;
@@ -54,6 +55,7 @@ export function Header({ title, subtitle, actions, companyId }: HeaderProps) {
 
         {/* Right-side nav items */}
         <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
+          {mounted && <span className="hidden lg:block"><GroupSwitcher /></span>}
           {mounted && pendingCount > 0 && (
             <div className="hidden items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-xs text-yellow-700 md:flex">
               <RefreshCw size={12} className={isSyncing ? "animate-spin" : ""} />

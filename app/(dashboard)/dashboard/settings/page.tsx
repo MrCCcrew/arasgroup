@@ -128,7 +128,7 @@ export default async function SettingsPage() {
                       <Link2 size={18} className="text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-bold truncate">{group.nameAr}</h3>
+                      <Link href={`/dashboard?groupId=${group.id}`} className="font-bold hover:text-primary hover:underline truncate">{group.nameAr}</Link>
                       {group.nameEn && <p className="text-xs text-muted-foreground">{group.nameEn}</p>}
                     </div>
                   </div>
