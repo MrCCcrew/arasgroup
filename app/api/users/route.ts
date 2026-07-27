@@ -61,13 +61,14 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search");
 
+  const where = {
+    accountType: { not: "DRIVER" as const },
+    ...(search ? { OR: [{ nameAr: { contains: search } }, { email: { contains: search } }] } : {}),
+  };
+
   try {
     const users = await prisma.user.findMany({
-      where: search
-        ? {
-            OR: [{ nameAr: { contains: search } }, { email: { contains: search } }],
-          }
-        : undefined,
+      where,
       include: {
         roles: { include: { role: true, company: true } },
         groupAccess: { include: { group: true } },
@@ -83,11 +84,7 @@ export async function GET(request: NextRequest) {
     console.error("Users API fallback query:", error);
 
     const users = await prisma.user.findMany({
-      where: search
-        ? {
-            OR: [{ nameAr: { contains: search } }, { email: { contains: search } }],
-          }
-        : undefined,
+      where,
       include: {
         roles: { include: { role: true, company: true } },
         groupAccess: { include: { group: true } },

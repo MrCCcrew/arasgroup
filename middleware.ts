@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "rashid_erp_session";
+const LOCALE_COOKIE_NAME = "rashid_erp_locale";
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
@@ -36,7 +37,15 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    if (pathname === "/driver" || pathname.startsWith("/driver/")) {
+      loginUrl.searchParams.set("portal", "driver");
+    }
+    const response = NextResponse.redirect(loginUrl);
+    if (loginUrl.searchParams.get("portal") === "driver" && !request.cookies.get(LOCALE_COOKIE_NAME)) {
+      response.cookies.set(LOCALE_COOKIE_NAME, "en", { sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60 });
+    }
+    return response;
   }
 
   // Decode JWT to check account type
@@ -57,6 +66,9 @@ export async function middleware(request: NextRequest) {
 
     // Redirect drivers to /driver portal
     if (accountType === 'DRIVER' || accountType === 'CAR_WASH_WORKER') {
+      if (pathname.startsWith('/api/') && !pathname.startsWith('/api/driver/')) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      }
       if (!pathname.startsWith('/driver') && !pathname.startsWith('/api/driver')) {
         return NextResponse.redirect(new URL('/driver', request.url));
       }

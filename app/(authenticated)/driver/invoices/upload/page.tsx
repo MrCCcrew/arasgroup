@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Camera, Upload, Check, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
-import Image from 'next/image';
 import { readInvoiceImage } from '@/lib/delivery/invoice-ocr';
 import { useLocale } from '@/components/providers/locale-provider';
 
@@ -143,11 +142,10 @@ export default function UploadInvoicePage() {
             {preview ? (
               <div className="relative">
                 <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
-                  <Image
+                  <img
                     src={preview}
                     alt={t('driver.invoicePreview')}
-                    fill
-                    className="object-contain"
+                    className="h-full w-full object-contain"
                   />
                 </div>
                 <Button

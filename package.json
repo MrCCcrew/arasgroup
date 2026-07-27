@@ -14,6 +14,7 @@
     "db:seed:driver-permissions": "tsx scripts/seed-driver-permissions.ts",
     "db:studio": "prisma studio",
     "test:owner-management": "tsx tests/owner-management-parser.test.ts && tsx tests/nbk-sample-integration.test.ts",
+    "test:driver-portal": "tsx tests/driver-portal.test.ts",
     "typecheck:app": "tsc --noEmit --project tsconfig.app.json",
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts"
   },

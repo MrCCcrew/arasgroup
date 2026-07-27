@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/types";
+import { LOCALE_COOKIE_NAME } from "@/lib/i18n";
 
 const COOKIE_NAME = "rashid_erp_session";
 const EXPIRES_IN = 7 * 24 * 60 * 60;
@@ -200,7 +201,11 @@ export async function POST(request: NextRequest) {
       success: true,
       data: userData,
       user: userData, // For desktop app compatibility
-      redirectTo: sessionUser.accountType === "OWNER_MANAGED_PARTNER" ? "/partner" : "/dashboard",
+      redirectTo: sessionUser.accountType === "OWNER_MANAGED_PARTNER"
+        ? "/partner"
+        : sessionUser.accountType === "DRIVER" || sessionUser.accountType === "CAR_WASH_WORKER"
+          ? "/driver"
+          : "/dashboard",
     });
 
     response.cookies.set(COOKIE_NAME, token, {
@@ -210,6 +215,14 @@ export async function POST(request: NextRequest) {
       maxAge: EXPIRES_IN,
       path: "/",
     });
+
+    if ((sessionUser.accountType === "DRIVER" || sessionUser.accountType === "CAR_WASH_WORKER") && !request.cookies.get(LOCALE_COOKIE_NAME)) {
+      response.cookies.set(LOCALE_COOKIE_NAME, "en", {
+        sameSite: "lax",
+        path: "/",
+        maxAge: 365 * 24 * 60 * 60,
+      });
+    }
 
     return response;
   } catch (error) {
