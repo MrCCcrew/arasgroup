@@ -392,6 +392,9 @@ model OwnerManagedStatementImport {
   rawText      String?  @db.LongText
   importedById String
   confirmedAt  DateTime?
+  cancelledAt DateTime?
+  cancelledById String?
+  cancelReason String? @db.Text
   createdAt    DateTime @default(now())
   company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   revenues     OwnerManagedRevenue[]
@@ -417,6 +420,9 @@ model OwnerManagedRevenue {
   rawRowText           String?  @db.Text
   status               OwnerManagedRevenueStatus @default(UNMATCHED)
   rejectionReason      String?  @db.Text
+  voidedAt             DateTime?
+  voidedById           String?
+  voidReason           String?  @db.Text
   createdAt            DateTime @default(now())
   company              Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   partner              OwnerManagedPartner?        @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -432,6 +438,7 @@ enum OwnerManagedRevenueStatus {
   INVALID
   DUPLICATE
   REVIEW
+  VOIDED
 }
 
 enum OwnershipType {

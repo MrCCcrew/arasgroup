@@ -203,6 +203,18 @@ function buildCompanyNav(base: string): NavItem[] {
   ];
 }
 
+function buildOwnerManagedNav(base: string): NavItem[] {
+  return [
+    { href: `${base}/owner-management`, labelKey: "nav.ownerManagedDashboard", icon: <LayoutDashboard size={16} />, iconColor: "blue" },
+    { href: `${base}/owner-management/partners`, labelKey: "nav.ownerManagedPartners", icon: <Users size={16} />, iconColor: "violet" },
+    { href: `${base}/owner-management/expenses`, labelKey: "nav.expenses", icon: <Receipt size={16} />, iconColor: "amber" },
+    { href: `${base}/owner-management/revenues`, labelKey: "nav.ownerManagedRevenues", icon: <TrendingUp size={16} />, iconColor: "emerald" },
+    { href: `${base}/owner-management/import`, labelKey: "nav.ownerManagedImport", icon: <ArrowUpFromLine size={16} />, iconColor: "cyan" },
+    { href: `${base}/owner-management/imports`, labelKey: "nav.ownerManagedImports", icon: <BookOpen size={16} />, iconColor: "teal" },
+    { href: "/dashboard", labelKey: "nav.groupDashboard", icon: <Building2 size={16} />, iconColor: "slate" },
+  ];
+}
+
 function filterGroupNav(user: SessionUser, items: NavItem[]) {
   return items.filter((item) => {
     if (item.href === "/dashboard") return true;
@@ -269,6 +281,7 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
 
   const navItems = useMemo(() => {
     if (!mounted || !currentCompany) return filterGroupNav(session, GROUP_NAV);
+    if (currentCompany.type === "OWNER_MANAGED") return buildOwnerManagedNav(`/dashboard/companies/${currentCompany.id}`);
     return filterCompanyNav(session, currentCompany, buildCompanyNav(`/dashboard/companies/${currentCompany.id}`));
   }, [mounted, currentCompany, session]);
 
