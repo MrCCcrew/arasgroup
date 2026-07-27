@@ -394,7 +394,7 @@ model OwnerManagedStatementImport {
   confirmedAt  DateTime?
   cancelledAt DateTime?
   cancelledById String?
-  cancelReason String? @db.Text
+  cancellationReason String? @db.Text
   createdAt    DateTime @default(now())
   company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   revenues     OwnerManagedRevenue[]
