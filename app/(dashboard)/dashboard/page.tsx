@@ -11,12 +11,29 @@ import { ExpiryAlertsPanel } from "./ExpiryAlertsPanel";
 const DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER", "CAR_WASH_DRIVER"] as const;
 const ADMIN_TYPES = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] as const;
 
-export default async function GroupDashboardPage() {
+export default async function GroupDashboardPage({ searchParams }: { searchParams: Promise<{ groupId?: string }> }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const companyFilter = session.isSuperAdmin ? {} : { id: { in: session.companyAccess } };
-  const employeeCompanyFilter = session.isSuperAdmin ? {} : { companyId: { in: session.companyAccess } };
+  const { groupId: requestedGroupId } = await searchParams;
+  const accessibleGroups = await prisma.group.findMany({
+    where: session.isSuperAdmin || session.hasGlobalGroupAccess
+      ? {}
+      : { companies: { some: { id: { in: session.companyAccess } } } },
+    select: { id: true, nameAr: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const currentGroupId = requestedGroupId && accessibleGroups.some((group) => group.id === requestedGroupId)
+    ? requestedGroupId
+    : accessibleGroups[0]?.id;
+  if (!currentGroupId) redirect("/dashboard/settings");
+
+  const groupCompanyIds = (await prisma.company.findMany({ where: { groupId: currentGroupId }, select: { id: true } })).map((company) => company.id);
+  const scopedCompanyIds = session.isSuperAdmin || session.hasGlobalGroupAccess
+    ? groupCompanyIds
+    : groupCompanyIds.filter((companyId) => session.companyAccess.includes(companyId));
+  const companyFilter = { id: { in: scopedCompanyIds } };
+  const employeeCompanyFilter = { companyId: { in: scopedCompanyIds } };
 
   const [companies, totalEmployees, expiringResidencies, totalActiveByCompany, driverByCompany, adminByCompany, investorByCompany, deletedByCompany] =
     await Promise.all([

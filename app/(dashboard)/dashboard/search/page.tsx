@@ -42,7 +42,7 @@ export default async function GroupSearchPage({ searchParams }: Props) {
       isActive: true,
       ...(session.isSuperAdmin ? {} : { id: { in: session.companyAccess } }),
     },
-    select: { id: true, nameAr: true, nameEn: true, type: true },
+    select: { id: true, nameAr: true, nameEn: true, type: true, group: { select: { id: true, nameAr: true, nameEn: true } } },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -227,7 +227,7 @@ export default async function GroupSearchPage({ searchParams }: Props) {
                 <option value="">{text.allCompanies}</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
-                    {locale === "en" ? company.nameEn ?? company.nameAr : company.nameAr}
+                    {locale === "en" ? company.nameEn ?? company.nameAr : company.nameAr} — {locale === "en" ? company.group.nameEn ?? company.group.nameAr : company.group.nameAr}
                   </option>
                 ))}
               </select>

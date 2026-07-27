@@ -15,7 +15,7 @@ export default async function DriverLayout({
     redirect('/login');
   }
 
-  if (session.accountType !== 'DRIVER' && session.accountType !== 'CAR_WASH_WORKER') {
+  if (session.accountType !== 'DRIVER') {
     redirect('/dashboard');
   }
 

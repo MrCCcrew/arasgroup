@@ -203,8 +203,10 @@ export async function POST(request: NextRequest) {
       user: userData, // For desktop app compatibility
       redirectTo: sessionUser.accountType === "OWNER_MANAGED_PARTNER"
         ? "/partner"
-        : sessionUser.accountType === "DRIVER" || sessionUser.accountType === "CAR_WASH_WORKER"
+        : sessionUser.accountType === "DRIVER"
           ? "/driver"
+          : sessionUser.accountType === "CAR_WASH_WORKER"
+            ? "/car-wash-portal"
           : "/dashboard",
     });
 

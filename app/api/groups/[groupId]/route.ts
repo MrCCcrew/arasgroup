@@ -8,12 +8,17 @@ interface Props {
 
 export async function GET(_req: NextRequest, { params }: Props) {
   try {
+    const session = await requireRequestSession(_req);
+    if (session instanceof NextResponse) return session;
     const { groupId } = await params;
     const group = await prisma.group.findUnique({
       where: { id: groupId },
       include: { companies: { orderBy: { sortOrder: "asc" } } },
     });
     if (!group) return NextResponse.json({ success: false, error: "المجموعة غير موجودة" }, { status: 404 });
+    if (!session.isSuperAdmin && !session.hasGlobalGroupAccess && !group.companies.some((company) => session.companyAccess.includes(company.id))) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ success: true, data: group });
   } catch {
     return NextResponse.json({ success: false, error: "فشل في جلب المجموعة" }, { status: 500 });

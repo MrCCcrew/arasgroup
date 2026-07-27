@@ -43,8 +43,9 @@ const createUserSchema = z.object({
   password: z.string().min(8, "كلمة المرور يجب ألا تقل عن 8 أحرف"),
   isActive: z.boolean().default(true),
   isSuperAdmin: z.boolean().default(false),
+  hasGlobalGroupAccess: z.boolean().default(false),
   roleIds: z.array(z.string()).default([]),
-  groupIds: z.array(z.string()).default([]),
+  groupAccess: z.array(companyAccessSchema.extend({ groupId: z.string() }).omit({ companyId: true, roleId: true })).default([]),
   companyAccess: z.array(companyAccessSchema).default([]),
   branchAccess: z.array(branchAccessSchema).default([]),
   directPermissions: z.array(directPermissionSchema).default([]),
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
           passwordHash,
           isActive: data.isActive,
           isSuperAdmin: data.isSuperAdmin,
+          hasGlobalGroupAccess: data.hasGlobalGroupAccess,
         },
       });
 
@@ -142,11 +144,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      for (const groupId of data.groupIds) {
-        await tx.userGroupAccess.upsert({
-          where: { userId_groupId: { userId: user.id, groupId } },
-          update: {},
-          create: { userId: user.id, groupId, canView: true },
+      for (const entry of data.groupAccess) {
+        await tx.userGroupAccess.create({
+          data: { userId: user.id, ...entry },
         });
       }
 
@@ -237,7 +237,8 @@ export async function POST(request: NextRequest) {
           resourceType: "User",
           newValues: {
             roleIds: data.roleIds,
-            groupIds: data.groupIds,
+            hasGlobalGroupAccess: data.hasGlobalGroupAccess,
+            groupAccess: data.groupAccess,
             companyAccess: data.companyAccess,
             branchAccess: data.branchAccess,
             directPermissions: data.directPermissions,

@@ -38,6 +38,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
           companyAccess: {
             include: { company: { select: { nameAr: true } } },
           },
+          groupAccess: true,
           branchAccess: {
             include: { branch: { select: { nameAr: true } } },
           },
@@ -65,8 +66,10 @@ async function loadUsersPageData(): Promise<UsersPageData> {
         orderBy: { sortOrder: "asc" },
         select: {
           id: true,
+          groupId: true,
           nameAr: true,
           type: true,
+          group: { select: { id: true, nameAr: true } },
           branches: {
             where: { isActive: true },
             orderBy: { sortOrder: "asc" },
@@ -110,6 +113,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
           companyAccess: {
             include: { company: { select: { nameAr: true } } },
           },
+          groupAccess: true,
           branchAccess: {
             include: { branch: { select: { nameAr: true } } },
           },
@@ -125,8 +129,10 @@ async function loadUsersPageData(): Promise<UsersPageData> {
         orderBy: { sortOrder: "asc" },
         select: {
           id: true,
+          groupId: true,
           nameAr: true,
           type: true,
+          group: { select: { id: true, nameAr: true } },
           branches: {
             where: { isActive: true },
             orderBy: { sortOrder: "asc" },

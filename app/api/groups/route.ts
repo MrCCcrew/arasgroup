@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRequestSession } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const session = await requireRequestSession(request);
+    if (session instanceof NextResponse) return session;
     const groups = await prisma.group.findMany({
+      where: session.isSuperAdmin || session.hasGlobalGroupAccess ? {} : { companies: { some: { id: { in: session.companyAccess } } } },
       include: { companies: { orderBy: { sortOrder: "asc" } } },
       orderBy: { createdAt: "asc" },
     });

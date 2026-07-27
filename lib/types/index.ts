@@ -24,6 +24,7 @@ export interface SessionUser {
   nameEn?: string | null;
   locale?: "ar" | "en";
   isSuperAdmin: boolean;
+  hasGlobalGroupAccess?: boolean;
   employeeId?: string | null;
   accountType?: "ADMIN" | "DRIVER" | "CAR_WASH_WORKER" | "OWNER_MANAGED_PARTNER";
   roles: SessionRole[];
@@ -86,6 +87,7 @@ export interface JwtPayload {
   nameEn?: string | null;
   locale?: "ar" | "en";
   isSuperAdmin: boolean;
+  hasGlobalGroupAccess?: boolean;
   roles: SessionRole[];
   groupAccess: SessionGroupAccess[];
   companyAccess?: string[];

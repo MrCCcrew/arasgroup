@@ -28,6 +28,10 @@ eng.traineddata
 prisma/migrations/*
 !prisma/migrations/20260727_owner_management_production/
 !prisma/migrations/20260727_owner_management_production/migration.sql
+!prisma/migrations/20260727_group_company_scopes/
+!prisma/migrations/20260727_group_company_scopes/migration.sql
+!prisma/migrations/20260728_car_wash_portal/
+!prisma/migrations/20260728_car_wash_portal/migration.sql
 
 # Logs
 npm-debug.log*

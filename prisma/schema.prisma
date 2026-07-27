@@ -20,6 +20,7 @@ model User {
   phone              String?
   isActive           Boolean         @default(true)
   isSuperAdmin       Boolean         @default(false)
+  hasGlobalGroupAccess Boolean       @default(false)
   employeeId         String?         @unique
   accountType        UserAccountType @default(ADMIN)
   mustChangePassword Boolean         @default(false)
@@ -49,6 +50,8 @@ model User {
   reviewedInvoices                DeliveryInvoice[]         @relation("InvoiceReviewedBy")
   ownerManagedPartner             OwnerManagedPartner?      @relation("OwnerManagedPartnerUser")
   createdOwnerManagedExpenses     OwnerManagedExpense[]     @relation("OwnerManagedExpenseCreatedBy")
+  createdCarWashRevenues          CarWashRevenue[]          @relation("CarWashRevenueCreatedBy")
+  createdCarWashExpenses          CarWashExpense[]          @relation("CarWashExpenseCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1958,13 +1961,22 @@ model CarWashRevenue {
   amount      Decimal     @db.Decimal(18, 3)
   description String?
   date        DateTime
+  paymentMethod String @default("CASH")
+  imageUrl    String?
+  ocrRawText  String?
+  transactionReference String?
+  source      String @default("ADMIN")
+  createdById String?
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("CarWashRevenueCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
   @@index([date])
+  @@index([createdById])
+  @@index([source])
   @@map("car_wash_revenues")
 }
 
@@ -1980,13 +1992,21 @@ model CarWashExpense {
   amount      Decimal  @db.Decimal(18, 3)
   description String
   date        DateTime
+  paymentMethod String @default("CASH")
+  imageUrl    String?
+  ocrRawText  String?
+  source      String @default("ADMIN")
+  createdById String?
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("CarWashExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
   @@index([date])
+  @@index([createdById])
+  @@index([source])
   @@map("car_wash_expenses")
 }
 

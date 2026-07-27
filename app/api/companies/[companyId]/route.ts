@@ -8,12 +8,15 @@ interface Props {
 
 export async function GET(_req: NextRequest, { params }: Props) {
   try {
+    const session = await requireRequestSession(_req);
+    if (session instanceof NextResponse) return session;
     const { companyId } = await params;
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       include: { group: true },
     });
     if (!company) return NextResponse.json({ success: false, error: "الشركة غير موجودة" }, { status: 404 });
+    if (!session.isSuperAdmin && !session.companyAccess.includes(companyId)) return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     return NextResponse.json({ success: true, data: company });
   } catch {
     return NextResponse.json({ success: false, error: "فشل في جلب الشركة" }, { status: 500 });

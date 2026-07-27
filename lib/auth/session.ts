@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import type { JwtPayload, SessionUser } from "@/lib/types";
 import { getLocale } from "@/lib/i18n";
+import { resolveUserCompanyAccess } from "@/lib/auth/company-access";
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "fallback-secret-change-in-production-32ch",
@@ -134,6 +135,7 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
     nameEn: user.nameEn,
     locale,
     isSuperAdmin: user.isSuperAdmin,
+    hasGlobalGroupAccess: user.hasGlobalGroupAccess,
     employeeId: user.employeeId,
     accountType: user.accountType,
     roles: user.roles.map((ur: any) => ({
@@ -148,16 +150,8 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
       canDelete: entry.canDelete,
       canApprove: entry.canApprove,
     })),
-    companyAccess: user.companyAccess.map((entry: any) => entry.companyId),
-    companyAccessEntries: user.companyAccess.map((entry: any) => ({
-      companyId: entry.companyId,
-      roleId: entry.roleId,
-      canView: entry.canView,
-      canCreate: entry.canCreate,
-      canUpdate: entry.canUpdate,
-      canDelete: entry.canDelete,
-      canApprove: entry.canApprove,
-    })),
+    companyAccess: [],
+    companyAccessEntries: [],
     branchAccess: user.branchAccess.map((entry: any) => ({
       branchId: entry.branchId,
       companyId: entry.companyId,
@@ -191,6 +185,18 @@ async function loadSessionUser(userId: string, locale?: "ar" | "en"): Promise<Se
         })),
       ),
   };
+
+  const resolvedAccess = await resolveUserCompanyAccess(user.id);
+  sessionUser.hasGlobalGroupAccess = resolvedAccess.hasGlobalAccess;
+  sessionUser.companyAccess = resolvedAccess.accessibleCompanyIds;
+  sessionUser.companyAccessEntries = resolvedAccess.companyAccess.map((entry) => ({
+    companyId: entry.companyId,
+    canView: entry.canView,
+    canCreate: entry.canCreate,
+    canUpdate: entry.canUpdate,
+    canDelete: entry.canDelete,
+    canApprove: entry.canApprove,
+  }));
 
   setCache(userId, locale, sessionUser);
   return sessionUser;

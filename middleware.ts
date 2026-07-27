@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
     const loginUrl = new URL("/login", request.url);
-    if (pathname === "/driver" || pathname.startsWith("/driver/")) {
+    if (pathname === "/driver" || pathname.startsWith("/driver/") || pathname === "/car-wash-portal" || pathname.startsWith("/car-wash-portal/")) {
       loginUrl.searchParams.set("portal", "driver");
     }
     const response = NextResponse.redirect(loginUrl);
@@ -64,17 +64,23 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
-    // Redirect drivers to /driver portal
-    if (accountType === 'DRIVER' || accountType === 'CAR_WASH_WORKER') {
+    if (accountType === 'DRIVER') {
       if (pathname.startsWith('/api/') && !pathname.startsWith('/api/driver/')) {
         return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
       }
       if (!pathname.startsWith('/driver') && !pathname.startsWith('/api/driver')) {
         return NextResponse.redirect(new URL('/driver', request.url));
       }
+    } else if (accountType === 'CAR_WASH_WORKER') {
+      if (pathname.startsWith('/api/') && !pathname.startsWith('/api/car-wash-portal/')) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      }
+      if (!pathname.startsWith('/car-wash-portal') && !pathname.startsWith('/api/car-wash-portal/')) {
+        return NextResponse.redirect(new URL('/car-wash-portal', request.url));
+      }
     } else {
       // Redirect admin users away from driver portal
-      if (pathname.startsWith('/driver')) {
+      if (pathname.startsWith('/driver') || pathname.startsWith('/car-wash-portal')) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
     }

@@ -25,6 +25,8 @@ interface BranchOption {
 
 interface CompanyOption {
   id: string;
+  groupId: string;
+  group: { id: string; nameAr: string };
   nameAr: string;
   type: string;
   branches: BranchOption[];
@@ -36,6 +38,15 @@ interface ExistingUser {
   nameAr: string;
   isActive: boolean;
   isSuperAdmin: boolean;
+  hasGlobalGroupAccess: boolean;
+  groupAccess: Array<{
+    groupId: string;
+    canView: boolean;
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+    canApprove: boolean;
+  }>;
   roles: Array<{
     roleId: string;
     companyId: string | null;
@@ -239,9 +250,12 @@ export function UserManagement({
   });
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Record<string, AccessFlags>>({});
+  const [selectedGroups, setSelectedGroups] = useState<Record<string, AccessFlags>>({});
+  const [hasGlobalGroupAccess, setHasGlobalGroupAccess] = useState(false);
   const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>({});
 
   const selectedCompanyIds = useMemo(() => Object.keys(selectedCompanies), [selectedCompanies]);
+  const groups = useMemo(() => Array.from(new Map(companies.map((company) => [company.groupId, company.group])).values()), [companies]);
   const selectedScope = useMemo(() => {
     if (!selectedModule || selectedActions.length === 0) return null;
     return permissions.find((p) => p.module === selectedModule && p.action === selectedActions[0])?.scope ?? null;
@@ -286,6 +300,17 @@ export function UserManagement({
         return next;
       }
       return { ...prev, [companyId]: { ...defaultFlags } };
+    });
+  }
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroups((prev) => {
+      if (prev[groupId]) {
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      }
+      return { ...prev, [groupId]: { ...defaultFlags } };
     });
   }
 
@@ -441,7 +466,8 @@ export function UserManagement({
       const payload = {
         ...form,
         roleIds: selectedRoles,
-        groupIds: [],
+        hasGlobalGroupAccess,
+        groupAccess: Object.entries(selectedGroups).map(([groupId, flags]) => ({ groupId, ...flags })),
         companyAccess: Object.entries(selectedCompanies).map(([companyId, flags]) => ({
           companyId,
           ...flags,
@@ -480,6 +506,8 @@ export function UserManagement({
       });
       setSelectedRoles([]);
       setSelectedCompanies({});
+      setSelectedGroups({});
+      setHasGlobalGroupAccess(false);
       setSelectedBranches({});
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : text("فشل في إنشاء المستخدم", "Failed to create user"));
@@ -726,6 +754,18 @@ export function UserManagement({
               <span>Super Admin</span>
             </label>
           </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 font-medium">{text("نطاق المجموعات", "Group access scope")}</h3>
+          <label className="mb-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={hasGlobalGroupAccess} onChange={(event) => setHasGlobalGroupAccess(event.target.checked)} />
+            <span>{text("جميع المجموعات", "All groups")}</span>
+          </label>
+          {!hasGlobalGroupAccess ? <div className="space-y-2 rounded-xl border p-3">{groups.map((group) => {
+            const selected = selectedGroups[group.id];
+            return <div key={group.id} className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(selected)} onChange={() => toggleGroup(group.id)} />{group.nameAr}</label>{selected ? <AccessFlagEditor value={selected} onChange={(field, checked) => setSelectedGroups((prev) => ({ ...prev, [group.id]: { ...prev[group.id], [field]: checked } }))} /> : null}</div>;
+          })}</div> : null}
         </div>
 
         <div>
@@ -1414,6 +1454,9 @@ function CompanyAccessEditor({
       ]),
     ),
   );
+  const [selectedGroups, setSelectedGroups] = useState<Record<string, AccessFlags>>(() => Object.fromEntries(user.groupAccess.map((entry) => [entry.groupId, { canView: entry.canView, canCreate: entry.canCreate, canUpdate: entry.canUpdate, canDelete: entry.canDelete, canApprove: entry.canApprove }])));
+  const [hasGlobalGroupAccess, setHasGlobalGroupAccess] = useState(user.hasGlobalGroupAccess);
+  const groups = Array.from(new Map(companies.map((company) => [company.groupId, company.group])).values());
   const [selectedBranches, setSelectedBranches] = useState<Record<string, AccessFlags & { companyId: string }>>(() =>
     Object.fromEntries(
       user.branchAccess.map((b) => [
@@ -1434,6 +1477,13 @@ function CompanyAccessEditor({
         return next;
       }
       return { ...prev, [companyId]: { ...defaultFlags } };
+    });
+  }
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroups((previous) => {
+      if (previous[groupId]) { const next = { ...previous }; delete next[groupId]; return next; }
+      return { ...previous, [groupId]: { ...defaultFlags } };
     });
   }
 
@@ -1461,6 +1511,7 @@ function CompanyAccessEditor({
     setError("");
     try {
       const companyAccess = Object.entries(selectedCompanies).map(([companyId, flags]) => ({ companyId, ...flags }));
+      const groupAccess = Object.entries(selectedGroups).map(([groupId, flags]) => ({ groupId, ...flags }));
       const branchAccess = Object.entries(selectedBranches).map(([branchId, value]) => ({
         branchId,
         companyId: value.companyId,
@@ -1474,7 +1525,7 @@ function CompanyAccessEditor({
       const response = await fetch(`/api/users/${user.id}/access`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyAccess, branchAccess }),
+        body: JSON.stringify({ hasGlobalGroupAccess, groupAccess, companyAccess, branchAccess }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -1504,6 +1555,10 @@ function CompanyAccessEditor({
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p> : null}
 
       <div className="space-y-4">
+        <div className="rounded-xl border bg-card p-4">
+          <label className="mb-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={hasGlobalGroupAccess} onChange={(event) => setHasGlobalGroupAccess(event.target.checked)} />{text("جميع المجموعات", "All groups")}</label>
+          {!hasGlobalGroupAccess ? <div className="space-y-2">{groups.map((group) => { const selected = selectedGroups[group.id]; return <div key={group.id} className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(selected)} onChange={() => toggleGroup(group.id)} />{group.nameAr}</label>{selected ? <AccessFlagEditor value={selected} onChange={(field, checked) => setSelectedGroups((previous) => ({ ...previous, [group.id]: { ...previous[group.id], [field]: checked } }))} /> : null}</div>; })}</div> : null}
+        </div>
         {companies.map((company) => {
           const isSelected = Boolean(selectedCompanies[company.id]);
           return (
