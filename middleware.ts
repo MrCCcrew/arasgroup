@@ -38,11 +38,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
     const loginUrl = new URL("/login", request.url);
-    if (pathname === "/driver" || pathname.startsWith("/driver/") || pathname === "/car-wash-portal" || pathname.startsWith("/car-wash-portal/")) {
+    if (pathname === "/driver" || pathname.startsWith("/driver/")) {
       loginUrl.searchParams.set("portal", "driver");
+    } else if (pathname === "/car-wash-portal" || pathname.startsWith("/car-wash-portal/")) {
+      loginUrl.searchParams.set("portal", "car-wash");
     }
     const response = NextResponse.redirect(loginUrl);
-    if (loginUrl.searchParams.get("portal") === "driver" && !request.cookies.get(LOCALE_COOKIE_NAME)) {
+    if ((loginUrl.searchParams.get("portal") === "driver" || loginUrl.searchParams.get("portal") === "car-wash") && !request.cookies.get(LOCALE_COOKIE_NAME)) {
       response.cookies.set(LOCALE_COOKIE_NAME, "en", { sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60 });
     }
     return response;
