@@ -47,6 +47,8 @@ model User {
   activityLogs                    EmployeeActivityLog[]
   trackingSessions                DriverTrackingSession[]
   reviewedInvoices                DeliveryInvoice[]         @relation("InvoiceReviewedBy")
+  ownerManagedPartner             OwnerManagedPartner?      @relation("OwnerManagedPartnerUser")
+  createdOwnerManagedExpenses     OwnerManagedExpense[]     @relation("OwnerManagedExpenseCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,6 +62,7 @@ enum UserAccountType {
   ADMIN
   DRIVER
   CAR_WASH_WORKER
+  OWNER_MANAGED_PARTNER
 }
 
 model Role {
@@ -311,6 +314,10 @@ model Company {
   assetCustodies           AssetCustody[]
   driverVehicleAssignments DriverVehicleAssignment[]
   knetCommissionSettings   KnetCommissionSettings[]
+  ownerManagedPartners     OwnerManagedPartner[]
+  ownerManagedExpenses     OwnerManagedExpense[]
+  ownerManagedImports      OwnerManagedStatementImport[]
+  ownerManagedRevenues     OwnerManagedRevenue[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -330,6 +337,98 @@ enum CompanyType {
   TRADING
   HOLDING
   OTHER
+  OWNER_MANAGED
+}
+
+model OwnerManagedPartner {
+  id        String  @id @default(cuid())
+  companyId String
+  userId    String  @unique
+  name      String
+  phone     String?
+  email     String?
+  mid       String
+  isActive  Boolean @default(true)
+  company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User                  @relation("OwnerManagedPartnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  expenses  OwnerManagedExpense[]
+  revenues  OwnerManagedRevenue[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([companyId, mid])
+  @@index([companyId])
+  @@map("owner_managed_partners")
+}
+
+model OwnerManagedExpense {
+  id          String   @id @default(cuid())
+  companyId   String
+  partnerId   String
+  invoiceDate DateTime
+  amount      Decimal  @db.Decimal(15, 3)
+  notes       String?  @db.Text
+  imageUrl    String?
+  ocrRawText  String?  @db.LongText
+  createdById String
+  deletedAt   DateTime?
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partner     OwnerManagedPartner @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  createdBy   User                @relation("OwnerManagedExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  @@index([companyId, partnerId, invoiceDate])
+  @@map("owner_managed_expenses")
+}
+
+model OwnerManagedStatementImport {
+  id           String   @id @default(cuid())
+  companyId    String
+  fileName     String
+  fileHash     String
+  storageUrl   String?
+  rawText      String?  @db.LongText
+  importedById String
+  confirmedAt  DateTime?
+  createdAt    DateTime @default(now())
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  revenues     OwnerManagedRevenue[]
+  @@unique([companyId, fileHash])
+  @@index([companyId, createdAt])
+  @@map("owner_managed_statement_imports")
+}
+
+model OwnerManagedRevenue {
+  id                   String   @id @default(cuid())
+  companyId            String
+  partnerId            String?
+  importId             String
+  mid                  String?
+  transactionReference String?
+  transactionDate      DateTime?
+  postingDate          DateTime?
+  amount               Decimal  @db.Decimal(15, 3)
+  branchCode           String?
+  description          String   @db.Text
+  balance              Decimal? @db.Decimal(15, 3)
+  pageNumber           Int
+  rawRowText           String?  @db.Text
+  status               OwnerManagedRevenueStatus @default(UNMATCHED)
+  rejectionReason      String?  @db.Text
+  createdAt            DateTime @default(now())
+  company              Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partner              OwnerManagedPartner?        @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  import               OwnerManagedStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  @@unique([companyId, mid, transactionReference, amount])
+  @@index([companyId, partnerId, transactionDate])
+  @@map("owner_managed_revenues")
+}
+
+enum OwnerManagedRevenueStatus {
+  MATCHED
+  UNMATCHED
+  INVALID
+  DUPLICATE
+  REVIEW
 }
 
 enum OwnershipType {

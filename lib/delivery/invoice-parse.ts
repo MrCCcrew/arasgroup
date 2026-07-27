@@ -72,6 +72,8 @@ const SOFT_NEGATIVE_KEYWORDS = [
 
 const DATE_HINT_KEYWORDS = ["date", "التاريخ"];
 
+const ENGLISH_MONTHS: Record<string, number> = { january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sep: 9, sept: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12 };
+
 const TIME_RE = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
 const ISO_DATE_RE = /\b(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/g;
 const DMY_DATE_RE = /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/g;
@@ -342,6 +344,19 @@ function findDateInText(text: string): string | null {
   while ((match = dmyRe.exec(text))) {
     const iso = toIso(match[3], match[2], match[1]);
     if (iso) return iso;
+    // If the middle number cannot be a month (for example 06/15/2026),
+    // the numeric date has an unambiguous MM/DD/YYYY interpretation.
+    const mdy = toIso(match[3], match[1], match[2]);
+    if (mdy) return mdy;
+  }
+
+  const monthMatch = text.match(/\b(\d{1,2})\s+([a-zA-Z]+)\s+(\d{2,4})\b|\b([a-zA-Z]+)\s+(\d{1,2}),?\s+(\d{2,4})\b/);
+  if (monthMatch) {
+    const day = monthMatch[1] ?? monthMatch[5];
+    const monthName = (monthMatch[2] ?? monthMatch[4] ?? "").toLowerCase();
+    const year = monthMatch[3] ?? monthMatch[6];
+    const month = ENGLISH_MONTHS[monthName];
+    if (day && year && month) return toIso(year, String(month), day);
   }
 
   return null;

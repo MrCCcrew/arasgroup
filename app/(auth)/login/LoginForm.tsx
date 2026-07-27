@@ -36,7 +36,7 @@ export default function LoginForm({ logoUrl, groupNameAr, groupNameEn }: Props) 
         return;
       }
 
-      window.location.assign("/dashboard");
+      window.location.assign(data.redirectTo === "/partner" ? "/partner" : "/dashboard");
       return;
     } catch {
       setError("حدث خطأ في الاتصال بالخادم");

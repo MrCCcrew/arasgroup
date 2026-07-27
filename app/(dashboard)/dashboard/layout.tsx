@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/components/layout/sidebar-context";
 export default async function DashboardRootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.accountType === "OWNER_MANAGED_PARTNER") redirect("/partner");
 
   const companies = await prisma.company.findMany({
     where: {

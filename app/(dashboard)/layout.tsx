@@ -5,5 +5,6 @@ import { redirect } from "next/navigation";
 export default async function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.accountType === "OWNER_MANAGED_PARTNER") redirect("/partner");
   return <>{children}</>;
 }

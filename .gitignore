@@ -22,9 +22,12 @@ next-build.tar.gz
 # Local history / temp files
 .history/
 .tmp/
+eng.traineddata
 
 # Prisma generated
-prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/20260727_owner_management_production/
+!prisma/migrations/20260727_owner_management_production/migration.sql
 
 # Logs
 npm-debug.log*

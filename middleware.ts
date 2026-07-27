@@ -44,6 +44,17 @@ export async function middleware(request: NextRequest) {
     const { payload } = await jwtVerify(token, SECRET);
     const accountType = payload.accountType as string | undefined;
 
+    if (accountType === "OWNER_MANAGED_PARTNER") {
+      if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+        return NextResponse.redirect(new URL("/partner", request.url));
+      }
+      if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/owner-management/partner/")) {
+        return NextResponse.json({ success: false, error: "غير مصرح بالوصول إلى واجهات الإدارة" }, { status: 403 });
+      }
+    } else if (pathname === "/partner" || pathname.startsWith("/partner/")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
     // Redirect drivers to /driver portal
     if (accountType === 'DRIVER' || accountType === 'CAR_WASH_WORKER') {
       if (!pathname.startsWith('/driver') && !pathname.startsWith('/api/driver')) {

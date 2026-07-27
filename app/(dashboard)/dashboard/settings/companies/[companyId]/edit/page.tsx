@@ -15,6 +15,7 @@ interface Company {
 }
 
 const companyTypes = [
+  { value: "OWNER_MANAGED", label: "شركات بنظام إدارة المالك" },
   { value: "DELIVERY",  label: "توصيل طلبات" },
   { value: "CAR_WASH",  label: "غسيل سيارات" },
   { value: "TRADING",   label: "تجارة عامة" },

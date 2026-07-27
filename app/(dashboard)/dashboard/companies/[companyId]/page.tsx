@@ -90,6 +90,7 @@ export default async function CompanyDashboardPage({ params }: Props) {
   });
 
   if (!company) notFound();
+  if (company.type === "OWNER_MANAGED") redirect(`/dashboard/companies/${companyId}/owner-management`);
 
   const canViewAccountingForQuery = session.isSuperAdmin || hasPermission(session, "ACCOUNTING", "VIEW", { companyId });
 

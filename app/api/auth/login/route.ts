@@ -191,6 +191,7 @@ export async function POST(request: NextRequest) {
       nameAr: user.nameAr,
       nameEn: user.nameEn,
       isSuperAdmin: user.isSuperAdmin,
+      accountType: sessionUser.accountType,
       roles: sessionUser.roles,
       companyAccess: sessionUser.companyAccess,
     };
@@ -199,6 +200,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: userData,
       user: userData, // For desktop app compatibility
+      redirectTo: sessionUser.accountType === "OWNER_MANAGED_PARTNER" ? "/partner" : "/dashboard",
     });
 
     response.cookies.set(COOKIE_NAME, token, {

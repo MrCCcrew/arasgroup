@@ -7,7 +7,7 @@ const createCompanySchema = z.object({
   groupId: z.string(),
   nameAr: z.string().min(2, "الاسم مطلوب"),
   nameEn: z.string().optional(),
-  type: z.enum(["DELIVERY", "CAR_WASH", "TRADING", "HOLDING", "OTHER"]),
+  type: z.enum(["DELIVERY", "CAR_WASH", "TRADING", "HOLDING", "OTHER", "OWNER_MANAGED"]),
   commercialReg: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
