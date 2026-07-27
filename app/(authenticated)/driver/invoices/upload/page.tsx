@@ -33,6 +33,8 @@ export default function UploadInvoicePage() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
+    // Reset both inputs so the same photo can be selected again after replacement.
+    e.target.value = '';
     if (!selectedFile) return;
 
     if (!selectedFile.type.startsWith('image/')) {
@@ -187,7 +189,7 @@ export default function UploadInvoicePage() {
             )}
             {reading && <p className="text-sm text-muted-foreground">{t('driver.readingInvoice')}</p>}
             {ocrMessage && <p className="text-sm text-muted-foreground">{ocrMessage}</p>}
-            {file && !reading && <div className="space-y-2"><p className="truncate text-sm text-muted-foreground">{file.name}</p><div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()}>{t('driver.changeImage')}</Button><Button type="button" variant="destructive" onClick={() => { setFile(null); setPreview(null); setOcr(null); setOcrMessage(null); }}>{t('driver.removeImage')}</Button></div></div>}
+            {file && !reading && <div className="space-y-2"><p className="truncate text-sm text-muted-foreground">{file.name}</p><div className="grid grid-cols-3 gap-2"><Button type="button" variant="outline" onClick={() => cameraInputRef.current?.click()}><Camera className="me-1 h-4 w-4" />{t('driver.takePhoto')}</Button><Button type="button" variant="outline" onClick={() => galleryInputRef.current?.click()}><Upload className="me-1 h-4 w-4" />{t('driver.chooseFromGallery')}</Button><Button type="button" variant="destructive" onClick={() => { setFile(null); setPreview(null); setOcr(null); setOcrMessage(null); }}>{t('driver.removeImage')}</Button></div></div>}
           </CardContent>
         </Card>
 
