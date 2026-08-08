@@ -27,7 +27,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
   try {
     const [users, roles, companies, permissions] = await Promise.all([
       prisma.user.findMany({
-        where: { accountType: { not: "DRIVER" } },
+        where: { accountType: { notIn: ["DRIVER", "CAR_WASH_WORKER"] } },
         include: {
           roles: {
             include: {
@@ -102,7 +102,7 @@ async function loadUsersPageData(): Promise<UsersPageData> {
 
     const [users, roles, companies] = await Promise.all([
       prisma.user.findMany({
-        where: { accountType: { not: "DRIVER" } },
+        where: { accountType: { notIn: ["DRIVER", "CAR_WASH_WORKER"] } },
         include: {
           roles: {
             include: {

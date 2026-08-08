@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import { UserAccountType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
 
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search");
 
   const where = {
-    accountType: { not: "DRIVER" as const },
+    accountType: { notIn: [UserAccountType.DRIVER, UserAccountType.CAR_WASH_WORKER] },
     ...(search ? { OR: [{ nameAr: { contains: search } }, { email: { contains: search } }] } : {}),
   };
 
