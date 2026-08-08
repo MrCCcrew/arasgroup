@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCarWashPortalContext } from "@/lib/auth/car-wash-portal";
 import { requireRequestSession } from "@/lib/auth/access";
+import { carWashDriverMovementScope } from "@/lib/car-wash/driver-movement-scope";
 
 const inputSchema = z.object({
   kind: z.enum(["EXPENSE", "CASH", "KNET"]), vehicleId: z.string(), categoryId: z.string().optional(), amount: z.number().positive(), date: z.string().transform((value) => new Date(value)), notes: z.string().max(2000).optional(), imageUrl: z.string().url().optional(), ocrRawText: z.string().max(20000).optional(), transactionReference: z.string().max(191).optional(),
@@ -35,8 +36,8 @@ export async function GET(request: NextRequest) {
   const commonInclude = { operation: { include: { vehicle: { select: { id: true, code: true, nameAr: true, nameEn: true } } } }, createdBy: { select: { id: true, nameAr: true, nameEn: true, email: true } } } as const;
 
   const [expenses, revenues] = await Promise.all([
-    kind && kind !== "EXPENSE" ? Promise.resolve([]) : prisma.carWashExpense.findMany({ where: { operation: operationWhere, ...(from || to ? { date: dateWhere } : {}) }, include: commonInclude }),
-    kind === "EXPENSE" ? Promise.resolve([]) : prisma.carWashRevenue.findMany({ where: { operation: operationWhere, ...(kind === "CASH" || kind === "KNET" ? { type: kind } : {}), ...(from || to ? { date: dateWhere } : {}) }, include: commonInclude }),
+    kind && kind !== "EXPENSE" ? Promise.resolve([]) : prisma.carWashExpense.findMany({ where: { ...carWashDriverMovementScope(context.employeeId, context.companyId), operation: operationWhere, ...(from || to ? { date: dateWhere } : {}) }, include: commonInclude }),
+    kind === "EXPENSE" ? Promise.resolve([]) : prisma.carWashRevenue.findMany({ where: { ...carWashDriverMovementScope(context.employeeId, context.companyId), operation: operationWhere, ...(kind === "CASH" || kind === "KNET" ? { type: kind } : {}), ...(from || to ? { date: dateWhere } : {}) }, include: commonInclude }),
   ]);
   const categoryIds = expenses.flatMap((expense) => expense.categoryId ? [expense.categoryId] : []);
   const categories = categoryIds.length ? await prisma.expenseCategory.findMany({ where: { id: { in: categoryIds } }, select: { id: true, nameAr: true, nameEn: true } }) : [];
@@ -77,12 +78,12 @@ export async function POST(request: NextRequest) {
     if (!operation) operation = await tx.carWashDailyOperation.create({ data: { vehicleId: vehicle.id, companyId: context.companyId, locationId: location.id, date: operationDate, notes: data.notes } });
     if (operation.companyId !== context.companyId || operation.locationId !== location.id) throw new Error("Operation location mismatch");
     if (data.kind === "EXPENSE") {
-      const expense = await tx.carWashExpense.create({ data: { operationId: operation.id, categoryId: data.categoryId, amount: data.amount, description: data.notes ?? "Portal expense", date: operationDate, paymentMethod: "CASH", imageUrl: data.imageUrl, ocrRawText: data.ocrRawText, source: "CAR_WASH_PORTAL", createdById: context.userId } });
+      const expense = await tx.carWashExpense.create({ data: { operationId: operation.id, categoryId: data.categoryId, amount: data.amount, description: data.notes ?? "Portal expense", date: operationDate, paymentMethod: "CASH", imageUrl: data.imageUrl, ocrRawText: data.ocrRawText, source: "CAR_WASH_PORTAL", createdById: context.userId, createdByEmployeeId: context.employeeId } });
       await tx.carWashDailyOperation.update({ where: { id: operation.id }, data: { totalExpenses: { increment: data.amount }, netRevenue: { decrement: data.amount } } });
       await tx.auditLog.create({ data: { userId: context.userId, companyId: context.companyId, branchId: context.branchId, action: "CREATE_CAR_WASH_PORTAL_EXPENSE", module: "car_wash", resourceId: expense.id, resourceType: "CarWashExpense" } });
       return { id: expense.id, kind: "EXPENSE", date: expense.date, amount: asAmount(expense.amount), vehicleId: vehicle.id, vehicle, source: expense.source };
     }
-    const revenue = await tx.carWashRevenue.create({ data: { operationId: operation.id, type: data.kind, amount: data.amount, description: data.notes, date: operationDate, paymentMethod: data.kind, imageUrl: data.imageUrl, ocrRawText: data.ocrRawText, transactionReference: data.transactionReference, source: "CAR_WASH_PORTAL", createdById: context.userId } });
+    const revenue = await tx.carWashRevenue.create({ data: { operationId: operation.id, type: data.kind, amount: data.amount, description: data.notes, date: operationDate, paymentMethod: data.kind, imageUrl: data.imageUrl, ocrRawText: data.ocrRawText, transactionReference: data.transactionReference, source: "CAR_WASH_PORTAL", createdById: context.userId, createdByEmployeeId: context.employeeId } });
     if (data.kind === "KNET") await tx.knetTransaction.create({ data: { operationId: operation.id, amount: data.amount, date: operationDate, transactionRef: data.transactionReference, cardType: "KNET" } });
     await tx.carWashDailyOperation.update({ where: { id: operation.id }, data: data.kind === "CASH" ? { totalCash: { increment: data.amount }, netRevenue: { increment: data.amount } } : { totalKnet: { increment: data.amount }, netRevenue: { increment: data.amount } } });
     await tx.auditLog.create({ data: { userId: context.userId, companyId: context.companyId, branchId: context.branchId, action: "CREATE_CAR_WASH_PORTAL_REVENUE", module: "car_wash", resourceId: revenue.id, resourceType: "CarWashRevenue" } });
