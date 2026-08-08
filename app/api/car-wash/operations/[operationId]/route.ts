@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { assertCompanyAccess, requireRequestSession } from "@/lib/auth/access";
 import { createCarWashDailyJE, createExpenseJE } from "@/lib/accounting/auto-entries";
 import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
+import { discardLinkedJournalEntry } from "@/lib/accounting/journal-engine";
 
 interface Props {
   params: Promise<{ operationId: string }>;
@@ -132,18 +133,20 @@ export async function PUT(request: NextRequest, { params }: Props) {
     }
 
     const operation = await prisma.$transaction(async (tx) => {
-      if (existingOperation.journalEntryId) {
-        await tx.journalEntryLine.deleteMany({ where: { journalEntryId: existingOperation.journalEntryId } });
-        await tx.journalEntry.deleteMany({ where: { id: existingOperation.journalEntryId } });
-      }
+      // Legacy rows can hold stale journalEntryId values. The helper first checks
+      // whether a referenced entry exists, then preserves its accounting audit trail.
+      await discardLinkedJournalEntry(tx, existingOperation.journalEntryId, {
+        userId,
+        reasonAr: "ملغى - أعيد بناء قيد عملية غسيل السيارات بعد التعديل",
+      });
 
       // Delete old expense journal entries and expense records
       for (const expense of linkedExpenses) {
-        if (expense.journalEntryId) {
-          await tx.journalEntryLine.deleteMany({ where: { journalEntryId: expense.journalEntryId } });
-          await tx.journalEntry.deleteMany({ where: { id: expense.journalEntryId } });
-        }
-        await tx.expense.deleteMany({ where: { id: expense.id } });
+        await discardLinkedJournalEntry(tx, expense.journalEntryId, {
+          userId,
+          reasonAr: "ملغى - أعيد بناء قيد مصروف عملية غسيل السيارات بعد التعديل",
+        });
+        await tx.expense.update({ where: { id: expense.id }, data: { isDeleted: true } });
       }
 
       await tx.knetTransaction.deleteMany({ where: { operationId } });
@@ -161,6 +164,8 @@ export async function PUT(request: NextRequest, { params }: Props) {
           totalExpenses,
           netRevenue,
           notes: data.notes,
+          journalEntryId: null,
+          status: "OPEN",
           revenues: {
             create: data.revenues.map((r) => ({ type: r.type, amount: r.amount, description: r.description, date: r.date })),
           },
@@ -382,7 +387,8 @@ export async function DELETE(request: NextRequest, { params }: Props) {
         });
 
         if (expense.journalEntryId) {
-          await tx.journalEntry.update({
+          // A legacy expense can point to a missing entry; updateMany is a safe no-op.
+          await tx.journalEntry.updateMany({
             where: { id: expense.journalEntryId },
             data: {
               status: "CANCELLED",
@@ -397,7 +403,8 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       });
 
       if (operation.journalEntryId) {
-        await tx.journalEntry.update({
+        // A stale operation reference must not block deletion.
+        await tx.journalEntry.updateMany({
           where: { id: operation.journalEntryId },
           data: {
             status: "CANCELLED",
