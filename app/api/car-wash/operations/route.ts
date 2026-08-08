@@ -5,6 +5,14 @@ import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
 import { requireRequestSession } from "@/lib/auth/access";
 import { z } from "zod";
 
+const KUWAIT_OFFSET = "+03:00";
+
+function parseKuwaitCalendarDate(value: string | null, endOfDay = false) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsed = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}${KUWAIT_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
 function expenseReference(operationId: string) {
   return `CWOP:${operationId}`;
 }
@@ -38,21 +46,26 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get("companyId");
     const vehicleId = searchParams.get("vehicleId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
+    const fromDate = searchParams.get("fromDate") ?? searchParams.get("startDate");
+    const toDate = searchParams.get("toDate") ?? searchParams.get("endDate");
+    const month = Number.parseInt(searchParams.get("month") ?? "", 10);
+    const year = Number.parseInt(searchParams.get("year") ?? "", 10);
+    const rangeStart = parseKuwaitCalendarDate(fromDate);
+    const rangeEnd = parseKuwaitCalendarDate(toDate, true);
+    const hasDateRange = Boolean(rangeStart || rangeEnd);
+    const validMonth = Number.isInteger(month) && month >= 1 && month <= 12 && Number.isInteger(year);
+    const monthLastDay = validMonth ? new Date(Date.UTC(year, month, 0)).getUTCDate() : undefined;
+    const monthStart = validMonth ? parseKuwaitCalendarDate(`${year}-${String(month).padStart(2, "0")}-01`) : undefined;
+    const monthEnd = validMonth && monthLastDay ? parseKuwaitCalendarDate(`${year}-${String(month).padStart(2, "0")}-${String(monthLastDay).padStart(2, "0")}`, true) : undefined;
+    const date = hasDateRange
+      ? { ...(rangeStart ? { gte: rangeStart } : {}), ...(rangeEnd ? { lte: rangeEnd } : {}) }
+      : monthStart && monthEnd ? { gte: monthStart, lte: monthEnd } : undefined;
 
     const operations = await prisma.carWashDailyOperation.findMany({
       where: {
         ...(companyId ? { companyId } : {}),
         ...(vehicleId ? { vehicleId } : {}),
-        ...(startDate || endDate
-          ? {
-              date: {
-                ...(startDate ? { gte: new Date(startDate) } : {}),
-                ...(endDate ? { lte: new Date(endDate) } : {}),
-              },
-            }
-          : {}),
+        ...(date ? { date } : {}),
       },
       include: {
         vehicle: { select: { code: true, nameAr: true } },

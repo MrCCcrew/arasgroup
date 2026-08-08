@@ -11,13 +11,27 @@ import { DeleteOperationButton } from "./DeleteOperationButton";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ vehicleId?: string; month?: string; year?: string }>;
+  searchParams: Promise<{ vehicleId?: string; month?: string; year?: string; fromDate?: string; toDate?: string }>;
 }
 
 const MONTHS = {
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
 } as const;
+
+const KUWAIT_OFFSET = "+03:00";
+
+function parseKuwaitCalendarDate(value: string | undefined, endOfDay = false) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsed = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}${KUWAIT_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function kuwaitDateParam(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kuwait", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
 
 export default async function CarWashOperationsPage({ params, searchParams }: Props) {
   const session = await getSession();
@@ -32,13 +46,34 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
   const year = Number.parseInt(sp.year ?? String(now.getFullYear()), 10);
   const month = Number.parseInt(sp.month ?? String(now.getMonth() + 1), 10);
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const fromDate = parseKuwaitCalendarDate(sp.fromDate);
+  const toDate = parseKuwaitCalendarDate(sp.toDate, true);
+  const hasDateRange = Boolean(fromDate || toDate);
+  const invalidDateRange = Boolean(fromDate && toDate && fromDate > toDate);
+  const monthLastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const monthStart = parseKuwaitCalendarDate(`${year}-${String(month).padStart(2, "0")}-01`)!;
+  const monthEnd = parseKuwaitCalendarDate(`${year}-${String(month).padStart(2, "0")}-${String(monthLastDay).padStart(2, "0")}`, true)!;
+  const dateFilter = hasDateRange ? { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } : { gte: monthStart, lte: monthEnd };
+  const operationsHref = (overrides: { vehicleId?: string; fromDate?: string; toDate?: string } = {}) => {
+    const query = new URLSearchParams();
+    const vehicleId = overrides.vehicleId === undefined ? sp.vehicleId : overrides.vehicleId;
+    const selectedFrom = overrides.fromDate === undefined ? sp.fromDate : overrides.fromDate;
+    const selectedTo = overrides.toDate === undefined ? sp.toDate : overrides.toDate;
+    if (vehicleId) query.set("vehicleId", vehicleId);
+    if (selectedFrom) query.set("fromDate", selectedFrom);
+    if (selectedTo) query.set("toDate", selectedTo);
+    if (!selectedFrom && !selectedTo) { query.set("month", String(month)); query.set("year", String(year)); }
+    return `/dashboard/companies/${companyId}/car-wash/operations?${query.toString()}`;
+  };
+  const today = kuwaitDateParam(now);
+  const weekStartDate = new Date(`${today}T12:00:00${KUWAIT_OFFSET}`);
+  weekStartDate.setDate(weekStartDate.getDate() - ((weekStartDate.getDay() + 6) % 7));
+  const weekStart = kuwaitDateParam(weekStartDate);
 
   const operations = await prisma.carWashDailyOperation.findMany({
     where: {
       companyId,
-      date: { gte: startDate, lte: endDate },
+      date: dateFilter,
       ...(sp.vehicleId ? { vehicleId: sp.vehicleId } : {}),
     },
     include: {
@@ -67,7 +102,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
     <div>
       <Header
         title={locale === "en" ? "Car Wash Operations" : "عمليات غسيل السيارات"}
-        subtitle={`${MONTHS[locale][month - 1]} ${year}`}
+        subtitle={hasDateRange ? `${sp.fromDate ?? "…"} — ${sp.toDate ?? "…"}` : `${MONTHS[locale][month - 1]} ${year}`}
         companyId={companyId}
         actions={
           <Link
@@ -95,9 +130,26 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
           ))}
         </div>
 
+        <form method="GET" className="rounded-xl border bg-card p-4">
+          <input type="hidden" name="month" value={month} />
+          <input type="hidden" name="year" value={year} />
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "From date" : "من تاريخ"}</span><input name="fromDate" type="date" defaultValue={sp.fromDate} className="input-field w-full" dir="ltr" /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "To date" : "إلى تاريخ"}</span><input name="toDate" type="date" defaultValue={sp.toDate} className="input-field w-full" dir="ltr" /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "Vehicle" : "السيارة"}</span><select name="vehicleId" defaultValue={sp.vehicleId ?? ""} className="input-field w-full"><option value="">{locale === "en" ? "All vehicles" : "كل السيارات"}</option>{vehicles.map((vehicle: CarWashVehicleItem) => <option key={vehicle.id} value={vehicle.id}>{vehicle.code} — {locale === "en" ? vehicle.nameEn ?? vehicle.nameAr : vehicle.nameAr}</option>)}</select></label>
+            <div className="flex items-end gap-2"><button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{locale === "en" ? "Apply" : "تطبيق"}</button><Link href={`/dashboard/companies/${companyId}/car-wash/operations`} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted">{locale === "en" ? "Clear" : "مسح"}</Link></div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <Link href={operationsHref({ fromDate: today, toDate: today })} className="rounded-full border px-3 py-1 hover:bg-muted">{locale === "en" ? "Today" : "اليوم"}</Link>
+            <Link href={operationsHref({ fromDate: weekStart, toDate: today })} className="rounded-full border px-3 py-1 hover:bg-muted">{locale === "en" ? "This week" : "هذا الأسبوع"}</Link>
+            <Link href={`/dashboard/companies/${companyId}/car-wash/operations?month=${month}&year=${year}${sp.vehicleId ? `&vehicleId=${sp.vehicleId}` : ""}`} className="rounded-full border px-3 py-1 hover:bg-muted">{locale === "en" ? "This month" : "هذا الشهر"}</Link>
+          </div>
+          {invalidDateRange && <p className="mt-3 text-sm text-destructive">{locale === "en" ? "From date must be before or equal to To date." : "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له."}</p>}
+        </form>
+
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/dashboard/companies/${companyId}/car-wash/operations?month=${month}&year=${year}`}
+            href={operationsHref({ vehicleId: "" })}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${!sp.vehicleId ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "All" : "الكل"}
@@ -105,7 +157,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
           {vehicles.map((vehicle: CarWashVehicleItem) => (
             <Link
               key={vehicle.id}
-              href={`/dashboard/companies/${companyId}/car-wash/operations?vehicleId=${vehicle.id}&month=${month}&year=${year}`}
+              href={operationsHref({ vehicleId: vehicle.id })}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${sp.vehicleId === vehicle.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
               {vehicle.code} - {locale === "en" ? vehicle.nameEn ?? vehicle.nameAr : vehicle.nameAr}
@@ -133,7 +185,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                 {operations.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-muted-foreground">
-                      {locale === "en" ? "No operations found this month" : "لا توجد عمليات في هذا الشهر"}
+                      {hasDateRange ? (locale === "en" ? "No operations found for the selected period" : "لا توجد عمليات في الفترة المحددة") : (locale === "en" ? "No operations found this month" : "لا توجد عمليات في هذا الشهر")}
                     </td>
                   </tr>
                 ) : (
