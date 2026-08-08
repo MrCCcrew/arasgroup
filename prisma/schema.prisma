@@ -997,6 +997,8 @@ model Employee {
   carWashWorker             CarWashWorker?
   assetCustodies            AssetCustody[]
   expenses                  Expense[]
+  carWashRevenuesCreated    CarWashRevenue[]          @relation("CarWashRevenueCreatedByEmployee")
+  carWashExpensesCreated    CarWashExpense[]          @relation("CarWashExpenseCreatedByEmployee")
   salaryPayments            SalaryPayment[]
   salaryItems               SalaryItem[]
   tickets                   EmployeeTicket[]
@@ -1974,15 +1976,18 @@ model CarWashRevenue {
   transactionReference String?
   source      String @default("ADMIN")
   createdById String?
+  createdByEmployeeId String?
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
   createdBy User? @relation("CarWashRevenueCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByEmployee Employee? @relation("CarWashRevenueCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
   @@index([date])
   @@index([createdById])
+  @@index([operationId, createdByEmployeeId, date])
   @@index([source])
   @@map("car_wash_revenues")
 }
@@ -2004,15 +2009,18 @@ model CarWashExpense {
   ocrRawText  String?
   source      String @default("ADMIN")
   createdById String?
+  createdByEmployeeId String?
 
   operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
   createdBy User? @relation("CarWashExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByEmployee Employee? @relation("CarWashExpenseCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([operationId])
   @@index([date])
   @@index([createdById])
+  @@index([operationId, createdByEmployeeId, date])
   @@index([source])
   @@map("car_wash_expenses")
 }
