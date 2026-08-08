@@ -188,6 +188,82 @@ export async function getBalanceSheet(
   };
 }
 
+/**
+ * Cash movement for a period. Cash accounts are identified solely through the
+ * existing BankAccount -> ChartOfAccount link; account names are never used.
+ * The chart currently has no reliable Operating/Investing/Financing metadata,
+ * so this intentionally does not guess a three-part cash-flow classification.
+ */
+export async function getCashMovementReport(
+  companyId: string,
+  fiscalYearId: string,
+  startDate: Date,
+  endDate: Date,
+) {
+  const cashAccounts = await prisma.bankAccount.findMany({
+    where: { companyId, chartAccountId: { not: null } },
+    select: { chartAccountId: true, chartAccount: { select: { id: true, code: true, nameAr: true, nameEn: true } } },
+  });
+  const accountIds = cashAccounts.flatMap((account) => account.chartAccountId ? [account.chartAccountId] : []);
+  if (accountIds.length === 0) {
+    return {
+      accounts: [], movements: [], openingCash: 0, totalCashIn: 0, totalCashOut: 0, netCashMovement: 0, closingCash: 0,
+      reconciliationDifference: 0,
+      classificationAvailable: false,
+      configurationWarning: "No bank or cash accounts are linked to the chart of accounts.",
+    };
+  }
+
+  const [openingBalances, prior, periodLines] = await Promise.all([
+    prisma.openingBalance.findMany({ where: { fiscalYearId, accountId: { in: accountIds } } }),
+    prisma.journalEntryLine.aggregate({
+      where: { accountId: { in: accountIds }, journalEntry: { companyId, fiscalYearId, status: "POSTED", isDeleted: false, date: { lt: startDate } } },
+      _sum: { debit: true, credit: true },
+    }),
+    prisma.journalEntryLine.findMany({
+      where: { accountId: { in: accountIds }, journalEntry: { companyId, fiscalYearId, status: "POSTED", isDeleted: false, date: { gte: startDate, lte: endDate } } },
+      include: { account: { select: { code: true, nameAr: true, nameEn: true } }, journalEntry: { select: { id: true, number: true, date: true, descriptionAr: true, descriptionEn: true } } },
+      orderBy: [{ journalEntry: { date: "asc" } }, { journalEntry: { number: "asc" } }, { sortOrder: "asc" }],
+    }),
+  ]);
+
+  const openingFromBalances = openingBalances.reduce((sum, balance) => sum + Number(balance.debit) - Number(balance.credit), 0);
+  const openingCash = openingFromBalances + Number(prior._sum.debit ?? 0) - Number(prior._sum.credit ?? 0);
+  const movements = periodLines.map((line) => {
+    const debit = Number(line.debit);
+    const credit = Number(line.credit);
+    return {
+      lineId: line.id,
+      entryId: line.journalEntry.id,
+      journalNumber: line.journalEntry.number,
+      date: line.journalEntry.date,
+      descriptionAr: line.descriptionAr ?? line.journalEntry.descriptionAr,
+      descriptionEn: line.descriptionEn ?? line.journalEntry.descriptionEn,
+      account: line.account,
+      cashIn: debit,
+      cashOut: credit,
+      net: debit - credit,
+    };
+  });
+  const totalCashIn = movements.reduce((sum, movement) => sum + movement.cashIn, 0);
+  const totalCashOut = movements.reduce((sum, movement) => sum + movement.cashOut, 0);
+  const netCashMovement = totalCashIn - totalCashOut;
+  const closingCash = openingCash + netCashMovement;
+
+  return {
+    accounts: cashAccounts.map((account) => account.chartAccount).filter((account): account is NonNullable<typeof account> => account !== null),
+    movements,
+    openingCash,
+    totalCashIn,
+    totalCashOut,
+    netCashMovement,
+    closingCash,
+    reconciliationDifference: 0,
+    classificationAvailable: false,
+    configurationWarning: null,
+  };
+}
+
 /** General Ledger for an account (legacy — used by API route) */
 export async function getGeneralLedger(
   companyId: string,

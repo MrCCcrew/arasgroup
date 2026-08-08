@@ -136,6 +136,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/accounting/reports/trial-balance`, labelKey: "nav.trialBalance", icon: <BarChart3 size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/reports/income-statement`, labelKey: "nav.incomeStatement", icon: <TrendingUp size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/reports/balance-sheet`, labelKey: "nav.balanceSheet", icon: <BarChart3 size={14} />, iconColor: "emerald" },
+        { href: `${base}/accounting/reports/cash-flow`, labelKey: "nav.cashFlow", icon: <Wallet size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/reports/account-ledger`, labelKey: "nav.accountLedger", icon: <BookOpen size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/reports/general-ledger`, labelKey: "nav.generalLedger", icon: <FileText size={14} />, iconColor: "emerald" },
       ],

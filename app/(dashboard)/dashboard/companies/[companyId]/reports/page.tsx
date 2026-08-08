@@ -88,6 +88,15 @@ export default async function ReportsPage({ params }: Props) {
       badges: [filterBadge, pdfBadge],
     },
     {
+      title: locale === "en" ? "Cash Movement" : "حركة النقد",
+      description: locale === "en" ? "Cash and bank movement from posted journal entries" : "حركة النقد والبنوك من القيود المحاسبية المرحلة",
+      href: `${base}/accounting/reports/cash-flow`,
+      icon: Wallet,
+      color: "text-teal-600",
+      bg: "bg-teal-50",
+      badges: [filterBadge],
+    },
+    {
       title: locale === "en" ? "Account Ledger" : "أستاذ الحساب",
       description: locale === "en" ? "Detailed movement for a selected account" : "حركة تفصيلية لحساب محدد",
       href: `${base}/accounting/reports/account-ledger`,
