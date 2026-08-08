@@ -210,6 +210,7 @@ export async function getCashMovementReport(
       accounts: [], movements: [], openingCash: 0, totalCashIn: 0, totalCashOut: 0, netCashMovement: 0, closingCash: 0,
       reconciliationDifference: 0,
       classificationAvailable: false,
+      categories: { OPERATING: 0, INVESTING: 0, FINANCING: 0, NONE: 0 },
       configurationWarning: "No bank or cash accounts are linked to the chart of accounts.",
     };
   }
@@ -250,6 +251,23 @@ export async function getCashMovementReport(
   const netCashMovement = totalCashIn - totalCashOut;
   const closingCash = openingCash + netCashMovement;
 
+  const entryIds = [...new Set(periodLines.map((line) => line.journalEntryId))];
+  const counterparts = entryIds.length ? await prisma.journalEntryLine.findMany({
+    where: { journalEntryId: { in: entryIds }, accountId: { notIn: accountIds } },
+    include: { account: { select: { cashFlowCategory: true } } },
+  }) : [];
+  const counterpartByEntry = new Map<string, typeof counterparts>();
+  for (const line of counterparts) counterpartByEntry.set(line.journalEntryId, [...(counterpartByEntry.get(line.journalEntryId) ?? []), line]);
+  const categories = { OPERATING: 0, INVESTING: 0, FINANCING: 0, NONE: 0 };
+  for (const movement of movements) {
+    const oppositeLines = counterpartByEntry.get(movement.entryId) ?? [];
+    const direction = movement.net >= 0 ? 1 : -1;
+    const eligible = oppositeLines.map((line) => ({ line, amount: Math.max(0, direction > 0 ? Number(line.credit) - Number(line.debit) : Number(line.debit) - Number(line.credit)) })).filter((item) => item.amount > 0);
+    const denominator = eligible.reduce((sum, item) => sum + item.amount, 0);
+    if (!denominator) { categories.NONE += movement.net; continue; }
+    for (const item of eligible) categories[item.line.account.cashFlowCategory] += movement.net * (item.amount / denominator);
+  }
+
   return {
     accounts: cashAccounts.map((account) => account.chartAccount).filter((account): account is NonNullable<typeof account> => account !== null),
     movements,
@@ -259,7 +277,8 @@ export async function getCashMovementReport(
     netCashMovement,
     closingCash,
     reconciliationDifference: 0,
-    classificationAvailable: false,
+    classificationAvailable: true,
+    categories,
     configurationWarning: null,
   };
 }

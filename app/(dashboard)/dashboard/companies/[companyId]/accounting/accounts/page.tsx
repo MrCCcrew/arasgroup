@@ -69,6 +69,8 @@ interface Account {
   nameEn?: string;
   type: string;
   normalBalance: string;
+  cashFlowCategory: string;
+  cashFlowSubcategory?: string;
   level: number;
   isHeader: boolean;
   parentId?: string;
@@ -90,6 +92,8 @@ const BLANK_FORM = {
   parentId: "",
   isHeader: false,
   normalBalance: "DEBIT",
+  cashFlowCategory: "NONE",
+  cashFlowSubcategory: "",
   notes: "",
 };
 
@@ -250,6 +254,8 @@ export default function AccountsPage() {
       parentId: account.parentId ?? "",
       isHeader: account.isHeader,
       normalBalance: account.normalBalance,
+      cashFlowCategory: account.cashFlowCategory,
+      cashFlowSubcategory: account.cashFlowSubcategory ?? "",
       notes: account.notes ?? "",
     });
     setError("");
@@ -284,6 +290,8 @@ export default function AccountsPage() {
                   parentId: form.parentId || null,
                   isHeader: form.isHeader,
                   normalBalance: form.normalBalance,
+                  cashFlowCategory: form.cashFlowCategory,
+                  cashFlowSubcategory: form.cashFlowSubcategory || null,
                   notes: form.notes || undefined,
                 }
               : { ...form, companyId, isHeader: form.isHeader },
@@ -441,6 +449,14 @@ export default function AccountsPage() {
                     <option value="DEBIT">{locale === "en" ? "Debit" : "مدين"}</option>
                     <option value="CREDIT">{locale === "en" ? "Credit" : "دائن"}</option>
                   </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Cash flow category" : "تصنيف التدفق النقدي"}</label>
+                  <select value={form.cashFlowCategory} onChange={(event) => setForm((previous) => ({ ...previous, cashFlowCategory: event.target.value }))} className="input-field w-full text-sm"><option value="NONE">{locale === "en" ? "None" : "غير مصنف"}</option><option value="OPERATING">{locale === "en" ? "Operating" : "تشغيلي"}</option><option value="INVESTING">{locale === "en" ? "Investing" : "استثماري"}</option><option value="FINANCING">{locale === "en" ? "Financing" : "تمويلي"}</option></select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">{locale === "en" ? "Cash flow subcategory" : "تصنيف فرعي للتدفق النقدي"}</label>
+                  <input type="text" value={form.cashFlowSubcategory} onChange={(event) => setForm((previous) => ({ ...previous, cashFlowSubcategory: event.target.value }))} className="input-field w-full text-sm" />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium">{locale === "en" ? "English name" : "اسم الحساب بالإنجليزي"}</label>

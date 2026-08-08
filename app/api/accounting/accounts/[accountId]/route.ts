@@ -16,6 +16,8 @@ const updateSchema = z.object({
   parentId: z.string().nullable().optional(),
   isHeader: z.boolean().optional(),
   normalBalance: z.enum(["DEBIT", "CREDIT"]).optional(),
+  cashFlowCategory: z.enum(["NONE", "OPERATING", "INVESTING", "FINANCING"]).optional(),
+  cashFlowSubcategory: z.string().max(191).nullable().optional(),
   notes: z.string().optional(),
   isActive: z.boolean().optional(),
 });

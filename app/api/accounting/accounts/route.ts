@@ -13,6 +13,8 @@ const createAccountSchema = z.object({
   parentId: z.string().optional(),
   isHeader: z.boolean().default(false),
   normalBalance: z.enum(["DEBIT", "CREDIT"]).default("DEBIT"),
+  cashFlowCategory: z.enum(["NONE", "OPERATING", "INVESTING", "FINANCING"]).default("NONE"),
+  cashFlowSubcategory: z.string().max(191).nullable().optional(),
   notes: z.string().optional(),
 });
 
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get("companyId");
     const type = searchParams.get("type");
     const isHeader = searchParams.get("isHeader");
+    const cashFlowCategory = searchParams.get("cashFlowCategory");
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
@@ -42,6 +45,7 @@ export async function GET(request: NextRequest) {
         isActive: true,
         ...(type ? { type: type as "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE" } : {}),
         ...(isHeader !== null ? { isHeader: isHeader === "true" } : {}),
+        ...(cashFlowCategory ? { cashFlowCategory: cashFlowCategory as "NONE" | "OPERATING" | "INVESTING" | "FINANCING" } : {}),
       },
       orderBy: { code: "asc" },
     });
