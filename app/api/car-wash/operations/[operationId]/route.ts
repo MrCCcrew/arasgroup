@@ -134,16 +134,16 @@ export async function PUT(request: NextRequest, { params }: Props) {
     const operation = await prisma.$transaction(async (tx) => {
       if (existingOperation.journalEntryId) {
         await tx.journalEntryLine.deleteMany({ where: { journalEntryId: existingOperation.journalEntryId } });
-        await tx.journalEntry.delete({ where: { id: existingOperation.journalEntryId } });
+        await tx.journalEntry.deleteMany({ where: { id: existingOperation.journalEntryId } });
       }
 
       // Delete old expense journal entries and expense records
       for (const expense of linkedExpenses) {
         if (expense.journalEntryId) {
           await tx.journalEntryLine.deleteMany({ where: { journalEntryId: expense.journalEntryId } });
-          await tx.journalEntry.delete({ where: { id: expense.journalEntryId } });
+          await tx.journalEntry.deleteMany({ where: { id: expense.journalEntryId } });
         }
-        await tx.expense.delete({ where: { id: expense.id } });
+        await tx.expense.deleteMany({ where: { id: expense.id } });
       }
 
       await tx.knetTransaction.deleteMany({ where: { operationId } });
