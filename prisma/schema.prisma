@@ -567,6 +567,8 @@ model ChartOfAccount {
   isHeader      Boolean       @default(false)
   isActive      Boolean       @default(true)
   normalBalance NormalBalance @default(DEBIT)
+  cashFlowCategory CashFlowCategory @default(NONE)
+  cashFlowSubcategory String?
   notes         String?
 
   company         Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -598,6 +600,13 @@ enum AccountType {
 enum NormalBalance {
   DEBIT
   CREDIT
+}
+
+enum CashFlowCategory {
+  NONE
+  OPERATING
+  INVESTING
+  FINANCING
 }
 
 model OpeningBalance {
