@@ -152,7 +152,30 @@ export default function SalaryBatchDetailPage() {
 
   return (
     <div>
-      <Header
+      <style jsx global>{`
+        .salary-print-header, .salary-print-footer { display: none; }
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { background: #fff !important; color: #111827 !important; }
+          .print-hidden, .salary-actions, .salary-details { display: none !important; }
+          .salary-print-header { display: block !important; border-bottom: 3px solid #0f766e; margin: 0 0 14px; padding: 0 0 10px; }
+          .salary-print-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+          .salary-print-title h1 { margin: 0; font-size: 21px; color: #0f172a; }
+          .salary-print-title p { margin: 4px 0 0; color: #475569; font-size: 12px; }
+          .salary-print-meta { text-align: end; font-size: 11px; color: #475569; }
+          .salary-batch-print { max-width: none !important; padding: 0 !important; }
+          .salary-batch-print > .grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; margin-bottom: 12px; }
+          .salary-batch-print .stat-card, .salary-batch-print .section-card { border: 1px solid #cbd5e1 !important; box-shadow: none !important; border-radius: 5px !important; padding: 9px !important; }
+          .salary-batch-print .overflow-hidden, .salary-batch-print .overflow-x-auto { overflow: visible !important; }
+          .salary-batch-print table { width: 100% !important; font-size: 10px !important; border-collapse: collapse !important; }
+          .salary-batch-print th { background: #0f766e !important; color: #fff !important; font-weight: 700 !important; white-space: nowrap; }
+          .salary-batch-print th, .salary-batch-print td { border: 1px solid #cbd5e1 !important; padding: 6px !important; }
+          .salary-batch-print tr { break-inside: avoid; }
+          .salary-batch-print tfoot td { background: #ecfdf5 !important; color: #065f46 !important; }
+          .salary-print-footer { display: block !important; margin-top: 14px; border-top: 1px solid #cbd5e1; padding-top: 7px; color: #64748b; font-size: 10px; text-align: center; }
+        }
+      `}</style>
+      <div className="print-hidden"><Header
         title={locale === "en" ? "Salary Batch" : "دفعة الرواتب"}
         subtitle={`${title} - ${cycleLabel}`}
         companyId={companyId}
@@ -197,12 +220,15 @@ export default function SalaryBatchDetailPage() {
             </button>
           </div>
         }
-      />
+      /></div>
 
-      <div className="page-container space-y-5">
+      <div className="page-container space-y-5 salary-batch-print">
+        <div className="salary-print-header" dir={locale === "en" ? "ltr" : "rtl"}>
+          <div className="salary-print-title"><div><h1>{locale === "en" ? "Payroll Register" : "كشف رواتب"}</h1><p>{cycleLabel} · {title}</p></div><div className="salary-print-meta"><div>{locale === "en" ? "Salary batch" : "دفعة الرواتب"}: {batch.id.slice(-8).toUpperCase()}</div><div>{new Date().toLocaleDateString(numLocale)}</div></div></div>
+        </div>
         <Link
           href={`/dashboard/companies/${companyId}/hr/salaries`}
-          className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="print-hidden flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowRight size={14} />
           {locale === "en" ? "Back to salary batches" : "العودة لدفعات الرواتب"}
@@ -315,7 +341,7 @@ export default function SalaryBatchDetailPage() {
                         <td className="number font-bold text-green-700">
                           {formatKWD(Number(payment.netAmount), numLocale)}
                         </td>
-                        <td onClick={(e) => e.stopPropagation()}>
+                        <td className="salary-actions" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2">
                             <SalaryPDFButton companyId={companyId} batchId={batchId} paymentId={payment.id} />
                             <SalaryWhatsAppButton paymentId={payment.id} />
@@ -324,7 +350,7 @@ export default function SalaryBatchDetailPage() {
                       </tr>
 
                       {isExpanded && (
-                        <tr className="bg-muted/10">
+                        <tr className="salary-details bg-muted/10">
                           <td colSpan={8} className="px-5 py-3">
                             <div className="grid gap-4 sm:grid-cols-3 text-sm">
                               {payment.actualOrders != null && (
@@ -397,6 +423,7 @@ export default function SalaryBatchDetailPage() {
             </table>
           </div>
         </div>
+        <div className="salary-print-footer">{locale === "en" ? "Computer-generated payroll register" : "كشف رواتب صادر إلكترونيًا"}</div>
       </div>
     </div>
   );
