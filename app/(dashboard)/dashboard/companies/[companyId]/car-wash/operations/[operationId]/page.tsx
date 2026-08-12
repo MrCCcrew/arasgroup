@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { DeleteOperationButton } from "../DeleteOperationButton";
+import { MovementImageViewer } from "@/components/car-wash/movement-image-viewer";
 
 interface Props {
   params: Promise<{ companyId: string; operationId: string }>;
@@ -126,6 +127,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                       </td>
                       <td className="text-sm text-muted-foreground">{revenue.description ?? "-"}</td>
                       <td className="number font-bold">{Number(revenue.amount).toFixed(3)}</td>
+                      <td><MovementImageViewer imageUrl={revenue.imageUrl} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -150,6 +152,7 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
                     <tr key={expense.id}>
                       <td className="text-sm">{expense.description}</td>
                       <td className="number font-bold text-red-600">{Number(expense.amount).toFixed(3)}</td>
+                      <td><MovementImageViewer imageUrl={expense.imageUrl} /></td>
                     </tr>
                   ))}
                 </tbody>

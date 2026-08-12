@@ -23,6 +23,7 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
   const [ok, setOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [image, setImage] = useState<File | null>(null);
   const [reading, setReading] = useState(false);
   const [form, setForm] = useState({ vehicleId: "", categoryId: "", kind: "CASH", date: new Date().toISOString().slice(0, 10), amount: "", notes: "", transactionReference: "" });
 
@@ -49,6 +50,7 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
       return;
     }
     setPreview(URL.createObjectURL(file));
+    setImage(file);
     setReading(true);
     try {
       const result = await readInvoiceImage(file);
@@ -69,6 +71,7 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
 
   function removeImage() {
     setPreview(null);
+    setImage(null);
     if (cameraInput.current) cameraInput.current.value = "";
     if (galleryInput.current) galleryInput.current.value = "";
   }
@@ -82,7 +85,16 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/car-wash-portal/movements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: expense ? "EXPENSE" : form.kind, vehicleId: form.vehicleId, categoryId: expense ? form.categoryId : undefined, amount: Number(form.amount), date: form.date, notes: form.notes, transactionReference: form.transactionReference || undefined }) });
+      const requestData = new FormData();
+      requestData.append("kind", expense ? "EXPENSE" : form.kind);
+      requestData.append("vehicleId", form.vehicleId);
+      if (expense) requestData.append("categoryId", form.categoryId);
+      requestData.append("amount", form.amount);
+      requestData.append("date", form.date);
+      if (form.notes) requestData.append("notes", form.notes);
+      if (form.transactionReference) requestData.append("transactionReference", form.transactionReference);
+      if (image) requestData.append("image", image);
+      const response = await fetch("/api/car-wash-portal/movements", { method: "POST", body: requestData });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
       setOk(t("تم حفظ الحركة", "Movement saved"));
@@ -97,9 +109,7 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
   }
 
   if (!data) return <p>{error || t("جارٍ التحميل...", "Loading...")}</p>;
-  const category = data.categories.find((item) => item.id === form.categoryId);
-  const water = category?.type.toLowerCase() === "water" || category?.code?.toLowerCase() === "water";
-  const needsImageControl = !expense || !water;
+  const needsImageControl = true;
 
   return <form onSubmit={submit} className="space-y-4 rounded-xl border bg-white p-4" dir={english ? "ltr" : "rtl"}>
     {error && <p className="text-red-600">{error}</p>}{ok && <p className="text-green-600">{ok}</p>}
@@ -109,7 +119,7 @@ export function PortalMovementForm({ expense }: { expense: boolean }) {
     <label>{t("المبلغ", "Amount")}<input required type="number" step="0.001" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} className="input-field w-full" /></label>
     {!expense && form.kind === "KNET" && <label>{t("مرجع العملية", "Transaction reference")}<input value={form.transactionReference} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} className="input-field w-full" /></label>}
     <label>{t("ملاحظات", "Notes")}<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="input-field w-full" /></label>
-    {needsImageControl && <>
+    {needsImageControl && <><p className="text-xs text-muted-foreground">{t("صورة الفاتورة اختيارية للمصروفات والإيرادات اليدوية", "Invoice image is optional for manual expenses and revenues")}</p>
       <input ref={cameraInput} className="hidden" type="file" accept="image/*" capture="environment" onChange={handleImageChange} />
       <input ref={galleryInput} className="hidden" type="file" accept="image/*" onChange={handleImageChange} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
