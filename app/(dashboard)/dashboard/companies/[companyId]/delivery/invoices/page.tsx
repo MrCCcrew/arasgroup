@@ -86,6 +86,9 @@ export default function DeliveryInvoicesPage() {
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [fType, setFType] = useState("");
+  const [drivers, setDrivers] = useState<Person[]>([]);
+  const [driverId, setDriverId] = useState("");
+  const [driverName, setDriverName] = useState("");
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("");
   const [uploadSource, setUploadSource] = useState("");
@@ -96,6 +99,10 @@ export default function DeliveryInvoicesPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rejectingInvoice, setRejectingInvoice] = useState<Invoice | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+
+  useEffect(() => {
+    loadPeople(companyId, "DRIVER").then(setDrivers);
+  }, [companyId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +129,7 @@ export default function DeliveryInvoicesPage() {
       ...(effectiveFrom ? { from: effectiveFrom } : {}),
       ...(effectiveTo ? { to: effectiveTo } : {}),
       ...(fType ? { targetType: fType } : {}),
+      ...(driverId ? { driverId } : {}),
       ...(search ? { search } : {}),
       ...(reviewStatus ? { reviewStatus } : {}),
       ...(uploadSource ? { uploadSource } : {}),
@@ -130,7 +138,7 @@ export default function DeliveryInvoicesPage() {
     const p = await res.json();
     if (p.success) setInvoices(p.data);
     setLoading(false);
-  }, [companyId, from, to, month, year, fType, search, reviewStatus, uploadSource]);
+  }, [companyId, from, to, month, year, fType, driverId, search, reviewStatus, uploadSource]);
 
   useEffect(() => {
     load();
@@ -264,6 +272,27 @@ export default function DeliveryInvoicesPage() {
             </select>
           </div>
           <div>
+            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Driver" : "السائق"}</label>
+            <input
+              list="invoice-driver-options"
+              value={driverName}
+              onChange={(event) => {
+                const value = event.target.value;
+                setDriverName(value);
+                const selectedDriver = drivers.find((driver) => (en ? driver.nameEn ?? driver.nameAr : driver.nameAr) === value);
+                setDriverId(selectedDriver?.id ?? "");
+              }}
+              placeholder={en ? "Type or select a driver" : "اكتب أو اختر اسم السائق"}
+              className="input-field w-48"
+            />
+            <datalist id="invoice-driver-options">
+              {drivers.map((driver) => {
+                const name = en ? driver.nameEn ?? driver.nameAr : driver.nameAr;
+                return <option key={driver.id} value={name} />;
+              })}
+            </datalist>
+          </div>
+          <div>
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Review" : "المراجعة"}</label>
             <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)} className="input-field w-40">
               <option value="">{en ? "All" : "الكل"}</option>
@@ -284,8 +313,8 @@ export default function DeliveryInvoicesPage() {
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
           </div>
-          {(from || to || month || year || fType || search || reviewStatus || uploadSource) && (
-            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setSearch(""); setReviewStatus(""); setUploadSource(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+          {(from || to || month || year || fType || driverId || driverName || search || reviewStatus || uploadSource) && (
+            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setDriverId(""); setDriverName(""); setSearch(""); setReviewStatus(""); setUploadSource(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
               {en ? "Clear" : "مسح"}
             </button>
           )}
