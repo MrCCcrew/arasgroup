@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -221,6 +221,13 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
+                          <Link
+                            href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}`}
+                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-primary hover:bg-muted"
+                          >
+                            <Eye size={13} />
+                            {locale === "en" ? "View invoices" : "عرض الفواتير"}
+                          </Link>
                           <Link
                             href={`/dashboard/companies/${companyId}/car-wash/operations/${operation.id}/edit`}
                             className="text-xs text-primary hover:underline"
