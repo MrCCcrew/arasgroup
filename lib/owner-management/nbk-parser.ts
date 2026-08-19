@@ -33,8 +33,10 @@ export type NbkPreviewRow = {
 };
 
 function parseDate(value?: string) {
-  if (!value || !/^\d{4}\/\d{2}\/\d{2}$/.test(value)) return undefined;
-  const parsed = new Date(`${value.replace(/\//g, "-")}T00:00:00.000Z`);
+  if (!value || !/^(?:\d{4}\/\d{2}\/\d{2}|\d{2}\/\d{2}\/\d{4})$/.test(value)) return undefined;
+  const [first, second, third] = value.split("/");
+  const normalized = first.length === 4 ? `${first}-${second}-${third}` : `${third}-${second}-${first}`;
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
@@ -48,8 +50,8 @@ export function parseNbkVisualRows(rows: NbkVisualRow[]): NbkPreviewRow[] {
     postingDate: parseDate(row.postingDate),
     branchCode: row.branchCode,
     balance: row.balance,
-    mid: normalizeMid(row.mid ?? ""),
-    transactionReference: row.transactionReference ?? null,
+    mid: normalizeMid(row.mid ?? "") ?? extractMid(row.description),
+    transactionReference: row.transactionReference ?? extractTransactionReference(row.description),
     balanceVerified: row.balanceVerified,
   }));
 }

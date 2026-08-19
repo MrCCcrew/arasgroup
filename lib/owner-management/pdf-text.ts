@@ -41,10 +41,44 @@ function decimal(value?: string) {
 }
 
 function date(value?: string) {
-  return value && /^\d{4}\/\d{2}\/\d{2}$/.test(value) ? value : undefined;
+  return value && /^(?:\d{4}\/\d{2}\/\d{2}|\d{2}\/\d{2}\/\d{4})$/.test(value) ? value : undefined;
 }
 
 function visualRows(pageNumber: number, items: PositionedText[]): NbkVisualRow[] {
+  // Current NBK statements are left-to-right: Posting date, description,
+  // details, transaction date, amount, balance. Their multi-line details
+  // must be grouped beneath the posting-date row anchor.
+  const anchors = items
+    .filter((item) => item.x < 90 && Boolean(date(item.text)))
+    .sort((a, b) => b.y - a.y);
+  if (anchors.length > 0) {
+    return anchors.map((anchor, index) => {
+      const nextY = anchors[index + 1]?.y ?? -Infinity;
+      const rowBottom = nextY === -Infinity ? -Infinity : (anchor.y + nextY) / 2;
+      const inRow = (item: PositionedText, minX: number, maxX: number) => item.x >= minX && item.x < maxX && item.y <= anchor.y + 22 && item.y > rowBottom;
+      const description = items
+        .filter((item) => inRow(item, 90, 330))
+        .sort((a, b) => b.y - a.y || a.x - b.x)
+        .map((item) => item.text)
+        .join(" ");
+      const transactionDate = items.find((item) => inRow(item, 330, 400) && Boolean(date(item.text)))?.text;
+      const amount = items.find((item) => inRow(item, 400, 480) && Boolean(decimal(item.text)))?.text;
+      const balance = items.find((item) => inRow(item, 480, Infinity) && Boolean(decimal(item.text)))?.text;
+      const rowItems = items.filter((item) => item.y <= anchor.y + 22 && item.y > rowBottom).sort((a, b) => b.y - a.y || a.x - b.x);
+      return {
+        pageNumber,
+        rawRowText: rowItems.map((item) => item.text).join(" "),
+        transactionDate,
+        postingDate: anchor.text,
+        description,
+        amount,
+        balance,
+        y: anchor.y,
+      };
+    }).filter((row) => Boolean(row.transactionDate && row.amount));
+  }
+
+  // Legacy NBK layout retained for existing statement formats.
   const grouped: Array<{ y: number; items: PositionedText[] }> = [];
   for (const item of [...items].sort((a, b) => b.y - a.y || a.x - b.x)) {
     const row = grouped.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
@@ -127,13 +161,19 @@ export async function extractPdfText(bytes: Uint8Array): Promise<ExtractedPdf> {
         return text && x !== undefined && y !== undefined ? [{ text, x, y }] : [];
       });
       const rows = visualRows(pageNumber, items);
-      const viewport = page.getViewport({ scale: 3 });
-      const canvas = await createPdfCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-      const context = canvas.getContext("2d") as any;
-      await page.render({ canvasContext: context, viewport }).promise;
-      worker ??= await createOcrWorker();
-      const result = await worker.recognize(Buffer.from(await canvas.encode("png")), {}, { tsv: true });
-      addOcrDetails(rows, ocrMidLines(result.data.tsv ?? "", page.getViewport({ scale: 1 }).height, 3));
+      // Text-based NBK files already contain the MID/reference in the details
+      // column. Avoid rendering and OCRing every page, which can time out on
+      // long statements. OCR remains only as a fallback for legacy rows that
+      // truly lack extractable MID text.
+      if (rows.length > 0 && items.length < 20 && rows.some((row) => !/\bMID\s*[:.-]?\s*\d{8,12}\b/i.test(row.rawRowText))) {
+        const viewport = page.getViewport({ scale: 3 });
+        const canvas = await createPdfCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        const context = canvas.getContext("2d") as any;
+        await page.render({ canvasContext: context, viewport }).promise;
+        worker ??= await createOcrWorker();
+        const result = await worker.recognize(Buffer.from(await canvas.encode("png")), {}, { tsv: true });
+        addOcrDetails(rows, ocrMidLines(result.data.tsv ?? "", page.getViewport({ scale: 1 }).height, 3));
+      }
       verifyBalances(rows);
       allRows.push(...rows);
       pages.push(rows.map((row) => row.rawRowText).join("\n"));
