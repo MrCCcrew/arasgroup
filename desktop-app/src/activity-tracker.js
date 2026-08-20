@@ -1,6 +1,6 @@
 const activeWin = require('active-win');
 const os = require('os');
-const screenshot = require('screenshot-desktop');
+const { desktopCapturer } = require('electron');
 
 class ActivityTracker {
   constructor(apiClient) {
@@ -240,8 +240,20 @@ class ActivityTracker {
     try {
       console.log('Taking screenshot...');
 
-      // Take screenshot (returns buffer)
-      const imgBuffer = await screenshot({ format: 'jpg', quality: 60 });
+      // Capture using Electron itself. The previous screenshot-desktop helper
+      // silently failed on some Windows installs, while activity logging kept
+      // working. Electron's desktopCapturer is bundled with the application
+      // and does not rely on the external batch capture script.
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 1280, height: 720 },
+        fetchWindowIcons: false,
+      });
+      const source = sources[0];
+      if (!source || source.thumbnail.isEmpty()) {
+        throw new Error('No screen image was captured');
+      }
+      const imgBuffer = source.thumbnail.toJPEG(60);
 
       // Convert buffer to base64
       const base64Image = imgBuffer.toString('base64');

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { uploadToR2 } from "@/lib/storage/r2";
-import { assertPermission, requireRequestSession } from "@/lib/auth/access";
+import { assertPermission, isOwnerOrAdminSession, requireRequestSession } from "@/lib/auth/access";
 
 // Schema for activity log from desktop app
 const activityLogSchema = z.object({
@@ -196,8 +196,11 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await requireRequestSession(request);
   if (session instanceof NextResponse) return session;
-  const permissionError = assertPermission(session, "AUDIT_LOGS", "DELETE");
-  if (permissionError) return permissionError;
+  // Activity records are sensitive. The UI is only shown to audit viewers,
+  // but destructive cleanup is limited to the group owner or system admin.
+  if (!isOwnerOrAdminSession(session)) {
+    return NextResponse.json({ success: false, error: "ليس لديك صلاحية حذف سجلات النشاط" }, { status: 403 });
+  }
   try {
     const { searchParams } = request.nextUrl;
     const logIds = searchParams.get("ids")?.split(",") || [];

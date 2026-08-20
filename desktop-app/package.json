@@ -1,6 +1,6 @@
 {
   "name": "arasgroup-control",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ARASGROUP Control Desktop Client",
   "main": "main.js",
   "scripts": {
