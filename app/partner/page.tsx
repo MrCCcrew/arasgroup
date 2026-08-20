@@ -1,14 +1,14 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
-import { getPartnerFromSession } from "@/lib/owner-management/access";
-import { prisma } from "@/lib/db";
+"use client";
 import Link from "next/link";
-
-export default async function PartnerPortal() {
-  const session = await getSession(); if (!session) redirect("/login");
-  const partner = await getPartnerFromSession(session); if (!partner) redirect("/dashboard");
-  const [r, e] = await Promise.all([prisma.ownerManagedRevenue.aggregate({ where: { partnerId: partner.id, status: "MATCHED" }, _sum: { amount: true } }), prisma.ownerManagedExpense.aggregate({ where: { partnerId: partner.id, deletedAt: null }, _sum: { amount: true } })]);
-  const revenue = Number(r._sum.amount ?? 0), expense = Number(e._sum.amount ?? 0);
-  return <main dir="rtl" className="min-h-screen bg-muted/30 p-4 md:p-8"><section className="mx-auto max-w-4xl space-y-6"><header><h1 className="text-2xl font-bold">بوابة الشريك</h1><p className="text-sm text-muted-foreground">{partner.name} · MID: <span dir="ltr">{partner.mid}</span></p></header><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Card title="الإيرادات" value={revenue}/><Card title="المصروفات" value={expense}/><Card title="صافي الحساب" value={revenue-expense}/></div><div className="section-card grid grid-cols-2 gap-3 md:grid-cols-4"><Link className="rounded-lg border p-3 text-center" href="/partner/expenses">رفع فاتورة وفواتيري</Link><Link className="rounded-lg border p-3 text-center" href="/partner/revenues">إيراداتي</Link><Link className="rounded-lg border p-3 text-center" href="/partner/statement">كشف حسابي</Link><Link className="rounded-lg border p-3 text-center" href="/api/owner-management/partner/summary">تحديث الملخص</Link></div></section></main>;
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useLocale } from "@/components/providers/locale-provider";
+type Summary = { partner: { name: string; mid: string }; revenue: number; expense: number; net: number };
+export default function PartnerPortal() {
+  const { locale } = useLocale(); const en = locale === "en"; const t = (ar: string, english: string) => en ? english : ar;
+  const [summary, setSummary] = useState<Summary | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  const refresh = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/owner-management/partner/summary", { cache: "no-store" }); const payload = await response.json(); if (!response.ok || !payload.success) throw new Error(payload.error || "Unable to load summary"); setSummary(payload.data); } catch { setError(t("تعذر تحديث الملخص. حاول مرة أخرى.", "Unable to refresh the summary. Please try again.")); } finally { setLoading(false); } }, [en]);
+  useEffect(() => { void refresh(); }, [refresh]);
+  const cards = summary ? [[t("الإيرادات", "Revenues"), summary.revenue], [t("المصروفات", "Expenses"), summary.expense], [t("صافي الحساب", "Net balance"), summary.net]] : [];
+  return <main dir={en ? "ltr" : "rtl"} className="min-h-screen bg-muted/30 p-4 md:p-8"><section className="mx-auto max-w-4xl space-y-6"><header className="flex items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">{t("بوابة الشريك", "Partner portal")}</h1>{summary && <p className="text-sm text-muted-foreground">{summary.partner.name} · MID: <span dir="ltr">{summary.partner.mid}</span></p>}</div><button type="button" onClick={() => void refresh()} disabled={loading} className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} />{t("تحديث الملخص", "Refresh summary")}</button></header>{error && <p className="rounded border border-destructive p-3 text-sm text-destructive">{error}</p>}<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{loading ? [0, 1, 2].map((key) => <div key={key} className="section-card h-24 animate-pulse" />) : cards.map(([title, value]) => <div key={String(title)} className="section-card"><p className="text-sm text-muted-foreground">{title}</p><p className="mt-2 text-2xl font-bold" dir="ltr">{Number(value).toFixed(3)} KWD</p></div>)}</div><div className="section-card grid grid-cols-1 gap-3 sm:grid-cols-3"><Link className="rounded-lg border p-4 text-center" href="/partner/expenses">{t("رفع ومراجعة المصروفات", "Upload and review expenses")}</Link><Link className="rounded-lg border p-4 text-center" href="/partner/revenues">{t("إيراداتي وإيصالات الإيداع", "Revenues and deposit receipts")}</Link><Link className="rounded-lg border p-4 text-center" href="/partner/statement">{t("كشف حسابي", "My statement")}</Link></div></section></main>;
 }
-function Card({ title, value }: { title: string; value: number }) { return <div className="section-card"><p className="text-sm text-muted-foreground">{title}</p><p className="mt-2 text-2xl font-bold" dir="ltr">{value.toFixed(3)} KWD</p></div>; }
