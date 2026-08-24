@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const status = isMatched ? "MATCHED" : row.mid ? "REVIEW" : "UNMATCHED";
         const duplicate = await tx.ownerManagedRevenue.findFirst({ where: { companyId, mid: row.mid, transactionReference, amount: new Prisma.Decimal(row.amount) }, select: { id: true } });
         if (duplicate) { skipped.DUPLICATE = (skipped.DUPLICATE ?? 0) + 1; continue; }
-        await tx.ownerManagedRevenue.create({ data: { companyId, importId: imported.id, partnerId: isMatched ? partner!.id : null, mid: row.mid, transactionReference, transactionDate, postingDate: row.postingDate, amount: new Prisma.Decimal(row.amount), branchCode: row.branchCode, description: row.description, balance: row.balance ? new Prisma.Decimal(row.balance) : undefined, pageNumber: row.pageNumber, rawRowText: row.rawRowText, status } });
+        await tx.ownerManagedRevenue.create({ data: { companyId, importId: imported.id, partnerId: isMatched ? partner!.id : null, mid: row.mid, transactionReference, transactionDate, postingDate: row.postingDate, amount: new Prisma.Decimal(row.amount), branchCode: row.branchCode, description: row.description, balance: row.balance ? new Prisma.Decimal(row.balance.replace(/,/g, "")) : undefined, pageNumber: row.pageNumber, rawRowText: row.rawRowText, status } });
         saved++; if (isMatched) totals[partner!.name] = (totals[partner!.name] ?? 0) + Number(row.amount); else unmatched++;
       }
       const skippedCount = Object.values(skipped).reduce((sum, count) => sum + count, 0);
