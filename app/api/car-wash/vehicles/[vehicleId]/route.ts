@@ -18,6 +18,7 @@ const updateSchema = z.object({
   knetDeviceId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   assignedDriverEmployeeId: z.string().optional().nullable(),
+  teamEmployeeIds: z.array(z.string()).max(20).optional(),
   plateNumber: z.string().optional(),
   make: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
@@ -68,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return NextResponse.json({ success: false, error: conflictMessage }, { status: 409 });
     }
 
-    const { assignedDriverEmployeeId, nameAr, nameEn, knetDeviceId, isActive, make, model, color, registrationExpiry, insuranceExpiry, notes } = parsed.data;
+    const { assignedDriverEmployeeId, teamEmployeeIds, nameAr, nameEn, knetDeviceId, isActive, make, model, color, registrationExpiry, insuranceExpiry, notes } = parsed.data;
 
     const result = await prisma.$transaction(async (tx) => {
       if (
@@ -134,6 +135,33 @@ export async function PATCH(request: NextRequest, { params }: Props) {
           await tx.carWashWorker.update({
             where: { id: assignedDriver.id },
             data: { assignedCarWashVehicleId: vehicleId },
+          });
+        }
+      }
+
+      if (teamEmployeeIds !== undefined) {
+        const uniqueIds = [...new Set(teamEmployeeIds)];
+        const team = uniqueIds.length
+          ? await tx.carWashWorker.findMany({
+              where: {
+                employeeId: { in: uniqueIds },
+                companyId: existing.companyId,
+                role: { in: ["WASHER", "WASHING_WORKER", "SUPERVISOR", "OTHER"] },
+              },
+              select: { id: true },
+            })
+          : [];
+        if (team.length !== uniqueIds.length) {
+          throw new Error("أحد أعضاء الفريق المختارين غير موجود ضمن عمال الغسيل");
+        }
+        await tx.carWashWorker.updateMany({
+          where: { companyId: existing.companyId, vehicleId },
+          data: { vehicleId: null },
+        });
+        if (team.length) {
+          await tx.carWashWorker.updateMany({
+            where: { id: { in: team.map((worker) => worker.id) } },
+            data: { vehicleId },
           });
         }
       }

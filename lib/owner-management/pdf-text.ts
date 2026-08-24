@@ -45,6 +45,35 @@ function date(value?: string) {
 }
 
 function visualRows(pageNumber: number, items: PositionedText[]): NbkVisualRow[] {
+  // NBK account statements exported from the current online banking portal use
+  // this order: Transaction Date, Branch, Transaction Description, Posting
+  // Date, Credit/Debit Amount, Balance. The description can span several lines.
+  const currentPortalLayout = items.some((item) => item.text === "Transaction Description" && item.x >= 120 && item.x < 250);
+  if (currentPortalLayout) {
+    const anchors = items.filter((item) => item.x < 80 && Boolean(date(item.text))).sort((a, b) => b.y - a.y);
+    return anchors.map((anchor, index) => {
+      const nextY = anchors[index + 1]?.y ?? -Infinity;
+      const rowBottom = nextY === -Infinity ? -Infinity : (anchor.y + nextY) / 2;
+      const inRow = (item: PositionedText, minX: number, maxX: number) => item.x >= minX && item.x < maxX && item.y <= anchor.y + 12 && item.y > rowBottom;
+      const rowItems = items.filter((item) => item.y <= anchor.y + 12 && item.y > rowBottom).sort((a, b) => b.y - a.y || a.x - b.x);
+      const description = items.filter((item) => inRow(item, 125, 318)).sort((a, b) => b.y - a.y || a.x - b.x).map((item) => item.text).join(" ");
+      const postingDate = items.find((item) => inRow(item, 318, 380) && Boolean(date(item.text)))?.text;
+      const amount = items.find((item) => inRow(item, 380, 480) && Boolean(decimal(item.text)))?.text;
+      const balance = items.find((item) => inRow(item, 480, Infinity) && Boolean(decimal(item.text)))?.text;
+      return {
+        pageNumber,
+        rawRowText: rowItems.map((item) => item.text).join(" "),
+        transactionDate: anchor.text,
+        postingDate,
+        branchCode: items.find((item) => inRow(item, 80, 125) && /^\d{4,5}$/.test(item.text))?.text,
+        description,
+        amount,
+        balance,
+        y: anchor.y,
+      };
+    }).filter((row) => Boolean(row.postingDate && row.amount));
+  }
+
   // Current NBK statements are left-to-right: Posting date, description,
   // details, transaction date, amount, balance. Their multi-line details
   // must be grouped beneath the posting-date row anchor.

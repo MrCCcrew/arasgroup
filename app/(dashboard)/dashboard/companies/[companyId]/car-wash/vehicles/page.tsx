@@ -87,6 +87,7 @@ const EMPTY_EDIT = {
   insuranceExpiry: "",
   notes: "",
   assignedDriverEmployeeId: "",
+  teamEmployeeIds: [] as string[],
 };
 
 export default function CarWashVehiclesPage() {
@@ -94,6 +95,7 @@ export default function CarWashVehiclesPage() {
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [teamMembers, setTeamMembers] = useState<DriverOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
@@ -107,12 +109,14 @@ export default function CarWashVehiclesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [vehiclesPayload, driversPayload] = await Promise.all([
+    const [vehiclesPayload, driversPayload, workersPayload] = await Promise.all([
       fetch(`/api/car-wash/vehicles?companyId=${companyId}`).then((response) => response.json()),
       fetch(`/api/hr/employees?companyId=${companyId}&type=CAR_WASH_DRIVER`).then((response) => response.json()),
+      fetch(`/api/hr/employees?companyId=${companyId}&type=CAR_WASH_WORKER`).then((response) => response.json()),
     ]);
     if (vehiclesPayload.success) setVehicles(vehiclesPayload.data);
     if (driversPayload.success) setDrivers(driversPayload.data);
+    if (workersPayload.success) setTeamMembers(workersPayload.data);
     setLoading(false);
   }, [companyId]);
 
@@ -132,6 +136,7 @@ export default function CarWashVehiclesPage() {
       insuranceExpiry: v.vehicle.insuranceExpiry?.slice(0, 10) ?? "",
       notes: "",
       assignedDriverEmployeeId: assignedDriver?.employee.id ?? "",
+      teamEmployeeIds: v.workers.map((worker) => worker.employee.id).filter(Boolean) as string[],
     });
     setEditError("");
   }
@@ -158,6 +163,7 @@ export default function CarWashVehiclesPage() {
         registrationExpiry: editForm.registrationExpiry || null,
         insuranceExpiry: editForm.insuranceExpiry || null,
         assignedDriverEmployeeId: editForm.assignedDriverEmployeeId || null,
+        teamEmployeeIds: editForm.teamEmployeeIds,
       }),
     });
     const data = await res.json();
@@ -170,6 +176,15 @@ export default function CarWashVehiclesPage() {
   function assignedDriverName(vehicle: Vehicle) {
     const assignedDriver = vehicle.assignedWorkers[0];
     return assignedDriver?.employee?.nameAr ?? null;
+  }
+
+  function toggleTeamMember(employeeId: string) {
+    setEditForm((previous) => ({
+      ...previous,
+      teamEmployeeIds: previous.teamEmployeeIds.includes(employeeId)
+        ? previous.teamEmployeeIds.filter((id) => id !== employeeId)
+        : [...previous.teamEmployeeIds, employeeId],
+    }));
   }
 
   async function confirmDeactivate() {
@@ -359,6 +374,20 @@ export default function CarWashVehiclesPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="form-label">فريق الغسيل</label>
+              <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
+                {teamMembers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">لا يوجد عمال غسيل مسجلون.</p>
+                ) : teamMembers.map((worker) => (
+                  <label key={worker.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={editForm.teamEmployeeIds.includes(worker.id)} onChange={() => toggleTeamMember(worker.id)} />
+                    <span>{worker.nameAr}{worker.employeeNumber ? ` - ${worker.employeeNumber}` : ""}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">اختر جميع عمال الغسيل المعيّنين لهذه المركبة.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
