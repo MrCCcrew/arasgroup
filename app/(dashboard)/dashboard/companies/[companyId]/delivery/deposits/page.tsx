@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
+import { DepositSubmissionActions } from "@/components/delivery/deposit-submission-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -53,7 +54,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
       : {}),
   };
 
-  const [deposits, driverRows, agg] = await Promise.all([
+  const [deposits, driverRows, agg, uploadedDeposits] = await Promise.all([
     prisma.driverWalletTransaction.findMany({
       where,
       include: {
@@ -68,6 +69,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
       orderBy: { employee: { nameAr: "asc" } },
     }),
     prisma.driverWalletTransaction.aggregate({ where, _sum: { amount: true }, _count: true }),
+    prisma.driverDepositSubmission.findMany({ where: { companyId, deletedAt: null, ...(sp.driverId ? { driverId: sp.driverId } : {}), ...(fromDate || toDate ? { depositDate: { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } } : {}) }, include: { driver: { include: { employee: { select: { nameAr: true, nameEn: true } } } } }, orderBy: [{ reviewStatus: "asc" }, { createdAt: "desc" }] }),
   ]);
 
   type DepositRow = typeof deposits[number];
@@ -239,6 +241,10 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
               </tbody>
             </table>
           </div>
+        </div>
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="border-b px-4 py-3"><h2 className="font-semibold">{en ? "Uploaded deposit receipts" : "إيصالات الإيداعات المرفوعة"}</h2><p className="text-xs text-muted-foreground">{en ? "Approve to add the amount to the driver's wallet." : "لا يُحتسب الإيداع في المحفظة إلا بعد الموافقة."}</p></div>
+          <div className="overflow-x-auto"><table className="ar-table"><thead><tr><th>{en ? "Date" : "التاريخ"}</th><th>{en ? "Driver" : "السائق"}</th><th>{en ? "Amount" : "المبلغ"}</th><th>{en ? "Reference" : "رقم العملية"}</th><th>{en ? "Status" : "الحالة"}</th><th>{en ? "Actions" : "الإجراءات"}</th></tr></thead><tbody>{uploadedDeposits.length===0?<tr><td colSpan={6} className="py-6 text-center text-muted-foreground">{en?"No uploaded receipts":"لا توجد إيصالات مرفوعة"}</td></tr>:uploadedDeposits.map((row)=><tr key={row.id}><td>{formatDate(row.depositDate,numberLocale)}</td><td>{en?row.driver.employee.nameEn??row.driver.employee.nameAr:row.driver.employee.nameAr}</td><td className="number font-bold text-emerald-600">{formatKWD(Number(row.amount),numberLocale)}</td><td dir="ltr">{row.transactionReference??"—"}</td><td>{row.reviewStatus==="APPROVED"?(en?"Approved":"معتمد"):row.reviewStatus==="REJECTED"?(en?"Rejected":"مرفوض"):(en?"Pending":"قيد المراجعة")}</td><td><DepositSubmissionActions id={row.id} imagePath={row.imagePath} amount={Number(row.amount)} date={row.depositDate.toLocaleDateString("en-CA")} notes={row.notes} status={row.reviewStatus}/></td></tr>)}</tbody></table></div>
         </div>
       </div>
     </div>

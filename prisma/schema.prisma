@@ -12,46 +12,48 @@ datasource db {
 // ═══════════════════════════════════════════════════════════
 
 model User {
-  id                 String          @id @default(cuid())
-  email              String          @unique
-  nameAr             String
-  nameEn             String?
-  passwordHash       String
-  phone              String?
-  isActive           Boolean         @default(true)
-  isSuperAdmin       Boolean         @default(false)
-  hasGlobalGroupAccess Boolean       @default(false)
-  employeeId         String?         @unique
-  accountType        UserAccountType @default(ADMIN)
-  mustChangePassword Boolean         @default(false)
+  id                   String          @id @default(cuid())
+  email                String          @unique
+  nameAr               String
+  nameEn               String?
+  passwordHash         String
+  phone                String?
+  isActive             Boolean         @default(true)
+  isSuperAdmin         Boolean         @default(false)
+  hasGlobalGroupAccess Boolean         @default(false)
+  employeeId           String?         @unique
+  accountType          UserAccountType @default(ADMIN)
+  mustChangePassword   Boolean         @default(false)
 
-  employee                        Employee?                 @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  roles                           UserRole[]
-  groupAccess                     UserGroupAccess[]
-  companyAccess                   UserCompanyAccess[]
-  branchAccess                    UserBranchAccess[]
-  auditLogs                       AuditLog[]
-  uploadedAttachments             Attachment[]              @relation("AttachmentUploadedBy")
-  createdDriverVehicleAssignments DriverVehicleAssignment[] @relation("DriverVehicleAssignmentCreatedBy")
-  assignedAssetCustodies          AssetCustody[]            @relation("AssetCustodyAssignedBy")
-  returnedAssetCustodies          AssetCustody[]            @relation("AssetCustodyReturnedBy")
-  createdJournalEntries           JournalEntry[]            @relation("JournalCreatedBy")
-  approvedJournalEntries          JournalEntry[]            @relation("JournalApprovedBy")
-  vehicleIncidents                VehicleIncident[]         @relation("VehicleIncidentCreatedBy")
-  completedTasks                  CompletedTask[]
-  reminders                       Reminder[]
-  pushSubscriptions               PushSubscription[]
-  directPermissions               UserPermission[]          @relation("UserDirectPermissions")
-  grantedPermissions              UserPermission[]          @relation("UserPermissionGrantedBy")
-  createdTalabatImports           TalabatReportImport[]     @relation("TalabatImportCreatedBy")
-  talabatAllocations              TalabatReportAllocation[] @relation("TalabatAllocationCreatedBy")
-  activityLogs                    EmployeeActivityLog[]
-  trackingSessions                DriverTrackingSession[]
-  reviewedInvoices                DeliveryInvoice[]         @relation("InvoiceReviewedBy")
-  ownerManagedPartner             OwnerManagedPartner?      @relation("OwnerManagedPartnerUser")
-  createdOwnerManagedExpenses     OwnerManagedExpense[]     @relation("OwnerManagedExpenseCreatedBy")
-  createdCarWashRevenues          CarWashRevenue[]          @relation("CarWashRevenueCreatedBy")
-  createdCarWashExpenses          CarWashExpense[]          @relation("CarWashExpenseCreatedBy")
+  employee                         Employee?                 @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  roles                            UserRole[]
+  groupAccess                      UserGroupAccess[]
+  companyAccess                    UserCompanyAccess[]
+  branchAccess                     UserBranchAccess[]
+  auditLogs                        AuditLog[]
+  uploadedAttachments              Attachment[]              @relation("AttachmentUploadedBy")
+  createdDriverVehicleAssignments  DriverVehicleAssignment[] @relation("DriverVehicleAssignmentCreatedBy")
+  assignedAssetCustodies           AssetCustody[]            @relation("AssetCustodyAssignedBy")
+  returnedAssetCustodies           AssetCustody[]            @relation("AssetCustodyReturnedBy")
+  createdJournalEntries            JournalEntry[]            @relation("JournalCreatedBy")
+  approvedJournalEntries           JournalEntry[]            @relation("JournalApprovedBy")
+  vehicleIncidents                 VehicleIncident[]         @relation("VehicleIncidentCreatedBy")
+  completedTasks                   CompletedTask[]
+  reminders                        Reminder[]
+  pushSubscriptions                PushSubscription[]
+  directPermissions                UserPermission[]          @relation("UserDirectPermissions")
+  grantedPermissions               UserPermission[]          @relation("UserPermissionGrantedBy")
+  createdTalabatImports            TalabatReportImport[]     @relation("TalabatImportCreatedBy")
+  talabatAllocations               TalabatReportAllocation[] @relation("TalabatAllocationCreatedBy")
+  activityLogs                     EmployeeActivityLog[]
+  trackingSessions                 DriverTrackingSession[]
+  reviewedInvoices                 DeliveryInvoice[]         @relation("InvoiceReviewedBy")
+  createdDriverDepositSubmissions  DriverDepositSubmission[] @relation("DriverDepositCreatedBy")
+  reviewedDriverDepositSubmissions DriverDepositSubmission[] @relation("DriverDepositReviewedBy")
+  ownerManagedPartner              OwnerManagedPartner?      @relation("OwnerManagedPartnerUser")
+  createdOwnerManagedExpenses      OwnerManagedExpense[]     @relation("OwnerManagedExpenseCreatedBy")
+  createdCarWashRevenues           CarWashRevenue[]          @relation("CarWashRevenueCreatedBy")
+  createdCarWashExpenses           CarWashExpense[]          @relation("CarWashExpenseCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -274,10 +276,10 @@ model Company {
   isActive            Boolean       @default(true)
   sortOrder           Int           @default(0)
 
-  group                    Group                     @relation(fields: [groupId], references: [id])
-  investor                 Investor?                 @relation("InvestorOwnedCompanies", fields: [investorId], references: [id], onDelete: SetNull)
-  parentCompany            Company?                  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id], onDelete: SetNull)
-  childCompanies           Company[]                 @relation("CompanyHierarchy")
+  group                    Group                         @relation(fields: [groupId], references: [id])
+  investor                 Investor?                     @relation("InvestorOwnedCompanies", fields: [investorId], references: [id], onDelete: SetNull)
+  parentCompany            Company?                      @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id], onDelete: SetNull)
+  childCompanies           Company[]                     @relation("CompanyHierarchy")
   branches                 Branch[]
   bankAccounts             BankAccount[]
   fiscalYears              FiscalYear[]
@@ -297,7 +299,7 @@ model Company {
   carWashVehicles          CarWashVehicle[]
   carWashWorkers           CarWashWorker[]
   carWashLocations         CarWashLocation[]
-  investors                Investor[]                @relation("CompanyInvestors")
+  investors                Investor[]                    @relation("CompanyInvestors")
   expenseCategories        ExpenseCategory[]
   expenses                 Expense[]
   salaryBatches            SalaryBatch[]
@@ -321,6 +323,7 @@ model Company {
   ownerManagedExpenses     OwnerManagedExpense[]
   ownerManagedImports      OwnerManagedStatementImport[]
   ownerManagedRevenues     OwnerManagedRevenue[]
+  driverDepositSubmissions DriverDepositSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -344,34 +347,35 @@ enum CompanyType {
 }
 
 model OwnerManagedPartner {
-  id        String  @id @default(cuid())
+  id        String                @id @default(cuid())
   companyId String
-  userId    String  @unique
+  userId    String                @unique
   name      String
   phone     String?
   email     String?
   mid       String
-  isActive  Boolean @default(true)
+  isActive  Boolean               @default(true)
   company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user      User                  @relation("OwnerManagedPartnerUser", fields: [userId], references: [id], onDelete: Cascade)
   expenses  OwnerManagedExpense[]
   revenues  OwnerManagedRevenue[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
   @@unique([companyId, mid])
   @@index([companyId])
   @@map("owner_managed_partners")
 }
 
 model OwnerManagedExpense {
-  id          String   @id @default(cuid())
+  id          String              @id @default(cuid())
   companyId   String
   partnerId   String
   invoiceDate DateTime
-  amount      Decimal  @db.Decimal(15, 3)
-  notes       String?  @db.Text
+  amount      Decimal             @db.Decimal(15, 3)
+  notes       String?             @db.Text
   imageUrl    String?
-  ocrRawText  String?  @db.LongText
+  ocrRawText  String?             @db.LongText
   createdById String
   deletedAt   DateTime?
   company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -379,32 +383,34 @@ model OwnerManagedExpense {
   createdBy   User                @relation("OwnerManagedExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
+
   @@index([companyId, partnerId, invoiceDate])
   @@map("owner_managed_expenses")
 }
 
 model OwnerManagedStatementImport {
-  id           String   @id @default(cuid())
-  companyId    String
-  fileName     String
-  fileHash     String
-  storageUrl   String?
-  rawText      String?  @db.LongText
-  importedById String
-  confirmedAt  DateTime?
-  cancelledAt DateTime?
-  cancelledById String?
-  cancellationReason String? @db.Text
-  createdAt    DateTime @default(now())
-  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  revenues     OwnerManagedRevenue[]
+  id                 String                @id @default(cuid())
+  companyId          String
+  fileName           String
+  fileHash           String
+  storageUrl         String?
+  rawText            String?               @db.LongText
+  importedById       String
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancellationReason String?               @db.Text
+  createdAt          DateTime              @default(now())
+  company            Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  revenues           OwnerManagedRevenue[]
+
   @@unique([companyId, fileHash])
   @@index([companyId, createdAt])
   @@map("owner_managed_statement_imports")
 }
 
 model OwnerManagedRevenue {
-  id                   String   @id @default(cuid())
+  id                   String                      @id @default(cuid())
   companyId            String
   partnerId            String?
   importId             String
@@ -412,21 +418,22 @@ model OwnerManagedRevenue {
   transactionReference String?
   transactionDate      DateTime?
   postingDate          DateTime?
-  amount               Decimal  @db.Decimal(15, 3)
+  amount               Decimal                     @db.Decimal(15, 3)
   branchCode           String?
-  description          String   @db.Text
-  balance              Decimal? @db.Decimal(15, 3)
+  description          String                      @db.Text
+  balance              Decimal?                    @db.Decimal(15, 3)
   pageNumber           Int
-  rawRowText           String?  @db.Text
-  status               OwnerManagedRevenueStatus @default(UNMATCHED)
-  rejectionReason      String?  @db.Text
+  rawRowText           String?                     @db.Text
+  status               OwnerManagedRevenueStatus   @default(UNMATCHED)
+  rejectionReason      String?                     @db.Text
   voidedAt             DateTime?
   voidedById           String?
-  voidReason           String?  @db.Text
-  createdAt            DateTime @default(now())
+  voidReason           String?                     @db.Text
+  createdAt            DateTime                    @default(now())
   company              Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   partner              OwnerManagedPartner?        @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   import               OwnerManagedStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
   @@unique([companyId, mid, transactionReference, amount])
   @@index([companyId, partnerId, transactionDate])
   @@map("owner_managed_revenues")
@@ -555,21 +562,21 @@ model FiscalYear {
 // ═══════════════════════════════════════════════════════════
 
 model ChartOfAccount {
-  id            String        @id @default(cuid())
-  companyId     String
-  code          String
-  nameAr        String
-  nameEn        String?
-  type          AccountType
-  subtype       String?
-  parentId      String?
-  level         Int           @default(1)
-  isHeader      Boolean       @default(false)
-  isActive      Boolean       @default(true)
-  normalBalance NormalBalance @default(DEBIT)
-  cashFlowCategory CashFlowCategory @default(NONE)
+  id                  String           @id @default(cuid())
+  companyId           String
+  code                String
+  nameAr              String
+  nameEn              String?
+  type                AccountType
+  subtype             String?
+  parentId            String?
+  level               Int              @default(1)
+  isHeader            Boolean          @default(false)
+  isActive            Boolean          @default(true)
+  normalBalance       NormalBalance    @default(DEBIT)
+  cashFlowCategory    CashFlowCategory @default(NONE)
   cashFlowSubcategory String?
-  notes         String?
+  notes               String?
 
   company         Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   parent          ChartOfAccount?    @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
@@ -1006,8 +1013,8 @@ model Employee {
   carWashWorker             CarWashWorker?
   assetCustodies            AssetCustody[]
   expenses                  Expense[]
-  carWashRevenuesCreated    CarWashRevenue[]          @relation("CarWashRevenueCreatedByEmployee")
-  carWashExpensesCreated    CarWashExpense[]          @relation("CarWashExpenseCreatedByEmployee")
+  carWashRevenuesCreated    CarWashRevenue[]            @relation("CarWashRevenueCreatedByEmployee")
+  carWashExpensesCreated    CarWashExpense[]            @relation("CarWashExpenseCreatedByEmployee")
   salaryPayments            SalaryPayment[]
   salaryItems               SalaryItem[]
   tickets                   EmployeeTicket[]
@@ -1307,6 +1314,7 @@ model Driver {
   operatedDailyOrders   DeliveryDailyOrder[]           @relation("DailyOrderOperatedAsDriver")
   dailyOrderAllocations DeliveryDailyOrderAllocation[] @relation("DailyOrderAllocationDriver")
   walletTransactions    DriverWalletTransaction[]
+  depositSubmissions    DriverDepositSubmission[]
   reportLines           DeliveryMonthlyReportLine[]
   walletSettlements     DriverWalletSettlement[]
   vehicleAssignments    DriverVehicleAssignment[]
@@ -1784,8 +1792,9 @@ model DriverWalletTransaction {
   isSettled      Boolean               @default(false)
   settledAt      DateTime?
 
-  driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  driver            Driver                   @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  bankAccount       BankAccount?             @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  depositSubmission DriverDepositSubmission?
 
   createdAt DateTime @default(now())
 
@@ -1794,6 +1803,46 @@ model DriverWalletTransaction {
   @@index([date])
   @@index([bankAccountId])
   @@map("driver_wallet_transactions")
+}
+
+model DriverDepositSubmission {
+  id                   String              @id @default(cuid())
+  driverId             String
+  companyId            String
+  amount               Decimal             @db.Decimal(18, 3)
+  depositDate          DateTime
+  imagePath            String
+  storageKey           String?
+  originalFileName     String?
+  mimeType             String?
+  fileSize             Int?
+  notes                String?             @db.Text
+  transactionReference String?
+  reviewStatus         DepositReviewStatus @default(PENDING_REVIEW)
+  rejectionReason      String?             @db.Text
+  reviewedById         String?
+  reviewedAt           DateTime?
+  walletTransactionId  String?             @unique
+  createdById          String
+  deletedAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  driver            Driver                   @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  company           Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewedBy        User?                    @relation("DriverDepositReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdBy         User                     @relation("DriverDepositCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  walletTransaction DriverWalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, reviewStatus, depositDate])
+  @@index([driverId, reviewStatus])
+  @@map("driver_deposit_submissions")
+}
+
+enum DepositReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 enum WalletTransactionType {
@@ -1973,23 +2022,23 @@ model CarWashDailyOperation {
 }
 
 model CarWashRevenue {
-  id          String      @id @default(cuid())
-  operationId String
-  type        RevenueType
-  amount      Decimal     @db.Decimal(18, 3)
-  description String?
-  date        DateTime
-  paymentMethod String @default("CASH")
-  imageUrl    String?
-  ocrRawText  String?
+  id                   String      @id @default(cuid())
+  operationId          String
+  type                 RevenueType
+  amount               Decimal     @db.Decimal(18, 3)
+  description          String?
+  date                 DateTime
+  paymentMethod        String      @default("CASH")
+  imageUrl             String?
+  ocrRawText           String?
   transactionReference String?
-  source      String @default("ADMIN")
-  createdById String?
-  createdByEmployeeId String?
+  source               String      @default("ADMIN")
+  createdById          String?
+  createdByEmployeeId  String?
 
-  operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
-  createdBy User? @relation("CarWashRevenueCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdByEmployee Employee? @relation("CarWashRevenueCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  operation         CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  createdBy         User?                 @relation("CarWashRevenueCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByEmployee Employee?             @relation("CarWashRevenueCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
@@ -2007,22 +2056,22 @@ enum RevenueType {
 }
 
 model CarWashExpense {
-  id          String   @id @default(cuid())
-  operationId String
-  categoryId  String?
-  amount      Decimal  @db.Decimal(18, 3)
-  description String
-  date        DateTime
-  paymentMethod String @default("CASH")
-  imageUrl    String?
-  ocrRawText  String?
-  source      String @default("ADMIN")
-  createdById String?
+  id                  String   @id @default(cuid())
+  operationId         String
+  categoryId          String?
+  amount              Decimal  @db.Decimal(18, 3)
+  description         String
+  date                DateTime
+  paymentMethod       String   @default("CASH")
+  imageUrl            String?
+  ocrRawText          String?
+  source              String   @default("ADMIN")
+  createdById         String?
   createdByEmployeeId String?
 
-  operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
-  createdBy User? @relation("CarWashExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdByEmployee Employee? @relation("CarWashExpenseCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  operation         CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  createdBy         User?                 @relation("CarWashExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByEmployee Employee?             @relation("CarWashExpenseCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
