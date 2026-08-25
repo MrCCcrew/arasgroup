@@ -44,6 +44,14 @@ echo "  ✓ Build complete"
 
 # ── 6. Restart PM2 ─────────────────────────────────────────
 echo "[6/6] Restarting application..."
+# Load only the protected GPS-stop password hash for PM2. Other .env settings
+# remain private to the server and are not copied into the process environment.
+if [ -f ".env" ]; then
+  DRIVER_TRACKING_STOP_PASSWORD_HASH_LINE="$(grep '^DRIVER_TRACKING_STOP_PASSWORD_HASH=' .env || true)"
+  if [ -n "$DRIVER_TRACKING_STOP_PASSWORD_HASH_LINE" ]; then
+    export "$DRIVER_TRACKING_STOP_PASSWORD_HASH_LINE"
+  fi
+fi
 if pm2 list | grep -q "$APP_NAME"; then
   pm2 reload "$APP_NAME" --update-env
 else
