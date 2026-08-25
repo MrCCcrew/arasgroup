@@ -424,7 +424,8 @@ export function canAccessCompany(user: SessionUser, companyId: string): boolean 
 
 export function canAccessBranch(user: SessionUser, branchId: string): boolean {
   if (user.isSuperAdmin) return true;
-  return user.branchAccess.some((entry) => entry.branchId === branchId && entry.canView);
+  return user.branchAccess.some((entry) => entry.branchId === branchId && entry.canView)
+    || user.permissions.some((permission) => permission.allowed !== false && permission.scopeKey != null && permission.scope === "BRANCH" && permission.branchId === branchId);
 }
 
 export function getAccessibleCompanyIds(user: SessionUser): string[] {
