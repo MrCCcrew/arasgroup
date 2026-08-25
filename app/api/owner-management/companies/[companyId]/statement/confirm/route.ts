@@ -5,16 +5,20 @@ import { requireRequestSession } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
 import { requireOwnerManagedCompany, forbidden } from "@/lib/owner-management/access";
 import { getPreview, takePreview } from "@/lib/owner-management/preview-store";
-import { isRateLimited, requestClientKey } from "@/lib/security/rate-limit";
+
+/** Bank statements may use either Arabic or English thousands/decimal separators. */
+function statementAmount(value?: string | number) {
+  const normalized = String(value ?? "").replace(/[\s,٬]/g, "").replace(/٫/g, ".");
+  return /^-?\d+(?:\.\d+)?$/.test(normalized) ? new Prisma.Decimal(normalized) : null;
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ companyId: string }> }) {
   const session = await requireRequestSession(request); if (session instanceof NextResponse) return session;
-  if (isRateLimited(requestClientKey(request, session.id), 5, 10 * 60_000)) return NextResponse.json({ success: false, error: "تم تجاوز حد تأكيد الاستيراد. حاول لاحقاً." }, { status: 429 });
   const { companyId } = await params; if (!await requireOwnerManagedCompany(session, companyId)) return forbidden();
   const { token } = await request.json(); if (!token) return NextResponse.json({ success: false, error: "بيانات المعاينة ناقصة" }, { status: 400 });
   const candidate = getPreview(token, companyId, session.id); if (!candidate) return NextResponse.json({ success: false, error: "انتهت المعاينة؛ أعد رفع الملف" }, { status: 410 });
   const invalid = candidate.rows.filter((row) => row.status === "INVALID").length;
-  if (invalid / Math.max(candidate.rows.length, 1) > 0.2 || candidate.rows.every((row) => Number(row.amount) === 0)) return NextResponse.json({ success: false, error: "تعذر تأكيد معاينة غير مكتملة أو بلا عمليات صالحة" }, { status: 422 });
+  if (invalid / Math.max(candidate.rows.length, 1) > 0.2 || candidate.rows.every((row) => statementAmount(row.amount)?.isZero() ?? true)) return NextResponse.json({ success: false, error: "تعذر تأكيد معاينة غير مكتملة أو بلا عمليات صالحة" }, { status: 422 });
   const preview = takePreview(token, companyId, session.id); if (!preview) return NextResponse.json({ success: false, error: "انتهت المعاينة؛ أعد رفع الملف" }, { status: 410 });
   const fileHash = createHash("sha256").update(preview.bytes).digest("hex");
   try {
@@ -25,15 +29,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       for (const row of preview.rows) {
         const partner = row.mid ? partners.get(row.mid) : undefined;
         const hasValidDate = row.transactionDate instanceof Date && !Number.isNaN(row.transactionDate.getTime());
-        if (row.status === "INVALID" || !hasValidDate || Number(row.amount) <= 0) { const reason = row.status === "INVALID" ? "INVALID" : !hasValidDate ? "MISSING_TRANSACTION_DATE" : "DEBIT_OR_ZERO_AMOUNT"; skipped[reason] = (skipped[reason] ?? 0) + 1; continue; }
+        const amount = statementAmount(row.amount);
+        if (row.status === "INVALID" || !hasValidDate || !amount || amount.lte(0)) { const reason = row.status === "INVALID" ? "INVALID" : !hasValidDate ? "MISSING_TRANSACTION_DATE" : "DEBIT_OR_ZERO_AMOUNT"; skipped[reason] = (skipped[reason] ?? 0) + 1; continue; }
         const transactionDate = row.transactionDate!;
         const transactionReference = row.transactionReference ?? `AUTO-${createHash("sha256").update(`${row.pageNumber}|${transactionDate.toISOString()}|${row.amount}|${row.rawRowText}`).digest("hex").slice(0, 24)}`;
         const isMatched = row.status === "MATCHED" && Boolean(partner && partner.id === row.partnerId);
         const status = isMatched ? "MATCHED" : row.mid ? "REVIEW" : "UNMATCHED";
-        const duplicate = await tx.ownerManagedRevenue.findFirst({ where: { companyId, mid: row.mid, transactionReference, amount: new Prisma.Decimal(row.amount) }, select: { id: true } });
+        const duplicate = await tx.ownerManagedRevenue.findFirst({ where: { companyId, mid: row.mid, transactionReference, amount }, select: { id: true } });
         if (duplicate) { skipped.DUPLICATE = (skipped.DUPLICATE ?? 0) + 1; continue; }
-        await tx.ownerManagedRevenue.create({ data: { companyId, importId: imported.id, partnerId: isMatched ? partner!.id : null, mid: row.mid, transactionReference, transactionDate, postingDate: row.postingDate, amount: new Prisma.Decimal(row.amount), branchCode: row.branchCode, description: row.description, balance: row.balance ? new Prisma.Decimal(row.balance.replace(/,/g, "")) : undefined, pageNumber: row.pageNumber, rawRowText: row.rawRowText, status } });
-        saved++; if (isMatched) totals[partner!.name] = (totals[partner!.name] ?? 0) + Number(row.amount); else unmatched++;
+        await tx.ownerManagedRevenue.create({ data: { companyId, importId: imported.id, partnerId: isMatched ? partner!.id : null, mid: row.mid, transactionReference, transactionDate, postingDate: row.postingDate, amount, branchCode: row.branchCode, description: row.description, balance: row.balance ? statementAmount(row.balance) : undefined, pageNumber: row.pageNumber, rawRowText: row.rawRowText, status } });
+        saved++; if (isMatched) totals[partner!.name] = (totals[partner!.name] ?? 0) + amount.toNumber(); else unmatched++;
       }
       const skippedCount = Object.values(skipped).reduce((sum, count) => sum + count, 0);
       return { importId: imported.id, savedCount: saved, unmatchedCount: unmatched, duplicateCount: skipped.DUPLICATE ?? 0, totalsByPartner: Object.fromEntries(Object.entries(totals).map(([name, total]) => [name, total.toFixed(3)])), skipped, skippedCount };
