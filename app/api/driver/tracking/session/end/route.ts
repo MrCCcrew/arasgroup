@@ -48,9 +48,17 @@ export async function POST(request: NextRequest) {
     if (trackingSession.status === 'ENDED') {
       return NextResponse.json({ success: true, data: { id: trackingSession.id, status: trackingSession.status, endedAt: trackingSession.endedAt } });
     }
-    const updated = await prisma.driverTrackingSession.update({ where: { id: trackingSession.id }, data: { status: 'ENDED', endedAt: new Date() } });
-    return NextResponse.json({ success: true, data: { id: updated.id, status: updated.status, endedAt: updated.endedAt } });
-  } catch {
+    // Avoid a race with a concurrent session refresh or cleanup. updateMany is
+    // idempotent and does not throw when the row was just ended elsewhere.
+    await prisma.driverTrackingSession.updateMany({
+      where: { id: trackingSession.id, userId: session.id, companyId: employee.companyId, status: { not: 'ENDED' } },
+      data: { status: 'ENDED', endedAt: new Date() },
+    });
+    const endedSession = await prisma.driverTrackingSession.findUnique({ where: { id: trackingSession.id }, select: { id: true, status: true, endedAt: true } });
+    if (!endedSession || endedSession.status !== 'ENDED') return NextResponse.json({ code: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ success: true, data: endedSession });
+  } catch (error) {
+    console.error('Stop tracking session error:', error);
     return NextResponse.json({ code: 'STOP_FAILED' }, { status: 500 });
   }
 }
