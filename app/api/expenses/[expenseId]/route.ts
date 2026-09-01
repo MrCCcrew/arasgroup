@@ -66,7 +66,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     const { expenseId } = await params;
     const expense = await prisma.expense.findUnique({
       where: { id: expenseId },
-      select: { id: true, companyId: true, journalEntryId: true, isDeleted: true },
+      select: { id: true, companyId: true, journalEntryId: true, isDeleted: true, carWashExpense: { select: { id: true } } },
     });
     if (!expense || expense.isDeleted) {
       return NextResponse.json({ success: false, error: "المصروف غير موجود" }, { status: 404 });
@@ -77,6 +77,13 @@ export async function DELETE(request: NextRequest, { params }: Props) {
 
     if (!session.isSuperAdmin) {
       return NextResponse.json({ success: false, error: "يلزم صلاحية المشرف العام للحذف" }, { status: 403 });
+    }
+
+    if (expense.carWashExpense) {
+      return NextResponse.json(
+        { success: false, error: "This expense is linked to a car-wash operation and must be cancelled from that operation to keep the records aligned." },
+        { status: 409 },
+      );
     }
 
     await prisma.$transaction(async (tx) => {

@@ -44,6 +44,15 @@ export default async function ExpenseDetailPage({ params }: Props) {
 
   const expense = await prisma.expense.findFirst({
     where: { id: expenseId, companyId, isDeleted: false },
+    include: {
+      carWashExpense: {
+        select: {
+          imageUrl: true,
+          source: true,
+          operation: { select: { vehicle: { select: { code: true, nameAr: true, nameEn: true } } } },
+        },
+      },
+    },
   });
 
   if (!expense) notFound();
@@ -152,7 +161,25 @@ export default async function ExpenseDetailPage({ params }: Props) {
                 <p className="font-medium">{locale === "en" ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr}</p>
               </div>
             )}
+            {expense.carWashExpense && (
+              <div>
+                <p className="mb-1 text-xs text-muted-foreground">{locale === "en" ? "Source" : "المصدر"}</p>
+                <p className="font-medium">
+                  {locale === "en" ? "Car wash operation" : "عملية غسيل سيارات"}
+                  {` — ${expense.carWashExpense.operation.vehicle.code}`}
+                </p>
+              </div>
+            )}
           </div>
+
+          {expense.carWashExpense?.imageUrl && (
+            <div className="border-t pt-5">
+              <p className="mb-3 text-sm font-medium">{locale === "en" ? "Uploaded receipt" : "صورة الإيصال المرفوعة"}</p>
+              <a href={expense.carWashExpense.imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
+                <img src={expense.carWashExpense.imageUrl} alt={locale === "en" ? "Uploaded expense receipt" : "إيصال المصروف المرفوع"} className="max-h-96 max-w-full rounded-lg border object-contain" />
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>

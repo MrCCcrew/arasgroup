@@ -6,6 +6,8 @@ import { nanoid } from "nanoid";
 import { getCarWashPortalContext } from "@/lib/auth/car-wash-portal";
 import { requireRequestSession } from "@/lib/auth/access";
 import { carWashDriverMovementScope } from "@/lib/car-wash/driver-movement-scope";
+import { createExpenseJE } from "@/lib/accounting/auto-entries";
+import { resolveExpenseAccountCode } from "@/lib/accounting/expense-accounts";
 
 const inputSchema = z.object({
   kind: z.enum(["EXPENSE", "CASH", "KNET"]), vehicleId: z.string(), categoryId: z.string().optional(), amount: z.number().positive(), date: z.string().transform((value) => new Date(value)), notes: z.string().max(2000).optional(), imageUrl: z.string().url().optional(), ocrRawText: z.string().max(20000).optional(), transactionReference: z.string().max(191).optional(),
@@ -77,14 +79,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Image must be JPG, PNG, WEBP, or GIF and smaller than 10 MB" }, { status: 400 });
   }
   const operationDate = day(data.date);
-  const vehicle = await prisma.carWashVehicle.findFirst({ where: { id: data.vehicleId, companyId: context.companyId, isActive: true }, select: { id: true, branchId: true, code: true, nameAr: true, nameEn: true } });
+  const vehicle = await prisma.carWashVehicle.findFirst({ where: { id: data.vehicleId, companyId: context.companyId, isActive: true }, select: { id: true, branchId: true, costCenterId: true, code: true, nameAr: true, nameEn: true } });
   if (!vehicle || (context.assignedVehicleId && vehicle.id !== context.assignedVehicleId)) return NextResponse.json({ success: false, error: "Vehicle is not assigned to this account" }, { status: 403 });
   const location = await prisma.carWashLocation.findFirst({ where: { companyId: context.companyId, isActive: true }, select: { id: true } });
   if (!location) return NextResponse.json({ success: false, error: "No valid wash location is configured for this vehicle" }, { status: 400 });
+  let expenseCategoryType: string | undefined;
   if (data.kind === "EXPENSE") {
     if (!data.categoryId) return NextResponse.json({ success: false, error: "Expense category is required" }, { status: 400 });
-    const category = await prisma.expenseCategory.findFirst({ where: { id: data.categoryId, companyId: context.companyId }, select: { id: true, nameAr: true, nameEn: true } });
+    const category = await prisma.expenseCategory.findFirst({ where: { id: data.categoryId, companyId: context.companyId }, select: { id: true, nameAr: true, nameEn: true, type: true } });
     if (!category) return NextResponse.json({ success: false, error: "Invalid expense category" }, { status: 400 });
+    expenseCategoryType = category.type;
   }
   if (data.kind === "KNET" && data.transactionReference) {
     const duplicate = await prisma.knetTransaction.findFirst({ where: { transactionRef: data.transactionReference, date: operationDate, amount: data.amount, operation: { vehicleId: vehicle.id } }, select: { id: true } });
@@ -98,10 +102,38 @@ export async function POST(request: NextRequest) {
     if (!operation) operation = await tx.carWashDailyOperation.create({ data: { vehicleId: vehicle.id, companyId: context.companyId, locationId: location.id, date: operationDate, notes: data.notes } });
     if (operation.companyId !== context.companyId || operation.locationId !== location.id) throw new Error("Operation location mismatch");
     if (data.kind === "EXPENSE") {
-      const expense = await tx.carWashExpense.create({ data: { operationId: operation.id, categoryId: data.categoryId, amount: data.amount, description: data.notes ?? "Portal expense", date: operationDate, paymentMethod: "CASH", imageUrl, ocrRawText: data.ocrRawText, source: "CAR_WASH_PORTAL", createdById: context.userId, createdByEmployeeId: context.employeeId } });
+      const carWashExpense = await tx.carWashExpense.create({ data: { operationId: operation.id, categoryId: data.categoryId, amount: data.amount, description: data.notes ?? "Portal expense", date: operationDate, paymentMethod: "CASH", imageUrl, ocrRawText: data.ocrRawText, source: "CAR_WASH_PORTAL", createdById: context.userId, createdByEmployeeId: context.employeeId } });
+      const accountingExpense = await tx.expense.create({
+        data: {
+          companyId: context.companyId,
+          categoryId: data.categoryId!,
+          date: operationDate,
+          amount: data.amount,
+          descriptionAr: data.notes ?? "مصروف مرفوع من سائق الغسيل",
+          paymentMethod: "CASH",
+          reference: `CWPORTAL:${carWashExpense.id}`,
+          branchId: vehicle.branchId ?? undefined,
+          costCenterId: vehicle.costCenterId ?? undefined,
+          carWashVehicleId: vehicle.id,
+          status: "POSTED",
+        },
+      });
+      const expenseJournalEntry = await createExpenseJE({
+        companyId: context.companyId,
+        userId: context.userId,
+        expenseAccountCode: resolveExpenseAccountCode(expenseCategoryType),
+        amount: data.amount,
+        isCash: true,
+        costCenterId: vehicle.costCenterId ?? undefined,
+        refId: accountingExpense.id,
+        descriptionAr: data.notes ?? "مصروف مرفوع من سائق الغسيل",
+        date: operationDate,
+      });
+      await tx.expense.update({ where: { id: accountingExpense.id }, data: { journalEntryId: expenseJournalEntry.id } });
+      await tx.carWashExpense.update({ where: { id: carWashExpense.id }, data: { accountingExpenseId: accountingExpense.id } });
       await tx.carWashDailyOperation.update({ where: { id: operation.id }, data: { totalExpenses: { increment: data.amount }, netRevenue: { decrement: data.amount } } });
-      await tx.auditLog.create({ data: { userId: context.userId, companyId: context.companyId, branchId: context.branchId, action: "CREATE_CAR_WASH_PORTAL_EXPENSE", module: "car_wash", resourceId: expense.id, resourceType: "CarWashExpense" } });
-      return { id: expense.id, kind: "EXPENSE", date: expense.date, amount: asAmount(expense.amount), vehicleId: vehicle.id, vehicle, source: expense.source };
+      await tx.auditLog.create({ data: { userId: context.userId, companyId: context.companyId, branchId: context.branchId, action: "CREATE_CAR_WASH_PORTAL_EXPENSE", module: "car_wash", resourceId: carWashExpense.id, resourceType: "CarWashExpense" } });
+      return { id: carWashExpense.id, kind: "EXPENSE", date: carWashExpense.date, amount: asAmount(carWashExpense.amount), vehicleId: vehicle.id, vehicle, source: carWashExpense.source };
     }
     const revenue = await tx.carWashRevenue.create({ data: { operationId: operation.id, type: data.kind, amount: data.amount, description: data.notes, date: operationDate, paymentMethod: data.kind, imageUrl, ocrRawText: data.ocrRawText, transactionReference: data.transactionReference, source: "CAR_WASH_PORTAL", createdById: context.userId, createdByEmployeeId: context.employeeId } });
     if (data.kind === "KNET") await tx.knetTransaction.create({ data: { operationId: operation.id, amount: data.amount, date: operationDate, transactionRef: data.transactionReference, cardType: "KNET" } });

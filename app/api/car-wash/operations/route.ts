@@ -143,11 +143,8 @@ export async function POST(request: NextRequest) {
           revenues: {
             create: data.revenues.map((r) => ({ type: r.type, amount: r.amount, description: r.description, date: r.date })),
           },
-          expenses: {
-            create: data.expenses.map((e) => ({ categoryId: e.categoryId, amount: e.amount, description: e.description, date: e.date })),
-          },
         },
-        include: { revenues: true, expenses: true },
+        include: { revenues: true },
       });
 
       // Create KNET transactions for KNET revenues (using their actual dates)
@@ -220,6 +217,17 @@ export async function POST(request: NextRequest) {
           throw new Error(`فئة المصروف في السطر رقم ${index + 1} غير صالحة لهذه الشركة`);
         }
 
+        const carWashExpense = await tx.carWashExpense.create({
+          data: {
+            operationId: op.id,
+            categoryId: expense.categoryId,
+            amount: expense.amount,
+            description: expense.description,
+            date: expense.date,
+            paymentMethod: "CASH",
+          },
+        });
+
         const accountingExpense = await tx.expense.create({
           data: {
             companyId: data.companyId,
@@ -233,6 +241,11 @@ export async function POST(request: NextRequest) {
             carWashVehicleId: data.vehicleId,
             status: "POSTED",
           },
+        });
+
+        await tx.carWashExpense.update({
+          where: { id: carWashExpense.id },
+          data: { accountingExpenseId: accountingExpense.id },
         });
 
         // Group by date and category

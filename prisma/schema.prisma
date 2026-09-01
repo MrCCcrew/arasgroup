@@ -2068,8 +2068,10 @@ model CarWashExpense {
   source              String   @default("ADMIN")
   createdById         String?
   createdByEmployeeId String?
+  accountingExpenseId String?  @unique
 
   operation         CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  accountingExpense Expense?               @relation("CarWashExpenseAccounting", fields: [accountingExpenseId], references: [id], onDelete: Restrict)
   createdBy         User?                 @relation("CarWashExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdByEmployee Employee?             @relation("CarWashExpenseCreatedByEmployee", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
 
@@ -3395,6 +3397,7 @@ model Expense {
   investor       Investor?        @relation(fields: [investorId], references: [id], onDelete: Restrict)
   costCenter     CostCenter?      @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
   carWashVehicle CarWashVehicle?  @relation(fields: [carWashVehicleId], references: [id], onDelete: Restrict)
+  carWashExpense CarWashExpense?  @relation("CarWashExpenseAccounting")
   violation      DriverViolation?
 
   createdAt DateTime @default(now())
