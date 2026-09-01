@@ -286,6 +286,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             targetType: "DRIVER",
             driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
             deletedAt: null,
+            reviewStatus: { not: "REJECTED" },
             ...invoiceDateFilter,
           },
           _sum: { amount: true },

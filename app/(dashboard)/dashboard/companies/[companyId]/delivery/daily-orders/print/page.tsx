@@ -168,6 +168,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
             targetType: "DRIVER",
             driverId: sp.driverId,
             deletedAt: null,
+            reviewStatus: { not: "REJECTED" },
           },
           _sum: { amount: true },
         })

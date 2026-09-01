@@ -215,6 +215,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
             targetType: "DRIVER",
             driverId: { in: driverIds },
             deletedAt: null,
+            reviewStatus: { not: "REJECTED" },
             ...invoiceDateFilter,
           },
           _sum: { amount: true },
