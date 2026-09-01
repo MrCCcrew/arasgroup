@@ -49,12 +49,14 @@ export async function GET(request: NextRequest) {
       currency: inv.currency,
       imagePath: inv.imagePath,
       notes: inv.notes,
+      reviewStatus: inv.reviewStatus,
     };
   });
 
   // مجمّع لكل شخص
   const map = new Map<string, { name: string; targetType: string; count: number; total: number; lastDate: Date }>();
-  for (const d of details) {
+  const countedDetails = details.filter((detail) => detail.reviewStatus !== "REJECTED");
+  for (const d of countedDetails) {
     const r = map.get(d.key) ?? { name: d.name, targetType: d.targetType, count: 0, total: 0, lastDate: d.invoiceDate };
     r.count += 1;
     r.total += d.amount;
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
     success: true,
     summary,
     details,
-    grandTotal: details.reduce((s, d) => s + d.amount, 0),
+    grandTotal: countedDetails.reduce((s, d) => s + d.amount, 0),
     count: details.length,
   });
 }

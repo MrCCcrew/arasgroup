@@ -144,11 +144,16 @@ export default function DeliveryInvoicesPage() {
     load();
   }, [load]);
 
-  const stats = useMemo(() => ({
-    count: invoices.length,
-    total: invoices.reduce((sum, invoice) => sum + invoice.amount, 0),
-    people: new Set(invoices.map((invoice) => invoice.name)).size,
-  }), [invoices]);
+  const stats = useMemo(() => {
+    // Rejected invoices remain visible for auditing, but never count in totals.
+    // Soft-deleted invoices are already excluded by the API.
+    const countedInvoices = invoices.filter((invoice) => invoice.reviewStatus !== "REJECTED");
+    return {
+      count: invoices.length,
+      total: countedInvoices.reduce((sum, invoice) => sum + invoice.amount, 0),
+      people: new Set(invoices.map((invoice) => invoice.name)).size,
+    };
+  }, [invoices]);
 
   const review = async (invoice: Invoice, status: "APPROVED" | "REJECTED", reason?: string) => {
     setReviewingId(invoice.id);
