@@ -10,8 +10,13 @@ import { ExpenseRowActions } from "@/components/expenses/expense-row-actions";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ categoryId?: string; page?: string; startDate?: string; endDate?: string }>;
+  searchParams: Promise<{ categoryId?: string; page?: string; startDate?: string; endDate?: string; month?: string; year?: string }>;
 }
+
+const MONTHS = {
+  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+} as const;
 
 function getJournalStatusLabel(status: string | null | undefined, locale: "ar" | "en") {
   if (status === "POSTED") return locale === "en" ? "Posted" : "مرحل";
@@ -40,8 +45,12 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
   const pageSize = 25;
 
   const now = new Date();
-  const startDate = sp.startDate ? new Date(`${sp.startDate}T00:00:00`) : new Date(now.getFullYear(), now.getMonth(), 1);
-  const endDate = sp.endDate ? new Date(`${sp.endDate}T23:59:59.999`) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const requestedMonth = Number.parseInt(sp.month ?? String(now.getMonth() + 1), 10);
+  const month = requestedMonth >= 1 && requestedMonth <= 12 ? requestedMonth : now.getMonth() + 1;
+  const requestedYear = Number.parseInt(sp.year ?? String(now.getFullYear()), 10);
+  const year = Number.isInteger(requestedYear) ? requestedYear : now.getFullYear();
+  const startDate = sp.startDate ? new Date(`${sp.startDate}T00:00:00`) : new Date(year, month - 1, 1);
+  const endDate = sp.endDate ? new Date(`${sp.endDate}T23:59:59.999`) : new Date(year, month, 0, 23, 59, 59, 999);
 
   const where = {
     companyId,
@@ -119,6 +128,13 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
       <div className="page-container space-y-4">
         <form method="get" className="section-card">
           <div className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="year" value={year} />
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
+              <select name="month" defaultValue={String(month)} className="input-field">
+                {MONTHS[locale].map((monthName, index) => <option key={monthName} value={index + 1}>{monthName}</option>)}
+              </select>
+            </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "From" : "من"}</label>
               <input
