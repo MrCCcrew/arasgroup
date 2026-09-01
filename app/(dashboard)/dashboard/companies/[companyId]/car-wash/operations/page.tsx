@@ -131,9 +131,9 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
         </div>
 
         <form method="GET" className="rounded-xl border bg-card p-4">
-          <input type="hidden" name="month" value={month} />
           <input type="hidden" name="year" value={year} />
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "Month" : "الشهر"}</span><select name="month" defaultValue={String(month)} className="input-field w-full">{MONTHS[locale].map((monthName, index) => <option key={monthName} value={index + 1}>{monthName}</option>)}</select></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "From date" : "من تاريخ"}</span><input name="fromDate" type="date" defaultValue={sp.fromDate} className="input-field w-full" dir="ltr" /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "To date" : "إلى تاريخ"}</span><input name="toDate" type="date" defaultValue={sp.toDate} className="input-field w-full" dir="ltr" /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">{locale === "en" ? "Vehicle" : "السيارة"}</span><select name="vehicleId" defaultValue={sp.vehicleId ?? ""} className="input-field w-full"><option value="">{locale === "en" ? "All vehicles" : "كل السيارات"}</option>{vehicles.map((vehicle: CarWashVehicleItem) => <option key={vehicle.id} value={vehicle.id}>{vehicle.code} — {locale === "en" ? vehicle.nameEn ?? vehicle.nameAr : vehicle.nameAr}</option>)}</select></label>
