@@ -7,16 +7,12 @@ import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
 import { ExpenseRowActions } from "@/components/expenses/expense-row-actions";
+import { ExpenseMonthFilter } from "@/components/expenses/expense-month-filter";
 
 interface Props {
   params: Promise<{ companyId: string }>;
   searchParams: Promise<{ categoryId?: string; page?: string; startDate?: string; endDate?: string; month?: string; year?: string }>;
 }
-
-const MONTHS = {
-  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
-  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-} as const;
 
 function getJournalStatusLabel(status: string | null | undefined, locale: "ar" | "en") {
   if (status === "POSTED") return locale === "en" ? "Posted" : "مرحل";
@@ -129,11 +125,10 @@ export default async function ExpensesPage({ params, searchParams }: Props) {
         <form method="get" className="section-card">
           <div className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="year" value={year} />
+            <input type="hidden" name="month" value={month} />
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Month" : "الشهر"}</label>
-              <select name="month" defaultValue={String(month)} className="input-field">
-                {MONTHS[locale].map((monthName, index) => <option key={monthName} value={index + 1}>{monthName}</option>)}
-              </select>
+              <ExpenseMonthFilter locale={locale} month={month} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "From" : "من"}</label>
