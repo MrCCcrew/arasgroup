@@ -43,6 +43,10 @@ interface Rider {
   // Carriage CSV fields
   reportType?: string;
   actualCompletedDeliveries?: number;
+  pickupsCount?: number;
+  pickupCancellations?: number;
+  dropoffsCount?: number;
+  dropoffCancellations?: number;
   evaluatedHours?: string;
   achievementPayment?: string;
   operatorDeduction?: string;
@@ -111,6 +115,7 @@ export default function TalabatImportDetailPage() {
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [allocAllLoading, setAllocAllLoading] = useState(false);
   const [allocAllMsg, setAllocAllMsg] = useState("");
+  const [recalculating, setRecalculating] = useState(false);
 
   // Allocation modal state
   const [allocRider, setAllocRider] = useState<Rider | null>(null);
@@ -223,6 +228,20 @@ export default function TalabatImportDetailPage() {
     await load();
   }
 
+  async function recalculateCurrentRate() {
+    if (!confirm("سيتم تحديث الأرقام وفق معدل 0.590 و1.180 مع الاحتفاظ بتوزيع كل سائق بنفس النسب. هل تريد المتابعة؟")) return;
+    setRecalculating(true);
+    setPostError("");
+    const res = await fetch(`/api/delivery/talabat-imports/${importId}/recalculate-current-rate`, { method: "POST" });
+    const data = await res.json();
+    setRecalculating(false);
+    if (!data.success) {
+      setPostError(data.error ?? "فشلت إعادة الاحتساب");
+      return;
+    }
+    await load();
+  }
+
   if (loading || !imp) {
     return <div className="page-container py-16 text-center text-sm text-muted-foreground">جاري التحميل...</div>;
   }
@@ -243,6 +262,16 @@ export default function TalabatImportDetailPage() {
         companyId={companyId}
         actions={
           <div className="flex items-center gap-2">
+            {isEditable && (
+              <button
+                onClick={recalculateCurrentRate}
+                disabled={recalculating}
+                className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                <Wand2 size={14} />
+                {recalculating ? "جاري إعادة الاحتساب..." : "إعادة الاحتساب مع حفظ التوزيع"}
+              </button>
+            )}
             {isEditable && (
               <button
                 onClick={() => setCancelConfirm(true)}
@@ -298,10 +327,10 @@ export default function TalabatImportDetailPage() {
           {[
             { label: "الصفوف", value: imp.totalRows.toString() },
             { label: "السائقون", value: imp.totalRiders.toString() },
-            { label: "Pickup Pay", value: fmt3(imp.totalPickupPay) },
-            { label: "Dropoff Pay", value: fmt3(imp.totalDropoffPay) },
-            { label: "إجمالي الطلبات", value: fmt3(imp.totalCalculatedOrders), bold: true },
-            { label: "دفع Data", value: fmt3(imp.totalPayment) },
+            { label: "Pickup × 0.590", value: fmt3(imp.totalPickupPay) },
+            { label: "Dropoff × 0.590", value: fmt3(imp.totalDropoffPay) },
+            { label: "الطلبات المحسوبة (Pickup + Dropoff ÷ 1.180)", value: fmt3(imp.totalCalculatedOrders), bold: true },
+            { label: "إجمالي التحصيل (معدل 1.180)", value: fmt3(imp.totalPayment) },
             totalSummaryPayment !== null ? { label: "Final Payment", value: fmt3(totalSummaryPayment), warn: Math.abs(paymentDiff!) > 0.01 } : null,
             totalSummaryPayment !== null && paymentDiff !== null ? { label: "الفرق", value: fmt3(paymentDiff), warn: Math.abs(paymentDiff) > 0.01, color: Math.abs(paymentDiff) > 0.01 ? "text-red-600" : "text-emerald-600" } : null,
           ].filter(Boolean).map((s, i) => s && (
@@ -335,10 +364,12 @@ export default function TalabatImportDetailPage() {
                     <th>كود طلبات</th>
                     <th>اسم السائق في طلبات</th>
                     <th>الصفوف</th>
-                    <th>Pickup Pay</th>
-                    <th>Dropoff Pay</th>
-                    <th>الطلبات المحسوب</th>
-                    <th>الدفع الكلي</th>
+                    <th>Pickup الصافي</th>
+                    <th>Dropoff الصافي</th>
+                    <th>الطلبات المحسوبة ÷ 1.180</th>
+                    <th>Pickup × 0.590</th>
+                    <th>Dropoff × 0.590</th>
+                    <th>إجمالي التحصيل (1.180)</th>
                     <th>حالة المطابقة</th>
                     <th>السائق المرتبط</th>
                     <th>إجراءات</th>
@@ -366,10 +397,12 @@ export default function TalabatImportDetailPage() {
                           )}
                         </td>
                         <td className="text-center text-sm">{rider.rowCount}</td>
+                        <td className="number text-sm">{fmt3(Math.max(0, (rider.pickupsCount ?? 0) - Math.abs(rider.pickupCancellations ?? 0)))}</td>
+                        <td className="number text-sm">{fmt3(Math.max(0, (rider.dropoffsCount ?? 0) - Math.abs(rider.dropoffCancellations ?? 0)))}</td>
+                        <td className="number font-bold text-primary">{fmt3(rider.calculatedOrdersRounded)}</td>
                         <td className="number text-sm">{fmt3(rider.totalPickupPay)}</td>
                         <td className="number text-sm">{fmt3(rider.totalDropoffPay)}</td>
-                        <td className="number font-bold text-primary">{fmt3(rider.calculatedOrdersRounded)}</td>
-                        <td className="number text-sm">{fmt3(rider.totalPayment)}</td>
+                        <td className="number text-sm font-bold text-emerald-700">{fmt3(rider.totalPayment)}</td>
                         <td>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ms.color}`}>
                             {ms.label}

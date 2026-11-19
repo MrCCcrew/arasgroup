@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import localFont from "next/font/local";
+import { defaultVoucherPrintSettings, effectiveVoucherPrintSettings, type VoucherPrintSettings } from "@/lib/accounting/voucher-print-settings";
+
+const cairoExtraBold = localFont({
+  src: "../../../../../../../../../public/fonts/Cairo-ExtraBold.ttf",
+  weight: "800",
+  style: "normal",
+  display: "swap",
+});
 
 interface Account {
   code: string;
@@ -19,6 +28,7 @@ interface Line {
 
 interface Entry {
   id: string;
+  companyId: string;
   number: string;
   date: string;
   type: string;
@@ -96,13 +106,13 @@ function VoucherBody({ entry, company, copy }: { entry: Entry; company: Company;
   const dateStr = dateObj.toLocaleDateString("ar-KW", { year: "numeric", month: "long", day: "numeric" });
 
   return (
-    <div className="voucher-body">
+    <div className={`voucher-body${isVoucher ? " voucher-document" : ""}`}>
       <div className="voucher-header">
         <div className="company-info">
           {company.logoUrl && <img src={company.logoUrl} alt={company.nameAr} className="company-logo" />}
           <div>
-            <h1 className="company-name">{company.nameAr}</h1>
-            {company.nameEn && <p className="company-name-en">{company.nameEn}</p>}
+            <h1 className={`company-name${isVoucher ? ` ${cairoExtraBold.className}` : ""}`}>{company.nameAr}</h1>
+            {company.nameEn && <p className={`company-name-en${isVoucher ? ` ${cairoExtraBold.className}` : ""}`}>{company.nameEn}</p>}
             {company.address && <p className="company-detail">{company.address}</p>}
             {company.phone && <p className="company-detail" dir="ltr">{company.phone}</p>}
           </div>
@@ -220,25 +230,35 @@ export default function PrintVoucherPage() {
   const [entry, setEntry] = useState<Entry | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<VoucherPrintSettings>(defaultVoucherPrintSettings);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
+    setLoading(true); setError(""); setEntry(null); setCompany(null);
     Promise.all([
       fetch(`/api/accounting/journal-entries/${id}`).then((r) => r.json()),
       fetch(`/api/companies/${companyId}`).then((r) => r.json()),
-    ]).then(([je, co]) => {
-      if (je.success) setEntry(je.data);
-      if (co.success) setCompany(co.data);
-      setLoading(false);
-    });
+      fetch(`/api/companies/${companyId}/voucher-print-settings`).then((r) => r.json()),
+    ]).then(([je, co, preferences]) => {
+      if (!je.success || !co.success || !preferences.success) throw new Error("تعذر تحميل السند أو إعدادات الطباعة. أعد تحميل الصفحة.");
+      if (je.data.companyId !== companyId) throw new Error("السند لا يتبع هذه الشركة");
+      if (active) { setEntry(je.data); setCompany(co.data); setSettings(preferences.data); }
+    }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [id, companyId]);
 
   if (loading) {
     return <div style={{ padding: "2rem", textAlign: "center", fontFamily: "Arial" }}>جار التحميل...</div>;
   }
 
+  if (error) return <div role="alert" style={{ padding: "2rem" }}>{error}</div>;
   if (!entry || !company) {
     return <div style={{ padding: "2rem", textAlign: "center", fontFamily: "Arial" }}>القيد غير موجود</div>;
   }
+
+  const printSettings = effectiveVoucherPrintSettings(entry.type, settings);
+  const landscape = printSettings.orientation === "landscape";
 
   return (
     <>
@@ -254,7 +274,11 @@ export default function PrintVoucherPage() {
           display: flex; align-items: center; background: #6b7280; color: white; border: none;
           padding: 0.5rem 1.2rem; border-radius: 0.5rem; font-size: 0.9rem; cursor: pointer; text-decoration: none; font-family: inherit;
         }
-        .page-wrapper { max-width: 210mm; margin: 2rem auto; display: flex; flex-direction: column; gap: 0; }
+        .page-wrapper { max-width: ${landscape ? "297mm" : "210mm"}; margin: 4rem auto 2rem; display: flex; flex-direction: ${landscape && printSettings.copies === 2 ? "row" : "column"}; gap: 0; }
+        .voucher-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+        .company-info { min-width: 0; }
+        .field-value { min-width: 0; }
+        ${landscape && printSettings.copies === 2 ? `.page-wrapper .voucher-body { padding: 5mm; } .page-wrapper .company-name { font-size: 1rem; } .page-wrapper .company-logo { width: 45px; height: 45px; } .page-wrapper .voucher-title-box { padding: 0.3rem; } .page-wrapper .field-label { min-width: 0; } .page-wrapper .field-underline { min-width: 0; } .page-wrapper .voucher-body + .voucher-body { border-top: none; border-right: 2px dashed #9ca3af; }` : ""}
         .voucher-body { background: white; padding: 1.5rem 2rem; border: 1px solid #d1d5db; }
         .voucher-body + .voucher-body { border-top: 2px dashed #9ca3af; }
         .voucher-header {
@@ -262,6 +286,12 @@ export default function PrintVoucherPage() {
         }
         .company-info { display: flex; align-items: flex-start; gap: 0.75rem; }
         .company-logo { width: 70px; height: 70px; object-fit: contain; border-radius: 6px; border: 1.5px solid #1e3a8a; padding: 4px; background: white; }
+        .page-wrapper .voucher-document .company-logo { width: ${landscape && printSettings.copies === 2 ? "128px" : "180px"}; height: ${landscape && printSettings.copies === 2 ? "110px" : "125px"}; flex-shrink: 0; }
+        .voucher-document .voucher-header { gap: 1rem; }
+        .voucher-document .company-info { flex: 1; flex-wrap: wrap; align-items: center; }
+        .voucher-document .company-info > div { flex: 1; min-width: 100px; }
+        .voucher-document .voucher-title-box { flex-shrink: 0; }
+        .voucher-document .company-name-en { font-weight: 800; }
         .company-name { font-size: 1.4rem; font-weight: 800; color: #1e3a8a; }
         .company-name-en { font-size: 0.95rem; font-weight: 600; color: #374151; direction: ltr; text-align: left; margin-top: 0.2rem; }
         .company-detail { font-size: 0.78rem; color: #6b7280; margin-top: 0.15rem; }
@@ -303,18 +333,21 @@ export default function PrintVoucherPage() {
           .page-wrapper { margin: 0; max-width: 100%; }
           .voucher-body { border: none; padding: 1.2rem 1.5rem; }
           .voucher-body + .voucher-body { border-top: 2px dashed #9ca3af; }
-          @page { size: A4; margin: 1cm; }
+          .voucher-body { break-inside: avoid; }
+          @page voucher { size: A4 ${printSettings.orientation}; margin: 10mm; }
+          .page-wrapper { page: voucher; }
         }
       `}</style>
 
       <div className="print-controls">
-        <button onClick={() => window.print()}>طباعة</button>
+        <button onClick={async () => { await document.fonts.ready; window.print(); }}>طباعة</button>
+        {(entry.type === "RECEIPT" || entry.type === "PAYMENT") && <a href={`/dashboard/companies/${companyId}/accounting/print-settings`}>إعدادات الطباعة</a>}
         <a href={`/dashboard/companies/${companyId}/accounting/journal-entries`}>العودة</a>
       </div>
 
       <div className="page-wrapper">
         <VoucherBody entry={entry} company={company} copy={false} />
-        <VoucherBody entry={entry} company={company} copy={true} />
+        {printSettings.copies === 2 && <VoucherBody entry={entry} company={company} copy={true} />}
       </div>
     </>
   );

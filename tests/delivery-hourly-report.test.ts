@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { reportPeriod, summarizeHourlyReport } from "../lib/delivery/hourly-report";
+const row = { driverId: "d1", workEntityId: "e1", minutes: 90, ordersCount: 10, amount: "2.000", driver: { employee: { nameAr: "Driver", nameEn: null } }, workEntity: { name: "eyed" } };
+const result = summarizeHourlyReport([row, { ...row, driverId: "d2", minutes: 60, ordersCount: 99, amount: "1.250" }, { ...row, workEntityId: "e2", minutes: 30, ordersCount: 0, amount: "0.750" }]);
+assert.equal(result.minutes, 180);
+assert.equal(result.orders, 109);
+assert.equal(result.amount.toFixed(3), "4.000");
+assert.equal(result.byDriver.length, 2, "drivers with identical names must not merge");
+assert.equal(result.byDriver[0].amount.toFixed(3), "2.750");
+assert.equal(result.byEntity[0].minutes, 150);
+assert.equal(summarizeHourlyReport([{ ...row, ordersCount: 10000 }]).amount.toFixed(3), "2.000");
+const period = reportPeriod({ from: "2026-09-01", to: "2026-09-30" });
+assert.equal(period.from.toISOString(), "2026-09-01T00:00:00.000Z");
+assert.equal(period.until.toISOString(), "2026-10-01T00:00:00.000Z");
+const leap = reportPeriod({}, new Date("2024-02-15T00:00:00Z"));
+assert.equal(leap.toString, "2024-02-29");
+assert.equal(summarizeHourlyReport([]).amount.toFixed(3), "0.000");
+console.log("Hourly report tests passed: saved amounts, independent orders, grouping and inclusive date boundaries");

@@ -97,9 +97,22 @@ export async function DELETE(request: NextRequest, { params }: Props) {
 
     const c = await prisma.establishmentContract.findFirst({ where: { id: contractId, licenseId } });
     if (!c) return NextResponse.json({ success: false, error: "العقد غير موجود" }, { status: 404 });
-    if (c.isActive) return NextResponse.json({ success: false, error: "لا يمكن حذف النسخة النشطة" }, { status: 400 });
-
-    await prisma.establishmentContract.delete({ where: { id: contractId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.establishmentContract.delete({ where: { id: contractId } });
+      if (c.isActive) {
+        const replacement = await tx.establishmentContract.findFirst({
+          where: { licenseId },
+          orderBy: { version: "desc" },
+          select: { id: true },
+        });
+        if (replacement) {
+          await tx.establishmentContract.update({
+            where: { id: replacement.id },
+            data: { isActive: true },
+          });
+        }
+      }
+    });
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "خطأ" }, { status: 500 });

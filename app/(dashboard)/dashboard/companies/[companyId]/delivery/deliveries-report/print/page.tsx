@@ -1,4 +1,6 @@
-import { redirect } from "next/navigation";
+import { HourlyReport } from "@/components/delivery/hourly-report";
+import { canAccessCompany, hasPermission } from "@/lib/auth/permissions";
+import { notFound, redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -6,7 +8,7 @@ import { formatDate } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ contractId?: string; from?: string; to?: string; driverId?: string }>;
+  searchParams: Promise<{ contractId?: string; from?: string; to?: string; driverId?: string; workEntityId?: string; mode?: string }>;
 }
 
 const AR = {
@@ -40,7 +42,17 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
 
   const { companyId } = await params;
   const sp = await searchParams;
-  const contractId = sp.contractId ?? "";
+  if (!canAccessCompany(session, companyId) || (!hasPermission(session, "DELIVERY_REPORTS", "VIEW", { companyId }) && !hasPermission(session, "DELIVERY_OPERATIONS", "VIEW", { companyId }))) notFound();
+  const reportContract = await prisma.deliveryContract.findFirst({
+    where: { companyId, ...(sp.contractId ? { id: sp.contractId } : { OR: [{ usesHourlyWork: true }, { usesLocationPricing: true }, { hourlyWorkEntries: { some: {} } }] }) },
+    select: { id: true, usesHourlyWork: true, _count: { select: { hourlyWorkEntries: true } } }, orderBy: { nameAr: "asc" },
+  });
+  if (sp.contractId && !reportContract) notFound();
+  if (reportContract && (sp.mode === "hourly" || (sp.mode !== "deliveries" && (reportContract.usesHourlyWork || reportContract._count.hourlyWorkEntries > 0)))) {
+    return <HourlyReport companyId={companyId} contractId={reportContract.id} search={sp} session={session} print />;
+  }
+
+  const contractId = reportContract?.id ?? "";
   const fromDate = sp.from ? new Date(`${sp.from}T00:00:00.000`) : undefined;
   const toDate = sp.to ? new Date(`${sp.to}T23:59:59.999`) : undefined;
 
@@ -79,6 +91,7 @@ export default async function DeliveriesReportPrintPage({ params, searchParams }
   }
 
   const backQuery = new URLSearchParams({
+    mode: "deliveries",
     ...(contractId ? { contractId } : {}),
     ...(sp.from ? { from: sp.from } : {}),
     ...(sp.to ? { to: sp.to } : {}),

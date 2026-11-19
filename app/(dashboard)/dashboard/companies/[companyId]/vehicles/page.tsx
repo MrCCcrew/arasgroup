@@ -52,7 +52,14 @@ export default async function VehiclesPage({ params }: Props) {
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
-        assignedEmployee: { select: { id: true, nameAr: true, nameEn: true } },
+        assignedEmployee: {
+          select: {
+            id: true,
+            nameAr: true,
+            nameEn: true,
+            driver: { select: { talabatId: true } },
+          },
+        },
         assignedDrivers: {
           where: {
             employee: {
@@ -63,6 +70,7 @@ export default async function VehiclesPage({ params }: Props) {
           },
           select: {
             id: true,
+            talabatId: true,
             employee: { select: { id: true, nameAr: true, nameEn: true } },
           },
           orderBy: { createdAt: "desc" },
@@ -159,9 +167,15 @@ export type VehicleRow = {
   licenseId: string | null;
   branch: { nameAr: string; nameEn: string | null } | null;
   investor: { nameAr: string; nameEn: string | null } | null;
-  assignedEmployee: { id: string; nameAr: string; nameEn: string | null } | null;
+  assignedEmployee: {
+    id: string;
+    nameAr: string;
+    nameEn: string | null;
+    driver: { talabatId: string | null } | null;
+  } | null;
   assignedDrivers: Array<{
     id: string;
+    talabatId: string | null;
     employee: { id: string; nameAr: string; nameEn: string | null };
   }>;
   license: { id: string; commercialNameAr: string; licenseNumber: string } | null;

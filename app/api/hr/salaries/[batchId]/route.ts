@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { createSalaryPaymentJE } from "@/lib/accounting/auto-entries";
+import { createAdvanceSalaryJournal, lockAdvanceCompany, prepareAdvanceSalary, reserveAdvanceInstallments, validateReservedAdvances } from "@/lib/hr/employee-advances";
+import { getAccessibleBranchIds } from "@/lib/auth/permissions";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { discardLinkedJournalEntry, ensureLinkedJournalEntryIsMutable } from "@/lib/accounting/journal-engine";
-import { buildSalaryBatchDraft } from "@/lib/hr/salary-batch-builder";
+import { salaryAdjustmentDetailsSchema } from "@/lib/hr/salary-adjustments";
+import { linkSalaryItemsToPayments } from "@/lib/hr/salary-items";
+import { linkViolationInstallmentsToPayments, reserveViolationInstallments, settleViolationInstallments } from "@/lib/hr/driver-violation-installments";
 
 interface Ctx {
   params: Promise<{ batchId: string }>;
@@ -43,6 +46,9 @@ const updateBatchSchema = z.object({
     fuelAddition: z.number().min(0).default(0),
     targetDeduction: z.number().min(0).default(0),
     companyDeduction: z.number().min(0).default(0),
+    vehicleRentDeduction: z.number().min(0).default(0),
+    housingDeduction: z.number().min(0).default(0),
+    adjustmentDetails: salaryAdjustmentDetailsSchema,
     attendanceDays: z.number().min(0).optional(),
     evaluationScore: z.number().min(0).optional(),
     targetOrders: z.number().int().min(0).optional(),
@@ -161,8 +167,18 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (permissionError) return permissionError;
 
     const updated = await prisma.$transaction(async (tx) => {
-      if (parsed.data.status === "CANCELLED" && batch.journalEntryId) {
-        await discardLinkedJournalEntry(tx, batch.journalEntryId, {
+      await lockAdvanceCompany(tx, batch.companyId);
+      const current = await tx.salaryBatch.findUniqueOrThrow({ where: { id: batchId } });
+      if ((current.status === "PAID" || current.status === "CANCELLED") && parsed.data.status && parsed.data.status !== current.status) throw new Error("لا يمكن تغيير حالة دفعة مصروفة أو ملغاة");
+      if (parsed.data.status === "PAID" && current.status !== "APPROVED") throw new Error("اعتمد دفعة الرواتب قبل تأكيد صرفها");
+      if (parsed.data.status === "PAID" || parsed.data.status === "APPROVED") await validateReservedAdvances(tx, batchId);
+      if (parsed.data.status === "PAID") await settleViolationInstallments(tx, batchId);
+      if (parsed.data.status === "CANCELLED") {
+        await reserveAdvanceInstallments(tx, batchId, []);
+        await reserveViolationInstallments(tx, batchId, []);
+      }
+      if (parsed.data.status === "CANCELLED" && current.journalEntryId) {
+        await discardLinkedJournalEntry(tx, current.journalEntryId, {
           userId: session.id,
           reasonAr: AR.cancelReason,
         });
@@ -177,7 +193,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ success: false, error: AR.updateFailed }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : AR.updateFailed }, { status: 400 });
   }
 }
 
@@ -207,10 +223,13 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     await ensureLinkedJournalEntryIsMutable(prisma, batch.journalEntryId, AR.editAction);
 
     const data = parsed.data;
-    const draft = buildSalaryBatchDraft(data.payments);
 
-    await prisma.$transaction(async (tx) => {
-      await discardLinkedJournalEntry(tx, batch.journalEntryId, {
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      await lockAdvanceCompany(tx, batch.companyId);
+      const current = await tx.salaryBatch.findUniqueOrThrow({ where: { id: batchId } });
+      ensureBatchIsEditable(current.status);
+      const draft = await prepareAdvanceSalary(tx, batch.companyId, data.year, data.month, data.payments, getAccessibleBranchIds(session, batch.companyId), batchId);
+      await discardLinkedJournalEntry(tx, current.journalEntryId, {
         userId: session.id,
         reasonAr: AR.updateReason,
       });
@@ -218,7 +237,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       await tx.salaryItem.deleteMany({ where: { batchId } });
       await tx.salaryPayment.deleteMany({ where: { batchId } });
 
-      await tx.salaryBatch.update({
+      const updated = await tx.salaryBatch.update({
         where: { id: batchId },
         data: {
           month: data.month,
@@ -240,6 +259,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
               incentives: payment.incentives,
               additionalEarnings: payment.additionalEarnings,
               deductions: payment.deductions,
+              advanceDeduction: payment.advanceDeduction,
               netAmount: payment.netAmount,
               notes: payment.notes,
             })),
@@ -248,21 +268,15 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
             create: draft.items,
           },
         },
+        include: { payments: true },
       });
-    });
-
-    const salaryJournalEntry = await createSalaryPaymentJE({
-      companyId: batch.companyId,
-      userId: session.id,
-      totalAmount: draft.totalNet,
-      month: data.month,
-      year: data.year,
-      refId: batchId,
-    });
-
-    const updatedBatch = await prisma.salaryBatch.update({
-      where: { id: batchId },
-      data: { journalEntryId: salaryJournalEntry.id },
+      await linkSalaryItemsToPayments(tx, batchId, updated.payments);
+      await reserveAdvanceInstallments(tx, batchId, draft.dueIds);
+      await reserveViolationInstallments(tx, batchId, draft.violationDueIds);
+      await linkViolationInstallmentsToPayments(tx, batchId, updated.payments);
+      const violationRecoveries = draft.items.filter(item => item.sourceType === "DRIVER_VIOLATION").map(item => ({ employeeId: item.employeeId, amount: item.amount }));
+      const journal = await createAdvanceSalaryJournal(tx, batch.companyId, session.id, batchId, data.month, data.year, draft.totalNet, draft.payments.reduce((sum, row) => sum + row.advanceDeduction, 0), draft.payments, violationRecoveries);
+      return tx.salaryBatch.update({ where: { id: batchId }, data: { journalEntryId: journal.id } });
     });
 
     return NextResponse.json({ success: true, data: updatedBatch });
@@ -294,7 +308,12 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
     await ensureLinkedJournalEntryIsMutable(prisma, batch.journalEntryId, AR.deleteAction);
 
     await prisma.$transaction(async (tx) => {
-      await discardLinkedJournalEntry(tx, batch.journalEntryId, {
+      await lockAdvanceCompany(tx, batch.companyId);
+      const current = await tx.salaryBatch.findUniqueOrThrow({ where: { id: batchId } });
+      ensureBatchIsDeletable(current.status);
+      await reserveAdvanceInstallments(tx, batchId, []);
+      await reserveViolationInstallments(tx, batchId, []);
+      await discardLinkedJournalEntry(tx, current.journalEntryId, {
         userId: session.id,
         reasonAr: AR.deleteReason,
       });

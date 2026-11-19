@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, Building2, Search, TrendingUp, Truck, UserRound, Users } from "lucide-react";
@@ -120,7 +120,8 @@ export default async function GroupDashboardPage({ searchParams }: { searchParam
     DELIVERY: "شركة توصيل",
     CAR_WASH: "شركة غسيل سيارات",
     GENERAL_TRADING: "تجارة عامة",
-    TRADING: "تجارة",
+    CONTRACTING: "مقاولات",
+    TRADING: "تجارة عامة",
     HOLDING: "قابضة",
     OTHER: "أخرى",
   };
@@ -129,6 +130,7 @@ export default async function GroupDashboardPage({ searchParams }: { searchParam
     DELIVERY: "bg-blue-500",
     CAR_WASH: "bg-cyan-500",
     GENERAL_TRADING: "bg-emerald-500",
+    CONTRACTING: "bg-orange-500",
     TRADING: "bg-emerald-600",
     HOLDING: "bg-violet-500",
     OTHER: "bg-slate-500",
@@ -149,40 +151,55 @@ export default async function GroupDashboardPage({ searchParams }: { searchParam
       <Header title="لوحة تحكم المجموعة" subtitle="عبد الفتاح راشد سليمان - الكويت" />
 
       {/* Quick Access - Companies */}
-      <div className="border-b bg-gradient-to-b from-background to-muted/20">
-        <div className="page-container">
-          <div className="flex items-center gap-2 overflow-x-auto py-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Building2 size={16} />
-              <span className="whitespace-nowrap">الوصول السريع:</span>
+      <section className="border-b bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="page-container py-4">
+          <div className="rounded-2xl border bg-card/95 p-3 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 size={18} /></span>
+                <div>
+                  <h2 className="text-sm font-bold">{"\u0627\u0644\u0648\u0635\u0648\u0644 \u0627\u0644\u0633\u0631\u064a\u0639 \u0644\u0644\u0634\u0631\u0643\u0627\u062a"}</h2>
+                  <p className="text-xs text-muted-foreground">{"\u0627\u062e\u062a\u0631 \u0627\u0644\u0634\u0631\u0643\u0629 \u0644\u0644\u062f\u062e\u0648\u0644 \u0625\u0644\u0649 \u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645 \u0627\u0644\u062e\u0627\u0635\u0629 \u0628\u0647\u0627"}</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{companies.length} {"\u0634\u0631\u0643\u0629"}</span>
             </div>
-            <div className="flex gap-2">
-              {companies.map((company) => (
-                <Link
-                  key={company.id}
-                  href={`/dashboard/companies/${company.id}`}
-                  className="group flex items-center gap-2 whitespace-nowrap rounded-full border bg-card px-4 py-1.5 text-sm font-medium transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md"
-                >
-                  <div className={`h-5 w-5 shrink-0 overflow-hidden rounded ${companyTypeColors[company.type] ?? "bg-gray-500"}`}>
-                    {company.logoUrl ? (
-                      <Image src={company.logoUrl} alt={company.nameAr} width={20} height={20} className="h-full w-full object-contain p-0.5" unoptimized />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-white">
-                        {company.nameAr.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <span>{company.nameAr}</span>
-                  <span className="text-xs opacity-60 group-hover:opacity-80">
-                    ({totalMap.get(company.id) ?? 0})
-                  </span>
-                </Link>
-              ))}
+
+            <div className="max-h-[21rem] overflow-y-auto overscroll-contain pr-1">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {companies.map((company) => {
+                  const employeeCount = totalMap.get(company.id) ?? 0;
+                  return (
+                    <Link
+                      key={company.id}
+                      href={`/dashboard/companies/${company.id}`}
+                      className="group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border bg-background px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/[0.03] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <span className={`absolute inset-y-0 right-0 w-1 ${companyTypeColors[company.type] ?? "bg-slate-500"}`} />
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ${companyTypeColors[company.type] ?? "bg-slate-500"}`}>
+                        {company.logoUrl ? (
+                          <Image src={company.logoUrl} alt={company.nameAr} width={40} height={40} className="h-full w-full object-contain p-1" unoptimized />
+                        ) : (
+                          <span className="text-sm font-bold text-white">{company.nameAr.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">{company.nameAr}</p>
+                        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="truncate">{companyTypeLabels[company.type] ?? company.type}</span>
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-border" />
+                          <span className="inline-flex shrink-0 items-center gap-1"><Users size={11} /> {employeeCount}</span>
+                          {company._count.branches > 0 && <span className="shrink-0">{company._count.branches} {"\u0641\u0631\u0639"}</span>}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
+      </section>
       <div className="page-container">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard icon={<Building2 size={20} className="text-blue-600" />} label="إجمالي الشركات" value={companies.length} bg="bg-blue-50" />
@@ -339,3 +356,4 @@ function StatCard({
     </div>
   );
 }
+

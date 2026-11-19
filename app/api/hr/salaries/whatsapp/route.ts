@@ -4,6 +4,7 @@ import { requireRequestSession } from "@/lib/auth/access";
 import { buildSalaryWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import { uploadToR2 } from "@/lib/storage/r2";
 import { renderSalarySlipPdfBuffer } from "@/lib/hr/salary-slip-pdf";
+import { salaryPaymentItemsWhere } from "@/lib/hr/salary-items";
 
 const AR = {
   paymentIdRequired: "\u0645\u0639\u0631\u0641 \u062f\u0641\u0639\u0629 \u0627\u0644\u0631\u0627\u062a\u0628 \u0645\u0637\u0644\u0648\u0628",
@@ -46,11 +47,37 @@ export async function GET(request: NextRequest) {
       select: { nameAr: true, nameEn: true },
     }),
     prisma.salaryItem.findMany({
-      where: { salaryPaymentId: payment.id },
-      select: { titleAr: true, titleEn: true, amount: true, category: true },
+      where: salaryPaymentItemsWhere(payment),
+      select: { titleAr: true, titleEn: true, amount: true, category: true, type: true, sourceType: true, sourceId: true },
       orderBy: { createdAt: "asc" },
     }),
   ]);
+
+  const violationIds = items
+    .filter(item => item.sourceType === "DRIVER_VIOLATION" && item.sourceId)
+    .map(item => item.sourceId as string);
+  const violations = violationIds.length
+    ? await prisma.driverViolation.findMany({
+      where: { id: { in: violationIds } },
+      select: { id: true, type: true, date: true, locationAr: true, descriptionAr: true },
+    })
+    : [];
+  const violationsById = new Map(violations.map(violation => [violation.id, violation]));
+  const messageItems = items.map(item => {
+    const violation = item.sourceType === "DRIVER_VIOLATION" && item.sourceId
+      ? violationsById.get(item.sourceId)
+      : null;
+    if (!violation) return { ...item, amount: Number(item.amount) };
+    const date = violation.date.toLocaleDateString(locale === "en" ? "en-GB" : "ar-KW");
+    const extraAr = [violation.type, date, violation.locationAr, violation.descriptionAr].filter(Boolean).join(" — ");
+    const extraEn = [violation.type, date].filter(Boolean).join(" — ");
+    return {
+      ...item,
+      titleAr: `\u0645\u062e\u0627\u0644\u0641\u0629 \u0645\u0631\u0648\u0631: ${extraAr}`,
+      titleEn: `Traffic violation: ${extraEn}`,
+      amount: Number(item.amount),
+    };
+  });
 
   let pdfUrl =
     `${origin}/dashboard/companies/${payment.batch.companyId}` +
@@ -120,6 +147,8 @@ export async function GET(request: NextRequest) {
     netWithoutIncentive: Number(payment.netAmount) - Number(payment.incentives),
     deductions: Number(payment.deductions),
     netAmount: Number(payment.netAmount),
+    additionalEarnings: Number(payment.additionalEarnings),
+    items: messageItems,
     pdfUrl,
   });
 

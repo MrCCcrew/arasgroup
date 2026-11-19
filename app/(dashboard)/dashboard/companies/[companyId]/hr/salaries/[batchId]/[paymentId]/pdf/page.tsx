@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatKWD } from "@/lib/utils";
+import { salaryPaymentItemsWhere } from "@/lib/hr/salary-items";
 
 interface Props {
   params: Promise<{ companyId: string; batchId: string; paymentId: string }>;
@@ -97,7 +98,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
       select: { nameAr: true, nameEn: true },
     }),
     prisma.salaryItem.findMany({
-      where: { salaryPaymentId: paymentId },
+      where: salaryPaymentItemsWhere(payment),
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -312,7 +313,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
           <tbody>
             {earnings.map((item: SalaryItemRow) => (
               <tr key={item.id}>
-                <td>{locale === "en" ? item.titleEn : item.titleAr}</td>
+                <td>{locale === "en" ? item.titleEn || item.titleAr : item.titleAr}</td>
                 <td className="amount">{formatKWD(Number(item.amount), numberLocale)}</td>
               </tr>
             ))}
@@ -332,7 +333,7 @@ export default async function SalaryPDFPage({ params, searchParams }: Props) {
               <tbody>
                 {deductions.map((item: SalaryItemRow) => (
                   <tr key={item.id}>
-                    <td>{locale === "en" ? item.titleEn : item.titleAr}</td>
+                    <td>{locale === "en" ? item.titleEn || item.titleAr : item.titleAr}</td>
                     <td className="amount">{formatKWD(Number(item.amount), numberLocale)}</td>
                   </tr>
                 ))}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
+import { initializeCompanyChart } from "@/lib/accounting/company-chart";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -52,7 +53,12 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       targetGroupId = newGroup.id;
     }
 
-    const company = await prisma.company.update({
+    const company = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+      if (type && type !== "CONTRACTING" && await tx.constructionProject.count({ where: { companyId } })) {
+        throw new Error("لا يمكن تغيير نشاط شركة لها مشروعات مقاولات مسجلة");
+      }
+      const updated = await tx.company.update({
       where: { id: companyId },
       data: {
         ...(nameAr !== undefined ? { nameAr } : {}),
@@ -67,7 +73,12 @@ export async function PATCH(request: NextRequest, { params }: Props) {
         ...(targetGroupId ? { groupId: targetGroupId } : {}),
       },
       include: { group: true },
-    });
+      });
+      if (["CONTRACTING", "GROCERY", "CLOTHING_RETAIL", "TAILORING", "FABRIC_RETAIL", "TAILORING_FABRIC_RETAIL", "TOBACCO_SHISHA", "MOBILE_REPAIR_ACCESSORIES"].includes(type)) {
+        await initializeCompanyChart(tx, companyId, type);
+      }
+      return updated;
+    }, { timeout: 30000 });
 
     return NextResponse.json({ success: true, data: company });
   } catch (error) {

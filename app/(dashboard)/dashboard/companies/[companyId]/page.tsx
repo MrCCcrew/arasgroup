@@ -31,6 +31,8 @@ const companyTypeLabels = {
     CAR_WASH: "غسيل سيارات",
     TRADING: "تجارة عامة",
     GENERAL_TRADING: "تجارة عامة",
+    CONTRACTING: "مقاولات",
+    GROCERY: "بقالة ومخزون",
     HOLDING: "قابضة",
     OTHER: "أخرى",
   },
@@ -39,6 +41,8 @@ const companyTypeLabels = {
     CAR_WASH: "Car Wash",
     TRADING: "General Trading",
     GENERAL_TRADING: "General Trading",
+    CONTRACTING: "Contracting",
+    GROCERY: "Grocery & inventory",
     HOLDING: "Holding",
     OTHER: "Other",
   },
@@ -233,6 +237,12 @@ export default async function CompanyDashboardPage({ params }: Props) {
       />
 
       <div className="page-container space-y-6">
+        {company.type === "CONTRACTING" && (hasPermission(session, "CONTRACTING", "VIEW", { companyId }) || canViewAccounting) && (
+          <Link href={`/dashboard/companies/${companyId}/contracting`} className="section-card block border-orange-200 bg-orange-50">
+            <strong>{locale === "en" ? "Contracting projects" : "مشروعات المقاولات"}</strong>
+            <p>{locale === "en" ? "Projects, contracts, certificates, costs and site logs" : "المشروعات والعقود والمستخلصات والتكاليف وسجل الموقع"}</p>
+          </Link>
+        )}
 
         {/* ── شعار الشركة (مشرف عام فقط) ── */}
         {session.isSuperAdmin && (

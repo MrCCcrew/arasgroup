@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { createViolationInstallments } from "@/lib/hr/driver-violation-installments";
 
 interface Ctx { params: Promise<{ violationId: string }> }
 
@@ -28,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 const patchSchema = z.object({
-  status: z.enum(["PENDING", "SETTLED", "CANCELLED"]).optional(),
+  status: z.enum(["CANCELLED"]).optional(),
   installmentsPaid: z.number().int().min(0).optional(),
   notes: z.string().optional().nullable(),
   locationAr: z.string().optional().nullable(),
@@ -68,7 +69,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 }
 
 const updateSchema = z.object({
-  driverId: z.string(),
+  driverId: z.string().optional().nullable(),
+  employeeId: z.string().optional().nullable(),
   vehicleId: z.string().optional().nullable(),
   date: z.string(),
   locationAr: z.string().optional().nullable(),
@@ -83,7 +85,9 @@ const updateSchema = z.object({
   installmentMonths: z.number().int().min(1).optional().nullable(),
   notes: z.string().optional().nullable(),
   expenseCategoryId: z.string().optional().nullable(),
-});
+  installmentStartYear: z.number().int().min(2020).max(2200).optional().nullable(),
+  installmentStartMonth: z.number().int().min(1).max(12).optional().nullable(),
+}).refine(data => Boolean(data.driverId || data.employeeId), { message: "Driver or employee is required" });
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
   const session = await requireRequestSession(request);
@@ -97,7 +101,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
 
     const existing = await prisma.driverViolation.findUnique({
       where: { id: violationId },
-      select: { companyId: true, status: true },
+      select: { companyId: true, status: true, employeeId: true, driverId: true, installmentsPaid: true },
     });
     if (!existing) return NextResponse.json({ success: false, error: "المخالفة غير موجودة" }, { status: 404 });
 
@@ -109,24 +113,34 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     }
 
     const data = parsed.data;
-    const updated = await prisma.driverViolation.update({
-      where: { id: violationId },
-      data: {
-        driverId: data.driverId,
-        vehicleId: data.vehicleId || null,
-        date: new Date(data.date),
-        locationAr: data.locationAr || null,
-        locationEn: data.locationEn || null,
-        type: data.type,
-        descriptionAr: data.descriptionAr || null,
-        descriptionEn: data.descriptionEn || null,
-        amount: data.amount,
-        responsibility: data.responsibility,
-        driverSharePct: data.responsibility === "SPLIT" ? data.driverSharePct : null,
-        paymentMode: data.paymentMode,
-        installmentMonths: data.paymentMode === "INSTALLMENT" ? data.installmentMonths : null,
-        notes: data.notes || null,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const record = await tx.driverViolation.update({
+        where: { id: violationId },
+        data: {
+          driverId: data.driverId ?? existing.driverId,
+          employeeId: data.employeeId ?? existing.employeeId,
+          vehicleId: data.vehicleId || null,
+          date: new Date(data.date),
+          locationAr: data.locationAr || null,
+          locationEn: data.locationEn || null,
+          type: data.type,
+          descriptionAr: data.descriptionAr || null,
+          descriptionEn: data.descriptionEn || null,
+          amount: data.amount,
+          responsibility: data.responsibility,
+          driverSharePct: data.responsibility === "SPLIT" ? data.driverSharePct : null,
+          paymentMode: data.paymentMode,
+          installmentMonths: data.paymentMode === "INSTALLMENT" ? data.installmentMonths : null,
+          installmentStartYear: data.installmentStartYear ?? new Date(data.date).getUTCFullYear(),
+          installmentStartMonth: data.installmentStartMonth ?? new Date(data.date).getUTCMonth() + 1,
+          notes: data.notes || null,
+        },
+      });
+      // Rebuild only deductions that have not reached a salary batch yet; paid
+      // installments are immutable historical payroll records.
+      await tx.driverViolationInstallment.deleteMany({ where: { violationId, settledAt: null, batchId: null } });
+      await createViolationInstallments(tx, record);
+      return record;
     });
 
     return NextResponse.json({ success: true, data: updated });

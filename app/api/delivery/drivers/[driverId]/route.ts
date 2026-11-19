@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession } from "@/lib/auth/access";
+import { applyOrderRateToDraftSalaryPayments } from "@/lib/hr/refresh-delivery-salary-orders";
 
 interface Ctx {
   params: Promise<{ driverId: string }>;
@@ -30,6 +31,10 @@ const updateSchema = z.object({
   isRegisteredTalabat: z.boolean().optional(),
   isRegisteredRoPops: z.boolean().optional(),
   targetOrders: z.number().int().min(0).optional(),
+  payrollMode: z.enum(["TARGET_INCENTIVE", "CALCULATED_ORDER_RATE"]).optional(),
+  calculatedOrderRate: z.number().min(0).max(100).optional(),
+  monthlyVehicleRent: z.number().min(0).max(999999).optional(),
+  monthlyHousingDeduction: z.number().min(0).max(999999).optional(),
   isActive: z.boolean().optional(),
   employeeType: z.enum([
     "DRIVER", "DELIVERY_DRIVER", "DELIVERY_ADMIN", "OFFICE_EMPLOYEE",
@@ -115,6 +120,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       isRegisteredTalabat,
       isRegisteredRoPops,
       targetOrders,
+      payrollMode,
+      calculatedOrderRate,
+      monthlyVehicleRent,
+      monthlyHousingDeduction,
       employeeType,
       isActive,
       fuelCardNumber,
@@ -185,6 +194,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       if (isRegisteredTalabat !== undefined) driverData.isRegisteredTalabat = isRegisteredTalabat;
       if (isRegisteredRoPops !== undefined) driverData.isRegisteredRoPops = isRegisteredRoPops;
       if (targetOrders !== undefined) driverData.targetOrders = targetOrders;
+      if (payrollMode !== undefined) driverData.payrollMode = payrollMode;
+      if (calculatedOrderRate !== undefined) driverData.calculatedOrderRate = calculatedOrderRate;
+      if (monthlyVehicleRent !== undefined) driverData.monthlyVehicleRent = monthlyVehicleRent;
+      if (monthlyHousingDeduction !== undefined) driverData.monthlyHousingDeduction = monthlyHousingDeduction;
       if (fuelCardNumber !== undefined) driverData.fuelCardNumber = fuelCardNumber;
 
       if (assignedVehicleId !== undefined) {
@@ -243,7 +256,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         }
       }
 
-      return tx.driver.update({
+      const updatedDriver = await tx.driver.update({
         where: { id: driverId },
         data: driverData,
         include: {
@@ -251,6 +264,19 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
           assignedVehicle: { select: { id: true, plateNumber: true, make: true, model: true } },
         },
       });
+
+      if (updatedDriver.payrollMode === "CALCULATED_ORDER_RATE") {
+        await applyOrderRateToDraftSalaryPayments(tx, {
+          companyId: currentDriver.employee.companyId,
+          employeeId: currentDriver.employeeId,
+          driverId,
+          rate: Number(updatedDriver.calculatedOrderRate),
+          vehicleRent: Number(updatedDriver.monthlyVehicleRent),
+          housing: Number(updatedDriver.monthlyHousingDeduction),
+          userId: session.id,
+        });
+      }
+      return updatedDriver;
     });
 
     return NextResponse.json({ success: true, data: driver });

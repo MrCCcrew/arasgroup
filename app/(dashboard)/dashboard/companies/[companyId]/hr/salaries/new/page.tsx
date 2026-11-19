@@ -1,9 +1,12 @@
 "use client";
 
+import { useSalaryAdvances } from "@/hooks/use-salary-advances";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Save, Truck, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { SalaryAdjustmentEditor } from "@/components/hr/salary-adjustment-editor";
+import { adjustmentTotal, type SalaryAdjustment, type SalaryAdjustmentDetails, type SalaryAdjustmentField } from "@/lib/hr/salary-adjustments";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 
@@ -19,6 +22,10 @@ const DELIVERY_DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER"];
 interface DriverInfo {
   id: string;
   targetOrders: number;
+  payrollMode: "TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE";
+  calculatedOrderRate: string | number;
+  monthlyVehicleRent: string | number;
+  monthlyHousingDeduction: string | number;
 }
 
 interface Employee {
@@ -32,6 +39,7 @@ interface Employee {
 
 // سطر راتب — يحمل التفصيل الكامل للسائقين والحقول البسيطة لباقي الموظفين
 interface PaymentLine {
+  adjustmentDetails?: SalaryAdjustmentDetails;
   employeeId: string;
   isDriver: boolean;
   driverId: string | null;
@@ -45,6 +53,10 @@ interface PaymentLine {
   fuelAddition: string;     // إضافة بنزين وبنشر
   targetDeduction: string;  // خصم تارجيت (تلقائي عند أقل من التارجيت)
   companyDeduction: string; // خصم شركة
+  payrollMode: "TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE";
+  calculatedOrderRate: string;
+  vehicleRentDeduction: string;
+  housingDeduction: string;
   // الموظفون الآخرون (الشكل البسيط)
   additionalEarnings: string;
   deductions: string;
@@ -82,6 +94,7 @@ export default function NewSalaryBatchPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const advances = useSalaryAdvances(companyId, year, month);
   const [notes, setNotes] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [lines, setLines] = useState<PaymentLine[]>([]);
@@ -116,6 +129,10 @@ export default function NewSalaryBatchPage() {
                 fuelAddition: "0",
                 targetDeduction: "0",
                 companyDeduction: "0",
+                payrollMode: driver?.payrollMode ?? "TARGET_INCENTIVE",
+                calculatedOrderRate: String(driver?.calculatedOrderRate ?? "0.950"),
+                vehicleRentDeduction: isDriver && driver?.payrollMode === "CALCULATED_ORDER_RATE" ? String(driver?.monthlyVehicleRent ?? "130") : "0",
+                housingDeduction: isDriver && driver?.payrollMode === "CALCULATED_ORDER_RATE" ? String(driver?.monthlyHousingDeduction ?? "30") : "0",
                 additionalEarnings: "0",
                 deductions: "0",
                 notes: "",
@@ -141,12 +158,15 @@ export default function NewSalaryBatchPage() {
             if (!line.isDriver || !line.driverId) return line;
             const actual = totals[line.driverId] ?? 0;
             const target = parseInt(line.targetOrders || "0", 10) || 0;
+            const isOrderRate = line.payrollMode === "CALCULATED_ORDER_RATE";
             const diff = actual - target;
             return {
               ...line,
               actualOrders: String(actual),
-              incentive: diff > 0 ? String(round3(diff * INCENTIVE_RATE)) : "0",
-              targetDeduction: diff < 0 ? String(round3(-diff * INCENTIVE_RATE)) : "0",
+              baseAmount: isOrderRate ? String(round3(actual * n(line.calculatedOrderRate))) : line.baseAmount,
+              incentive: isOrderRate ? "0" : (diff > 0 ? String(round3(diff * INCENTIVE_RATE)) : "0"),
+              targetDeduction: isOrderRate ? "0" : (diff < 0 ? String(round3(-diff * INCENTIVE_RATE)) : "0"),
+              foodAllowance: isOrderRate ? "0" : line.foodAllowance,
             };
           }),
         );
@@ -173,6 +193,13 @@ export default function NewSalaryBatchPage() {
         // إعادة حساب الحافز/خصم التارجيت تلقائياً عند تغيير الطلبات أو التارجيت
         if (line.isDriver && (field === "actualOrders" || field === "targetOrders")) {
           const actual = parseInt(field === "actualOrders" ? value : next.actualOrders || "0", 10) || 0;
+          if (next.payrollMode === "CALCULATED_ORDER_RATE") {
+            next.baseAmount = String(round3(actual * n(next.calculatedOrderRate)));
+            next.incentive = "0";
+            next.targetDeduction = "0";
+            next.foodAllowance = "0";
+            return next;
+          }
           const target = parseInt(field === "targetOrders" ? value : next.targetOrders || "0", 10) || 0;
           const diff = actual - target;
           next.incentive = diff > 0 ? String(round3(diff * INCENTIVE_RATE)) : "0";
@@ -183,15 +210,23 @@ export default function NewSalaryBatchPage() {
     );
   }
 
+  function setLineAdjustments(employeeId: string, field: SalaryAdjustmentField, items: SalaryAdjustment[]) {
+    setLines(previous => previous.map(line => line.employeeId === employeeId ? {
+      ...line,
+      [field]: String(adjustmentTotal(items)),
+      adjustmentDetails: { ...line.adjustmentDetails, [field]: items },
+    } : line));
+  }
+
   function driverNet(line: PaymentLine) {
     return round3(
       n(line.baseAmount) + n(line.incentive) + n(line.foodAllowance) + n(line.companyAddition) +
-      n(line.fuelAddition) - n(line.targetDeduction) - n(line.companyDeduction),
+      n(line.fuelAddition) - n(line.targetDeduction) - n(line.companyDeduction) - n(line.vehicleRentDeduction) - n(line.housingDeduction) - (advances.amounts[line.employeeId] || 0),
     );
   }
 
   function otherNet(line: PaymentLine) {
-    return round3(n(line.baseAmount) + n(line.incentive) + n(line.additionalEarnings) - n(line.deductions));
+    return round3(n(line.baseAmount) + n(line.incentive) + n(line.additionalEarnings) - n(line.deductions) - (advances.amounts[line.employeeId] || 0));
   }
 
   function lineNet(line: PaymentLine) {
@@ -230,6 +265,7 @@ export default function NewSalaryBatchPage() {
             employeeId: line.employeeId,
             baseAmount: n(line.baseAmount),
             incentives: n(line.incentive),
+            adjustmentDetails: line.adjustmentDetails,
             ...(line.isDriver
               ? {
                   targetOrders: parseInt(line.targetOrders || "0", 10) || undefined,
@@ -239,6 +275,8 @@ export default function NewSalaryBatchPage() {
                   fuelAddition: n(line.fuelAddition),
                   targetDeduction: n(line.targetDeduction),
                   companyDeduction: n(line.companyDeduction),
+                  vehicleRentDeduction: n(line.vehicleRentDeduction),
+                  housingDeduction: n(line.housingDeduction),
                 }
               : {
                   additionalEarnings: n(line.additionalEarnings),
@@ -284,6 +322,7 @@ export default function NewSalaryBatchPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {advances.error && <p role="alert" className="text-red-700">{advances.error}</p>}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <div className="section-card space-y-4">
@@ -360,6 +399,7 @@ export default function NewSalaryBatchPage() {
                           <th className="w-24 px-2 py-2 text-right font-bold text-blue-700">{ar ? "بنزين وبنشر" : "Fuel/tire"}</th>
                           <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? "خصم تارجيت" : "Target ded."}</th>
                           <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? "خصم شركة" : "Company ded."}</th>
+                          <th className="px-2 py-2 text-red-700">{ar ? "قسط السلفة" : "Advance installment"}</th>
                           <th className="w-24 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? "الصافي" : "Net"}</th>
                         </tr>
                       </thead>
@@ -386,7 +426,7 @@ export default function NewSalaryBatchPage() {
                                 <input type="number" step="0.001" min="0" value={line.foodAllowance} onChange={(e) => setLineField(line.employeeId, "foodAllowance", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" placeholder="0.000" />
                               </td>
                               <td className="px-2 py-2">
-                                <input type="number" step="0.001" min="0" value={line.companyAddition} onChange={(e) => setLineField(line.employeeId, "companyAddition", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" placeholder="0.000" />
+                                <SalaryAdjustmentEditor label={ar ? "إضافة الشركة" : "Company additions"} employeeName={emp.nameAr} locale={ar ? "ar" : "en"} total={line.companyAddition} items={line.adjustmentDetails?.companyAddition} onChange={items => setLineAdjustments(line.employeeId, "companyAddition", items)} />
                               </td>
                               <td className="px-2 py-2">
                                 <input type="number" step="0.001" min="0" value={line.fuelAddition} onChange={(e) => setLineField(line.employeeId, "fuelAddition", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" placeholder="0.000" />
@@ -395,8 +435,19 @@ export default function NewSalaryBatchPage() {
                                 <input type="number" step="0.001" min="0" value={line.targetDeduction} onChange={(e) => setLineField(line.employeeId, "targetDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" placeholder="0.000" />
                               </td>
                               <td className="px-2 py-2">
-                                <input type="number" step="0.001" min="0" value={line.companyDeduction} onChange={(e) => setLineField(line.employeeId, "companyDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" placeholder="0.000" />
+                                {line.payrollMode === "CALCULATED_ORDER_RATE" ? (
+                                  <div className="min-w-28 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-center text-red-700">
+                                    <span className="block tabular-nums">{(n(line.companyDeduction) + n(line.vehicleRentDeduction) + n(line.housingDeduction)).toFixed(3)}</span>
+                                    <span className="block text-xs">{ar ? `إيجار ${n(line.vehicleRentDeduction).toFixed(3)} + سكن ${n(line.housingDeduction).toFixed(3)}` : `Rent ${n(line.vehicleRentDeduction).toFixed(3)} + housing ${n(line.housingDeduction).toFixed(3)}`}</span>
+                                    <div className="mt-1 border-t border-red-200 pt-1">
+                                      <SalaryAdjustmentEditor label={ar ? "خصم إداري إضافي" : "Additional company deduction"} employeeName={emp.nameAr} locale={ar ? "ar" : "en"} deduction total={line.companyDeduction} items={line.adjustmentDetails?.companyDeduction} onChange={items => setLineAdjustments(line.employeeId, "companyDeduction", items)} />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <SalaryAdjustmentEditor label={ar ? "خصم الشركة" : "Company deductions"} employeeName={emp.nameAr} locale={ar ? "ar" : "en"} deduction total={line.companyDeduction} items={line.adjustmentDetails?.companyDeduction} onChange={items => setLineAdjustments(line.employeeId, "companyDeduction", items)} />
+                                )}
                               </td>
+                          <td className="number px-2 py-2 text-red-700">{(advances.amounts[line.employeeId] || 0).toFixed(3)}</td>
                               <td className="px-2 py-2 text-left">
                                 <span className={`number font-bold ${driverNet(line) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{driverNet(line).toFixed(3)}</span>
                               </td>
@@ -433,6 +484,7 @@ export default function NewSalaryBatchPage() {
                           <th className="w-28 px-3 py-2 text-right font-bold text-green-700">{ar ? "الحوافز" : "Incentives"}</th>
                           <th className="w-28 px-3 py-2 text-right font-bold text-blue-700">{ar ? "الإضافات" : "Additions"}</th>
                           <th className="w-28 px-3 py-2 text-right font-bold text-red-700">{ar ? "الخصومات" : "Deductions"}</th>
+                          <th className="px-2 py-2 text-red-700">{ar ? "قسط السلفة" : "Advance installment"}</th>
                           <th className="w-32 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? "الصافي" : "Net"}</th>
                         </tr>
                       </thead>
@@ -452,11 +504,12 @@ export default function NewSalaryBatchPage() {
                                 <input type="number" step="0.001" min="0" value={line.incentive} onChange={(e) => setLineField(line.employeeId, "incentive", e.target.value)} className={`${numInput} text-green-600`} dir="ltr" placeholder="0.000" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" step="0.001" min="0" value={line.additionalEarnings} onChange={(e) => setLineField(line.employeeId, "additionalEarnings", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" placeholder="0.000" />
+                                <SalaryAdjustmentEditor label={ar ? "الإضافات" : "Additions"} employeeName={emp.nameAr} locale={ar ? "ar" : "en"} total={line.additionalEarnings} items={line.adjustmentDetails?.additionalEarnings} onChange={items => setLineAdjustments(line.employeeId, "additionalEarnings", items)} />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" step="0.001" min="0" value={line.deductions} onChange={(e) => setLineField(line.employeeId, "deductions", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" placeholder="0.000" />
+                                <SalaryAdjustmentEditor label={ar ? "الخصومات" : "Deductions"} employeeName={emp.nameAr} locale={ar ? "ar" : "en"} deduction total={line.deductions} items={line.adjustmentDetails?.deductions} onChange={items => setLineAdjustments(line.employeeId, "deductions", items)} />
                               </td>
+                          <td className="number px-2 py-2 text-red-700">{(advances.amounts[line.employeeId] || 0).toFixed(3)}</td>
                               <td className="px-3 py-2 text-left">
                                 <span className={`number font-bold ${otherNet(line) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{otherNet(line).toFixed(3)}</span>
                               </td>
@@ -481,7 +534,7 @@ export default function NewSalaryBatchPage() {
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={loading || loadingEmployees}
+                disabled={loading || loadingEmployees || advances.loading || !!advances.error}
                 className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
                 <Save size={16} />

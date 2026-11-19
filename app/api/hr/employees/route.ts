@@ -45,7 +45,7 @@ const employeeSchema = z.object({
   licenseNumber: z.string().optional(),
   licenseExpiry: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
   jobTitle: z.string().optional(),
-  residentialAddress: z.string().optional(),
+  residentialAddress: z.string().trim().max(191).optional(),
   employmentStatus: z.enum(["ACTIVE", "ON_LEAVE", "SUSPENDED", "TERMINATED", "EXITED"]).default("ACTIVE"),
   phone: z.string().optional(),
   joinDate: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         licenseAssignments: {
           select: { licenseId: true, license: { select: { commercialNameAr: true, licenseNumber: true } } },
         },
-        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, targetOrders: true } },
+        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, targetOrders: true, payrollMode: true, calculatedOrderRate: true, monthlyVehicleRent: true, monthlyHousingDeduction: true } },
         carWashWorker: {
           select: {
             id: true,

@@ -1,4 +1,6 @@
-import { redirect } from "next/navigation";
+import { HourlyReport } from "@/components/delivery/hourly-report";
+import { canAccessCompany, hasPermission } from "@/lib/auth/permissions";
+import { notFound, redirect } from "next/navigation";
 import { FileDown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
@@ -8,7 +10,7 @@ import { formatDate } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ contractId?: string; from?: string; to?: string; driverId?: string }>;
+  searchParams: Promise<{ contractId?: string; from?: string; to?: string; driverId?: string; workEntityId?: string; mode?: string }>;
 }
 
 const AR = {
@@ -46,6 +48,16 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
 
   const { companyId } = await params;
   const sp = await searchParams;
+  if (!canAccessCompany(session, companyId) || (!hasPermission(session, "DELIVERY_REPORTS", "VIEW", { companyId }) && !hasPermission(session, "DELIVERY_OPERATIONS", "VIEW", { companyId }))) notFound();
+  const reportContract = await prisma.deliveryContract.findFirst({
+    where: { companyId, ...(sp.contractId ? { id: sp.contractId } : { OR: [{ usesHourlyWork: true }, { usesLocationPricing: true }, { hourlyWorkEntries: { some: {} } }] }) },
+    select: { id: true, usesHourlyWork: true, _count: { select: { hourlyWorkEntries: true } } }, orderBy: { nameAr: "asc" },
+  });
+  if (sp.contractId && !reportContract) notFound();
+  if (reportContract && (sp.mode === "hourly" || (sp.mode !== "deliveries" && (reportContract.usesHourlyWork || reportContract._count.hourlyWorkEntries > 0)))) {
+    return <HourlyReport companyId={companyId} contractId={reportContract.id} search={sp} session={session}  />;
+  }
+
   const locale = await getLocale();
   const en = locale === "en";
   const numberLocale = en ? "en-US" : "ar-KW";
@@ -53,12 +65,12 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
   const money = (n: number) => `${n.toLocaleString(numberLocale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${kwd}`;
 
   const contracts = await prisma.deliveryContract.findMany({
-    where: { companyId, usesLocationPricing: true },
+    where: { companyId, OR: [{ usesLocationPricing: true }, { usesHourlyWork: true }, { hourlyWorkEntries: { some: {} } }] },
     select: { id: true, nameAr: true, nameEn: true },
     orderBy: { nameAr: "asc" },
   });
 
-  const contractId = sp.contractId || contracts[0]?.id || "";
+  const contractId = reportContract?.id || "";
 
   // Default to current month if no date filters
   const now = new Date();
@@ -125,6 +137,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
   const qs = (extra: Record<string, string>) => {
     const query = new URLSearchParams({
       ...(contractId ? { contractId } : {}),
+      mode: "deliveries",
       from: fromString,
       to: toString,
       ...(sp.driverId ? { driverId: sp.driverId } : {}),
@@ -162,6 +175,7 @@ export default async function DeliveriesReportPage({ params, searchParams }: Pro
         ) : (
           <>
             <form method="GET" className="flex flex-wrap items-end gap-2">
+              <label className="text-xs text-muted-foreground">{en ? "Report system" : "نظام التقرير"}<select name="mode" defaultValue={sp.mode === "deliveries" ? "deliveries" : "auto"} className="input-field mt-1 block"><option value="auto">{en ? "Contract default" : "حسب إعداد العقد"}</option><option value="hourly">{en ? "Hourly work" : "العمل بالساعة"}</option><option value="deliveries">{en ? "Restaurants & locations" : "المطاعم والأماكن"}</option></select></label>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">{en ? "Contract" : AR.contract}</label>
                 <select name="contractId" defaultValue={contractId} className="input-field w-full sm:w-56">

@@ -67,6 +67,7 @@ enum UserAccountType {
   ADMIN
   DRIVER
   CAR_WASH_WORKER
+  GROCERY_EMPLOYEE
   OWNER_MANAGED_PARTNER
 }
 
@@ -275,6 +276,17 @@ model Company {
   logoUrl             String?
   isActive            Boolean       @default(true)
   sortOrder           Int           @default(0)
+  voucherPrintSettings CompanyVoucherPrintSettings?
+  constructionProjects ConstructionProject[]
+    groceryProducts      GroceryProduct[]
+    grocerySales         GrocerySaleInvoice[]
+    groceryDeposits      GroceryDepositReceipt[]
+    groceryKnetDevices   GroceryKnetDevice[]
+    groceryStatements    GroceryBankStatement[]
+  groceryOpeningInventory GroceryOpeningInventory?
+  groceryPurchases     GroceryPurchaseInvoice[]
+  groceryPurchaseSettlements GroceryPurchaseSettlement[]
+  groceryOperatingExpenses GroceryOperatingExpense[]
 
   group                    Group                         @relation(fields: [groupId], references: [id])
   investor                 Investor?                     @relation("InvestorOwnedCompanies", fields: [investorId], references: [id], onDelete: SetNull)
@@ -302,6 +314,7 @@ model Company {
   investors                Investor[]                    @relation("CompanyInvestors")
   expenseCategories        ExpenseCategory[]
   expenses                 Expense[]
+  employeeAdvances         EmployeeAdvance[]
   salaryBatches            SalaryBatch[]
   employeePositions        EmployeePosition[]
   endOfServiceCalcs        EndOfServiceCalc[]
@@ -344,6 +357,257 @@ enum CompanyType {
   HOLDING
   OTHER
   OWNER_MANAGED
+  CONTRACTING
+  GROCERY
+  CLOTHING_RETAIL
+  TAILORING
+  FABRIC_RETAIL
+  TAILORING_FABRIC_RETAIL
+  TOBACCO_SHISHA
+  MOBILE_REPAIR_ACCESSORIES
+}
+
+model GroceryProduct {
+  id String @id @default(cuid())
+  companyId String
+  sku String
+  nameAr String
+  unit String @default("قطعة")
+  quantity Decimal @default(0) @db.Decimal(18,3)
+  costPrice Decimal @default(0) @db.Decimal(18,3)
+  salePrice Decimal @default(0) @db.Decimal(18,3)
+  isActive Boolean @default(true)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@map("grocery_products")
+}
+
+model GrocerySaleInvoice {
+  id String @id @default(cuid())
+  companyId String
+  invoiceNumber String
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  paymentMethod String @default("KNET")
+  inventoryCost Decimal @default(0) @db.Decimal(18,3)
+  fileUrl String?
+  notes String?
+  createdById String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId, date])
+  @@map("grocery_sale_invoices")
+}
+
+model GroceryOpeningInventory {
+  id String @id @default(cuid())
+  companyId String @unique
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  notes String?
+  fileUrl String?
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@map("grocery_opening_inventory")
+}
+
+model GroceryPurchaseInvoice {
+  id String @id @default(cuid())
+  companyId String
+  invoiceNumber String
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  paymentMethod String @default("CASH")
+  supplierName String?
+  isOpeningInventoryInvoice Boolean @default(false)
+  outstandingAmount Decimal @default(0) @db.Decimal(18,3)
+  fileUrl String?
+  notes String?
+  createdById String
+  createdAt DateTime @default(now())
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  settlements GroceryPurchaseSettlement[]
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId, date])
+  @@map("grocery_purchase_invoices")
+}
+
+model GroceryPurchaseSettlement {
+  id String @id @default(cuid())
+  companyId String
+  purchaseInvoiceId String
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  paymentMethod String @default("CASH")
+  fileUrl String?
+  notes String?
+  createdById String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseInvoice GroceryPurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, date])
+  @@index([purchaseInvoiceId])
+  @@map("grocery_purchase_settlements")
+}
+
+model GroceryOperatingExpense {
+  id String @id @default(cuid())
+  companyId String
+  reference String
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  paymentMethod String @default("CASH")
+  fileUrl String?
+  notes String?
+  createdById String
+  createdAt DateTime @default(now())
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@unique([companyId, reference])
+  @@index([companyId, date])
+  @@map("grocery_operating_expenses")
+}
+
+model GroceryDepositReceipt {
+  id String @id @default(cuid())
+  companyId String
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(18,3)
+  paymentMethod String @default("CASH")
+  bankAccountId String?
+  fileUrl String?
+  notes String?
+  createdById String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([companyId, date])
+  @@map("grocery_deposit_receipts")
+}
+
+model GroceryKnetDevice {
+  id String @id @default(cuid())
+  companyId String
+  number String
+  label String?
+  isActive Boolean @default(true)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([companyId, number])
+  @@map("grocery_knet_devices")
+}
+
+model GroceryBankStatement {
+  id String @id @default(cuid())
+  companyId String
+  fromDate DateTime? @db.Date
+  toDate DateTime? @db.Date
+  fileUrl String
+  fileHash String?
+  importedCount Int @default(0)
+  confirmedAt DateTime?
+  createdById String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([companyId])
+  @@index([companyId, fileHash])
+  @@map("grocery_bank_statements")
+}
+
+model CompanyVoucherPrintSettings {
+  companyId   String   @id
+  copies      Int      @default(2)
+  orientation String   @default("portrait")
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_voucher_print_settings")
+}
+
+model ConstructionProject {
+  id           String @id @default(cuid())
+  companyId    String
+  code         String
+  name         String
+  location     String?
+  clientName   String
+  managerName  String?
+  budget       Decimal @db.Decimal(18, 3)
+  startDate    DateTime @db.Date
+  endDate      DateTime? @db.Date
+  status       String @default("ACTIVE")
+  costCenterId String @unique
+  createdAt    DateTime @default(now())
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  contracts    ConstructionContract[]
+  documents    ConstructionDocument[]
+  dailyLogs    ConstructionDailyLog[]
+  @@unique([companyId, code])
+  @@map("construction_projects")
+}
+
+model ConstructionContract {
+  id                     String @id @default(cuid())
+  projectId              String
+  number                 String
+  kind                   String
+  partyName              String
+  description            String?
+  value                  Decimal @db.Decimal(18, 3)
+  retentionPercent       Decimal @default(0) @db.Decimal(5, 2)
+  advanceRecoveryPercent Decimal @default(0) @db.Decimal(5, 2)
+  createdAt              DateTime @default(now())
+  project                ConstructionProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  documents              ConstructionDocument[]
+  @@unique([projectId, number])
+  @@map("construction_contracts")
+}
+
+model ConstructionDocument {
+  id              String @id @default(cuid())
+  projectId       String
+  contractId      String?
+  kind            String
+  status          String @default("DRAFT")
+  date            DateTime @db.Date
+  reference       String
+  description     String
+  amount          Decimal @db.Decimal(18, 3)
+  retention       Decimal @default(0) @db.Decimal(18, 3)
+  advanceRecovery Decimal @default(0) @db.Decimal(18, 3)
+  netAmount       Decimal @db.Decimal(18, 3)
+  category        String?
+  cashAccountId   String?
+  journalEntryId  String? @unique
+  createdById     String
+  createdAt       DateTime @default(now())
+  project         ConstructionProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  contract        ConstructionContract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  @@unique([projectId, reference])
+  @@index([projectId, date])
+  @@map("construction_documents")
+}
+
+model ConstructionDailyLog {
+  id              String @id @default(cuid())
+  projectId       String
+  date            DateTime @db.Date
+  description     String
+  workersCount    Int @default(0)
+  progressPercent Decimal @db.Decimal(5, 2)
+  createdById     String
+  createdAt       DateTime @default(now())
+  project         ConstructionProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  @@index([projectId, date])
+  @@map("construction_daily_logs")
 }
 
 model OwnerManagedPartner {
@@ -637,6 +901,7 @@ model OpeningBalance {
 // ═══════════════════════════════════════════════════════════
 
 model JournalEntry {
+  constructionDocument ConstructionDocument?
   id            String           @id @default(cuid())
   companyId     String
   fiscalYearId  String
@@ -756,6 +1021,7 @@ model JournalEntryLine {
 }
 
 model CostCenter {
+  constructionProject ConstructionProject?
   id        String  @id @default(cuid())
   companyId String
   code      String
@@ -1015,6 +1281,7 @@ model Employee {
   expenses                  Expense[]
   carWashRevenuesCreated    CarWashRevenue[]            @relation("CarWashRevenueCreatedByEmployee")
   carWashExpensesCreated    CarWashExpense[]            @relation("CarWashExpenseCreatedByEmployee")
+  employeeAdvances          EmployeeAdvance[]
   salaryPayments            SalaryPayment[]
   salaryItems               SalaryItem[]
   tickets                   EmployeeTicket[]
@@ -1028,6 +1295,7 @@ model Employee {
   managerSalaryLines        ManagerSalaryLine[]
   deliveryInvoices          DeliveryInvoice[]
   violations                DriverViolation[]
+  violationInstallments     DriverViolationInstallment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1198,6 +1466,8 @@ model SalaryBatch {
   branch   Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
   investor Investor?       @relation(fields: [investorId], references: [id], onDelete: SetNull)
   payments SalaryPayment[]
+  advanceInstallments EmployeeAdvanceInstallment[]
+  violationInstallments DriverViolationInstallment[]
   items    SalaryItem[]
 
   createdAt DateTime @default(now())
@@ -1242,6 +1512,7 @@ model SalaryPayment {
   baseAmount                 Decimal  @db.Decimal(18, 3)
   incentives                 Decimal  @default(0) @db.Decimal(18, 3)
   additionalEarnings         Decimal  @default(0) @db.Decimal(18, 3)
+  advanceDeduction           Decimal  @default(0) @db.Decimal(18, 3)
   deductions                 Decimal  @default(0) @db.Decimal(18, 3)
   netAmount                  Decimal  @db.Decimal(18, 3)
   investorSalaryCollectionId String?
@@ -1251,6 +1522,7 @@ model SalaryPayment {
   employee           Employee                  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   investorCollection InvestorSalaryCollection? @relation(fields: [investorSalaryCollectionId], references: [id], onDelete: Restrict)
   items              SalaryItem[]
+  violationInstallments DriverViolationInstallment[]
 
   @@index([batchId])
   @@index([employeeId])
@@ -1301,6 +1573,13 @@ model Driver {
   isRegisteredRoPops         Boolean @default(false)
   walletBalance              Decimal @default(0) @db.Decimal(18, 3)
   targetOrders               Int     @default(370)
+  // TARGET_INCENTIVE: fixed salary with target incentive/deduction.
+  // CALCULATED_ORDER_RATE: calculated orders × rate, less fixed recoveries.
+  payrollMode                String  @default("TARGET_INCENTIVE")
+  calculatedOrderRate        Decimal @default(0.950) @db.Decimal(18, 3)
+  monthlyVehicleRent         Decimal @default(130) @db.Decimal(18, 3)
+  monthlyHousingDeduction    Decimal @default(30) @db.Decimal(18, 3)
+  hourlyWorkEntries          DeliveryHourlyWorkEntry[]
   assignedVehicleId          String?
   vehiclePlateNumberSnapshot String?
   fuelCardNumber             String?
@@ -1473,6 +1752,10 @@ model DeliveryContract {
   // نظام تسجيل الطلبات: false = العادي (طلبات/تحصيل)، true = نظام المطاعم والأماكن
   // (كل توصيلة = مطعم + مكان بسعر، مرجعي فقط بعيد عن الحسابات) — لعقود مثل RoPops
   usesLocationPricing Boolean @default(false)
+  usesHourlyWork      Boolean @default(false)
+  defaultHourlyRate   Decimal? @db.Decimal(18, 3)
+  workEntities        DeliveryWorkEntity[]
+  hourlyWorkEntries   DeliveryHourlyWorkEntry[]
 
   company         Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
   monthlyReports  DeliveryMonthlyReport[]
@@ -1647,6 +1930,45 @@ enum DeliveryDailyOrderWorkStatus {
   MISSED_SHIFT
   LATE_LOGIN
   ABSENT
+}
+
+model DeliveryWorkEntity {
+  id          String   @id @default(cuid())
+  contractId  String
+  name        String
+  hourlyRate  Decimal? @db.Decimal(18, 3)
+  isActive    Boolean  @default(true)
+  contract    DeliveryContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  workEntries DeliveryHourlyWorkEntry[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([contractId, name])
+  @@map("delivery_work_entities")
+}
+
+model DeliveryHourlyWorkEntry {
+  id           String   @id @default(cuid())
+  contractId   String
+  driverId     String
+  workEntityId String
+  date         DateTime @db.Date
+  minutes      Int
+  ordersCount  Int      @default(0)
+  hourlyRate   Decimal  @db.Decimal(18, 3)
+  amount       Decimal  @db.Decimal(18, 3)
+  notes        String?  @db.Text
+  createdById  String
+  contract     DeliveryContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  driver       Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  workEntity   DeliveryWorkEntity @relation(fields: [workEntityId], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([driverId, contractId, workEntityId, date], map: "hourly_work_driver_contract_entity_date_key")
+  @@index([contractId, date])
+  @@index([workEntityId])
+  @@map("delivery_hourly_work_entries")
 }
 
 model DeliveryDailyOrder {
@@ -2008,6 +2330,7 @@ model CarWashDailyOperation {
   revenues         CarWashRevenue[]
   expenses         CarWashExpense[]
   knetTransactions KnetTransaction[]
+  bankKnetTransactions CarWashBankKnetTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2106,6 +2429,24 @@ model KnetTransaction {
   @@index([date])
   @@index([cardType])
   @@map("knet_transactions")
+}
+
+// Bank-statement amounts are a reconciliation source only. They must never
+// change the operational KNET revenue or enter KNET settlement processing.
+model CarWashBankKnetTransaction {
+  id             String   @id @default(cuid())
+  operationId    String
+  amount         Decimal  @db.Decimal(18, 3)
+  transactionRef String?
+  date           DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  operation CarWashDailyOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@unique([operationId, date])
+  @@index([date])
+  @@map("car_wash_bank_knet_transactions")
 }
 
 model KnetCommissionSettings {
@@ -2720,6 +3061,7 @@ model License {
   email                        String?
   fireLicenseExpiryDate        DateTime?
   healthLicenseExpiryDate      DateTime?
+  chamberOfCommerceExpiryDate  DateTime?
   advertisingLicenseExpiryDate DateTime?
   trafficCertExpiryDate        DateTime?
   customsCertExpiryDate        DateTime?
@@ -2749,6 +3091,8 @@ model License {
   importLicenseDoc       ImportLicenseDoc?
   advertisingDetails     LicenseAdvertisingDetails?
   fireSafetyCert         LicenseFireSafetyCert?
+  healthLicense          LicenseHealthLicense?
+  chamberOfCommerceCert  LicenseChamberOfCommerceCert?
   trafficCert            LicenseTrafficCert?
   customsCert            LicenseCustomsCert?
   licenseVehicles        LicenseVehicle[]
@@ -2756,6 +3100,9 @@ model License {
   managerPOA             ManagerPOA?
   workInjuryInsurances   WorkInjuryInsurance[]
   annualBalances         LicenseAnnualBalance[]
+  documentVersions       LicenseDocumentVersion[]
+  violations             LicenseViolation[]
+  partnerCivilIds        LicensePartnerCivilId[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2769,6 +3116,7 @@ model License {
   @@index([licenseExpiryDate])
   @@index([fireLicenseExpiryDate])
   @@index([healthLicenseExpiryDate])
+  @@index([chamberOfCommerceExpiryDate])
   @@index([advertisingLicenseExpiryDate])
   @@index([trafficCertExpiryDate])
   @@index([customsCertExpiryDate])
@@ -2776,6 +3124,59 @@ model License {
   @@index([unifiedEntityNumber])
   @@index([status])
   @@map("licenses")
+}
+
+// سجل موحّد لكل إصدار مرفوع من أقسام ملف الترخيص
+model LicenseDocumentVersion {
+  id          String   @id @default(cuid())
+  licenseId   String
+  sectionType String
+  version     Int
+  title       String?
+  fileUrl     String?
+  effectiveAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, sectionType, version])
+  @@index([licenseId, sectionType])
+  @@map("license_document_versions")
+}
+
+model LicenseViolation {
+  id            String   @id @default(cuid())
+  licenseId     String
+  violationDate DateTime
+  violatorName  String
+  amount        Decimal  @db.Decimal(15, 3)
+  fileUrl       String
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, violationDate])
+  @@map("license_violations")
+}
+
+model LicensePartnerCivilId {
+  id            String   @id @default(cuid())
+  licenseId     String
+  partnerNameAr String
+  civilId       String?
+  expiryDate    DateTime?
+  fileUrl       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, partnerNameAr])
+  @@index([licenseId, expiryDate])
+  @@map("license_partner_civil_ids")
 }
 
 model LicenseAddress {
@@ -2976,6 +3377,37 @@ model LicenseFireSafetyCert {
   license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
 
   @@map("license_fire_safety_certs")
+}
+
+// [9] الترخيص الصحي — مرتبط بالترخيص والموقع، مع وثيقة وتنبيه انتهاء
+model LicenseHealthLicense {
+  id               String   @id @default(cuid())
+  licenseId        String   @unique
+  licenseNumber    String?
+  issuingAuthority String?
+  issueDate        DateTime?
+  expiryDate       DateTime?
+  inspectionDate   DateTime?
+  fileUrl          String?
+  notes            String?
+  updatedAt        DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_health_licenses")
+}
+
+model LicenseChamberOfCommerceCert {
+  id         String   @id @default(cuid())
+  licenseId  String   @unique
+  issueDate  DateTime?
+  expiryDate DateTime?
+  fileUrl    String?
+  updatedAt  DateTime @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@map("license_chamber_of_commerce_certs")
 }
 
 // [9] اعتماد المرور
@@ -3179,14 +3611,19 @@ model DriverViolation {
   paymentMode       String @default("FULL")
   installmentMonths Int?
   installmentsPaid  Int    @default(0)
+  installmentStartYear  Int?
+  installmentStartMonth Int?
 
   status String @default("PENDING")
 
   // legacy field kept for backward compat
   driverPays Boolean @default(true)
 
-  // auto-created expense for company portion
+  // Created only after the company actually pays the traffic authority.
   expenseId String? @unique
+  companyExpenseCategoryId String?
+  trafficPaidAt DateTime?
+  trafficPaymentReference String?
 
   notes String?
 
@@ -3196,6 +3633,7 @@ model DriverViolation {
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   vehicle  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   expense  Expense?  @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  installments DriverViolationInstallment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3208,6 +3646,31 @@ model DriverViolation {
   @@index([date])
   @@index([status])
   @@map("driver_violations")
+}
+
+model DriverViolationInstallment {
+  id              String   @id @default(cuid())
+  violationId     String
+  employeeId      String
+  year            Int
+  month           Int
+  amount          Decimal  @db.Decimal(18, 3)
+  batchId         String?
+  salaryPaymentId String?
+  settledAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  violation     DriverViolation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  batch         SalaryBatch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  salaryPayment SalaryPayment?  @relation(fields: [salaryPaymentId], references: [id], onDelete: SetNull)
+
+  @@unique([violationId, year, month])
+  @@index([employeeId, year, month])
+  @@index([batchId])
+  @@index([salaryPaymentId])
+  @@map("driver_violation_installments")
 }
 
 model DriverAccident {
@@ -3843,4 +4306,37 @@ model DriverLocationPoint {
   @@index([sessionId, recordedAt])
   @@index([clientGeneratedId])
   @@map("driver_location_points")
+}
+
+model EmployeeAdvance {
+  id             String @id @default(cuid())
+  companyId      String
+  employeeId     String
+  amount         Decimal @db.Decimal(18, 3)
+  date           DateTime
+  notes          String? @db.Text
+  isCancelled    Boolean @default(false)
+  journalEntryId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  installments   EmployeeAdvanceInstallment[]
+  @@index([companyId, employeeId])
+  @@map("employee_advances")
+}
+
+model EmployeeAdvanceInstallment {
+  id        String @id @default(cuid())
+  advanceId String
+  year      Int
+  month     Int
+  amount    Decimal @db.Decimal(18, 3)
+  batchId   String?
+  advance   EmployeeAdvance @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  batch     SalaryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  @@unique([advanceId, year, month])
+  @@index([year, month])
+  @@index([batchId])
+  @@map("employee_advance_installments")
 }

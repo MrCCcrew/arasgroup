@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { kuwaitNow } from "@/lib/utils";
+import { isWorkInjuryDueSoon, workInjuryQuarterExpiryDate } from "@/lib/licenses/work-injury";
 
 type NotificationSeedInput = {
   type: string;
@@ -105,7 +106,7 @@ export async function regenerateNotifications() {
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const in6Months = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
 
-  const [employees, licenses, vehicles, investorClaims, investorSalaryCollections] = await Promise.all([
+  const [employees, licenses, workInjuryInsurances, vehicles, investorClaims, investorSalaryCollections] = await Promise.all([
     prisma.employee.findMany({
       where: {
         isDeleted: false,
@@ -139,6 +140,9 @@ export async function regenerateNotifications() {
           { fireLicenseExpiryDate: { gte: now, lte: in30Days } },
           { healthLicenseExpiryDate: { gte: now, lte: in30Days } },
           { advertisingLicenseExpiryDate: { gte: now, lte: in30Days } },
+          { trafficCertExpiryDate: { gte: now, lte: in30Days } },
+          { customsCertExpiryDate: { gte: now, lte: in30Days } },
+          { importLicenseExpiryDate: { gte: now, lte: in30Days } },
         ],
       },
       select: {
@@ -151,7 +155,14 @@ export async function regenerateNotifications() {
         fireLicenseExpiryDate: true,
         healthLicenseExpiryDate: true,
         advertisingLicenseExpiryDate: true,
+        trafficCertExpiryDate: true,
+        customsCertExpiryDate: true,
+        importLicenseExpiryDate: true,
       },
+    }),
+    prisma.workInjuryInsurance.findMany({
+      where: { license: { status: { not: "CANCELLED" } } },
+      select: { id: true, year: true, quarter: true, endDate: true, license: { select: { id: true, commercialNameAr: true, companyId: true, branchId: true } } },
     }),
     prisma.vehicle.findMany({
       where: {
@@ -251,6 +262,73 @@ export async function regenerateNotifications() {
         targetRole: "ADMINISTRATIVE_AFFAIRS",
         refModule: "licenses",
         refId: license.id,
+      }));
+    }
+    const additionalExpiryAlerts = [
+      { key: "fire", date: license.fireLicenseExpiryDate, title: "\u0631\u062e\u0635\u0629 \u0627\u0644\u0625\u0637\u0641\u0627\u0621", titleEn: "Fire safety license" },
+      { key: "health", date: license.healthLicenseExpiryDate, title: "\u0627\u0644\u062a\u0631\u062e\u064a\u0635 \u0627\u0644\u0635\u062d\u064a", titleEn: "Health license" },
+      { key: "advertising", date: license.advertisingLicenseExpiryDate, title: "\u062a\u0631\u062e\u064a\u0635 \u0627\u0644\u0625\u0639\u0644\u0627\u0646", titleEn: "Advertising license" },
+      { key: "traffic", date: license.trafficCertExpiryDate, title: "\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u0645\u0631\u0648\u0631", titleEn: "Traffic certificate" },
+      { key: "customs", date: license.customsCertExpiryDate, title: "\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062c\u0645\u0627\u0631\u0643", titleEn: "Customs certificate" },
+      { key: "import", date: license.importLicenseExpiryDate, title: "\u062a\u0631\u062e\u064a\u0635 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f", titleEn: "Import license" },
+    ];
+    for (const alert of additionalExpiryAlerts) {
+      if (!alert.date) continue;
+      jobs.push(upsertNotification({
+        type: `LICENSE_${alert.key.toUpperCase()}_EXPIRY`,
+        uniqueKey: `license:${license.id}:${alert.key}:${alert.date.toISOString().slice(0, 10)}`,
+        titleAr: `\u062a\u0646\u0628\u064a\u0647 \u0627\u0646\u062a\u0647\u0627\u0621 ${alert.title}`,
+        titleEn: `${alert.titleEn} expiry alert`,
+        messageAr: `${alert.title} \u0644\u0640 ${name} \u064a\u0646\u062a\u0647\u064a \u0642\u0631\u064a\u0628\u064b\u0627`,
+        messageEn: `${alert.titleEn} for ${license.commercialNameEn ?? name} is expiring soon`,
+        companyId: license.companyId,
+        branchId: license.branchId ?? undefined,
+        licenseId: license.id,
+        entityType: "LICENSE",
+        entityId: license.id,
+        dueDate: alert.date,
+        severity: "WARNING",
+        targetRole: "ADMINISTRATIVE_AFFAIRS",
+        refModule: "licenses",
+        refId: license.id,
+      }));
+    }
+    return jobs;
+  }));
+
+  const latestWorkInjuryByLicense = new Map<string, typeof workInjuryInsurances[number]>();
+  for (const insurance of workInjuryInsurances) {
+    const current = latestWorkInjuryByLicense.get(insurance.license.id);
+    if (!current || insurance.year > current.year || (insurance.year === current.year && insurance.quarter > current.quarter)) {
+      latestWorkInjuryByLicense.set(insurance.license.id, insurance);
+    }
+  }
+  await Promise.all([...latestWorkInjuryByLicense.values()].flatMap((insurance) => {
+    const license = insurance.license;
+    const jobs: Promise<unknown>[] = [];
+    const quarterExpiry = workInjuryQuarterExpiryDate(insurance.year, insurance.quarter);
+    if (isWorkInjuryDueSoon(quarterExpiry, now)) {
+      jobs.push(upsertNotification({
+        type: "WORK_INJURY_QUARTER_EXPIRY",
+        uniqueKey: `license:${license.id}:work-injury-quarter:${insurance.year}:q${insurance.quarter}:${quarterExpiry.toISOString().slice(0, 10)}`,
+        titleAr: "\u062a\u0646\u0628\u064a\u0647 \u0627\u0646\u062a\u0647\u0627\u0621 \u0633\u062c\u0644 \u0631\u0628\u0639 \u0627\u0644\u0625\u0635\u0627\u0628\u0627\u062a",
+        titleEn: "Work injury quarter record expiry alert",
+        messageAr: `\u0633\u062c\u0644 \u0631\u0628\u0639 \u0627\u0644\u0625\u0635\u0627\u0628\u0627\u062a \u0644\u0640 ${license.commercialNameAr} \u2014 ${insurance.year} Q${insurance.quarter} \u064a\u0646\u062a\u0647\u064a \u0642\u0631\u064a\u0628\u064b\u0627`,
+        companyId: license.companyId, branchId: license.branchId ?? undefined, licenseId: license.id,
+        entityType: "WORK_INJURY_INSURANCE", entityId: insurance.id, dueDate: quarterExpiry,
+        severity: "WARNING", targetRole: "ADMINISTRATIVE_AFFAIRS", refModule: "licenses", refId: license.id,
+      }));
+    }
+    if (isWorkInjuryDueSoon(insurance.endDate, now)) {
+      jobs.push(upsertNotification({
+        type: "WORK_INJURY_INSURANCE_EXPIRY",
+        uniqueKey: `license:${license.id}:work-injury-certificate:${insurance.year}:q${insurance.quarter}:${insurance.endDate!.toISOString().slice(0, 10)}`,
+        titleAr: "\u062a\u0646\u0628\u064a\u0647 \u0627\u0646\u062a\u0647\u0627\u0621 \u0634\u0647\u0627\u062f\u0629 \u062a\u0623\u0645\u064a\u0646 \u0625\u0635\u0627\u0628\u0627\u062a \u0627\u0644\u0639\u0645\u0644",
+        titleEn: "Work injury insurance certificate expiry alert",
+        messageAr: `\u0634\u0647\u0627\u062f\u0629 \u062a\u0623\u0645\u064a\u0646 \u0625\u0635\u0627\u0628\u0627\u062a \u0627\u0644\u0639\u0645\u0644 \u0644\u0640 ${license.commercialNameAr} \u062a\u0646\u062a\u0647\u064a \u0642\u0631\u064a\u0628\u064b\u0627`,
+        companyId: license.companyId, branchId: license.branchId ?? undefined, licenseId: license.id,
+        entityType: "WORK_INJURY_INSURANCE", entityId: insurance.id, dueDate: insurance.endDate,
+        severity: "WARNING", targetRole: "ADMINISTRATIVE_AFFAIRS", refModule: "licenses", refId: license.id,
       }));
     }
     return jobs;

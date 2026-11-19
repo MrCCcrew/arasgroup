@@ -289,6 +289,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
                 <th>{locale === "en" ? "Branch" : "الفرع"}</th>
                 <th>{locale === "en" ? "License" : "الترخيص"}</th>
                 <th>{locale === "en" ? "Driver" : "السائق"}</th>
+                <th>{locale === "en" ? "Talabat ID" : "معرف طلبات"}</th>
                 <th>{locale === "en" ? "Insurance" : "التأمين"}</th>
                 <th>{locale === "en" ? "Registration" : "التسجيل"}</th>
                 <th></th>
@@ -297,7 +298,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={11} className="py-10 text-center text-muted-foreground">
                     {locale === "en" ? "No vehicles found" : "لا توجد مركبات"}
                   </td>
                 </tr>
@@ -310,6 +311,9 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
                     ? locale === "en" ? v.branch.nameEn ?? v.branch.nameAr : v.branch.nameAr
                     : "—";
                   const assignedDriverEmployee = v.assignedDrivers[0]?.employee;
+                  const talabatId = v.assignedEmployee
+                    ? v.assignedEmployee.driver?.talabatId
+                    : v.assignedDrivers[0]?.talabatId;
                   const driverName = v.assignedEmployee
                     ? locale === "en" ? v.assignedEmployee.nameEn ?? v.assignedEmployee.nameAr : v.assignedEmployee.nameAr
                     : assignedDriverEmployee
@@ -339,6 +343,7 @@ export function VehiclesClient({ initialVehicles, branches, licenses, adminEmplo
                         )}
                       </td>
                       <td className="text-sm">{driverName}</td>
+                      <td className="number text-sm"><bdi>{talabatId || "—"}</bdi></td>
                       <td><ExpiryBadge date={insuranceDate} /></td>
                       <td><ExpiryBadge date={v.registrationExpiry} /></td>
                       <td>

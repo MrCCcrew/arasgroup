@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { createSalaryPaymentJE } from "@/lib/accounting/auto-entries";
+import { createAdvanceSalaryJournal, lockAdvanceCompany, prepareAdvanceSalary, reserveAdvanceInstallments } from "@/lib/hr/employee-advances";
+import { getAccessibleBranchIds } from "@/lib/auth/permissions";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
-import { buildSalaryBatchDraft } from "@/lib/hr/salary-batch-builder";
+import { salaryAdjustmentDetailsSchema } from "@/lib/hr/salary-adjustments";
+import { linkSalaryItemsToPayments } from "@/lib/hr/salary-items";
+import { linkViolationInstallmentsToPayments, reserveViolationInstallments } from "@/lib/hr/driver-violation-installments";
 
 const AR = {
   companyRequired: "\u0645\u0639\u0631\u0641 \u0627\u0644\u0634\u0631\u0643\u0629 \u0645\u0637\u0644\u0648\u0628",
@@ -22,6 +25,9 @@ const paymentLineSchema = z.object({
   fuelAddition: z.number().min(0).default(0),
   targetDeduction: z.number().min(0).default(0),
   companyDeduction: z.number().min(0).default(0),
+  vehicleRentDeduction: z.number().min(0).default(0),
+  housingDeduction: z.number().min(0).default(0),
+  adjustmentDetails: salaryAdjustmentDetailsSchema,
   attendanceDays: z.number().min(0).optional(),
   evaluationScore: z.number().min(0).optional(),
   targetOrders: z.number().int().min(0).optional(),
@@ -104,10 +110,11 @@ export async function POST(request: NextRequest) {
     });
     if (permissionError) return permissionError;
 
-    const draft = buildSalaryBatchDraft(data.payments);
 
-    const batch = await prisma.$transaction(async (tx) => (
-      tx.salaryBatch.create({
+    const batch = await prisma.$transaction(async (tx) => {
+      await lockAdvanceCompany(tx, data.companyId);
+      const draft = await prepareAdvanceSalary(tx, data.companyId, data.year, data.month, data.payments, getAccessibleBranchIds(session, data.companyId));
+      const created = await tx.salaryBatch.create({
         data: {
           companyId: data.companyId,
           branchId: data.branchId,
@@ -134,6 +141,7 @@ export async function POST(request: NextRequest) {
               incentives: payment.incentives,
               additionalEarnings: payment.additionalEarnings,
               deductions: payment.deductions,
+              advanceDeduction: payment.advanceDeduction,
               netAmount: payment.netAmount,
               notes: payment.notes,
             })),
@@ -143,21 +151,15 @@ export async function POST(request: NextRequest) {
           },
         },
         include: { payments: true },
-      })
-    ));
-
-    const salaryJournalEntry = await createSalaryPaymentJE({
-      companyId: data.companyId,
-      userId: session.id,
-      totalAmount: draft.totalNet,
-      month: data.month,
-      year: data.year,
-      refId: batch.id,
-    });
-
-    await prisma.salaryBatch.update({
-      where: { id: batch.id },
-      data: { journalEntryId: salaryJournalEntry.id },
+      });
+      await linkSalaryItemsToPayments(tx, created.id, created.payments);
+      await reserveAdvanceInstallments(tx, created.id, draft.dueIds);
+      await reserveViolationInstallments(tx, created.id, draft.violationDueIds);
+      await linkViolationInstallmentsToPayments(tx, created.id, created.payments);
+      const violationRecoveries = draft.items.filter(item => item.sourceType === "DRIVER_VIOLATION").map(item => ({ employeeId: item.employeeId, amount: item.amount }));
+      const journal = await createAdvanceSalaryJournal(tx, data.companyId, session.id, created.id, data.month, data.year, draft.totalNet, draft.payments.reduce((sum, row) => sum + row.advanceDeduction, 0), draft.payments, violationRecoveries);
+      await tx.salaryBatch.update({ where: { id: created.id }, data: { journalEntryId: journal.id } });
+      return { ...created, journalEntryId: journal.id };
     });
 
     return NextResponse.json({ success: true, data: batch }, { status: 201 });

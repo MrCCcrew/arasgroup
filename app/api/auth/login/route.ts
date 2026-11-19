@@ -10,6 +10,7 @@ const COOKIE_NAME = "rashid_erp_session";
 const EXPIRES_IN = 7 * 24 * 60 * 60;
 
 const loginSchema = z.object({
+  locale: z.enum(["ar", "en"]).optional(),
   email: z.string().email("البريد الإلكتروني غير صحيح"),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
 });
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { email, password } = parsed.data;
+    const { email, password, locale } = parsed.data;
 
     let user: any = null;
 
@@ -207,7 +208,7 @@ export async function POST(request: NextRequest) {
           ? "/driver"
           : sessionUser.accountType === "CAR_WASH_WORKER"
             ? "/car-wash-portal"
-          : "/dashboard",
+          : String(sessionUser.accountType) === "GROCERY_EMPLOYEE" ? "/grocery-portal" : "/dashboard",
     });
 
     response.cookies.set(COOKIE_NAME, token, {
@@ -218,7 +219,9 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
-    if ((sessionUser.accountType === "DRIVER" || sessionUser.accountType === "CAR_WASH_WORKER") && !request.cookies.get(LOCALE_COOKIE_NAME)) {
+    if (locale) response.cookies.set(LOCALE_COOKIE_NAME, locale, { sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60 });
+
+    if (!locale && (sessionUser.accountType === "DRIVER" || sessionUser.accountType === "CAR_WASH_WORKER") && !request.cookies.get(LOCALE_COOKIE_NAME)) {
       response.cookies.set(LOCALE_COOKIE_NAME, "en", {
         sameSite: "lax",
         path: "/",

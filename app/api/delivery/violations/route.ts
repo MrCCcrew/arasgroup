@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRequestSession, assertCompanyAccess } from "@/lib/auth/access";
+import { createViolationInstallments } from "@/lib/hr/driver-violation-installments";
 
 export async function GET(request: NextRequest) {
   const session = await requireRequestSession(request);
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const driverId = searchParams.get("driverId");
     const status = searchParams.get("status");
 
-    if (!companyId) return NextResponse.json({ success: false, error: "companyId مطلوب" }, { status: 400 });
+    if (!companyId) return NextResponse.json({ success: false, error: "companyId ظ…ط·ظ„ظˆط¨" }, { status: 400 });
 
     const companyAccessError = assertCompanyAccess(session, companyId);
     if (companyAccessError) return companyAccessError;
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: violations });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ success: false, error: "فشل في جلب المخالفات" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "ظپط´ظ„ ظپظٹ ط¬ظ„ط¨ ط§ظ„ظ…ط®ط§ظ„ظپط§طھ" }, { status: 500 });
   }
 }
 
@@ -56,10 +57,12 @@ const createSchema = z.object({
   driverSharePct: z.number().int().min(1).max(99).optional(),
   paymentMode: z.enum(["FULL", "INSTALLMENT"]).default("FULL"),
   installmentMonths: z.number().int().min(1).optional(),
+  installmentStartYear: z.number().int().min(2020).max(2200).optional(),
+  installmentStartMonth: z.number().int().min(1).max(12).optional(),
   notes: z.string().optional(),
   expenseCategoryId: z.string().optional(),
 }).refine((data) => data.driverId || data.employeeId, {
-  message: "يجب تحديد سائق أو موظف",
+  message: "ظٹط¬ط¨ طھط­ط¯ظٹط¯ ط³ط§ط¦ظ‚ ط£ظˆ ظ…ظˆط¸ظپ",
 });
 
 export async function POST(request: NextRequest) {
@@ -78,76 +81,33 @@ export async function POST(request: NextRequest) {
     if (companyAccessError) return companyAccessError;
 
     const violation = await prisma.$transaction(async (tx) => {
-      let expenseId: string | undefined;
-
-      // Auto-create expense for company portion
-      const companyPays = data.responsibility === "COMPANY" || data.responsibility === "SPLIT";
-      if (companyPays && data.expenseCategoryId) {
-        const companySharePct = data.responsibility === "COMPANY" ? 100 : (100 - (data.driverSharePct ?? 50));
-        const companyAmount = Number(data.amount) * companySharePct / 100;
-
-        // جلب اسم الموظف/السائق
-        let employeeName = "";
-        if (data.driverId) {
-          const driver = await tx.driver.findUnique({
-            where: { id: data.driverId },
-            select: { employee: { select: { nameAr: true } } },
-          });
-          employeeName = driver?.employee.nameAr ?? "";
-        } else if (data.employeeId) {
-          const employee = await tx.employee.findUnique({
-            where: { id: data.employeeId },
-            select: { nameAr: true },
-          });
-          employeeName = employee?.nameAr ?? "";
-        }
-
-        const expense = await tx.expense.create({
-          data: {
-            companyId: data.companyId,
-            branchId: data.branchId,
-            categoryId: data.expenseCategoryId,
-            date: data.date,
-            amount: companyAmount,
-            descriptionAr: `مخالفة مرور — ${employeeName} — ${data.type}`,
-            descriptionEn: data.descriptionEn ? `Traffic violation — ${data.type}` : undefined,
-            driverId: data.driverId,
-            vehicleId: data.vehicleId,
-            paymentMethod: "CASH",
-          },
-        });
-        expenseId = expense.id;
+      if ((data.responsibility === "COMPANY" || data.responsibility === "SPLIT") && data.expenseCategoryId) {
+        const category = await tx.expenseCategory.findFirst({ where: { id: data.expenseCategoryId, companyId: data.companyId } });
+        if (!category) throw new Error("فئة مصروف الشركة غير صالحة");
       }
 
-      return tx.driverViolation.create({
+      const created = await tx.driverViolation.create({
         data: {
-          companyId: data.companyId,
-          branchId: data.branchId,
-          driverId: data.driverId,
-          employeeId: data.employeeId,
-          vehicleId: data.vehicleId,
-          date: data.date,
-          locationAr: data.locationAr,
-          locationEn: data.locationEn,
-          type: data.type,
-          descriptionAr: data.descriptionAr,
-          descriptionEn: data.descriptionEn,
-          amount: data.amount,
-          responsibility: data.responsibility,
-          driverSharePct: data.driverSharePct,
-          paymentMode: data.paymentMode,
+          companyId: data.companyId, branchId: data.branchId, driverId: data.driverId, employeeId: data.employeeId,
+          vehicleId: data.vehicleId, date: data.date, locationAr: data.locationAr, locationEn: data.locationEn,
+          type: data.type, descriptionAr: data.descriptionAr, descriptionEn: data.descriptionEn, amount: data.amount,
+          responsibility: data.responsibility, driverSharePct: data.driverSharePct, paymentMode: data.paymentMode,
           installmentMonths: data.paymentMode === "INSTALLMENT" ? data.installmentMonths : null,
-          driverPays: data.responsibility !== "COMPANY",
-          status: "PENDING",
-          expenseId,
+          installmentStartYear: data.installmentStartYear ?? data.date.getUTCFullYear(),
+          installmentStartMonth: data.installmentStartMonth ?? data.date.getUTCMonth() + 1,
+          driverPays: data.responsibility !== "COMPANY", status: "PENDING",
+          companyExpenseCategoryId: data.responsibility === "COMPANY" || data.responsibility === "SPLIT" ? data.expenseCategoryId ?? null : null,
           notes: data.notes,
         },
       });
+      await createViolationInstallments(tx, created);
+      return created;
     });
 
     return NextResponse.json({ success: true, data: violation }, { status: 201 });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ success: false, error: "فشل في تسجيل المخالفة" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "ظپط´ظ„ ظپظٹ طھط³ط¬ظٹظ„ ط§ظ„ظ…ط®ط§ظ„ظپط©" }, { status: 500 });
   }
 }
+

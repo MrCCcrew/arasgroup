@@ -9,6 +9,14 @@ import Link from "next/link";
 interface Group { id: string; nameAr: string; }
 
 const companyTypes = [
+  { value: "TOBACCO_SHISHA", label: "\u0645\u0639\u0633\u0644 \u0648\u0633\u062c\u0627\u064a\u0631 \u0648\u0634\u064a\u0634\u0629" },
+  { value: "MOBILE_REPAIR_ACCESSORIES", label: "\u0647\u0648\u0627\u062a\u0641 \u0648\u0635\u064a\u0627\u0646\u0629 \u0648\u0625\u0643\u0633\u0633\u0648\u0627\u0631" },
+  { value: "CLOTHING_RETAIL", label: "\u0628\u064a\u0639 \u0645\u0644\u0627\u0628\u0633" },
+  { value: "TAILORING", label: "\u062e\u064a\u0627\u0637" },
+  { value: "FABRIC_RETAIL", label: "\u0628\u064a\u0639 \u0623\u0642\u0645\u0634\u0629" },
+  { value: "TAILORING_FABRIC_RETAIL", label: "\u062e\u064a\u0627\u0637 \u0645\u0639 \u0628\u064a\u0639 \u0623\u0642\u0645\u0634\u0629" },
+  { value: "CONTRACTING", label: "مقاولات" },
+  { value: "GROCERY",     label: "بقالة ومخزون" },
   { value: "OWNER_MANAGED", label: "شركات بنظام إدارة المالك" },
   { value: "DELIVERY",  label: "توصيل طلبات" },
   { value: "CAR_WASH",  label: "غسيل سيارات" },
@@ -88,7 +96,10 @@ export default function NewCompanyPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "فشل في الحفظ");
-      router.push("/dashboard/settings");
+      // A new company changes the dashboard layout data used by the sidebar.
+      // Use a full navigation so the company and its activity-specific modules
+      // are loaded immediately instead of retaining the previous group sidebar.
+      window.location.assign(`/dashboard/companies/${data.data.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

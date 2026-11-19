@@ -183,7 +183,7 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
       ? { companyId, branchId: { in: branchIds }, status: { not: "CANCELLED" } }
       : { companyId, status: { not: "CANCELLED" } };
 
-  const [employees, vehicles, licenses] = await Promise.all([
+  const [employees, vehicles, licenses, workInjuryInsurances] = await Promise.all([
     canViewEmployees
       ? prisma.employee.findMany({
           where: employeeWhere,
@@ -247,6 +247,13 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
           orderBy: { commercialNameAr: "asc" },
         })
       : Promise.resolve([] as LicenseAlertRow[]),
+    canViewLicenses
+      ? prisma.workInjuryInsurance.findMany({
+          where: { endDate: { not: null }, license: licenseWhere },
+          select: { id: true, year: true, quarter: true, endDate: true, license: { select: { id: true, commercialNameAr: true, licenseNumber: true } } },
+          orderBy: [{ year: "desc" }, { quarter: "desc" }],
+        })
+      : Promise.resolve([] as { id: string; year: number; quarter: number; endDate: Date | null; license: { id: string; commercialNameAr: string; licenseNumber: string } }[]),
   ]);
 
   const employeeAlerts = dedupeAlerts(
@@ -348,7 +355,23 @@ export async function getExpiryAlertsData(session: SessionUser, companyId: strin
     ),
   );
 
-  return [...employeeAlerts, ...vehicleAlerts, ...licenseAlerts].sort((a, b) => {
+  const workInjuryAlerts = dedupeAlerts(
+    workInjuryInsurances.flatMap((insurance) => {
+      if (!insurance.endDate || insurance.endDate > in90) return [];
+      return [makeAlert(
+        "license",
+        insurance.id,
+        insurance.license.commercialNameAr,
+        en ? `License no: ${insurance.license.licenseNumber}` : `\u0631\u0642\u0645 \u0627\u0644\u062a\u0631\u062e\u064a\u0635: ${insurance.license.licenseNumber}`,
+        en ? `Work injury insurance — ${insurance.year} Q${insurance.quarter}` : `\u062a\u0623\u0645\u064a\u0646 \u0625\u0635\u0627\u0628\u0627\u062a \u0627\u0644\u0639\u0645\u0644 — ${insurance.year} Q${insurance.quarter}`,
+        ensureDate(insurance.endDate),
+        now,
+        `/dashboard/companies/${companyId}/licenses/${insurance.license.id}`,
+      )];
+    }),
+  );
+
+  return [...employeeAlerts, ...vehicleAlerts, ...licenseAlerts, ...workInjuryAlerts].sort((a, b) => {
     if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
     return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
   });

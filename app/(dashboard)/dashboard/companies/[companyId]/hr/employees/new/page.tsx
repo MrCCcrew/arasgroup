@@ -233,6 +233,7 @@ export default function NewEmployeePage() {
     licenseNumber: "",
     licenseExpiry: "",
     phone: "",
+    residentialAddress: "",
     joinDate: "",
     baseSalary: "",
     bankAccountNumber: "",
@@ -339,6 +340,7 @@ export default function NewEmployeePage() {
           licenseNumber: form.licenseNumber || undefined,
           licenseExpiry: form.licenseExpiry || undefined,
           phone: form.phone || undefined,
+          residentialAddress: form.residentialAddress.trim() || undefined,
           joinDate: form.joinDate || undefined,
           baseSalary: form.baseSalary ? parseFloat(form.baseSalary) : undefined,
           bankAccountNumber: form.bankAccountNumber || undefined,
@@ -566,6 +568,17 @@ export default function NewEmployeePage() {
                   className="input-field w-full"
                   placeholder="+965XXXXXXXX"
                   dir="ltr"
+                />
+              </div>
+              <div>
+                <label htmlFor="residentialAddress" className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Residence location" : "مكان السكن"}</label>
+                <input
+                  id="residentialAddress"
+                  value={form.residentialAddress}
+                  onChange={(event) => setField("residentialAddress", event.target.value)}
+                  maxLength={191}
+                  className="input-field w-full"
+                  placeholder={locale === "en" ? "Area / building or accommodation name" : "المنطقة / اسم المبنى أو السكن"}
                 />
               </div>
 

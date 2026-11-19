@@ -1,3 +1,5 @@
+import { adjustmentTotal, salaryAdjustmentDetailsSchema, type SalaryAdjustmentDetails } from "./salary-adjustments";
+
 export interface SalaryPaymentDraftInput {
   employeeId: string;
   baseAmount: number;
@@ -9,6 +11,9 @@ export interface SalaryPaymentDraftInput {
   fuelAddition: number;
   targetDeduction: number;
   companyDeduction: number;
+  vehicleRentDeduction?: number;
+  housingDeduction?: number;
+  adjustmentDetails?: SalaryAdjustmentDetails;
   attendanceDays?: number;
   evaluationScore?: number;
   targetOrders?: number;
@@ -35,17 +40,26 @@ export function round3(value: number) {
 }
 
 export function buildSalaryBatchDraft(paymentsInput: SalaryPaymentDraftInput[]) {
-  const payments = paymentsInput.map((payment) => {
+  const payments = paymentsInput.map((input) => {
+    const adjustmentDetails = salaryAdjustmentDetailsSchema.parse(input.adjustmentDetails);
+    const payment = { ...input, adjustmentDetails };
+    for (const field of ["companyAddition", "companyDeduction", "additionalEarnings", "deductions"] as const) {
+      const details = adjustmentDetails?.[field];
+      if (details !== undefined) payment[field] = adjustmentTotal(details);
+    }
     const additionalEarningsRaw = payment.additionalEarnings;
     const deductionsRaw = payment.deductions;
     const additionalEarnings = round3(
       additionalEarningsRaw + payment.foodAllowance + payment.companyAddition + payment.fuelAddition,
     );
-    const deductions = round3(deductionsRaw + payment.targetDeduction + payment.companyDeduction);
+    const vehicleRentDeduction = payment.vehicleRentDeduction ?? 0;
+    const housingDeduction = payment.housingDeduction ?? 0;
+    const deductions = round3(deductionsRaw + payment.targetDeduction + payment.companyDeduction + vehicleRentDeduction + housingDeduction);
     const netAmount = round3(payment.baseAmount + payment.incentives + additionalEarnings - deductions);
 
     return {
       ...payment,
+      advanceDeduction: 0,
       additionalEarnings,
       deductions,
       netAmount,
@@ -70,6 +84,8 @@ export function buildSalaryBatchDraft(paymentsInput: SalaryPaymentDraftInput[]) 
       titleAr: string;
       titleEn: string;
       amount: number;
+      sourceType?: string;
+      sourceId?: string;
     }> = [
       {
         employeeId: payment.employeeId,
@@ -96,12 +112,22 @@ export function buildSalaryBatchDraft(paymentsInput: SalaryPaymentDraftInput[]) 
 
     add(true, "INCENTIVE", "EARNING", AR.incentive, "Incentive", payment.incentives);
     add(true, "FOOD_ALLOWANCE", "EARNING", AR.foodAllowance, "Food Allowance", payment.foodAllowance);
-    add(true, "COMPANY_ADDITION", "EARNING", AR.companyAddition, "Company Addition", payment.companyAddition);
+    const addDetails = (field: keyof SalaryAdjustmentDetails, type: string, category: string, titleAr: string, titleEn: string, amount: number) => {
+      const details = payment.adjustmentDetails?.[field];
+      if (details !== undefined) {
+        details.forEach(item => add(true, type, category, item.titleAr, item.titleEn || item.titleAr, item.amount));
+      } else {
+        add(true, type, category, titleAr, titleEn, amount);
+      }
+    };
+    addDetails("companyAddition", "COMPANY_ADDITION", "EARNING", AR.companyAddition, "Company Addition", payment.companyAddition);
     add(true, "FUEL_ADDITION", "EARNING", AR.fuelAddition, "Fuel & Tire Addition", payment.fuelAddition);
-    add(true, "ADDITIONAL_EARNING", "EARNING", AR.otherAddition, "Additional Earning", payment.additionalEarningsRaw);
+    addDetails("additionalEarnings", "ADDITIONAL_EARNING", "EARNING", AR.otherAddition, "Additional Earning", payment.additionalEarningsRaw);
     add(true, "TARGET_DEDUCTION", "DEDUCTION", AR.targetDeduction, "Target Deduction", payment.targetDeduction);
-    add(true, "COMPANY_DEDUCTION", "DEDUCTION", AR.companyDeduction, "Company Deduction", payment.companyDeduction);
-    add(true, "DEDUCTION", "DEDUCTION", AR.deduction, "Deduction", payment.deductionsRaw);
+    add(true, "VEHICLE_RENT_DEDUCTION", "DEDUCTION", "إيجار السيارة", "Vehicle rent", payment.vehicleRentDeduction ?? 0);
+    add(true, "HOUSING_DEDUCTION", "DEDUCTION", "بدل السكن", "Housing deduction", payment.housingDeduction ?? 0);
+    addDetails("companyDeduction", "COMPANY_DEDUCTION", "DEDUCTION", AR.companyDeduction, "Company Deduction", payment.companyDeduction);
+    addDetails("deductions", "DEDUCTION", "DEDUCTION", AR.deduction, "Deduction", payment.deductionsRaw);
 
     return result;
   });

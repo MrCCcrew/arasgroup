@@ -130,8 +130,11 @@ export async function POST(request: NextRequest) {
       const carriageParsed = parsed as any;
       totalPickup = carriageParsed.totals.pickupPayment;
       totalDropoff = carriageParsed.totals.dropoffPayment;
-      totalCalc = carriageParsed.totals.completedDeliveries; // Actual deliveries, not calculated
-      totalPayment = carriageParsed.totals.netPayment;
+      // The parser recalculates these totals from counts less cancellations at
+      // 0.590 per pickup/dropoff.  Do not use the report's legacy payment
+      // columns as the payroll source.
+      totalCalc = carriageParsed.totals.completedDeliveries;
+      totalPayment = carriageParsed.totals.pickupPayment + carriageParsed.totals.dropoffPayment;
     } else {
       // Talabat Excel totals (old logic)
       totalPickup = parsed.riders.reduce((s: number, r: any) => s + r.totalPickupPay, 0);
@@ -172,9 +175,12 @@ export async function POST(request: NextRequest) {
           // Payments (map to old fields for compatibility)
           totalPickupPay: r.pickupPayment,
           totalDropoffPay: r.dropoffPayment,
-          calculatedOrdersRaw: r.totalCompletedDeliveries, // Calculated: (Pickup + Dropoff) / 1.050
-          calculatedOrdersRounded: r.totalCompletedDeliveries,
-          totalPayment: r.netPayment,
+          // Payroll-equivalent orders = ((net pickups × 0.590) +
+          // (net dropoffs × 0.590)) ÷ 1.180.
+          calculatedOrdersRaw: r.calculatedOrders,
+          calculatedOrdersRounded: r.calculatedOrders,
+          // Current Talabat settlement: (net pickup + net dropoff) × 0.590.
+          totalPayment: r.pickupPayment + r.dropoffPayment,
           totalDeductions: r.operatorDeduction,
 
           // Carriage-specific fields

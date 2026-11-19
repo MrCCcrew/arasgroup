@@ -1,3 +1,5 @@
+import { employeeListParams, employeeListWhere, type EmployeeListFilters } from "@/lib/hr/employee-list";
+import { canAccessCompany, getAccessibleBranchIds, hasPermission } from "@/lib/auth/permissions";
 import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
@@ -7,14 +9,7 @@ import { formatDate, formatKWD } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{
-    type?: string;
-    positionId?: string;
-    search?: string;
-    group?: string;
-    status?: string;
-    category?: string;
-  }>;
+  searchParams: Promise<EmployeeListFilters>;
 }
 
 const typeLabels = {
@@ -55,6 +50,8 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
 
   const { companyId } = await params;
   const query = await searchParams;
+  if (!canAccessCompany(session, companyId) || !hasPermission(session, "HR", "VIEW", { companyId })) redirect("/dashboard");
+  const branchIds = getAccessibleBranchIds(session, companyId);
   const locale = await getLocale();
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
@@ -62,43 +59,13 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
   const getTypeLabel = (type: EmployeeType) => typeLabels[locale][type];
   const showingDeleted = query.status === "deleted";
 
-  const activeWhere = { companyId, isActive: true, isDeleted: false };
-  const deletedWhere = { companyId, isDeleted: true };
-  const baseWhere = showingDeleted ? deletedWhere : activeWhere;
-
-  const groupFilter =
-    query.group === "company"
-      ? { investorId: null }
-      : query.group === "investor"
-        ? { investorId: { not: null } }
-        : {};
-
-  const categoryFilter =
-    query.category === "drivers"
-      ? { type: { in: [...DRIVER_TYPES] } }
-      : query.category === "admins"
-        ? { investorId: null, type: { in: [...ADMIN_TYPES] } }
-        : query.category === "investor"
-          ? { investorId: { not: null } }
-          : {};
-
-  const typeFilter = query.type ? { type: query.type as EmployeeType } : {};
-  const positionFilter = query.positionId ? { positionId: query.positionId } : {};
-
   const [company, employees] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: { nameAr: true, nameEn: true, logoUrl: true },
     }),
     prisma.employee.findMany({
-      where: {
-        ...baseWhere,
-        ...groupFilter,
-        ...categoryFilter,
-        ...typeFilter,
-        ...positionFilter,
-        ...(query.search ? { nameAr: { contains: query.search } } : {}),
-      },
+      where: employeeListWhere(companyId, query, branchIds),
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
@@ -116,13 +83,7 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
   const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
 
   // Build query for back button
-  const backQuery = new URLSearchParams();
-  if (query.type) backQuery.set("type", query.type);
-  if (query.positionId) backQuery.set("positionId", query.positionId);
-  if (query.search) backQuery.set("search", query.search);
-  if (query.group) backQuery.set("group", query.group);
-  if (query.status) backQuery.set("status", query.status);
-  if (query.category) backQuery.set("category", query.category);
+  const backQuery = employeeListParams(query);
 
   const backHref = `/dashboard/companies/${companyId}/hr/employees${backQuery.toString() ? `?${backQuery.toString()}` : ""}`;
   const printDate = new Date().toLocaleDateString(numberLocale, { year: "numeric", month: "long", day: "numeric" });
@@ -142,7 +103,9 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
         .print-date { font-size: 0.78rem; color: #9ca3af; margin-top: 0.2rem; }
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; margin-top: 0.5rem; }
         th { background: #1f2937; color: white; padding: 0.4rem 0.3rem; text-align: ${isEnglish ? "left" : "right"}; border: 1px solid #1f2937; font-weight: 600; font-size: 0.68rem; }
-        td { padding: 0.35rem 0.3rem; border: 1px solid #d1d5db; }
+        thead { display: table-header-group; }
+        tr { break-inside: avoid; }
+        td { overflow-wrap: anywhere; padding: 0.35rem 0.3rem; border: 1px solid #d1d5db; }
         tr:nth-child(even) td { background: #f9fafb; }
         .number { font-variant-numeric: tabular-nums; direction: ltr; text-align: left; }
         @media print {
@@ -153,7 +116,7 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
         }
       `}</style>
 
-      <PrintControls backHref={backHref} />
+      <div className="controls"><PrintControls backHref={backHref} /></div>
 
       <div className="page">
         <div className="header">
@@ -169,6 +132,7 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
           </div>
           <p className="report-title">{isEnglish ? "Employees Report" : "تقرير الموظفين"}</p>
           <p className="report-sub">{employees.length} {isEnglish ? "employee(s)" : "موظف"}</p>
+          {query.residentialAddress && <p className="report-sub">{isEnglish ? "Residence location" : "مكان السكن"}: {query.residentialAddress}</p>}
           <p className="print-date">{isEnglish ? "Print date" : "تاريخ الطباعة"}: {printDate}</p>
         </div>
 
@@ -189,6 +153,7 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
                 {showInvestorColumn ? <th>{isEnglish ? "Investor" : "المسئول"}</th> : null}
                 <th>{isEnglish ? "Residency license" : "ترخيص الإقامة"}</th>
                 <th>{isEnglish ? "Work permit" : "ترخيص العمل"}</th>
+                <th>{isEnglish ? "Residence location" : "مكان السكن"}</th>
                 <th>{isEnglish ? "Phone" : "التليفون"}</th>
                 <th>{isEnglish ? "Main license" : "الترخيص الرئيسي"}</th>
                 <th>{isEnglish ? "Authorized signer" : "المفوض بالتوقيع"}</th>
@@ -235,6 +200,7 @@ export default async function EmployeesPrintPage({ params, searchParams }: Props
                         : employee.workPermitLicense.commercialNameAr
                       : "—"}
                   </td>
+                  <td>{employee.residentialAddress || "—"}</td>
                   <td className="number">{employee.phone ?? "—"}</td>
                   <td>
                     {employee.license
