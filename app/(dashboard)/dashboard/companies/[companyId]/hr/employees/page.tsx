@@ -433,7 +433,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         </td>
 
                         {/* 2. اسم الموظف */}
-                        <td>
+                        <td className="emp-name">
                           <div>
                             <p className="font-medium">{employee.nameAr}</p>
                             {employee.nameEn ? <p className="text-xs text-muted-foreground">{employee.nameEn}</p> : null}
@@ -482,7 +482,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         ) : null}
 
                         {/* 8. ترخيص الإقامة */}
-                        <td className="text-sm">
+                        <td className="emp-lic text-sm">
                           {employee.residencyLicense
                             ? locale === "en"
                               ? employee.residencyLicense.commercialNameEn ?? employee.residencyLicense.commercialNameAr
@@ -491,7 +491,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         </td>
 
                         {/* 9. ترخيص العمل */}
-                        <td className="text-sm">
+                        <td className="emp-lic text-sm">
                           {employee.workPermitLicense
                             ? locale === "en"
                               ? employee.workPermitLicense.commercialNameEn ?? employee.workPermitLicense.commercialNameAr

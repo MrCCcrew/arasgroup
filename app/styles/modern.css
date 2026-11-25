@@ -310,6 +310,10 @@ html[data-ui="modern"] .portal-shell.pt-28 { padding-top: 76px; }
   html[data-ui="modern"] .employee-filters > .grid > .grid > .grid { display: contents; }
 }
 
+/* Employees table: keep long license names to ~2 lines */
+html[data-ui="modern"] .ar-table td.emp-lic { min-width: 180px; }
+html[data-ui="modern"] .ar-table td.emp-name { min-width: 160px; }
+
 /* Hub pages: quick links become tiles (same links) */
 html[data-ui="modern"] .hub-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 @media (min-width: 768px) { html[data-ui="modern"] .hub-links { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -324,6 +328,11 @@ html[data-ui="modern"] .hub-links > a:hover { border-color: var(--m-pri-bd); bac
 
 /* Users management: keep names on one line */
 html[data-ui="modern"] .users-mgmt tbody td:first-child p { white-space: nowrap; }
+html[data-ui="modern"] .users-mgmt .user-perm-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 220px; }
+html[data-ui="modern"] .users-mgmt .user-perm-actions > * { margin: 0 !important; }
+html[data-ui="modern"] .users-mgmt .user-perm-actions > p { flex-basis: 100%; }
+html[data-ui="modern"] .users-mgmt .user-perm-actions button { white-space: nowrap; min-height: 34px; border-radius: 12px; }
+html[data-ui="modern"] .users-mgmt tbody td { vertical-align: top; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
 
 }
