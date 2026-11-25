@@ -9,7 +9,7 @@ export default async function CarWashPortalLayout({ children }: { children: Reac
   const context = await getCarWashPortalContext(session);
   if (!context) redirect("/dashboard");
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 pt-28">
+    <div className="portal-shell min-h-screen bg-slate-50 pb-24 pt-28">
       <CarWashPortalNavigation userNameAr={session.nameAr} userNameEn={session.nameEn} userEmail={session.email} companyNameAr={context.company.nameAr} companyNameEn={context.company.nameEn} />
       <main className="mx-auto max-w-lg p-4">{children}</main>
     </div>

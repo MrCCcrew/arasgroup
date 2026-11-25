@@ -20,7 +20,7 @@ export default async function DriverLayout({
   }
 
   return (
-    <DriverTrackingProvider><div className="min-h-screen bg-gray-50 pb-16">
+    <DriverTrackingProvider><div className="portal-shell min-h-screen bg-gray-50 pb-16">
       <main className="container mx-auto p-4 max-w-2xl">
         <DriverPortalHeader />
         {children}
