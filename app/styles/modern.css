@@ -303,6 +303,25 @@ html[data-ui="modern"] .portal-shell a.rounded-xl.border { border-radius: 18px; 
 html[data-ui="modern"] .portal-shell .rounded-2xl { border-radius: 22px; }
 html[data-ui="modern"] .portal-shell.pt-28 { padding-top: 76px; }
 
+/* Employees list filters: one compact grid on wide screens (same controls) */
+@media (min-width: 1024px) {
+  html[data-ui="modern"] .employee-filters > .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+  html[data-ui="modern"] .employee-filters > .grid > .grid,
+  html[data-ui="modern"] .employee-filters > .grid > .grid > .grid { display: contents; }
+}
+
+/* Hub pages: quick links become tiles (same links) */
+html[data-ui="modern"] .hub-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 768px) { html[data-ui="modern"] .hub-links { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+html[data-ui="modern"] .hub-links > a {
+  display: flex; align-items: center; justify-content: space-between; min-height: 64px;
+  padding: 14px 18px; border-radius: 18px; border-color: hsl(var(--border));
+  font-size: 15px; font-weight: 800; color: #0F172A; background: hsl(var(--card));
+}
+html[data-ui="modern"] .hub-links > a::after { content: "‹"; font-size: 20px; color: #94A3B8; }
+html[dir="ltr"][data-ui="modern"] .hub-links > a::after { content: "›"; }
+html[data-ui="modern"] .hub-links > a:hover { border-color: var(--m-pri-bd); background: #F5F7FF; }
+
 /* Users management: keep names on one line */
 html[data-ui="modern"] .users-mgmt tbody td:first-child p { white-space: nowrap; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }

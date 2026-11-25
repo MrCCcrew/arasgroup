@@ -128,7 +128,7 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, resi
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="employee-filters rounded-xl border bg-card p-4">
       <div className="grid gap-3">
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
