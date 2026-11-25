@@ -278,6 +278,31 @@ html[data-ui="modern"] .finance-document { border-radius: 16px; }
 /* Leaflet maps inside cards */
 html[data-ui="modern"] .leaflet-container { border-radius: 18px; }
 
+/* ── Employee portals (driver / car wash / grocery / partner) ── */
+html[data-ui="modern"] .portal-bottomnav {
+  background: rgba(255,255,255,.96);
+  border-top: 1px solid #E4E8F0;
+  box-shadow: 0 -6px 24px rgba(15,23,42,.06);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+html[data-ui="modern"] .portal-tab { color: #5B6577; font-weight: 700; border-radius: 14px; }
+html[data-ui="modern"] .portal-tab[data-active] { color: #3B5BDB; }
+html[data-ui="modern"] .portal-tab[data-active] svg { stroke-width: 2.4; }
+html[data-ui="modern"] .portal-topbar { background: rgba(244,246,250,.92); border-bottom: 0; box-shadow: none; }
+html[data-ui="modern"] .portal-topbar button.bg-red-600 { background: #FEF1EC; color: #B42318; border-radius: 12px; }
+html[data-ui="modern"] .portal-topbar-inline { padding-top: 4px; }
+html[data-ui="modern"] .portal-shell { background: #F4F6FA; }
+html[data-ui="modern"] .portal-shell .ui-card,
+html[data-ui="modern"] .portal-shell .section-card { border-radius: 22px; box-shadow: none; border-color: #E4E8F0; }
+html[data-ui="modern"] .portal-shell .ui-button { min-height: 48px; border-radius: 14px; font-weight: 700; }
+html[data-ui="modern"] .portal-shell.bg-muted\/30,
+html[data-ui="modern"] .portal-shell.bg-slate-50,
+html[data-ui="modern"] .portal-shell.bg-gray-50 { background: #F4F6FA; }
+html[data-ui="modern"] .portal-shell a.rounded-lg.border,
+html[data-ui="modern"] .portal-shell a.rounded-xl.border { border-radius: 18px; border-color: #E4E8F0; background: #fff; font-weight: 700; min-height: 56px; }
+html[data-ui="modern"] .portal-shell .rounded-2xl { border-radius: 22px; }
+html[data-ui="modern"] .portal-shell.pt-28 { padding-top: 76px; }
+
 /* Users management: keep names on one line */
 html[data-ui="modern"] .users-mgmt tbody td:first-child p { white-space: nowrap; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
