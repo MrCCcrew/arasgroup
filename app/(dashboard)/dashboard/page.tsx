@@ -6,7 +6,9 @@ import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
-import { ExpiryAlertsPanel } from "./ExpiryAlertsPanel";
+import { ExpiryAlertsPanel, getExpiryAlerts } from "./ExpiryAlertsPanel";
+import { ModernGroupDashboard } from "./modern/ModernGroupDashboard";
+import { getUiStyle } from "@/lib/ui-style";
 
 const DRIVER_TYPES = ["DRIVER", "DELIVERY_DRIVER", "CAR_WASH_DRIVER"] as const;
 const ADMIN_TYPES = ["DELIVERY_ADMIN", "OFFICE_EMPLOYEE", "ACCOUNTANT", "MANDOUB", "OFFICE_BOY", "OTHER"] as const;
@@ -145,6 +147,34 @@ export default async function GroupDashboardPage({ searchParams }: { searchParam
       ? { href: "/dashboard/settings", label: "إعدادات النظام", icon: <Building2 size={16} /> }
       : null,
   ].filter(Boolean) as { href: string; label: string; icon: React.ReactNode }[];
+
+  // Modern interface: same data, different layout. The classic JSX below is unchanged.
+  if ((await getUiStyle()) === "modern") {
+    const alertsData = await getExpiryAlerts(companyIds);
+    return (
+      <ModernGroupDashboard
+        userName={session.nameAr}
+        companies={companies.map((company) => ({
+          id: company.id,
+          nameAr: company.nameAr,
+          type: company.type,
+          logoUrl: company.logoUrl ?? null,
+          isActive: company.isActive,
+          branches: company._count.branches,
+          total: totalMap.get(company.id) ?? 0,
+          drivers: driverMap.get(company.id) ?? 0,
+          admins: adminMap.get(company.id) ?? 0,
+          investorEmployees: investorMap.get(company.id) ?? 0,
+          deleted: deletedMap.get(company.id) ?? 0,
+        }))}
+        totalEmployees={totalEmployees}
+        expiringResidencies={expiringResidencies}
+        alerts={alertsData}
+        showDeleted={session.isSuperAdmin}
+        quickLinks={quickLinks.map(({ href, label }) => ({ href, label }))}
+      />
+    );
+  }
 
   return (
     <div>

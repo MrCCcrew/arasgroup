@@ -28,7 +28,14 @@ function formatLicenseSummary(name?: string | null, number?: string | null) {
   return name ?? number ?? null;
 }
 
-export async function ExpiryAlertsPanel({ companyIds }: Props) {
+export interface ExpiryAlertTotals {
+  danger: number;
+  warning: number;
+  notice: number;
+}
+
+/** Loads and sorts the expiry alerts. Shared by the classic and the modern dashboard. */
+export async function getExpiryAlerts(companyIds: string[]): Promise<{ alerts: AlertItem[]; totals: ExpiryAlertTotals } | null> {
   if (companyIds.length === 0) return null;
 
   const now = new Date();
@@ -255,5 +262,11 @@ export async function ExpiryAlertsPanel({ companyIds }: Props) {
     notice: alerts.filter((item) => item.daysLeft > 60).length,
   };
 
-  return <ExpiryAlertsPanelClient alerts={alerts} maxShown={10} totals={totals} />;
+  return { alerts, totals };
+}
+
+export async function ExpiryAlertsPanel({ companyIds }: Props) {
+  const data = await getExpiryAlerts(companyIds);
+  if (!data) return null;
+  return <ExpiryAlertsPanelClient alerts={data.alerts} maxShown={10} totals={data.totals} />;
 }
