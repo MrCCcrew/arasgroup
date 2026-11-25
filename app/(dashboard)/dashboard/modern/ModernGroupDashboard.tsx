@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Building2, CalendarDays, ChevronLeft, Search, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, ChevronLeft, Search, Sparkles, Users, Zap } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import type { AlertItem, ExpiryAlertTotals } from "../ExpiryAlertsPanel";
 import { ModernExpiryAlerts } from "./ModernExpiryAlerts";
@@ -130,11 +130,17 @@ export function ModernGroupDashboard({ userName, companies, totalEmployees, expi
             )}
           </div>
           <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-            <section aria-label="الوصول السريع" className="flex flex-col gap-3 rounded-[24px] border border-[#E4E8F0] bg-card p-5">
-              <h2 className="text-lg font-extrabold">الوصول السريع</h2>
-              <div className="flex max-h-[26rem] flex-col gap-1 overflow-y-auto">
+            <section aria-label="الوصول السريع" className="flex flex-col overflow-hidden rounded-[24px] border-2 border-[#C7D2FE] bg-[#F5F7FF] shadow-[0_8px_24px_rgba(59,91,219,0.12)]">
+              <div className="flex items-center gap-3 bg-gradient-to-l from-[#3B5BDB] to-[#5B7BF0] px-5 py-4 text-white">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white/20"><Zap size={18} /></span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-extrabold leading-tight">الوصول السريع</h2>
+                  <p className="text-xs text-white/85">ادخل على أي شركة بضغطة · {companies.length} شركة</p>
+                </div>
+              </div>
+              <div className="flex max-h-[26rem] flex-col gap-1.5 overflow-y-auto p-3">
                 {companies.map((c) => (
-                  <Link key={c.id} href={`/dashboard/companies/${c.id}`} className="flex min-h-11 shrink-0 items-center gap-3 rounded-[14px] p-2.5 hover:bg-[#F8FAFC]">
+                  <Link key={c.id} href={`/dashboard/companies/${c.id}`} className="flex min-h-11 shrink-0 items-center gap-3 rounded-[14px] border border-[#E4E8F0] bg-white p-2.5 transition-colors hover:border-[#A5B4FC] hover:bg-[#EEF2FF]">
                     <CompanyAvatar company={c} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-bold" title={c.nameAr}>{c.nameAr}</span>

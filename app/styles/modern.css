@@ -87,11 +87,10 @@ html[data-ui="modern"] .app-sidebar .nav-item[data-active] {
   color: #FFFFFF;
   font-weight: 700;
 }
-html[data-ui="modern"] .app-sidebar .nav-icon {
-  background: transparent !important;
-  color: #94A3B8 !important;
-}
-html[data-ui="modern"] .app-sidebar .nav-item[data-active] .nav-icon { color: hsl(var(--sidebar-primary)) !important; }
+/* Section icons keep their per-section colours (same as classic), in a softer rounded badge */
+html[data-ui="modern"] .app-sidebar .nav-icon { border-radius: 10px; width: 30px; height: 30px; }
+html[data-ui="modern"] .app-sidebar .nav-children .nav-icon { width: 26px; height: 26px; border-radius: 8px; }
+html[data-ui="modern"] .app-sidebar .nav-item[data-active] .nav-icon { box-shadow: 0 0 0 1px currentColor inset; }
 html[data-ui="modern"] .app-sidebar .nav-children {
   border-color: #334155 !important;
   margin-inline-start: 22px;
