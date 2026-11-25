@@ -62,7 +62,7 @@
     "jose": "^5.10.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.511.0",
-    "next": "15.3.2",
+    "next": "15.5.29",
     "next-intl": "^3.0.0",
     "pdfjs-dist": "^4.10.38",
     "postcss": "^8.5.3",
