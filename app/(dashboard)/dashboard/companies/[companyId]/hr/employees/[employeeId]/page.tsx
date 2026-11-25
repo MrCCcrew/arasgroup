@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { DragFileHandle, fileDragProps } from "@/components/files/drag-file";
 import { formatDate, formatKWD } from "@/lib/utils";
 
 const DOC_TYPES = {
@@ -392,6 +393,7 @@ export default function EmployeeDetailPage() {
             <div className="flex items-center justify-between border-b p-4">
               <p className="text-sm font-medium">{preview.originalName}</p>
               <div className="flex items-center gap-2">
+                <DragFileHandle url={preview.filePath} name={preview.originalName} type={preview.fileType} en={locale === "en"} />
                 <a href={preview.filePath} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90">
                   <Eye size={13} />
                   {locale === "en" ? "Open / Print" : "فتح / طباعة"}
@@ -403,7 +405,7 @@ export default function EmployeeDetailPage() {
             </div>
             <div className="flex min-h-[300px] items-center justify-center p-4">
               {preview.fileType.startsWith("image/") ? (
-                <img src={preview.filePath} alt={preview.originalName} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+                <img src={preview.filePath} alt={preview.originalName} className="max-h-[70vh] max-w-full rounded-lg object-contain" {...fileDragProps(preview.filePath, preview.originalName, preview.fileType)} />
               ) : preview.fileType === "application/pdf" ? (
                 <iframe src={preview.filePath} className="h-[70vh] w-full rounded-lg" title={preview.originalName} />
               ) : (
@@ -448,7 +450,7 @@ function AttachmentCard({
 }) {
   const isImage = attachment.fileType.startsWith("image/");
   return (
-    <div className="group relative cursor-pointer overflow-hidden rounded-lg border bg-muted/20 transition-colors hover:border-primary/50" onClick={() => onPreview(attachment)}>
+    <div className="group relative cursor-pointer overflow-hidden rounded-lg border bg-muted/20 transition-colors hover:border-primary/50" onClick={() => onPreview(attachment)} {...fileDragProps(attachment.filePath, attachment.originalName, attachment.fileType)}>
       {isImage ? (
         <img src={attachment.filePath} alt={attachment.originalName} className="h-24 w-full object-cover" />
       ) : (
