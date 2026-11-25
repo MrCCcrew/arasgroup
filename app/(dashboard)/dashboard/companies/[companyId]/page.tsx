@@ -5,6 +5,8 @@ import {
   BookOpen,
   Building2,
   Car,
+  ChevronLeft,
+  MoreHorizontal,
   FileText,
   Receipt,
   ShieldCheck,
@@ -20,6 +22,8 @@ import { getLocale } from "@/lib/i18n";
 import { hasPermission } from "@/lib/auth/permissions";
 import { CompanyLogoUpload } from "@/components/company/CompanyLogoUpload";
 import { daysUntilExpiry, formatDate, formatKWD } from "@/lib/utils";
+import { getUiStyle } from "@/lib/ui-style";
+import { companyAvatarClasses } from "@/components/modern/company-meta";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -227,6 +231,201 @@ export default async function CompanyDashboardPage({ params }: Props) {
 
   if (canDo("REPORTS", "VIEW"))
     quickLinks.push({ href: `/dashboard/companies/${companyId}/reports`, label: locale === "en" ? "Reports" : "التقارير", color: "amber", icon: <FileText size={16} /> });
+
+  if ((await getUiStyle()) === "modern") {
+    const en = locale === "en";
+    const typeLabel = companyTypeLabels[locale][company.type as keyof typeof companyTypeLabels.ar] ?? company.type;
+    const initial = (companyName.replace(/^\s*(شركة|شركه)\s+/, "").trim() || companyName).charAt(0);
+    const kpis: Array<{ label: string; value: number; icon: React.ReactNode; tone?: "warn" | "crit"; href?: string }> = [
+      { label: en ? "Total employees" : "إجمالي الموظفين", value: company._count.employees, icon: <Users size={18} /> },
+      { label: en ? "Branches" : "الفروع", value: company._count.branches, icon: <Building2 size={18} /> },
+      ...(canViewAccounting
+        ? [{ label: en ? "Draft entries" : "قيد مسودة", value: unpostedJEs, icon: <Receipt size={18} />, tone: unpostedJEs > 0 ? ("warn" as const) : undefined, href: `/dashboard/companies/${companyId}/accounting/journal-entries` }]
+        : []),
+      { label: en ? "Residencies expiring (30d)" : "إقامة تنتهي (30 يوم)", value: expiringResidencies.length, icon: <AlertTriangle size={18} />, tone: expiringResidencies.length > 0 ? ("crit" as const) : undefined, href: `/dashboard/companies/${companyId}/hr/expiry-alerts` },
+    ];
+    const licenseStats: Array<{ label: string; value: number; href?: string; tone?: "warn" }> = [
+      { label: en ? "Main licenses" : "التراخيص الرئيسية", value: mainLicensesCount, href: `/dashboard/companies/${companyId}/licenses?type=main` },
+      { label: en ? "Sub licenses" : "التراخيص الفرعية", value: subLicensesCount, href: `/dashboard/companies/${companyId}/licenses?type=sub` },
+      { label: en ? "Emp. in main licenses" : "موظفو الرئيسية", value: empInMainLicenses },
+      { label: en ? "Emp. in sub licenses" : "موظفو الفرعية", value: empInSubLicenses },
+      { label: en ? "Licenses expiring (60d)" : "تراخيص تنتهي (60 يوم)", value: expiringLicenses, href: `/dashboard/companies/${companyId}/licenses`, tone: expiringLicenses > 0 ? "warn" : undefined },
+    ];
+    const toneBox = (tone?: "warn" | "crit") =>
+      tone === "crit" ? "border-[#F5C2B8] bg-[#FEF1EC]" : tone === "warn" ? "border-[#F3D48A] bg-[#FFF6E0]" : "border-[#E4E8F0] bg-card";
+    const toneText = (tone?: "warn" | "crit") => (tone === "crit" ? "text-[#B42318]" : tone === "warn" ? "text-[#8A5A00]" : "text-[#0F172A]");
+
+    return (
+      <div>
+        <Header title={companyName} subtitle={typeLabel} companyId={companyId} />
+
+        <div className="page-container flex flex-col gap-5">
+          <section className="flex flex-wrap items-center gap-4 rounded-[24px] border border-[#E4E8F0] bg-card p-5">
+            {company.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logoUrl} alt="" className="h-16 w-16 shrink-0 rounded-[18px] border border-[#E4E8F0] bg-white object-contain p-1" />
+            ) : (
+              <span className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] text-2xl font-extrabold ${companyAvatarClasses(company.type)}`}>{initial}</span>
+            )}
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-xl font-extrabold" title={companyName}>{companyName}</h2>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-[#5B6577]">
+                <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 font-bold text-[#3B5BDB]">{typeLabel}</span>
+                <span>{company._count.employees} {en ? "employees" : "موظف"}</span>
+                <span>•</span>
+                <span>{company._count.branches} {en ? "branches" : "فرع"}</span>
+                {company.isActive === false ? <span className="rounded-full bg-[#FEF1EC] px-2.5 py-1 font-bold text-[#B42318]">{en ? "Inactive" : "متوقف"}</span> : null}
+              </div>
+            </div>
+            {session.isSuperAdmin ? (
+              <details className="company-menu relative">
+                <summary aria-label={en ? "Company options" : "خيارات الشركة"} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-[14px] border border-[#E4E8F0] hover:bg-[#F1F4F9] [&::-webkit-details-marker]:hidden">
+                  <MoreHorizontal size={18} />
+                </summary>
+                <div className="absolute z-20 mt-3 w-[min(420px,calc(100vw-64px))] rounded-[18px] border border-[#E4E8F0] bg-card p-4 shadow-lg ltr:right-0 rtl:left-0">
+                  <CompanyLogoUpload companyId={companyId} currentLogoUrl={company.logoUrl ?? null} companyName={companyName} isSuperAdmin={session.isSuperAdmin} />
+                </div>
+              </details>
+            ) : null}
+          </section>
+
+          {company.type === "CONTRACTING" && (hasPermission(session, "CONTRACTING", "VIEW", { companyId }) || canViewAccounting) && (
+            <Link href={`/dashboard/companies/${companyId}/contracting`} className="flex items-center gap-4 rounded-[22px] border border-[#FAD7B5] bg-[#FFF4EA] p-5 hover:bg-[#FFEEDD]">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#C2410C]"><Building2 size={20} /></span>
+              <span className="min-w-0 flex-1">
+                <strong className="block">{en ? "Contracting projects" : "مشروعات المقاولات"}</strong>
+                <span className="text-sm text-[#5B6577]">{en ? "Projects, contracts, certificates, costs and site logs" : "المشروعات والعقود والمستخلصات والتكاليف وسجل الموقع"}</span>
+              </span>
+              <ChevronLeft size={18} className="text-[#94A3B8] ltr:rotate-180" />
+            </Link>
+          )}
+
+          {canViewAccounting && unpostedJEs > 0 && (
+            <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-[#F3D48A] bg-[#FFF6E0] p-4 text-[#5C3D00]">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-[#8A5A00]"><AlertTriangle size={18} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">{en ? "There are unposted journal entries that need review." : "يوجد قيود غير مرحلة تحتاج مراجعة."}</p>
+                <p className="text-sm">
+                  {en
+                    ? `${unpostedJEs} entries are still draft, pending approval, or approved without posting.`
+                    : `${unpostedJEs} قيدًا ما زال في حالة مسودة أو بانتظار اعتماد أو معتمد بدون ترحيل.`}
+                </p>
+              </div>
+              <Link href={`/dashboard/companies/${companyId}/accounting/journal-entries`} className="shrink-0 rounded-[14px] border border-[#E9C46A] bg-white px-4 py-2.5 text-sm font-bold hover:bg-[#FFF1CC]">
+                {en ? "Review entries" : "مراجعة القيود"}
+              </Link>
+            </div>
+          )}
+
+          <section aria-label={en ? "Key figures" : "المؤشرات"} className={`grid grid-cols-2 gap-3 ${kpis.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+            {kpis.map((kpi) => {
+              const body = (
+                <div className={`flex h-full flex-col gap-3 rounded-[22px] border p-5 ${toneBox(kpi.tone)}`}>
+                  <span className="flex items-center justify-between text-sm text-[#5B6577]">
+                    {kpi.label}
+                    <span className={`flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/70 ${toneText(kpi.tone)}`}>{kpi.icon}</span>
+                  </span>
+                  <span className={`text-3xl font-extrabold number ${toneText(kpi.tone)}`}>{String(kpi.value)}</span>
+                </div>
+              );
+              return kpi.href ? <Link key={kpi.label} href={kpi.href} className="block">{body}</Link> : <div key={kpi.label}>{body}</div>;
+            })}
+          </section>
+
+          <section className="rounded-[24px] border border-[#E4E8F0] bg-card p-5">
+            <h2 className="mb-4 text-lg font-extrabold">{en ? "Licenses overview" : "نظرة عامة على التراخيص"}</h2>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+              {licenseStats.map((stat) => {
+                const body = (
+                  <div className={`flex h-full flex-col gap-1 rounded-[16px] px-4 py-3 ${stat.tone === "warn" ? "bg-[#FFF6E0]" : "bg-[#F8FAFC]"} ${stat.href ? "hover:bg-[#EEF2FF]" : ""}`}>
+                    <span className="text-xs text-[#5B6577]">{stat.label}</span>
+                    <span className={`text-2xl font-extrabold number ${stat.tone === "warn" ? "text-[#8A5A00]" : ""}`}>{String(stat.value)}</span>
+                  </div>
+                );
+                return stat.href ? <Link key={stat.label} href={stat.href} className="block">{body}</Link> : <div key={stat.label}>{body}</div>;
+              })}
+            </div>
+          </section>
+
+          {quickLinks.length > 0 && (
+            <section className="rounded-[24px] border border-[#E4E8F0] bg-card p-5">
+              <h2 className="mb-4 text-lg font-extrabold">{en ? "Quick actions" : "إجراءات سريعة"}</h2>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+                {quickLinks.map((link: QuickLink) => (
+                  <Link key={link.href} href={link.href} className="flex min-h-12 items-center gap-2.5 rounded-[14px] border border-[#E4E8F0] px-3 text-sm font-bold text-[#0F172A] hover:border-[#C7D2FE] hover:bg-[#F5F7FF]">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-[#EEF2FF] text-[#3B5BDB]">{link.icon}</span>
+                    <span className="truncate">{link.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div className={`grid grid-cols-1 gap-5 ${canViewAccounting ? "lg:grid-cols-2" : ""}`}>
+            {canViewAccounting && (
+              <section className="rounded-[24px] border border-[#E4E8F0] bg-card p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-extrabold">{en ? "Recent journal entries" : "آخر القيود"}</h2>
+                  <Link href={`/dashboard/companies/${companyId}/accounting/journal-entries`} className="text-sm font-bold text-primary hover:underline">{en ? "View all" : "عرض الكل"}</Link>
+                </div>
+                {recentJEs.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">{en ? "No journal entries yet" : "لا توجد قيود"}</p>
+                ) : (
+                  <div className="divide-y divide-[#EEF0F4]">
+                    {recentJEs.map((entry: RecentJournalEntryRow) => (
+                      <Link key={entry.id} href={`/dashboard/companies/${companyId}/accounting/journal-entries/${entry.id}`} className="flex items-center justify-between gap-3 py-3 hover:bg-[#F8FAFC]">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold">{entry.number}</p>
+                          <p className="line-clamp-1 text-xs text-muted-foreground">{en ? entry.descriptionEn ?? entry.descriptionAr : entry.descriptionAr}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(entry.date, dateLocale)}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <p className="font-extrabold number text-[#0F172A]">{formatKWD(Number(entry.totalDebit), numberLocale)}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs status-${entry.status.toLowerCase()}`}>
+                            {journalStatusLabels[locale][entry.status as keyof typeof journalStatusLabels.ar]}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            <section className="rounded-[24px] border border-[#E4E8F0] bg-card p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-extrabold">{en ? "Residency alerts (30 days)" : "تنبيهات الإقامات (30 يوم)"}</h2>
+                <Link href={`/dashboard/companies/${companyId}/hr/expiry-alerts`} className="text-sm font-bold text-primary hover:underline">{en ? "View all" : "عرض الكل"}</Link>
+              </div>
+              {expiringResidencies.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">{en ? "No residencies expiring in the next 30 days" : "لا توجد إقامات منتهية خلال 30 يوم"}</p>
+              ) : (
+                <div className="divide-y divide-[#EEF0F4]">
+                  {expiringResidencies.map((employee: ExpiringResidencyRow, index: number) => {
+                    const days = daysUntilExpiry(employee.residencyExpiry);
+                    const employeeName = en ? employee.nameEn ?? employee.nameAr : employee.nameAr;
+                    const tone = days !== null && days <= 7 ? "bg-[#FEF1EC] text-[#B42318]" : days !== null && days <= 15 ? "bg-[#FFF1E6] text-[#B54708]" : "bg-[#FFF6E0] text-[#8A5A00]";
+                    return (
+                      <div key={`${employee.nameAr}-${index}`} className="flex items-center gap-3 py-3">
+                        <span className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-[14px] ${tone}`}>
+                          <span className="text-base font-extrabold leading-none">{days ?? "-"}</span>
+                          <span className="text-[10px]">{en ? "days" : "يوم"}</span>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold">{employeeName}</p>
+                          <p className="text-xs text-muted-foreground">{employee.residencyExpiry ? formatDate(employee.residencyExpiry, dateLocale) : "-"}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
