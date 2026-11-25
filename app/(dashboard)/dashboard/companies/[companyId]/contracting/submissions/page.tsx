@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Camera, FileText, Landmark, Receipt, Upload } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { fileDragProps } from "@/components/files/drag-file";
 
 type Project = { id: string; code: string; name: string };
 type Submission = { id: string; originalName: string; filePath: string; fileType: string; notes: string | null; attachmentType: string; createdAt: string; projectName: string; uploadedBy: { nameAr: string }; mine: boolean };
@@ -31,6 +32,6 @@ export default function ContractingSubmissionsPage() {
       </section>
       {message && <p role="status" className="rounded-xl border bg-card p-4 text-sm">{message}</p>}
       <section className="section-card"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-bold">آخر المستندات</h2><p className="text-sm text-muted-foreground">الرفع يتم باسم المستخدم وتحت المشروع المختار.</p></div><span className="rounded-full bg-muted px-3 py-1 text-xs">{submissions.length}</span></div>
-      {loading ? <p className="py-12 text-center text-muted-foreground">جارٍ التحميل...</p> : submissions.length === 0 ? <p className="py-12 text-center text-muted-foreground">لا توجد فواتير أو إيصالات مرفوعة حتى الآن.</p> : <div className="divide-y">{submissions.map(item => <div key={item.id} className="flex gap-3 py-4"><span className="rounded-lg bg-muted p-2 text-primary"><FileText size={19} /></span><div className="min-w-0 flex-1"><a href={item.filePath} target="_blank" rel="noreferrer" className="font-medium text-primary underline">{item.originalName}</a><p className="mt-1 text-sm">{item.attachmentType === "CONTRACTING_INVOICE" ? "فاتورة" : "إيصال إيداع"} · {item.projectName}</p>{item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}<p className="mt-1 text-xs text-muted-foreground">رفع بواسطة {item.uploadedBy.nameAr} · {new Date(item.createdAt).toLocaleDateString("en-CA")}</p></div></div>)}</div>}</section>
+      {loading ? <p className="py-12 text-center text-muted-foreground">جارٍ التحميل...</p> : submissions.length === 0 ? <p className="py-12 text-center text-muted-foreground">لا توجد فواتير أو إيصالات مرفوعة حتى الآن.</p> : <div className="divide-y">{submissions.map(item => <div key={item.id} className="flex gap-3 py-4"><span className="rounded-lg bg-muted p-2 text-primary"><FileText size={19} /></span><div className="min-w-0 flex-1"><a href={item.filePath} {...fileDragProps(item.filePath, item.originalName, item.fileType)} target="_blank" rel="noreferrer" className="font-medium text-primary underline">{item.originalName}</a><p className="mt-1 text-sm">{item.attachmentType === "CONTRACTING_INVOICE" ? "فاتورة" : "إيصال إيداع"} · {item.projectName}</p>{item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}<p className="mt-1 text-xs text-muted-foreground">رفع بواسطة {item.uploadedBy.nameAr} · {new Date(item.createdAt).toLocaleDateString("en-CA")}</p></div></div>)}</div>}</section>
     </main></div>;
 }

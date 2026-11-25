@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { DragFileHandle, fileDragProps } from "@/components/files/drag-file";
 
 interface Attachment {
   id: string;
@@ -116,6 +117,7 @@ function AttachmentCard({
     <div
       className="group relative cursor-pointer overflow-hidden rounded-lg border bg-muted/20 transition-colors hover:border-primary/50"
       onClick={() => onPreview(attachment)}
+      {...fileDragProps(attachment.filePath, attachment.originalName, attachment.fileType)}
     >
       {isImage ? (
         <img
@@ -338,6 +340,7 @@ export default function CompanyAttachmentsPage() {
             <div className="flex items-center justify-between border-b p-4">
               <p className="text-sm font-medium">{preview.originalName}</p>
               <div className="flex items-center gap-2">
+                <DragFileHandle url={preview.filePath} name={preview.originalName} type={preview.fileType} en={locale === "en"} />
                 <a
                   href={preview.filePath}
                   target="_blank"
@@ -361,6 +364,7 @@ export default function CompanyAttachmentsPage() {
                   src={preview.filePath}
                   alt={preview.originalName}
                   className="max-h-[70vh] max-w-full rounded-lg object-contain"
+                  {...fileDragProps(preview.filePath, preview.originalName, preview.fileType)}
                 />
               ) : preview.fileType === "application/pdf" ? (
                 <iframe

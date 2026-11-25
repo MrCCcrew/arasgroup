@@ -9,6 +9,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Upload, ExternalLink,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { fileDragProps } from "@/components/files/drag-file";
 import { workInjuryDateStatus, workInjuryQuarterExpiryDate } from "@/lib/licenses/work-injury";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,7 +143,7 @@ function FileLink({ url, label = "عرض الملف", onDelete }: { url: string 
   if (!url) return null;
   return (
     <span className="inline-flex items-center gap-1">
-      <a href={url} target="_blank" rel="noopener noreferrer"
+      <a href={url} target="_blank" rel="noopener noreferrer" {...fileDragProps(url, decodeURIComponent(url.split("/").pop()?.split("?")[0] || "file"))}
         className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
         <ExternalLink size={11} /> {label}
       </a>

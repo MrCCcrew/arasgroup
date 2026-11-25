@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fileDragProps } from "@/components/files/drag-file";
 import { FileText, Upload, Trash2, ExternalLink, Paperclip } from "lucide-react";
 
 interface Attachment {
@@ -219,6 +220,7 @@ export function VehicleAttachments({ vehicleId, companyId, initialAttachments, d
                       <div className="flex items-center gap-1 shrink-0">
                         <a
                           href={att.filePath}
+                          {...fileDragProps(att.filePath, att.originalName)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
