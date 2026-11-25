@@ -1,6 +1,7 @@
 "use client";
 
 import { UiStyleSwitcher } from "@/components/layout/ui-style-switcher";
+import { AssistantButton } from "@/components/assistant/assistant-button";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -392,6 +393,12 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
             </div>
           </div>
         </div>
+
+        {session.accountType === undefined || session.accountType === "ADMIN" ? (
+          <div className="px-2 pt-3">
+            <AssistantButton onNavigate={close} />
+          </div>
+        ) : null}
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
           {navItems
