@@ -277,4 +277,8 @@ html[data-ui="modern"] .finance-document { border-radius: 16px; }
 /* Leaflet maps inside cards */
 html[data-ui="modern"] .leaflet-container { border-radius: 18px; }
 
+/* Users management: keep names on one line */
+html[data-ui="modern"] .users-mgmt tbody td:first-child p { white-space: nowrap; }
+html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
+
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Building2, CheckCircle, KeyRound, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, XCircle } from "lucide-react";
+import { Building2, CheckCircle, KeyRound, MoreHorizontal, Plus, Search, Shield, SlidersHorizontal, Trash2, UserCheck, UserX, Users, X, XCircle } from "lucide-react";
 import { useLocale } from "@/components/providers/locale-provider";
+import { useUiStyle } from "@/components/providers/ui-style-provider";
 
 interface RoleOption {
   id: string;
@@ -223,6 +224,9 @@ export function UserManagement({
   granularPermissionsEnabled = true,
 }: Props) {
   const { locale, t } = useLocale();
+  const { isModern } = useUiStyle();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [userQuery, setUserQuery] = useState("");
   const [usersState, setUsersState] = useState<ExistingUser[]>(users);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -283,6 +287,16 @@ export function UserManagement({
 
 
   const text = (ar: string, en: string) => (locale === "en" ? en : ar);
+
+  // Modern style only: local search over the already-loaded list (display filter, no data change).
+  const normalizedUserQuery = userQuery.trim().toLowerCase();
+  const visibleUsers = isModern && normalizedUserQuery
+    ? usersState.filter((user) =>
+        [user.nameAr, user.email, ...user.roles.map((entry) => entry.role.nameAr)]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedUserQuery)),
+      )
+    : usersState;
 
   function updateField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -710,14 +724,45 @@ export function UserManagement({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className={isModern ? "users-mgmt flex flex-col gap-6" : "space-y-6"}>
+      <div className={isModern ? "order-1 grid grid-cols-1 gap-4 md:grid-cols-3" : "grid grid-cols-1 gap-4 md:grid-cols-3"}>
         <StatCard icon={<Users size={20} className="text-blue-600" />} iconBg="bg-blue-50" value={usersState.length} label={text("إجمالي المستخدمين", "Total users")} />
         <StatCard icon={<CheckCircle size={20} className="text-green-600" />} iconBg="bg-green-50" value={usersState.filter((user) => user.isActive).length} label={text("مستخدم نشط", "Active users")} />
         <StatCard icon={<Shield size={20} className="text-purple-600" />} iconBg="bg-purple-50" value={usersState.filter((user) => user.isSuperAdmin).length} label={text("مدير نظام", "System admins")} />
       </div>
 
-      <form onSubmit={handleSubmit} className="section-card space-y-6">
+      {isModern ? (
+        <div className="order-2 flex flex-col gap-3 md:flex-row md:items-center">
+          <label className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground ltr:left-3 rtl:right-3" />
+            <input
+              type="search"
+              value={userQuery}
+              onChange={(event) => setUserQuery(event.target.value)}
+              placeholder={text("ابحث بالاسم أو البريد أو الدور", "Search by name, email or role")}
+              className="input-field w-full ltr:pl-9 rtl:pr-9"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setCreateOpen((open) => !open)}
+            aria-expanded={createOpen}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+          >
+            {createOpen ? <X size={16} /> : <Plus size={16} />}
+            {createOpen ? text("إغلاق النموذج", "Close form") : text("مستخدم جديد", "New user")}
+          </button>
+        </div>
+      ) : null}
+
+      {isModern && !createOpen && (error || success) ? (
+        <div className="order-2">
+          {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+          {success ? <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{success}</div> : null}
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} hidden={isModern && !createOpen} className={isModern ? "order-3 section-card space-y-6" : "section-card space-y-6"}>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-base font-bold">{text("إنشاء مستخدم جديد", "Create New User")}</h2>
@@ -834,8 +879,11 @@ export function UserManagement({
         </button>
       </form>
 
-      <div className="section-card overflow-hidden">
-        <h2 className="mb-4 text-base font-bold">{text("المستخدمون الحاليون", "Current Users")}</h2>
+      <div className={isModern ? "order-4 section-card overflow-hidden" : "section-card overflow-hidden"}>
+        <h2 className="mb-4 text-base font-bold">
+          {text("المستخدمون الحاليون", "Current Users")}
+          {isModern ? <span className="ms-2 text-xs font-normal text-muted-foreground">{visibleUsers.length} / {usersState.length}</span> : null}
+        </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -851,7 +899,7 @@ export function UserManagement({
               </tr>
             </thead>
             <tbody>
-              {usersState.map((user) => {
+              {visibleUsers.map((user) => {
                 const isPasswordOpen = activePasswordUserId === user.id;
                 const isPermissionsOpen = activePermissionsUserId === user.id;
                 const isAccessOpen = activeAccessUserId === user.id;
@@ -960,6 +1008,44 @@ export function UserManagement({
                       </td>
                       {canManagePasswords ? (
                         <td className="px-4 py-3">
+                          {isModern ? (
+                            <details className="user-row-menu relative">
+                              <summary aria-label={text("الإجراءات", "Actions")} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-[12px] border hover:bg-muted [&::-webkit-details-marker]:hidden">
+                                <MoreHorizontal size={18} />
+                              </summary>
+                              <div onClick={(event) => { const menu = event.currentTarget.parentElement; if (menu instanceof HTMLDetailsElement) menu.open = false; }} className="mt-2 flex min-w-[190px] flex-col gap-1 rounded-[16px] border bg-card p-2 shadow-sm [&>button]:justify-start [&>button]:border-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePasswordUserId(isPasswordOpen ? null : user.id);
+                                setPasswordForm({ password: "", confirmPassword: "" });
+                              }}
+                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                            >
+                              <KeyRound size={14} />
+                              {t("usersManagement.resetPassword")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserStatus(user.id, !user.isActive)}
+                              disabled={loading}
+                              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50"
+                            >
+                              {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                              {user.isActive ? text("تعطيل", "Disable") : text("تفعيل", "Activate")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(user.id)}
+                              disabled={loading}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <Trash2 size={14} />
+                              {text("حذف", "Delete")}
+                            </button>
+                              </div>
+                            </details>
+                          ) : (
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -991,6 +1077,7 @@ export function UserManagement({
                               {text("حذف", "Delete")}
                             </button>
                           </div>
+                          )}
                         </td>
                       ) : null}
                     </tr>
