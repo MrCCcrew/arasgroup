@@ -117,7 +117,8 @@ html[data-ui="modern"] .app-header :is(button, a).rounded-full {
 }
 
 /* ── Page layout & cards ─────────────────────────── */
-html[data-ui="modern"] .page-container > * + * { margin-top: 20px; }
+html[data-ui="modern"] .page-container:not(.flex):not(.grid) > * + * { margin-top: 20px; }
+html[data-ui="modern"] .page-container.flex > * + *, html[data-ui="modern"] .page-container.grid > * + * { margin-top: 0; }
 @media (min-width: 1024px) {
   html[data-ui="modern"] .page-container { padding: 28px 32px; }
 }
