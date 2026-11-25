@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   const companyId = new URL(request.url).searchParams.get("companyId");
   try {
     const tasks = await getAssistantTasks(session, companyId || null);
-    return NextResponse.json({ success: true, data: { tasks, generatedAt: new Date().toISOString() } }, { headers: { "Cache-Control": "no-store" } });
+    const firstName = (session.nameAr || session.nameEn || "").trim().split(/\s+/)[0] || "";
+    return NextResponse.json({ success: true, data: { tasks, firstName, generatedAt: new Date().toISOString() } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("assistant tasks:", error);
     return NextResponse.json({ success: false, error: "تعذر تحميل المهام" }, { status: 500 });
