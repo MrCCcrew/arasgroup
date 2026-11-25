@@ -6,6 +6,7 @@ import { Building2, Users, Shield, Plus, Link2 } from "lucide-react";
 import Link from "next/link";
 import { GroupLogoUpload } from "@/components/group/GroupLogoUpload";
 import { ThemeSettings } from "@/components/settings/theme-settings";
+import { UiStyleSettingsCard } from "@/components/layout/ui-style-switcher";
 import { DatabaseBackup } from "@/components/settings/database-backup";
 
 const companyTypeLabels: Record<string, string> = {
@@ -99,7 +100,8 @@ export default async function SettingsPage() {
           </div>
         ) : null}
 
-        <div className="mb-6">
+        <div className="mb-6 space-y-6">
+          <UiStyleSettingsCard />
           <ThemeSettings />
         </div>
 

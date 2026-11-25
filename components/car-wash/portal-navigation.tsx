@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { History, Home, LogOut, ReceiptText, WalletCards } from "lucide-react";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { UiStyleSwitcher } from "@/components/layout/ui-style-switcher";
 import { useLocale } from "@/components/providers/locale-provider";
 
 type Props = {
@@ -45,6 +46,7 @@ export function CarWashPortalNavigation({ userNameAr, userNameEn, userEmail, com
             <p className="truncate text-xs text-slate-500">{companyName}</p>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
+            <UiStyleSwitcher showLabel={false} />
             <LanguageSwitcher />
             <button type="button" onClick={logout} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700" aria-label={t("\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062E\u0631\u0648\u062C", "Log out")}>
               <LogOut size={15} /> {t("\u062E\u0631\u0648\u062C", "Logout")}
