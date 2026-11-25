@@ -929,18 +929,28 @@ export function UserManagement({
                           {user.isSuperAdmin ? (
                             <span className="text-xs text-muted-foreground">{text("جميع الشركات", "All companies")}</span>
                           ) : (
-                            user.companyAccess.map((entry) => (
-                              <span key={entry.companyId} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                                {entry.company.nameAr}
-                              </span>
-                            ))
+                            <>
+                              {(isModern ? user.companyAccess.slice(0, 2) : user.companyAccess).map((entry) => (
+                                <span key={entry.companyId} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                                  {entry.company.nameAr}
+                                </span>
+                              ))}
+                              {isModern && user.companyAccess.length > 2 ? (
+                                <span
+                                  className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground"
+                                  title={user.companyAccess.slice(2).map((entry) => entry.company.nameAr).join("\n")}
+                                >
+                                  +{user.companyAccess.length - 2}
+                                </span>
+                              ) : null}
+                            </>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {user.branchAccess.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">{text("كل الفروع ضمن الشركات المصرح بها", "All branches within allowed companies")}</span>
+                            <span className="text-xs text-muted-foreground" title={isModern ? text("كل الفروع ضمن الشركات المصرح بها", "All branches within allowed companies") : undefined}>{isModern ? text("كل الفروع", "All branches") : text("كل الفروع ضمن الشركات المصرح بها", "All branches within allowed companies")}</span>
                           ) : (
                             user.branchAccess.map((entry) => (
                               <span key={entry.branchId} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
@@ -962,7 +972,7 @@ export function UserManagement({
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="space-y-2">
+                        <div className="user-perm-actions space-y-2">
                           <p className="text-xs text-muted-foreground">
                             {(user.directPermissions?.length ?? 0) > 0
                               ? text(`${user.directPermissions?.length ?? 0} صلاحية مباشرة`, `${user.directPermissions?.length ?? 0} direct permission(s)`)
