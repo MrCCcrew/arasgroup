@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./styles/modern.css";
 import { LocaleProvider } from "@/components/providers/locale-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { UiStyleProvider } from "@/components/providers/ui-style-provider";
 import { getThemePrepaintScript } from "@/lib/theme";
 import { getSession } from "@/lib/auth/session";
 import { getLocale, getLocaleDirection } from "@/lib/i18n";
+import { getUiStyle } from "@/lib/ui-style";
 import { prisma } from "@/lib/db";
 
 export const metadata: Metadata = {
@@ -32,6 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const dir = getLocaleDirection(locale);
   const session = await getSession();
+  const uiStyle = await getUiStyle();
 
   const group = await prisma.group.findFirst({
     select: { logoUrl: true },
@@ -40,7 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const faviconUrl = group?.logoUrl ?? "/favicon.svg";
 
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning>
+    <html lang={locale} dir={dir} data-ui={uiStyle} suppressHydrationWarning>
       <head>
         {/* تطبيق ثيم المستخدم المحفوظ قبل الرسم (منع وميض الألوان) */}
         <script dangerouslySetInnerHTML={{ __html: getThemePrepaintScript(session?.id) }} />
@@ -53,7 +57,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen bg-background antialiased">
         <LocaleProvider initialLocale={locale}>
-          <ThemeProvider userId={session?.id}>{children}</ThemeProvider>
+          <UiStyleProvider initialStyle={uiStyle}>
+            <ThemeProvider userId={session?.id}>{children}</ThemeProvider>
+          </UiStyleProvider>
         </LocaleProvider>
       </body>
     </html>

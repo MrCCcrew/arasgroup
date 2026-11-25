@@ -31,6 +31,15 @@ export const messages: Record<Locale, MessageTree> = {
       english: "English",
       switcherLabel: "\u062a\u063a\u064a\u064a\u0631 \u0627\u0644\u0644\u063a\u0629",
     },
+    uiStyle: {
+      title: "شكل الواجهة",
+      description: "اختر الشكل المريح لك. الاختيار محفوظ على هذا الجهاز ويمكنك الرجوع في أي وقت.",
+      switcherLabel: "تبديل شكل الواجهة",
+      modern: "الواجهة الحديثة",
+      classic: "الواجهة الكلاسيكية",
+      toModern: "تجربة الواجهة الحديثة",
+      toClassic: "الرجوع للواجهة الكلاسيكية",
+    },
     nav: {
       contracting: "\u0645\u0634\u0631\u0648\u0639\u0627\u062a \u0627\u0644\u0645\u0642\u0627\u0648\u0644\u0627\u062a",
       contractingSubmissions: "\u0631\u0641\u0639 \u0641\u0648\u0627\u062a\u064a\u0631 \u0648\u0625\u064a\u0635\u0627\u0644\u0627\u062a",
@@ -243,6 +252,15 @@ export const messages: Record<Locale, MessageTree> = {
       arabic: "Arabic",
       english: "English",
       switcherLabel: "Change language",
+    },
+    uiStyle: {
+      title: "Interface style",
+      description: "Pick the look you prefer. It is saved on this device and you can switch back any time.",
+      switcherLabel: "Switch interface style",
+      modern: "Modern interface",
+      classic: "Classic interface",
+      toModern: "Try the modern interface",
+      toClassic: "Back to the classic interface",
     },
     nav: {
       contracting: "Contracting Projects",

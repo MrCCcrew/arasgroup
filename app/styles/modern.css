@@ -1,0 +1,280 @@
+/*
+ * Modern UI 2027 — optional interface style.
+ * Every rule is scoped to html[data-ui="modern"] and wrapped in @media screen,
+ * so the classic interface and all printing stay exactly as they are.
+ * Font: Almarai only (already loaded by app/layout.tsx). Weights: 300/400/700/800.
+ */
+@media screen {
+
+html[data-ui="modern"] {
+  --background: 220 37.5% 96.9%;
+  --foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --primary: 228 69% 54.5%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 217.5 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 217.5 40% 96.1%;
+  --muted-foreground: 218.6 13.3% 41.2%;
+  --accent: 225.9 100% 96.7%;
+  --accent-foreground: 243.7 54.5% 41.4%;
+  --destructive: 12.9 90.3% 40.4%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 28.6% 91.8%;
+  --input: 220 28.6% 91.8%;
+  --ring: 228 69% 54.5%;
+  --sidebar-background: 222.2 47.4% 11.2%;
+  --sidebar-foreground: 212.7 26.8% 83.9%;
+  --sidebar-primary: 229.7 93.5% 81.8%;
+  --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+  --sidebar-accent: 217.2 32.6% 17.5%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 217.2 32.6% 17.5%;
+  --sidebar-ring: 229.7 93.5% 81.8%;  --radius: 1rem;
+  --m-line: #EEF0F4;
+  --m-subtle: #F8FAFC;
+  --m-crit-fg: #B42318; --m-crit-bg: #FEF1EC; --m-crit-bd: #F4C7B8; --m-crit-solid: #C4320A;
+  --m-warn-fg: #8A5A00; --m-warn-bg: #FFF6E0; --m-warn-bd: #F5D78A; --m-warn-strong: #6B4600;
+  --m-ok-fg: #067647;   --m-ok-bg: #ECFDF3;   --m-ok-bd: #ABEFC6;   --m-ok-strong: #055A37;
+  --m-info-fg: #1D5FA8; --m-info-bg: #EAF3FF;
+  --m-pri-fg: #3B5BDB;  --m-pri-bg: #EEF2FF;  --m-pri-bd: #C7D2FE;  --m-pri-strong: #2B44A8;
+  --m-vio-fg: #5925DC;  --m-vio-bg: #F4F3FF;
+  --m-org-fg: #B93815;  --m-org-bg: #FFF4ED;
+}
+
+/* ── Base ─────────────────────────────────────────── */
+html[data-ui="modern"] body {
+  font-family: 'Almarai', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+html[data-ui="modern"] :is(td, th, .number, [dir="ltr"]) { font-variant-numeric: tabular-nums; }
+html[data-ui="modern"] :is(h1, h2, h3) { letter-spacing: -0.01em; }
+html[data-ui="modern"] :focus-visible { outline: 2px solid hsl(var(--ring) / .6); outline-offset: 2px; }
+
+/* ── Sidebar: floating dark panel on desktop ─────── */
+html[data-ui="modern"] .app-sidebar {
+  background: hsl(var(--sidebar-background));
+  box-shadow: none;
+}
+@media (min-width: 768px) {
+  html[data-ui="modern"] .app-sidebar {
+    top: 16px;
+    right: 16px;
+    height: calc(100% - 32px);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  html[data-ui="modern"][dir="ltr"] .app-sidebar { left: 16px; right: auto; }
+  html[data-ui="modern"] .dashboard-main { margin-right: calc(16rem + 32px); margin-left: 0; }
+  html[data-ui="modern"][dir="ltr"] .dashboard-main { margin-left: calc(16rem + 32px); margin-right: 0; }
+}
+html[data-ui="modern"] .app-sidebar nav { padding: 12px 10px; }
+html[data-ui="modern"] .app-sidebar .nav-item {
+  min-height: 44px;
+  border-radius: 14px;
+  padding: 8px 12px;
+  border-width: 0 !important;
+  font-size: 14px;
+  color: hsl(var(--sidebar-foreground));
+  background: transparent;
+}
+html[data-ui="modern"] .app-sidebar .nav-item:hover { background: hsl(var(--sidebar-accent) / .7); color: #FFFFFF; }
+html[data-ui="modern"] .app-sidebar .nav-item[data-active] {
+  background: hsl(var(--sidebar-accent));
+  color: #FFFFFF;
+  font-weight: 700;
+}
+html[data-ui="modern"] .app-sidebar .nav-icon {
+  background: transparent !important;
+  color: #94A3B8 !important;
+}
+html[data-ui="modern"] .app-sidebar .nav-item[data-active] .nav-icon { color: hsl(var(--sidebar-primary)) !important; }
+html[data-ui="modern"] .app-sidebar .nav-children {
+  border-color: #334155 !important;
+  margin-inline-start: 22px;
+}
+html[data-ui="modern"] .app-sidebar .nav-children .nav-item { min-height: 40px; font-size: 13.5px; }
+
+/* ── Header ───────────────────────────────────────── */
+html[data-ui="modern"] .app-header {
+  background: hsl(var(--background) / .85);
+  border-bottom-color: transparent;
+}
+html[data-ui="modern"] .app-header h1 { font-weight: 800; }
+@media (min-width: 768px) {
+  html[data-ui="modern"] .app-header h1 { font-size: 26px; line-height: 1.3; }
+}
+html[data-ui="modern"] .app-header :is(button, a).rounded-full {
+  min-height: 40px;
+  border-radius: 14px;
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  padding-inline: 14px;
+  font-size: 13px;
+}
+
+/* ── Page layout & cards ─────────────────────────── */
+html[data-ui="modern"] .page-container > * + * { margin-top: 20px; }
+@media (min-width: 1024px) {
+  html[data-ui="modern"] .page-container { padding: 28px 32px; }
+}
+html[data-ui="modern"] .section-card {
+  border-radius: 22px;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: none;
+}
+@media (min-width: 768px) { html[data-ui="modern"] .section-card { padding: 24px; } }
+html[data-ui="modern"] .stat-card {
+  border-radius: 20px;
+  border-color: hsl(var(--border));
+  box-shadow: none;
+  padding: 18px;
+  gap: 10px;
+}
+html[data-ui="modern"] .stat-card :is(.text-2xl, .text-3xl, .text-xl) { font-weight: 800; letter-spacing: -0.01em; }
+html[data-ui="modern"] .ui-card { border-radius: 22px; box-shadow: none; border-color: hsl(var(--border)); }
+html[data-ui="modern"] .form-section { border-radius: 18px; background: var(--m-subtle); }
+
+/* Generic rounded boxes used directly in pages */
+html[data-ui="modern"] main :is(.rounded-lg, .rounded-xl).border:not(input):not(select):not(textarea):not(button):not(a):not(span) { border-radius: 18px; }
+html[data-ui="modern"] main .rounded-2xl.border { border-radius: 22px; }
+html[data-ui="modern"] main .shadow-sm:not(button):not(a) { box-shadow: none; }
+
+/* ── Tables ───────────────────────────────────────── */
+html[data-ui="modern"] .ar-table th,
+html[data-ui="modern"] main table thead th {
+  background: var(--m-subtle);
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 12px;
+  white-space: nowrap;
+  border-bottom: 0;
+}
+html[data-ui="modern"] main table thead tr:only-child > th:first-child { border-start-start-radius: 12px; border-end-start-radius: 12px; }
+html[data-ui="modern"] main table thead tr:only-child > th:last-child { border-start-end-radius: 12px; border-end-end-radius: 12px; }
+html[data-ui="modern"] .ar-table td,
+html[data-ui="modern"] main table tbody td {
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--m-line);
+  vertical-align: middle;
+}
+html[data-ui="modern"] .ar-table tbody tr:hover,
+html[data-ui="modern"] main table tbody tr:hover { background: var(--m-subtle); }
+html[data-ui="modern"] .finance-document table th,
+html[data-ui="modern"] .finance-document table td { border-radius: 0; }
+
+/* ── Inputs ───────────────────────────────────────── */
+html[data-ui="modern"] :is(.input-field, .ui-input):not(textarea) { min-height: 44px; }
+html[data-ui="modern"] :is(.input-field, .ui-input) {
+  border-radius: 14px;
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  font-size: 14px;
+}
+html[data-ui="modern"] :is(.input-field, .ui-input):focus {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / .2);
+  outline: none;
+}
+html[data-ui="modern"] .form-label { font-weight: 700; font-size: 13px; }
+html[data-ui="modern"] main :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: hsl(var(--primary));
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Buttons ──────────────────────────────────────── */
+html[data-ui="modern"] .ui-button { border-radius: 14px; font-weight: 700; }
+html[data-ui="modern"] .ui-button:not([class*="h-9"]):not([class*="w-10"]) { min-height: 44px; }
+html[data-ui="modern"] main button.rounded-lg,
+html[data-ui="modern"] main a.rounded-lg[href] { border-radius: 14px; }
+html[data-ui="modern"] .btn-primary { background: hsl(var(--primary)); }
+
+/* ── Status pills ─────────────────────────────────── */
+html[data-ui="modern"] :is(.status-draft, .status-pending, .status-approved, .status-posted, .status-rejected, .status-cancelled) {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+html[data-ui="modern"] .status-draft     { background: #F1F4F9; color: #334155; }
+html[data-ui="modern"] .status-pending   { background: var(--m-warn-bg); color: var(--m-warn-fg); }
+html[data-ui="modern"] .status-approved  { background: var(--m-pri-bg); color: var(--m-pri-fg); }
+html[data-ui="modern"] .status-posted    { background: var(--m-ok-bg); color: var(--m-ok-fg); }
+html[data-ui="modern"] .status-rejected  { background: var(--m-crit-bg); color: var(--m-crit-fg); }
+html[data-ui="modern"] .status-cancelled { background: #EEF0F4; color: #5B6577; }
+html[data-ui="modern"] main span.rounded-full:is([class*="bg-"]):is(.text-xs, [class*="text-[1"]) { font-weight: 700; padding-inline: 10px; }
+
+/* Filter chips: the selected chip is dark, like the reference */
+html[data-ui="modern"] main button.rounded-full.bg-primary,
+html[data-ui="modern"] main a.rounded-full.bg-primary {
+  background: #0F172A;
+  border-color: #0F172A;
+  color: #FFFFFF;
+}
+html[data-ui="modern"] main :is(button, a).rounded-full { min-height: 36px; }
+
+/* ── Modals ───────────────────────────────────────── */
+html[data-ui="modern"] :is(.modal-panel, .modal-panel-lg) { border-radius: 24px; box-shadow: 0 24px 60px rgba(2, 6, 23, .25); }
+html[data-ui="modern"] .modal-overlay { background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px); }
+@media (max-width: 767px) {
+  html[data-ui="modern"] :is(.modal-panel, .modal-panel-lg) { border-radius: 24px 24px 0 0; }
+}
+
+/* ── Hardcoded Tailwind colors → modern semantic palette ── */
+/* critical */
+html[data-ui="modern"] .bg-red-50  { background-color: var(--m-crit-bg); }
+html[data-ui="modern"] .bg-red-100 { background-color: #FEE4DA; }
+html[data-ui="modern"] :is(.text-red-600, .text-red-700, .text-red-800) { color: var(--m-crit-fg); }
+html[data-ui="modern"] .text-red-500 { color: var(--m-crit-solid); }
+html[data-ui="modern"] .border-red-200 { border-color: var(--m-crit-bd); }
+html[data-ui="modern"] .bg-red-600 { background-color: var(--m-crit-solid); }
+html[data-ui="modern"] .bg-red-700 { background-color: #A32A08; }
+/* success */
+html[data-ui="modern"] :is(.bg-green-50, .bg-emerald-50) { background-color: var(--m-ok-bg); }
+html[data-ui="modern"] :is(.bg-green-100, .bg-emerald-100) { background-color: #D1FADF; }
+html[data-ui="modern"] :is(.text-green-600, .text-green-700, .text-emerald-600, .text-emerald-700) { color: var(--m-ok-fg); }
+html[data-ui="modern"] :is(.text-green-800, .text-emerald-800) { color: var(--m-ok-strong); }
+html[data-ui="modern"] :is(.border-green-200, .border-emerald-200) { border-color: var(--m-ok-bd); }
+/* primary / info (blue) */
+html[data-ui="modern"] .bg-blue-50  { background-color: var(--m-pri-bg); }
+html[data-ui="modern"] .bg-blue-100 { background-color: #E0E7FF; }
+html[data-ui="modern"] :is(.text-blue-600, .text-blue-500) { color: var(--m-pri-fg); }
+html[data-ui="modern"] :is(.text-blue-700, .text-blue-800) { color: var(--m-pri-strong); }
+html[data-ui="modern"] .border-blue-200 { border-color: var(--m-pri-bd); }
+/* warning (yellow / amber) */
+html[data-ui="modern"] :is(.bg-yellow-50, .bg-amber-50) { background-color: #FFFBEB; }
+html[data-ui="modern"] :is(.bg-yellow-100, .bg-amber-100) { background-color: #FEF0C7; }
+html[data-ui="modern"] :is(.text-yellow-600, .text-yellow-700, .text-amber-600, .text-amber-700) { color: var(--m-warn-fg); }
+html[data-ui="modern"] :is(.text-yellow-800, .text-amber-800, .text-amber-900) { color: var(--m-warn-strong); }
+html[data-ui="modern"] :is(.border-yellow-200, .border-amber-200) { border-color: var(--m-warn-bd); }
+/* orange */
+html[data-ui="modern"] .bg-orange-50  { background-color: var(--m-org-bg); }
+html[data-ui="modern"] .bg-orange-100 { background-color: #FFE6D5; }
+html[data-ui="modern"] :is(.text-orange-600, .text-orange-700, .text-orange-800) { color: var(--m-org-fg); }
+html[data-ui="modern"] .border-orange-200 { border-color: #FAC9AE; }
+/* violet */
+html[data-ui="modern"] :is(.bg-purple-50, .bg-violet-50) { background-color: var(--m-vio-bg); }
+html[data-ui="modern"] :is(.bg-purple-100, .bg-violet-100) { background-color: #EBE9FE; }
+html[data-ui="modern"] :is(.text-purple-600, .text-purple-700, .text-violet-600, .text-violet-700) { color: var(--m-vio-fg); }
+/* neutrals */
+html[data-ui="modern"] :is(.bg-gray-100, .bg-slate-100) { background-color: #F1F4F9; }
+html[data-ui="modern"] :is(.bg-gray-50, .bg-slate-50) { background-color: var(--m-subtle); }
+html[data-ui="modern"] :is(.text-gray-500, .text-slate-500) { color: #5B6577; }
+html[data-ui="modern"] :is(.text-gray-600, .text-gray-700, .text-slate-600, .text-slate-700) { color: #334155; }
+html[data-ui="modern"] :is(.border-gray-200, .border-slate-200) { border-color: hsl(var(--border)); }
+html[data-ui="modern"] :is(.bg-gray-50, .bg-slate-50, .bg-muted\/30).min-h-screen { background-color: hsl(var(--background)); }
+
+/* Finance: workspaces follow the new look, printable documents stay paper-like */
+html[data-ui="modern"] .finance-workspace .section-card { border-radius: 22px; }
+html[data-ui="modern"] .finance-document { border-radius: 16px; }
+
+/* Leaflet maps inside cards */
+html[data-ui="modern"] .leaflet-container { border-radius: 18px; }
+
+}

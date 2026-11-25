@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Menu, RefreshCw } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { UiStyleSwitcher } from "@/components/layout/ui-style-switcher";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { useSyncStatus } from "@/lib/offline/sync-status";
 import { useLocale } from "@/components/providers/locale-provider";
@@ -28,7 +29,7 @@ export function Header({ title, subtitle, actions, companyId }: HeaderProps) {
   }, []);
 
   return (
-    <header className="no-print sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
+    <header className="app-header no-print sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
       {/* Main row */}
       <div className="flex items-center gap-2 px-4 py-3 md:px-6 md:py-4">
         {/* Hamburger — mobile only */}
@@ -64,6 +65,9 @@ export function Header({ title, subtitle, actions, companyId }: HeaderProps) {
           )}
           <span className="hidden md:block">
             {mounted && <LanguageSwitcher />}
+          </span>
+          <span className="hidden md:block">
+            {mounted && <UiStyleSwitcher />}
           </span>
           {mounted && companyId && (
             <Link

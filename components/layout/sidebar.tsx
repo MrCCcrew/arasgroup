@@ -1,5 +1,6 @@
 "use client";
 
+import { UiStyleSwitcher } from "@/components/layout/ui-style-switcher";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -414,6 +415,9 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
               <span>{t("system.superAdmin")}</span>
             </div>
           )}
+          <div className="px-3 pb-1 md:hidden">
+            <UiStyleSwitcher className="w-full justify-center border-sidebar-border text-sidebar-foreground/80 hover:text-sidebar-foreground" />
+          </div>
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -444,7 +448,7 @@ function IconBadge({
   const dim = size === "sm" ? "h-6 w-6" : "h-7 w-7";
 
   return (
-    <span className={cn("flex shrink-0 items-center justify-center rounded-md", dim, scheme.bg, scheme.text)}>
+    <span className={cn("nav-icon flex shrink-0 items-center justify-center rounded-md", dim, scheme.bg, scheme.text)}>
       {children}
     </span>
   );
@@ -464,6 +468,9 @@ function NavItemComponent({
 }) {
   const { t } = useLocale();
   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+  // Used only by the modern style: dashboard roots highlight on exact match, not on every sub-page.
+  const isRootHref = /^\/dashboard(\/companies\/[^/]+)?$/.test(item.href);
+  const isHighlighted = isRootHref ? pathname === item.href : isActive;
   const hasChildren = item.children && item.children.length > 0;
   const colorKey = (item.iconColor ?? "slate") as ColorKey;
   const scheme = C[colorKey] ?? C.slate;
@@ -491,8 +498,9 @@ function NavItemComponent({
     return (
       <div className="mb-0.5">
         <div
+          data-active={isHighlighted || undefined}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+            "nav-item flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
             isActive
               ? cn("border-r-2 font-medium text-sidebar-foreground", scheme.active)
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
@@ -508,7 +516,7 @@ function NavItemComponent({
         </div>
 
         {isExpanded && (
-          <div className="mb-1 mr-3 mt-0.5 space-y-0.5 border-r-2 pr-2" style={{ borderColor: "var(--sidebar-border)" }}>
+          <div className="nav-children mb-1 mr-3 mt-0.5 space-y-0.5 border-r-2 pr-2" style={{ borderColor: "var(--sidebar-border)" }}>
             {item.children!.map((child) => (
               <NavItemComponent
                 key={child.href}
@@ -527,8 +535,9 @@ function NavItemComponent({
   return (
     <Link
       href={item.href}
+      data-active={isHighlighted || undefined}
       className={cn(
-        "mb-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+        "nav-item mb-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
         isActive
           ? cn("border-r-2 font-medium text-sidebar-foreground", scheme.active)
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
