@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { hasPermission, type Module } from "@/lib/auth/permissions";
 import type { SessionUser } from "@/lib/types";
 
-export type AssistantArea = "accounting" | "hr" | "operations" | "admin" | "personal";
+export type AssistantArea = "accounting" | "hr" | "operations" | "admin" | "data" | "personal";
 export type AssistantSeverity = "crit" | "warn" | "info";
 
 export interface AssistantTask {
@@ -58,6 +58,8 @@ export async function getAssistantTasks(session: SessionUser, focusCompanyId?: s
   const licenseIds = ids((c) => can(c.id, "LICENSES", "ADMINISTRATIVE_AFFAIRS"));
   const vehicleIds = ids((c) => can(c.id, "VEHICLES", "ADMINISTRATIVE_AFFAIRS"));
   const claimIds = ids((c) => ["GENERAL_TRADING", "TRADING"].includes(c.type) && can(c.id, "INVESTOR_CLAIMS"));
+  const talabatIds = ids((c) => c.type === "DELIVERY" && can(c.id, "DELIVERY_OPERATIONS", "DELIVERY_REPORTS"));
+  const carWashIds = ids((c) => c.type === "CAR_WASH" && can(c.id, "CAR_WASH_OPERATIONS"));
   const approverIds = new Set<string>(accIds.filter((id: string) => hasPermission(session, "ACCOUNTING", "APPROVE", { companyId: id })));
 
   const employeeBase = (companyIds: string[]) => ({ companyId: { in: companyIds }, isActive: true, isDeleted: false });
@@ -90,6 +92,25 @@ export async function getAssistantTasks(session: SessionUser, focusCompanyId?: s
     claimIds.length ? prisma.investorClaim.groupBy({ by: ["companyId"], where: { companyId: { in: claimIds }, status: { in: ["PENDING", "SENT_TO_ACCOUNTANT", "SENT_TO_INVESTOR", "PARTIALLY_COLLECTED"] }, dueDate: { lt: now } }, _count: { _all: true } }) : none,
     accIds.length ? prisma.fiscalYear.findMany({ where: { companyId: { in: accIds }, isCurrent: true, isLocked: false, endDate: { lte: in30 } }, select: { companyId: true, year: true, endDate: true } }) : Promise.resolve([] as { companyId: string; year: number; endDate: Date }[]),
     prisma.reminder.findMany({ where: { userId: session.id, isCompleted: false, dueAt: { lte: new Date(now.getTime() + DAY) } }, select: { id: true, title: true, dueAt: true }, orderBy: { dueAt: "asc" }, take: 5 }),
+  ]);
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevMonthYear = month === 1 ? year - 1 : year;
+  const [
+    talabatDraft, monthlyDraft, ordersToday, carWashOpen,
+    empNoCivil, empNoResidency, empNoSalary, licNoExpiry, vehNoReg, currentFiscal,
+  ] = await Promise.all([
+    talabatIds.length ? prisma.talabatReportImport.groupBy({ by: ["companyId"], where: { companyId: { in: talabatIds }, status: "DRAFT" }, _count: { _all: true } }) : none,
+    talabatIds.length ? prisma.deliveryMonthlyReport.groupBy({ by: ["companyId"], where: { companyId: { in: talabatIds }, status: "DRAFT", month: prevMonth, year: prevMonthYear }, _count: { _all: true } }) : none,
+    depositIds.length && now.getHours() >= 15 ? prisma.deliveryDailyOrder.groupBy({ by: ["companyId"], where: { companyId: { in: depositIds }, date: { gte: startOfToday } }, _count: { _all: true } }) : none,
+    carWashIds.length ? prisma.carWashDailyOperation.groupBy({ by: ["companyId"], where: { companyId: { in: carWashIds }, status: "OPEN", date: { lt: startOfToday } }, _count: { _all: true } }) : none,
+    hrIds.length ? prisma.employee.groupBy({ by: ["companyId"], where: { ...employeeBase(hrIds), OR: [{ civilId: null }, { civilId: "" }] }, _count: { _all: true } }) : none,
+    hrIds.length ? prisma.employee.groupBy({ by: ["companyId"], where: { ...employeeBase(hrIds), residencyExpiry: null, NOT: [{ nationality: { contains: "كويت" } }, { nationality: { contains: "Kuwait" } }] }, _count: { _all: true } }) : none,
+    salaryIds.length ? prisma.employee.groupBy({ by: ["companyId"], where: { ...employeeBase(salaryIds), baseSalary: null, actualSalary: null }, _count: { _all: true } }) : none,
+    licenseIds.length ? prisma.license.groupBy({ by: ["companyId"], where: { companyId: { in: licenseIds }, status: { not: "CANCELLED" }, licenseExpiryDate: null }, _count: { _all: true } }) : none,
+    vehicleIds.length ? prisma.vehicle.groupBy({ by: ["companyId"], where: { companyId: { in: vehicleIds }, isActive: true, registrationExpiry: null }, _count: { _all: true } }) : none,
+    accIds.length ? prisma.fiscalYear.findMany({ where: { companyId: { in: accIds }, isCurrent: true }, select: { companyId: true } }) : Promise.resolve([] as { companyId: string }[]),
   ]);
 
   const tasks: AssistantTask[] = [];
@@ -137,6 +158,31 @@ export async function getAssistantTasks(session: SessionUser, focusCompanyId?: s
   push(toMap(licSoon as CountRow[]), (id, n) => ({ area: "admin", severity: "warn", title: "تراخيص منتهية أو تنتهي خلال 60 يوم", detail: `${n} ترخيص محتاج متابعة`, href: `${base(id)}/licenses` }), "lic");
   push(toMap(vehSoon as CountRow[]), (id, n) => ({ area: "admin", severity: "warn", title: "تسجيل أو تأمين مركبات قارب على الانتهاء", detail: `${n} مركبة خلال 30 يوم`, href: `${base(id)}/vehicles` }), "veh");
   push(toMap(claimsOverdue as CountRow[]), (id, n) => ({ area: "admin", severity: "warn", title: "مطالبات مسئولين متأخرة", detail: `${n} مطالبة عدّى ميعادها`, href: `${base(id)}/investors/claims` }), "claims");
+
+  push(toMap(talabatDraft as CountRow[]), (id, n) => ({ area: "operations", severity: "warn", title: "تقارير طلبات لم تُرحّل", detail: `${n} تقرير مستورد لسه مسودة`, href: `${base(id)}/delivery/talabat-imports` }), "talabat");
+  push(toMap(monthlyDraft as CountRow[]), (id, n) => ({ area: "operations", severity: "warn", title: `التقرير الشهري لـ ${MONTHS_AR[prevMonth - 1]} لم يُعتمد`, detail: `${n} تقرير شهري مسودة`, href: `${base(id)}/delivery/monthly-reports` }), "monthly");
+  if (now.getHours() >= 15) {
+    const recorded = toMap(ordersToday as CountRow[]);
+    for (const companyId of depositIds) {
+      if ((recorded.get(companyId) ?? 0) > 0) continue;
+      tasks.push({ id: `orders-today:${companyId}`, area: "operations", severity: "info", title: "لم تُسجَّل طلبات اليوم", detail: "مفيش أوردرات يومية متسجلة النهارده لسه", count: 1, href: `${base(companyId)}/delivery/daily-orders/new`, companyId, companyName: nameOf.get(companyId) ?? null });
+    }
+  }
+  push(toMap(carWashOpen as CountRow[]), (id, n) => ({ area: "operations", severity: "warn", title: "أيام غسيل مفتوحة لم تُقفل", detail: `${n} يوم تشغيل لسه مفتوح`, href: `${base(id)}/car-wash/operations` }), "carwash-open");
+
+  // ── Missing data (what is incomplete in the records) ──
+  push(toMap(empNoCivil as CountRow[]), (id, n) => ({ area: "data", severity: "warn", title: "موظفين من غير رقم مدني", detail: `${n} موظف ناقصه الرقم المدني`, href: `${base(id)}/hr/employees` }), "no-civil");
+  push(toMap(empNoResidency as CountRow[]), (id, n) => ({ area: "data", severity: "warn", title: "موظفين من غير تاريخ انتهاء إقامة", detail: `${n} موظف، فتنبيهات الإقامة مش هتشتغل لهم`, href: `${base(id)}/hr/employees` }), "no-residency");
+  push(toMap(empNoSalary as CountRow[]), (id, n) => ({ area: "data", severity: "info", title: "موظفين من غير راتب مسجّل", detail: `${n} موظف ناقصه الراتب`, href: `${base(id)}/hr/employees` }), "no-salary");
+  push(toMap(licNoExpiry as CountRow[]), (id, n) => ({ area: "data", severity: "warn", title: "تراخيص من غير تاريخ انتهاء", detail: `${n} ترخيص، فمش هيظهر تنبيه قبل انتهائه`, href: `${base(id)}/licenses` }), "lic-no-expiry");
+  push(toMap(vehNoReg as CountRow[]), (id, n) => ({ area: "data", severity: "info", title: "مركبات من غير تاريخ انتهاء التسجيل", detail: `${n} مركبة ناقصها التاريخ`, href: `${base(id)}/vehicles` }), "veh-no-reg");
+  {
+    const withCurrent = new Set((currentFiscal as { companyId: string }[]).map((row) => row.companyId));
+    for (const companyId of accIds) {
+      if (withCurrent.has(companyId)) continue;
+      tasks.push({ id: `no-fy:${companyId}`, area: "data", severity: "warn", title: "مفيش سنة مالية حالية", detail: "حدد السنة المالية الحالية علشان القيود والتقارير", count: 1, href: `${base(companyId)}/accounting/fiscal-years`, companyId, companyName: nameOf.get(companyId) ?? null });
+    }
+  }
 
   // ── Personal ──
   for (const reminder of reminders as { id: string; title: string; dueAt: Date }[]) {
