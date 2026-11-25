@@ -161,7 +161,7 @@ export default async function AdministrativeAffairsPage({ params }: Props) {
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">
             {locale === "en" ? "Quick links" : "روابط سريعة"}
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="hub-links flex flex-wrap gap-2">
             {quickLinks.map((link) => (
               <Link
                 key={link.href}
