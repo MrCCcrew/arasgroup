@@ -463,7 +463,7 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
             )}
             <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
               <Link
-                href={`/dashboard/companies/${companyId}/delivery/invoices${selectedDriver ? `?driverId=${selectedDriver.id}` : ''}${effectiveMonth ? `&month=${effectiveMonth}` : ''}${effectiveYear ? `&year=${effectiveYear}` : ''}`}
+                href={`/dashboard/companies/${companyId}/delivery/invoices?${new URLSearchParams({ ...(selectedDriver ? { driverId: selectedDriver.id } : {}), ...(effectiveMonth ? { month: String(effectiveMonth) } : {}), ...(effectiveYear ? { year: String(effectiveYear) } : {}) }).toString()}`}
                 className="block hover:opacity-80 transition-opacity"
               >
                 <p className="text-xs text-muted-foreground">
