@@ -103,7 +103,7 @@ export async function getAssistantTasks(session: SessionUser, focusCompanyId?: s
   ] = await Promise.all([
     talabatIds.length ? prisma.talabatReportImport.groupBy({ by: ["companyId"], where: { companyId: { in: talabatIds }, status: "DRAFT" }, _count: { _all: true } }) : none,
     talabatIds.length ? prisma.deliveryMonthlyReport.groupBy({ by: ["companyId"], where: { companyId: { in: talabatIds }, status: "DRAFT", month: prevMonth, year: prevMonthYear }, _count: { _all: true } }) : none,
-    depositIds.length && now.getHours() >= 15 ? prisma.deliveryDailyOrder.groupBy({ by: ["companyId"], where: { companyId: { in: depositIds }, date: { gte: startOfToday } }, _count: { _all: true } }) : none,
+    depositIds.length && now.getHours() >= 15 ? prisma.deliveryDailyOrder.groupBy({ by: ["companyId"], where: { companyId: { in: depositIds }, date: { gte: new Date(startOfToday.getTime() - DAY) } }, _count: { _all: true } }) : none,
     carWashIds.length ? prisma.carWashDailyOperation.groupBy({ by: ["companyId"], where: { companyId: { in: carWashIds }, status: "OPEN", date: { lt: startOfToday } }, _count: { _all: true } }) : none,
     hrIds.length ? prisma.employee.groupBy({ by: ["companyId"], where: { ...employeeBase(hrIds), OR: [{ civilId: null }, { civilId: "" }] }, _count: { _all: true } }) : none,
     hrIds.length ? prisma.employee.groupBy({ by: ["companyId"], where: { ...employeeBase(hrIds), residencyExpiry: null, NOT: [{ nationality: { contains: "كويت" } }, { nationality: { contains: "Kuwait" } }] }, _count: { _all: true } }) : none,
@@ -165,7 +165,7 @@ export async function getAssistantTasks(session: SessionUser, focusCompanyId?: s
     const recorded = toMap(ordersToday as CountRow[]);
     for (const companyId of depositIds) {
       if ((recorded.get(companyId) ?? 0) > 0) continue;
-      tasks.push({ id: `orders-today:${companyId}`, area: "operations", severity: "info", title: "لم تُسجَّل طلبات اليوم", detail: "مفيش أوردرات يومية متسجلة النهارده لسه", count: 1, href: `${base(companyId)}/delivery/daily-orders/new`, companyId, companyName: nameOf.get(companyId) ?? null });
+      tasks.push({ id: `orders-today:${companyId}`, area: "operations", severity: "info", title: "لم تُسجَّل طلبات أمس", detail: "مفيش أوردرات يومية متسجلة لأمس أو النهارده", count: 1, href: `${base(companyId)}/delivery/daily-orders/new`, companyId, companyName: nameOf.get(companyId) ?? null });
     }
   }
   push(toMap(carWashOpen as CountRow[]), (id, n) => ({ area: "operations", severity: "warn", title: "أيام غسيل مفتوحة لم تُقفل", detail: `${n} يوم تشغيل لسه مفتوح`, href: `${base(id)}/car-wash/operations` }), "carwash-open");

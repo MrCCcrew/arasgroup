@@ -157,9 +157,9 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
       role="dialog"
       aria-label="مساعدي"
       dir="rtl"
-      className="assistant-panel fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col overflow-hidden rounded-[22px] border border-border bg-card text-foreground shadow-[0_24px_60px_rgba(2,6,23,0.25)] md:inset-x-auto md:bottom-auto md:top-20 md:max-h-[78vh] md:w-[420px] ltr:md:left-[calc(16rem+40px)] rtl:md:right-[calc(16rem+40px)]"
+      className="assistant-panel fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col overflow-hidden rounded-[22px] border border-border bg-card text-foreground shadow-[0_24px_60px_rgba(2,6,23,0.25)] md:inset-x-auto md:bottom-auto md:top-20 md:max-h-[78vh] md:w-[420px]"
     >
-      <div className="flex items-center gap-3 bg-gradient-to-l from-[#3B5BDB] to-[#5B7BF0] px-4 py-3.5 text-white">
+      <div className="flex shrink-0 items-center gap-3 bg-gradient-to-l from-[#3B5BDB] to-[#5B7BF0] px-4 py-3.5 text-white">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white/20"><BlinkingBot size={22} /></span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-extrabold leading-tight">{hello} 👋</p>
@@ -174,11 +174,11 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {tasks.length > 0 ? (
-        <p className="border-b border-border bg-[#F5F7FF] px-4 py-3 text-sm leading-relaxed text-[#1E2A55] dark:bg-muted dark:text-foreground">{headline}</p>
+        <p className="shrink-0 border-b border-border bg-[#F5F7FF] px-4 py-3 text-sm leading-relaxed text-[#1E2A55] dark:bg-muted dark:text-foreground">{headline}</p>
       ) : null}
 
       {companyId ? (
-        <div className="grid grid-cols-2 gap-1 border-b border-border p-2">
+        <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-border p-2">
           {(["company", "all"] as const).map((value) => (
             <button key={value} type="button" onClick={() => setScope(value)} aria-pressed={scope === value}
               className={scope === value ? "min-h-9 rounded-[10px] bg-foreground text-sm font-bold text-background" : "min-h-9 rounded-[10px] text-sm text-muted-foreground hover:bg-muted"}>
@@ -188,7 +188,7 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       ) : null}
 
-      <div className="flex gap-1.5 overflow-x-auto border-b border-border px-3 py-2">
+      <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border px-3 py-2">
         {AREAS.filter((item) => item.key === "all" || areaCounts.has(item.key)).map((item) => (
           <button key={item.key} type="button" onClick={() => setArea(item.key)} aria-pressed={area === item.key}
             className={area === item.key ? "shrink-0 rounded-full bg-[#3B5BDB] px-3 py-1.5 text-xs font-bold text-white" : "shrink-0 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"}>
@@ -221,7 +221,7 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </div>
-      <div className="flex items-center gap-2 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
         {editingName ? (
           <form className="flex flex-1 items-center gap-2" onSubmit={(event) => { event.preventDefault(); saveNickname(String(new FormData(event.currentTarget).get("nick") ?? "")); }}>
             <span>ناديني بـ</span>
@@ -242,7 +242,7 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
   ) : null;
 
   const bubbleEl = bubble && mounted && !open ? createPortal(
-    <div role="status" dir="rtl" className="assistant-bubble fixed inset-x-3 bottom-4 z-[60] rounded-[20px] border border-[#C7D2FE] bg-card p-4 text-foreground shadow-[0_18px_48px_rgba(59,91,219,0.25)] md:inset-x-auto md:bottom-auto md:top-20 md:w-[360px] ltr:md:left-[calc(16rem+40px)] rtl:md:right-[calc(16rem+40px)]">
+    <div role="status" dir="rtl" className="assistant-bubble fixed inset-x-3 bottom-4 z-[60] rounded-[20px] border border-[#C7D2FE] bg-card p-4 text-foreground shadow-[0_18px_48px_rgba(59,91,219,0.25)] md:inset-x-auto md:bottom-auto md:top-20 md:w-[360px]">
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-gradient-to-l from-[#3B5BDB] to-[#5B7BF0] text-white"><BlinkingBot size={20} /></span>
         <div className="min-w-0 flex-1">
@@ -261,6 +261,7 @@ export function AssistantButton({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <>
+      <style>{`@media (min-width: 768px) { .assistant-panel, .assistant-bubble { inset-inline-start: calc(16rem + 40px); inset-inline-end: auto; } }`}</style>
       <button
         type="button"
         data-assistant-trigger
