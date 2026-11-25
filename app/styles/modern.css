@@ -333,10 +333,15 @@ html[data-ui="modern"] .users-mgmt .user-perm-actions > * { margin: 0 !important
 html[data-ui="modern"] .users-mgmt .user-perm-actions > p { flex-basis: 100%; }
 html[data-ui="modern"] .users-mgmt .user-perm-actions button { white-space: nowrap; min-height: 34px; border-radius: 12px; }
 html[data-ui="modern"] .users-mgmt tbody td { vertical-align: top; }
-html[data-ui="modern"] .users-mgmt tbody td span.rounded-full { display: inline-block; white-space: nowrap; max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
-html[data-ui="modern"] .users-mgmt tbody td:nth-child(3),
-html[data-ui="modern"] .users-mgmt tbody td:nth-child(4) { min-width: 170px; }
-html[data-ui="modern"] .users-mgmt tbody td:nth-child(2) { font-size: 13px; }
+html[data-ui="modern"] .users-mgmt tbody td span.rounded-full { display: inline-block; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+html[data-ui="modern"] .users-mgmt table td,
+html[data-ui="modern"] .users-mgmt table th { padding-inline: 10px; }
+html[data-ui="modern"] .users-mgmt tbody td:nth-child(2) { font-size: 13px; min-width: 180px; overflow-wrap: anywhere; }
+/* Row ⋯ menu floats over the table, opening toward the content side */
+html[data-ui="modern"] .user-row-menu > div { position: absolute; z-index: 30; top: 100%; width: 220px; box-shadow: 0 12px 32px rgba(15,23,42,.14); }
+html[dir="rtl"][data-ui="modern"] .user-row-menu > div { left: 0; }
+html[dir="ltr"][data-ui="modern"] .user-row-menu > div { right: 0; }
+html[data-ui="modern"] .users-mgmt .overflow-x-auto:has(details[open]) { padding-bottom: 200px; }
 html[data-ui="modern"] .users-mgmt .user-perm-actions { min-width: 0; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
 
