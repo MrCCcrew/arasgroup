@@ -333,6 +333,11 @@ html[data-ui="modern"] .users-mgmt .user-perm-actions > * { margin: 0 !important
 html[data-ui="modern"] .users-mgmt .user-perm-actions > p { flex-basis: 100%; }
 html[data-ui="modern"] .users-mgmt .user-perm-actions button { white-space: nowrap; min-height: 34px; border-radius: 12px; }
 html[data-ui="modern"] .users-mgmt tbody td { vertical-align: top; }
+html[data-ui="modern"] .users-mgmt tbody td span.rounded-full { display: inline-block; white-space: nowrap; max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+html[data-ui="modern"] .users-mgmt tbody td:nth-child(3),
+html[data-ui="modern"] .users-mgmt tbody td:nth-child(4) { min-width: 170px; }
+html[data-ui="modern"] .users-mgmt tbody td:nth-child(2) { font-size: 13px; }
+html[data-ui="modern"] .users-mgmt .user-perm-actions { min-width: 0; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
 
 }

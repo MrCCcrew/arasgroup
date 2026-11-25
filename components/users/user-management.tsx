@@ -904,6 +904,46 @@ export function UserManagement({
                 const isPermissionsOpen = activePermissionsUserId === user.id;
                 const isAccessOpen = activeAccessUserId === user.id;
                 const isRolesOpen = activeRolesUserId === user.id;
+                const permissionButtons = (
+                  <>
+                          {granularPermissionsEnabled ? (
+                            <button type="button" onClick={() => openPermissionEditor(user)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
+                              <SlidersHorizontal size={14} />
+                              {text("إدارة الصلاحيات", "Manage permissions")}
+                            </button>
+                          ) : (
+                            <span className="inline-flex rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                              {text("الصلاحيات الدقيقة غير مفعلة على الخادم بعد", "Granular permissions are not enabled on the server yet")}
+                            </span>
+                          )}
+                          {!user.isSuperAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isRolesOpen = activeRolesUserId === user.id;
+                                  setActiveRolesUserId(isRolesOpen ? null : user.id);
+                                  if (!isRolesOpen) {
+                                    setEditingRoles(user.roles.map((r) => ({ roleId: r.roleId, companyId: r.companyId })));
+                                  }
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                              >
+                                <Shield size={14} />
+                                {text("تعديل الأدوار", "Edit roles")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveAccessUserId(isAccessOpen ? null : user.id)}
+                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
+                              >
+                                <Building2 size={14} />
+                                {text("تعديل الشركات والفروع", "Edit companies & branches")}
+                              </button>
+                            </>
+                          ) : null}
+                  </>
+                );
                 return (
                   <Fragment key={user.id}>
                     <tr className="align-top transition-colors hover:bg-muted/30">
@@ -978,42 +1018,7 @@ export function UserManagement({
                               ? text(`${user.directPermissions?.length ?? 0} صلاحية مباشرة`, `${user.directPermissions?.length ?? 0} direct permission(s)`)
                               : text("لا توجد صلاحيات مباشرة", "No direct permissions")}
                           </p>
-                          {granularPermissionsEnabled ? (
-                            <button type="button" onClick={() => openPermissionEditor(user)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted">
-                              <SlidersHorizontal size={14} />
-                              {text("إدارة الصلاحيات", "Manage permissions")}
-                            </button>
-                          ) : (
-                            <span className="inline-flex rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                              {text("الصلاحيات الدقيقة غير مفعلة على الخادم بعد", "Granular permissions are not enabled on the server yet")}
-                            </span>
-                          )}
-                          {!user.isSuperAdmin ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const isRolesOpen = activeRolesUserId === user.id;
-                                  setActiveRolesUserId(isRolesOpen ? null : user.id);
-                                  if (!isRolesOpen) {
-                                    setEditingRoles(user.roles.map((r) => ({ roleId: r.roleId, companyId: r.companyId })));
-                                  }
-                                }}
-                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
-                              >
-                                <Shield size={14} />
-                                {text("تعديل الأدوار", "Edit roles")}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setActiveAccessUserId(isAccessOpen ? null : user.id)}
-                                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted"
-                              >
-                                <Building2 size={14} />
-                                {text("تعديل الشركات والفروع", "Edit companies & branches")}
-                              </button>
-                            </>
-                          ) : null}
+                          {!isModern || !canManagePasswords ? permissionButtons : null}
                         </div>
                       </td>
                       {canManagePasswords ? (
@@ -1023,7 +1028,8 @@ export function UserManagement({
                               <summary aria-label={text("الإجراءات", "Actions")} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-[12px] border hover:bg-muted [&::-webkit-details-marker]:hidden">
                                 <MoreHorizontal size={18} />
                               </summary>
-                              <div onClick={(event) => { const menu = event.currentTarget.parentElement; if (menu instanceof HTMLDetailsElement) menu.open = false; }} className="mt-2 flex min-w-[190px] flex-col gap-1 rounded-[16px] border bg-card p-2 shadow-sm [&>button]:justify-start [&>button]:border-0">
+                              <div onClick={(event) => { const menu = event.currentTarget.parentElement; if (menu instanceof HTMLDetailsElement) menu.open = false; }} className="mt-2 flex min-w-[190px] flex-col gap-1 rounded-[16px] border bg-card p-2 shadow-sm [&_button]:justify-start [&_button]:border-0 [&_button]:w-full">
+                                {permissionButtons}
                             <button
                               type="button"
                               onClick={() => {
