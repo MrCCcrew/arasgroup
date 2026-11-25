@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
   const companyId = new URL(request.url).searchParams.get("companyId");
   try {
     const tasks = await getAssistantTasks(session, companyId || null);
-    const firstName = (session.nameAr || session.nameEn || "").trim().split(/\s+/)[0] || "";
+    const GENERIC = new Set(["مدير", "المدير", "مشرف", "المشرف", "محاسب", "المحاسب", "موظف", "الموظف", "حساب", "admin", "Admin", "System"]);
+    const first = (session.nameAr || session.nameEn || "").trim().split(/\s+/)[0] || "";
+    const firstName = GENERIC.has(first) ? "" : first;
     return NextResponse.json({ success: true, data: { tasks, firstName, generatedAt: new Date().toISOString() } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("assistant tasks:", error);
