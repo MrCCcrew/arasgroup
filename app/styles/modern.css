@@ -364,3 +364,13 @@ html[data-ui="modern"] .users-mgmt .user-perm-actions { min-width: 0; }
 html[data-ui="modern"] .user-row-menu[open] > summary { background: hsl(var(--muted)); }
 
 }
+
+/* جداول الإدخال (تسجيل الطلبات اليومية وغيرها): أعمدة مضغوطة علشان الجدول كله يبان من غير ما يتقص */
+html[data-ui="modern"] main table tbody td:has(input, select) { padding: 6px 4px; }
+html[data-ui="modern"] main table:has(tbody input, tbody select) thead th { padding-inline: 4px; }
+html[data-ui="modern"] main table td :is(input, select).input-field { min-height: 40px; padding-inline: 8px; }
+html[data-ui="modern"] main table td select.input-field.w-32 { width: 7rem; }
+html[data-ui="modern"] main table td input.input-field.w-24 { width: 5.5rem; }
+html[data-ui="modern"] main table td input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+html[data-ui="modern"] main table td input[type="number"]::-webkit-inner-spin-button,
+html[data-ui="modern"] main table td input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
