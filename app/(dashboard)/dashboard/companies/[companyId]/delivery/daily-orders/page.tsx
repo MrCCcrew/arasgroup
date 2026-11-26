@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
+import { getDriverCashSummary } from "@/lib/delivery/driver-cash-summary";
 import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 import { DistributeOrders } from "./DistributeOrders";
@@ -225,77 +226,27 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
     ? [selectedDriver]
     : driverRows.filter((driver: DriverRowItem) => allDriverIds.includes(driver.id));
 
-  // Calculate wallet balance for the filtered month
-  // Wallet balance = CHARGE - DEPOSIT (for the filtered period)
-  let walletDateFilter = {};
-  if (effectiveMonth && effectiveYear) {
-    const monthNum = Number.parseInt(effectiveMonth, 10);
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-    walletDateFilter = { date: { gte: startDate, lte: endDate } };
-  } else if (effectiveYear) {
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-    walletDateFilter = { date: { gte: startDate, lte: endDate } };
+  // ملخص الكاش الموحّد (نفس الحساب في التقارير): المحصل − الإكراميات − الفواتير − إيداع طلبات − إيداع الشركة
+  const cashSummary = await getDriverCashSummary({
+    orderWhere: where,
+    month: effectiveMonth,
+    year: effectiveYear,
+    extraDriverIds: selectedDriver ? [selectedDriver.id] : [],
+  });
+  const statsIds = new Set(statsDriverRows.map((driver: DriverRowItem) => driver.id));
+  const cash = { walletBalance: 0, invoices: 0, talabatDeposits: 0, companyDeposits: 0 };
+  for (const [driverId, row] of cashSummary.byDriver) {
+    if (!statsIds.has(driverId)) continue;
+    cash.walletBalance += row.walletBalance;
+    cash.invoices += row.invoices;
+    cash.talabatDeposits += row.talabatDeposits;
+    cash.companyDeposits += row.companyDeposits;
   }
-
-  const walletTransactions = statsDriverRows.length > 0
-    ? await prisma.driverWalletTransaction.findMany({
-        where: {
-          driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
-          ...walletDateFilter,
-        },
-        select: { type: true, amount: true },
-      })
-    : [];
-
-  let totalWalletBalance = 0;
-  for (const tx of walletTransactions) {
-    const amount = Number(tx.amount);
-    if (tx.type === "CHARGE") {
-      // CHARGE increases driver debt (money owed to company)
-      totalWalletBalance += amount;
-    } else if (tx.type === "DEPOSIT") {
-      // DEPOSIT decreases driver debt (driver paid to company)
-      totalWalletBalance -= amount;
-    }
-    // Other types like CREDIT/DEBIT are handled separately
-  }
-
-  // Build invoice date filter matching the orders filter
-  let invoiceDateFilter = {};
-  if (effectiveMonth && effectiveYear) {
-    const monthNum = Number.parseInt(effectiveMonth, 10);
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
-  } else if (effectiveYear) {
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
-  }
-
-  const totalInvoicesAmount =
-    statsDriverRows.length > 0
-      ? await prisma.deliveryInvoice.aggregate({
-          where: {
-            targetType: "DRIVER",
-            driverId: { in: statsDriverRows.map((driver: DriverRowItem) => driver.id) },
-            deletedAt: null,
-            reviewStatus: { not: "REJECTED" },
-            ...invoiceDateFilter,
-          },
-          _sum: { amount: true },
-        })
-      : null;
-  const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
-
-  // Calculate net balance (Current Balance - Invoices)
-  const netBalance = totalWalletBalance - driverInvoicesTotal;
+  const totalWalletBalance = cash.walletBalance;
+  const driverInvoicesTotal = cash.invoices;
+  const talabatDepositsTotal = cash.talabatDeposits;
+  const companyDepositsTotal = cash.companyDeposits;
+  const netBalance = (totalCollectionAmount - totalTipsAmount) - driverInvoicesTotal - talabatDepositsTotal - companyDepositsTotal;
 
   const totalPages = Math.ceil(total / pageSize);
   const totalOrders = await prisma.deliveryDailyOrder.aggregate({ where, _sum: { ordersCount: true } });
@@ -471,6 +422,18 @@ export default async function DailyOrdersPage({ params, searchParams }: Props) {
                 </p>
                 <p className="number text-2xl font-bold text-purple-600 underline decoration-dotted">{driverInvoicesTotal.toFixed(3)} {kwd}</p>
               </Link>
+            </div>
+            <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Talabat deposits" : "إجمالي إيداع طلبات"}
+              </p>
+              <p className="number text-2xl font-bold text-orange-600">{talabatDepositsTotal.toFixed(3)} {kwd}</p>
+            </div>
+            <div className="border-r pr-4 rtl:border-l rtl:border-r-0 rtl:pl-4 rtl:pr-0">
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Company deposits" : "إجمالي إيداع الشركة"}
+              </p>
+              <p className="number text-2xl font-bold text-cyan-700">{companyDepositsTotal.toFixed(3)} {kwd}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { getDriverCashSummary, type DriverCashRow } from "@/lib/delivery/driver-cash-summary";
 import { getLocale } from "@/lib/i18n";
 
 interface Props {
@@ -16,6 +17,9 @@ const AR = {
   totalOrders: "إجمالي الطلبات",
   totalCollected: "إجمالي المحصل",
   totalInvoices: "إجمالي الفواتير",
+  tips: "الإكراميات",
+  talabatDeposits: "إيداع طلبات",
+  companyDeposits: "إيداع الشركة",
   totalWalletBalance: "إجمالي الرصيد الحالي",
   totalNetBalance: "إجمالي صافي الرصيد",
   selectedStatus: "الحالة المختارة",
@@ -41,6 +45,9 @@ const EN = {
   totalOrders: "Total Orders",
   totalCollected: "Total Collected",
   totalInvoices: "Total Invoices",
+  tips: "Tips",
+  talabatDeposits: "Talabat deposits",
+  companyDeposits: "Company deposits",
   totalWalletBalance: "Total Current Balance",
   totalNetBalance: "Total Net Balance",
   selectedStatus: "Selected Status",
@@ -177,154 +184,33 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
 
   type SummaryDriver = typeof driverRows[number];
 
-  // Build invoice date filter
-  let invoiceDateFilter = {};
-  if (effectiveMonth && effectiveYear) {
-    const monthNum = Number.parseInt(effectiveMonth, 10);
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
-  } else if (effectiveYear) {
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-    invoiceDateFilter = { invoiceDate: { gte: startDate, lte: endDate } };
-  }
-
-  const [charges, totalInvoicesAmount] = await Promise.all([
-    driverIds.length > 0
-      ? prisma.driverWalletTransaction.findMany({
-          where: {
-            type: "CHARGE",
-            driverId: { in: driverIds },
-          },
-          select: {
-            dailyOrderId: true,
-            driverId: true,
-            contractId: true,
-            date: true,
-            amount: true,
-          },
-        })
-      : Promise.resolve([]),
-    driverIds.length > 0
-      ? prisma.deliveryInvoice.groupBy({
-          by: ["driverId"],
-          where: {
-            targetType: "DRIVER",
-            driverId: { in: driverIds },
-            deletedAt: null,
-            reviewStatus: { not: "REJECTED" },
-            ...invoiceDateFilter,
-          },
-          _sum: { amount: true },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const chargeByOrder = new Map<string, number>();
-  const chargeByKey = new Map<string, number>();
-  for (const charge of charges) {
-    const amount = Number(charge.amount);
-    if (charge.dailyOrderId) {
-      chargeByOrder.set(charge.dailyOrderId, (chargeByOrder.get(charge.dailyOrderId) ?? 0) + amount);
-    }
-    const key = `${charge.driverId}|${charge.contractId ?? ""}|${charge.date.toISOString().slice(0, 10)}`;
-    chargeByKey.set(key, (chargeByKey.get(key) ?? 0) + amount);
-  }
-
-  const invoiceByDriverId = new Map<string, number>(totalInvoicesAmount.map((row: typeof totalInvoicesAmount[number]) => [row.driverId ?? "", Number(row._sum.amount ?? 0)]));
   const driverById = new Map<string, SummaryDriver>(driverRows.map((driver: SummaryDriver) => [driver.id, driver]));
 
-  // Calculate wallet balance from transactions in the filtered period (same as main page)
-  // Build wallet date filter matching the orders filter
-  let walletDateFilter = {};
-  if (effectiveMonth && effectiveYear) {
-    const monthNum = Number.parseInt(effectiveMonth, 10);
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-    walletDateFilter = { date: { gte: startDate, lte: endDate } };
-  } else if (effectiveYear) {
-    const yearNum = Number.parseInt(effectiveYear, 10);
-    const startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);
-    const endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-    walletDateFilter = { date: { gte: startDate, lte: endDate } };
-  }
+  // نفس حساب صفحة الطلبات اليومية: المحصل − الإكراميات − الفواتير − إيداع طلبات − إيداع الشركة
+  const cash = await getDriverCashSummary({ orderWhere: where, month: effectiveMonth, year: effectiveYear });
 
-  const walletTransactions = driverIds.length > 0
-    ? await prisma.driverWalletTransaction.findMany({
-        where: {
-          driverId: { in: driverIds },
-          ...walletDateFilter,
-        },
-        select: { driverId: true, type: true, amount: true },
-      })
-    : [];
-
-  const walletBalanceByDriverId = new Map<string, number>();
-  for (const tx of walletTransactions) {
-    const amount = Number(tx.amount);
-    const current = walletBalanceByDriverId.get(tx.driverId) ?? 0;
-    if (tx.type === "CHARGE") {
-      walletBalanceByDriverId.set(tx.driverId, current + amount);
-    } else if (tx.type === "DEPOSIT") {
-      walletBalanceByDriverId.set(tx.driverId, current - amount);
-    }
-  }
-
-  const summaryMap = new Map<
-    string,
-    {
-      driverName: string;
-      walletBalance: number;
-      totalCollected: number;
-      totalInvoices: number;
-      netBalance: number;
-      totalOrders: number;
-    }
-  >();
-
-  for (const order of orders) {
-    const driver = driverById.get(order.driverId);
+  type SummaryRowData = DriverCashRow & { driverName: string };
+  const summaryRows: SummaryRowData[] = [];
+  for (const [driverId, row] of cash.byDriver) {
+    const driver = driverById.get(driverId);
     if (!driver) continue;
-
-    if (!summaryMap.has(order.driverId)) {
-      const walletBalance = walletBalanceByDriverId.get(order.driverId) ?? 0;
-      const totalInvoices = invoiceByDriverId.get(order.driverId) ?? 0;
-      summaryMap.set(order.driverId, {
-        driverName: isEnglish ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr,
-        walletBalance,
-        totalCollected: 0,
-        totalInvoices,
-        netBalance: walletBalance - totalInvoices,
-        totalOrders: 0,
-      });
-    }
-
-    const item = summaryMap.get(order.driverId)!;
-    const collection =
-      chargeByOrder.get(order.id) ??
-      chargeByKey.get(`${order.driverId}|${order.contractId}|${order.date.toISOString().slice(0, 10)}`) ??
-      0;
-
-    item.totalCollected += collection;
-    item.totalOrders += order.ordersCount;
+    summaryRows.push({ ...row, driverName: isEnglish ? driver.employee.nameEn ?? driver.employee.nameAr : driver.employee.nameAr });
   }
-
-  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.driverName.localeCompare(b.driverName, isEnglish ? "en" : "ar"));
-  type SummaryRow = typeof summaryRows[number];
+  summaryRows.sort((a, b) => a.driverName.localeCompare(b.driverName, isEnglish ? "en" : "ar"));
+  type SummaryRow = SummaryRowData;
   const totals = summaryRows.reduce(
-    (acc: { walletBalance: number; totalCollected: number; totalInvoices: number; netBalance: number; totalOrders: number }, row: SummaryRow) => {
+    (acc, row: SummaryRow) => {
       acc.walletBalance += row.walletBalance;
-      acc.totalCollected += row.totalCollected;
-      acc.totalInvoices += row.totalInvoices;
+      acc.totalCollected += row.collected;
+      acc.tips += row.tips;
+      acc.totalInvoices += row.invoices;
+      acc.talabatDeposits += row.talabatDeposits;
+      acc.companyDeposits += row.companyDeposits;
       acc.netBalance += row.netBalance;
-      acc.totalOrders += row.totalOrders;
+      acc.totalOrders += row.orders;
       return acc;
     },
-    { walletBalance: 0, totalCollected: 0, totalInvoices: 0, netBalance: 0, totalOrders: 0 },
+    { walletBalance: 0, totalCollected: 0, tips: 0, totalInvoices: 0, talabatDeposits: 0, companyDeposits: 0, netBalance: 0, totalOrders: 0 },
   );
 
   const backQuery = new URLSearchParams({
@@ -342,7 +228,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
       <style>{`
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ${isEnglish ? "ltr" : "rtl"}; background: #f5f5f5; font-size: 11pt; }
-        .page { max-width: 210mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
+        .page { max-width: 297mm; margin: 2rem auto; background: white; padding: 2rem; border: 1px solid #d1d5db; }
         .header { text-align: center; border-bottom: 2px solid #1f2937; padding-bottom: 1rem; margin-bottom: 1.25rem; }
         .company { font-size: 1.4rem; font-weight: 700; }
         .sub { color: #6b7280; font-size: .9rem; margin-top: .25rem; }
@@ -357,7 +243,7 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
         @media print {
           body { background: white; }
           .page { max-width: 100%; margin: 0; padding: 0; border: none; }
-          @page { size: A4 portrait; margin: 1.2cm; }
+          @page { size: A4 landscape; margin: 1.2cm; }
         }
       `}</style>
 
@@ -397,6 +283,18 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
             <div className="label">{t.totalInvoices}</div>
             <div className="number">{totals.totalInvoices.toFixed(3)} {t.kwd}</div>
           </div>
+          <div className="card">
+            <div className="label">{t.tips}</div>
+            <div className="number">{totals.tips.toFixed(3)} {t.kwd}</div>
+          </div>
+          <div className="card">
+            <div className="label">{t.talabatDeposits}</div>
+            <div className="number">{totals.talabatDeposits.toFixed(3)} {t.kwd}</div>
+          </div>
+          <div className="card">
+            <div className="label">{t.companyDeposits}</div>
+            <div className="number">{totals.companyDeposits.toFixed(3)} {t.kwd}</div>
+          </div>
         </div>
 
         <div className="meta" style={{ gridTemplateColumns: "1fr" }}>
@@ -412,7 +310,10 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
               <th>{t.driver}</th>
               <th>{t.currentWalletBalance}</th>
               <th>{t.totalCollected}</th>
+              <th>{t.tips}</th>
               <th>{t.totalInvoices}</th>
+              <th>{t.talabatDeposits}</th>
+              <th>{t.companyDeposits}</th>
               <th>{t.netBalance}</th>
               <th>{t.ordersCount}</th>
             </tr>
@@ -420,17 +321,20 @@ export default async function DailyOrdersSummaryReportPage({ params, searchParam
           <tbody>
             {summaryRows.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center" }}>-</td>
+                <td colSpan={9} style={{ textAlign: "center" }}>-</td>
               </tr>
             ) : (
               summaryRows.map((row: SummaryRow) => (
                 <tr key={row.driverName}>
                   <td>{row.driverName}</td>
                   <td className="number">{row.walletBalance.toFixed(3)} {t.kwd}</td>
-                  <td className="number">{row.totalCollected.toFixed(3)} {t.kwd}</td>
-                  <td className="number">{row.totalInvoices.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.collected.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.tips.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.invoices.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.talabatDeposits.toFixed(3)} {t.kwd}</td>
+                  <td className="number">{row.companyDeposits.toFixed(3)} {t.kwd}</td>
                   <td className="number">{row.netBalance.toFixed(3)} {t.kwd}</td>
-                  <td className="number">{row.totalOrders}</td>
+                  <td className="number">{row.orders}</td>
                 </tr>
               ))
             )}

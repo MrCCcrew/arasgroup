@@ -90,7 +90,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
   }).toString();
 
   const methodLabel = (m: string | null) =>
-    m === "BANK" ? (en ? "Bank" : "بنك") : en ? "Cash" : "نقدي";
+    m === "TALABAT" ? (en ? "Talabat direct" : "إيداع طلبات") : m === "BANK" ? (en ? "Bank" : "بنك") : en ? "Cash" : "نقدي";
 
   return (
     <div>
@@ -225,7 +225,7 @@ export default async function DriverDepositsPage({ params, searchParams }: Props
                       <td className="font-medium">{en ? d.driver.employee.nameEn ?? d.driver.employee.nameAr : d.driver.employee.nameAr}</td>
                       <td className="number font-bold text-emerald-600">{formatKWD(Number(d.amount), numberLocale)}</td>
                       <td className="text-sm">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${d.paymentMethod === "BANK" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${d.paymentMethod === "TALABAT" ? "bg-orange-50 text-orange-700" : d.paymentMethod === "BANK" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
                           {methodLabel(d.paymentMethod)}
                         </span>
                       </td>

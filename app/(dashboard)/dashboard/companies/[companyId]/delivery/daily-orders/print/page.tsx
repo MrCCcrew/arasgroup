@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { PrintControls } from "@/components/ui/print-controls";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { getDriverCashSummary } from "@/lib/delivery/driver-cash-summary";
 import { getLocale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 
@@ -142,7 +143,7 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
     ...dateFilter,
   };
 
-  const [company, orders, selectedDriver, totalInvoicesAmount] = await Promise.all([
+  const [company, orders, selectedDriver] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: { nameAr: true, nameEn: true, logoUrl: true },
@@ -162,22 +163,15 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
           select: { walletBalance: true },
         })
       : null,
-    sp.driverId
-      ? prisma.deliveryInvoice.aggregate({
-          where: {
-            targetType: "DRIVER",
-            driverId: sp.driverId,
-            deletedAt: null,
-            reviewStatus: { not: "REJECTED" },
-          },
-          _sum: { amount: true },
-        })
-      : null,
   ]);
 
-  const driverBalance = selectedDriver ? Number(selectedDriver.walletBalance) : null;
-  const driverInvoicesTotal = totalInvoicesAmount?._sum.amount ? Number(totalInvoicesAmount._sum.amount) : 0;
-  const netBalance = selectedDriver ? (driverBalance ?? 0) - driverInvoicesTotal : null;
+  // نفس حساب صفحة الطلبات اليومية (للشهر المختار)
+  const cashRow = selectedDriver && sp.driverId
+    ? (await getDriverCashSummary({ orderWhere: where, month: effectiveMonth, year: effectiveYear, extraDriverIds: [sp.driverId] })).byDriver.get(sp.driverId) ?? null
+    : null;
+  const driverBalance = cashRow ? cashRow.walletBalance : null;
+  const driverInvoicesTotal = cashRow ? cashRow.invoices : 0;
+  const netBalance = cashRow ? cashRow.netBalance : null;
   type PrintedOrder = typeof orders[number];
 
   const grouped = new Map<
@@ -292,6 +286,22 @@ export default async function DailyOrdersPrintPage({ params, searchParams }: Pro
               <div style={{ color: "#9333ea", fontWeight: "bold" }}>
                 {driverInvoicesTotal.toFixed(3)} {t.kwd}
               </div>
+            </div>
+            <div className="card">
+              <div className="label">{isEnglish ? "Collected (after tips)" : "المحصل (بعد الإكراميات)"}</div>
+              <div style={{ fontWeight: "bold" }}>{(cashRow?.collected ?? 0).toFixed(3)} {t.kwd}</div>
+            </div>
+            <div className="card">
+              <div className="label">{isEnglish ? "Tips" : "الإكراميات"}</div>
+              <div style={{ fontWeight: "bold" }}>{(cashRow?.tips ?? 0).toFixed(3)} {t.kwd}</div>
+            </div>
+            <div className="card">
+              <div className="label">{isEnglish ? "Talabat deposits" : "إيداع طلبات"}</div>
+              <div style={{ fontWeight: "bold" }}>{(cashRow?.talabatDeposits ?? 0).toFixed(3)} {t.kwd}</div>
+            </div>
+            <div className="card">
+              <div className="label">{isEnglish ? "Company deposits" : "إيداع الشركة"}</div>
+              <div style={{ fontWeight: "bold" }}>{(cashRow?.companyDeposits ?? 0).toFixed(3)} {t.kwd}</div>
             </div>
             <div className="card">
               <div className="label">{t.netBalance}</div>

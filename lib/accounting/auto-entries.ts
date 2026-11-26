@@ -119,6 +119,47 @@ export async function createDriverWalletDepositJE(params: {
 }
 
 /**
+ * إيداع السائق مباشرة لشركة طلبات (مش في حساب الشركة):
+ *   مدين  2031 أمانات لشركة طلبات (الالتزام لطلبات بيقل)
+ *     دائن  1030 ذمم محافظ السائقين (السائق سدّد اللي عليه)
+ * يُرحَّل فورًا. لازم حساب 2031 يكون موجود، وإلا يرمي خطأ واضح (ومحدش بيتسجل).
+ */
+export async function createDriverTalabatDirectDepositJE(params: {
+  companyId: string;
+  userId: string;
+  driverId: string;
+  amount: number;
+  refId: string;
+  descriptionAr: string;
+  date?: Date;
+}): Promise<JournalEntry> {
+  const custody = await prisma.chartOfAccount.findFirst({
+    where: { companyId: params.companyId, code: "2031", type: "LIABILITY", isActive: true },
+    select: { id: true },
+  });
+  if (!custody) throw new Error("حساب 2031 (أمانات لشركة طلبات) غير موجود في دليل حسابات الشركة");
+
+  const fiscalYearId = await getCurrentFiscalYear(params.companyId);
+  const walletReceivableId = await getAccountId(params.companyId, "1030");
+
+  return createAndPostAutomaticEntry({
+    companyId: params.companyId,
+    fiscalYearId,
+    date: params.date ?? new Date(),
+    descriptionAr: params.descriptionAr,
+    type: "DELIVERY_WALLET",
+    refModule: "delivery",
+    refId: params.refId,
+    isAutomatic: true,
+    lines: [
+      { accountId: custody.id, debit: params.amount, credit: 0, driverId: params.driverId },
+      { accountId: walletReceivableId, debit: 0, credit: params.amount, driverId: params.driverId },
+    ],
+    createdById: params.userId,
+  });
+}
+
+/**
  * قيد التحصيل (COD) — النموذج (ب): عند تسجيل تحصيل للسائق، يُسجَّل التزام لشركة طلبات:
  *   مدين  1030 ذمم محافظ السائقين (السائق ماسك فلوس لطلبات)
  *     دائن  2031 أمانات لشركة طلبات (إحنا مديونين لطلبات)

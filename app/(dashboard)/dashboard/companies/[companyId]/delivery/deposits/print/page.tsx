@@ -93,7 +93,7 @@ export default async function DriverDepositsPrintPage({ params, searchParams }: 
     sp.from || sp.to
       ? `${sp.from ? formatDate(new Date(sp.from), "ar-KW") : "…"} ${AR.to} ${sp.to ? formatDate(new Date(sp.to), "ar-KW") : "…"}`
       : AR.allTime;
-  const methodLabel = (m: string | null) => (m === "BANK" ? AR.bankWord : AR.cash);
+  const methodLabel = (m: string | null) => (m === "TALABAT" ? "إيداع طلبات" : m === "BANK" ? AR.bankWord : AR.cash);
 
   return (
     <>
