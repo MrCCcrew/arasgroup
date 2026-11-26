@@ -153,7 +153,7 @@ export default function SalaryBatchDetailPage() {
   return (
     <div>
       <style jsx global>{`
-        .salary-print-header, .salary-print-footer { display: none; }
+        .salary-print-header, .salary-print-footer, .salary-print-signatures { display: none; }
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
           body { background: #fff !important; color: #111827 !important; }
@@ -172,6 +172,9 @@ export default function SalaryBatchDetailPage() {
           .salary-batch-print th, .salary-batch-print td { border: 1px solid #cbd5e1 !important; padding: 6px !important; }
           .salary-batch-print tr { break-inside: avoid; }
           .salary-batch-print tfoot td { background: #ecfdf5 !important; color: #065f46 !important; }
+          .salary-print-signatures { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8mm; margin-top: 10mm !important; break-inside: avoid; page-break-inside: avoid; color: #111827; text-align: center; }
+          .salary-print-signature-title { margin: 0; min-height: 12mm; font-size: 12px; font-weight: 700; }
+          .salary-print-signature-line { height: 16mm; border-bottom: 1px dotted #64748b; }
           .salary-print-footer { display: block !important; margin-top: 14px; border-top: 1px solid #cbd5e1; padding-top: 7px; color: #64748b; font-size: 10px; text-align: center; }
         }
       `}</style>
@@ -298,7 +301,9 @@ export default function SalaryBatchDetailPage() {
                     const hasAdditions = Number(payment.additionalEarnings) > 0;
                     const hasDeductions = Number(payment.deductions) > 0;
 
-                    const paymentItems = batch.items.filter((it) => it.salaryPaymentId === payment.id && it.type !== "BASE_SALARY");
+                    const paymentItems = batch.items.filter((it) =>
+                      (it.salaryPaymentId === payment.id || (!it.salaryPaymentId && it.employeeId === payment.employeeId)) && it.type !== "BASE_SALARY",
+                    );
                     const earningItems = paymentItems.filter((it) => it.category === "EARNING");
                     const deductionItems = paymentItems.filter((it) => it.category === "DEDUCTION");
                     const isExpanded = expandedId === payment.id;
@@ -376,7 +381,7 @@ export default function SalaryBatchDetailPage() {
                                   <ul className="space-y-0.5">
                                     {earningItems.map((it) => (
                                       <li key={it.id} className="flex justify-between gap-3">
-                                        <span className="text-muted-foreground">{it.titleAr}</span>
+                                        <span className="text-muted-foreground">{locale === "en" ? it.titleEn || it.titleAr : it.titleAr}</span>
                                         <span className="number text-green-600">{formatKWD(Number(it.amount), numLocale)}</span>
                                       </li>
                                     ))}
@@ -393,7 +398,7 @@ export default function SalaryBatchDetailPage() {
                                   <ul className="space-y-0.5">
                                     {deductionItems.map((it) => (
                                       <li key={it.id} className="flex justify-between gap-3">
-                                        <span className="text-muted-foreground">{it.titleAr}</span>
+                                        <span className="text-muted-foreground">{locale === "en" ? it.titleEn || it.titleAr : it.titleAr}</span>
                                         <span className="number text-red-600">{formatKWD(Number(it.amount), numLocale)}</span>
                                       </li>
                                     ))}
@@ -422,6 +427,20 @@ export default function SalaryBatchDetailPage() {
               )}
             </table>
           </div>
+        </div>
+        <div className="salary-print-signatures" dir={locale === "en" ? "ltr" : "rtl"}>
+          {[
+            { ar: "الإدارة المالية", en: "Finance Department" },
+            { ar: "الشئون الإدارية", en: "Administrative Affairs" },
+            { ar: "إدارة التشغيل", en: "Operations Department" },
+            { ar: "المدير التنفيذي", en: "Executive Director" },
+            { ar: "المدير العام", en: "General Manager" },
+          ].map((signatory) => (
+            <div key={signatory.en}>
+              <p className="salary-print-signature-title">{signatory[locale]}</p>
+              <div className="salary-print-signature-line" />
+            </div>
+          ))}
         </div>
         <div className="salary-print-footer">{locale === "en" ? "Computer-generated payroll register" : "كشف رواتب صادر إلكترونيًا"}</div>
       </div>

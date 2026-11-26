@@ -19,10 +19,11 @@ export async function POST(request: NextRequest, { params }: Props) {
   if (session instanceof NextResponse) return session;
   try {
     const { licenseId } = await params;
-    const lic = await prisma.license.findUnique({ where: { id: licenseId }, select: { companyId: true } });
+    const lic = await prisma.license.findUnique({ where: { id: licenseId }, select: { companyId: true, isMainLicense: true } });
     if (!lic) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
     const ce = assertCompanyAccess(session, lic.companyId);
     if (ce) return ce;
+    if (!lic.isMainLicense) return NextResponse.json({ success: false, error: "هذا القسم متاح للترخيص الرئيسي فقط" }, { status: 400 });
 
     const body = await request.json() as Record<string, unknown>;
 
@@ -90,16 +91,30 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     const contractId = new URL(request.url).searchParams.get("contractId");
     if (!contractId) return NextResponse.json({ success: false, error: "contractId مطلوب" }, { status: 400 });
 
-    const lic = await prisma.license.findUnique({ where: { id: licenseId }, select: { companyId: true } });
+    const lic = await prisma.license.findUnique({ where: { id: licenseId }, select: { companyId: true, isMainLicense: true } });
     if (!lic) return NextResponse.json({ success: false, error: "الترخيص غير موجود" }, { status: 404 });
     const ce = assertCompanyAccess(session, lic.companyId);
     if (ce) return ce;
+    if (!lic.isMainLicense) return NextResponse.json({ success: false, error: "هذا القسم متاح للترخيص الرئيسي فقط" }, { status: 400 });
 
     const c = await prisma.establishmentContract.findFirst({ where: { id: contractId, licenseId } });
     if (!c) return NextResponse.json({ success: false, error: "العقد غير موجود" }, { status: 404 });
-    if (c.isActive) return NextResponse.json({ success: false, error: "لا يمكن حذف النسخة النشطة" }, { status: 400 });
-
-    await prisma.establishmentContract.delete({ where: { id: contractId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.establishmentContract.delete({ where: { id: contractId } });
+      if (c.isActive) {
+        const replacement = await tx.establishmentContract.findFirst({
+          where: { licenseId },
+          orderBy: { version: "desc" },
+          select: { id: true },
+        });
+        if (replacement) {
+          await tx.establishmentContract.update({
+            where: { id: replacement.id },
+            data: { isActive: true },
+          });
+        }
+      }
+    });
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "خطأ" }, { status: 500 });

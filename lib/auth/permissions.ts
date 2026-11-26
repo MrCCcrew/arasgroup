@@ -6,6 +6,10 @@ import type {
 } from "@/lib/types";
 
 export type Module =
+  | "GROCERY"
+  | "GROCERY_SUBMISSIONS"
+  | "CONTRACTING"
+  | "CONTRACTING_SUBMISSIONS"
   | "DASHBOARD"
   | "COMPANIES"
   | "BRANCHES"
@@ -69,6 +73,18 @@ export type Scope = "GROUP" | "COMPANY" | "BRANCH" | "OWN";
 export type PermissionDefinition = { module: Module; action: Action; scope: Scope };
 
 export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
+  { module: "GROCERY_SUBMISSIONS", action: "VIEW", scope: "COMPANY" },
+  { module: "GROCERY_SUBMISSIONS", action: "CREATE", scope: "COMPANY" },
+  { module: "GROCERY", action: "VIEW", scope: "COMPANY" },
+  { module: "GROCERY", action: "CREATE", scope: "COMPANY" },
+  { module: "GROCERY", action: "UPDATE", scope: "COMPANY" },
+  { module: "GROCERY", action: "DELETE", scope: "COMPANY" },
+  { module: "CONTRACTING_SUBMISSIONS", action: "VIEW", scope: "COMPANY" },
+  { module: "CONTRACTING_SUBMISSIONS", action: "CREATE", scope: "COMPANY" },
+  { module: "CONTRACTING", action: "VIEW", scope: "COMPANY" },
+  { module: "CONTRACTING", action: "CREATE", scope: "COMPANY" },
+  { module: "CONTRACTING", action: "UPDATE", scope: "COMPANY" },
+  { module: "CONTRACTING", action: "DELETE", scope: "COMPANY" },
   { module: "DASHBOARD", action: "VIEW", scope: "GROUP" },
   { module: "COMPANIES", action: "VIEW", scope: "GROUP" },
   { module: "COMPANIES", action: "CREATE", scope: "GROUP" },
@@ -259,6 +275,10 @@ const ACTION_FLAG_MAP: Partial<Record<Action, keyof GrantFlags>> = {
 
 const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> = {
   SUPER_ADMIN: {
+    GROCERY: ["VIEW", "CREATE", "UPDATE", "DELETE"],
+    GROCERY_SUBMISSIONS: ["VIEW", "CREATE"],
+    CONTRACTING: ["VIEW", "CREATE", "UPDATE", "DELETE"],
+    CONTRACTING_SUBMISSIONS: ["VIEW", "CREATE"],
     DASHBOARD: ["VIEW"],
     COMPANIES: ["VIEW", "CREATE", "UPDATE", "DELETE"],
     BRANCHES: ["VIEW", "CREATE", "UPDATE", "DELETE"],
@@ -388,6 +408,16 @@ const ROLE_PERMISSION_MATRIX: Record<string, Partial<Record<Module, Action[]>>> 
     ATTACHMENTS: ["VIEW", "UPLOAD", "DOWNLOAD"],
     NOTIFICATIONS: ["VIEW", "UPDATE"],
     TASKS: ["VIEW", "CREATE", "UPDATE", "PRINT"],
+  },
+  CONTRACTING_SITE_EMPLOYEE: {
+    DASHBOARD: ["VIEW"],
+    CONTRACTING_SUBMISSIONS: ["VIEW", "CREATE"],
+    ATTACHMENTS: ["VIEW", "UPLOAD"],
+  },
+  GROCERY_EMPLOYEE: {
+    DASHBOARD: ["VIEW"],
+    GROCERY_SUBMISSIONS: ["VIEW", "CREATE"],
+    ATTACHMENTS: ["VIEW", "UPLOAD"],
   },
   HR_MANDOB: {
     DASHBOARD: ["VIEW"],
@@ -546,6 +576,8 @@ export function getVisibleModules(user: SessionUser, companyType?: string): Modu
 }
 
 export function companyTypeAllowsModule(companyType: string | undefined, module: Module): boolean {
+  if (module === "GROCERY" || module === "GROCERY_SUBMISSIONS") return ["GROCERY", "CLOTHING_RETAIL", "FABRIC_RETAIL", "TAILORING_FABRIC_RETAIL", "TAILORING", "TOBACCO_SHISHA", "MOBILE_REPAIR_ACCESSORIES"].includes(companyType ?? "");
+  if (module === "CONTRACTING" || module === "CONTRACTING_SUBMISSIONS") return companyType === "CONTRACTING";
   if (!companyType) return true;
 
   const shared: Module[] = [
@@ -562,14 +594,20 @@ export function companyTypeAllowsModule(companyType: string | undefined, module:
     "VEHICLES",
     "NOTIFICATIONS",
     "TASKS",
-    "INVESTOR_CLAIMS",
-    "INVESTOR_STATEMENTS",
     "SALARIES",
     "DRIVER_ACCOUNTS",
     "DRIVER_INVOICES",
     "DRIVER_TRACKING",
   ];
   if (shared.includes(module)) return true;
+
+  if (companyType === "CONTRACTING") {
+    return ["HR", "BRANCHES", "BANKS"].includes(module);
+  }
+
+  if (["GROCERY", "CLOTHING_RETAIL", "FABRIC_RETAIL", "TAILORING_FABRIC_RETAIL", "TAILORING", "TOBACCO_SHISHA", "MOBILE_REPAIR_ACCESSORIES"].includes(companyType)) {
+    return ["HR", "BRANCHES", "BANKS"].includes(module);
+  }
 
   if (companyType === "DELIVERY") {
     return [
@@ -623,6 +661,8 @@ export const SYSTEM_ROLES = [
   { name: "DELIVERY_HR", nameAr: "موظف موارد بشرية - التوصيل" },
   { name: "DELIVERY_OPERATIONS", nameAr: "مشرف / موظف عمليات" },
   { name: "CAR_WASH_SUPERVISOR", nameAr: "مشرف غسيل السيارات" },
+  { name: "CONTRACTING_SITE_EMPLOYEE", nameAr: "موظف موقع مقاولات - رفع مستندات" },
+  { name: "GROCERY_EMPLOYEE", nameAr: "موظف بقالة - رفع المبيعات والإيداعات" },
   { name: "HR_MANDOB", nameAr: "موظف المعاملات / مندوب" },
   { name: "INVESTOR_VIEWER", nameAr: "مستخدم متابعة المسئولين والمديرين" },
   { name: "READ_ONLY", nameAr: "قراءة فقط" },

@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Eye, Plus } from "lucide-react";
+import { Eye, Plus, Upload } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getSession } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
-import { DeleteOperationButton } from "./DeleteOperationButton";
 
 interface Props {
   params: Promise<{ companyId: string }>;
@@ -79,6 +77,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
     include: {
       vehicle: { select: { code: true, nameAr: true, nameEn: true } },
       location: { select: { nameAr: true, nameEn: true } },
+      bankKnetTransactions: { select: { amount: true } },
     },
     orderBy: { date: "desc" },
   });
@@ -96,7 +95,6 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
   const totalExpenses = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.totalExpenses), 0);
   const netRevenue = operations.reduce((sum: number, operation: CarWashOperationItem) => sum + Number(operation.netRevenue), 0);
 
-  const canDelete = hasPermission(session, "CAR_WASH_OPERATIONS", "DELETE", { companyId });
 
   return (
     <div>
@@ -105,13 +103,13 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
         subtitle={hasDateRange ? `${sp.fromDate ?? "…"} — ${sp.toDate ?? "…"}` : `${MONTHS[locale][month - 1]} ${year}`}
         companyId={companyId}
         actions={
-          <Link
+          <div className="flex items-center gap-2"><Link href={`/dashboard/companies/${companyId}/car-wash/operations/knet-bank`} className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"><Upload size={16} />{locale === "en" ? "KNET bank" : "بنك KNET"}</Link><Link
             href={`/dashboard/companies/${companyId}/car-wash/operations/new`}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Plus size={16} />
             {locale === "en" ? "New operation" : "عملية جديدة"}
-          </Link>
+          </Link></div>
         }
       />
 
@@ -175,6 +173,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                   <th>{locale === "en" ? "Location" : "الموقع"}</th>
                   <th>{locale === "en" ? "Cash" : "نقدي"}</th>
                   <th>KNET</th>
+                  <th>{locale === "en" ? "Bank KNET" : "KNET البنك"}</th>
                   <th>{locale === "en" ? "Expenses" : "مصروفات"}</th>
                   <th>{locale === "en" ? "Net" : "صافي"}</th>
                   <th>{locale === "en" ? "Status" : "الحالة"}</th>
@@ -184,7 +183,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
               <tbody>
                 {operations.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="py-8 text-center text-muted-foreground">
                       {hasDateRange ? (locale === "en" ? "No operations found for the selected period" : "لا توجد عمليات في الفترة المحددة") : (locale === "en" ? "No operations found this month" : "لا توجد عمليات في هذا الشهر")}
                     </td>
                   </tr>
@@ -198,6 +197,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                       <td className="text-sm">{locale === "en" ? operation.location.nameEn ?? operation.location.nameAr : operation.location.nameAr}</td>
                       <td className="number text-blue-600">{formatKWD(Number(operation.totalCash), numberLocale)}</td>
                       <td className="number text-purple-600">{formatKWD(Number(operation.totalKnet), numberLocale)}</td>
+                      <td className="number text-indigo-600">{formatKWD(operation.bankKnetTransactions.reduce((sum, transaction) => sum + Number(transaction.amount), 0), numberLocale)}</td>
                       <td className="number text-red-600">{formatKWD(Number(operation.totalExpenses), numberLocale)}</td>
                       <td className="number font-bold text-green-600">{formatKWD(Number(operation.netRevenue), numberLocale)}</td>
                       <td>
@@ -234,7 +234,6 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                           >
                             {locale === "en" ? "Edit" : "تعديل"}
                           </Link>
-                          {canDelete && <DeleteOperationButton operationId={operation.id} locale={locale} />}
                         </div>
                       </td>
                     </tr>
@@ -249,6 +248,7 @@ export default async function CarWashOperationsPage({ params, searchParams }: Pr
                     </td>
                     <td className="number text-blue-600">{formatKWD(totalCash, numberLocale)}</td>
                     <td className="number text-purple-600">{formatKWD(totalKnet, numberLocale)}</td>
+                    <td className="number text-indigo-600">{formatKWD(operations.reduce((sum, operation) => sum + operation.bankKnetTransactions.reduce((transactionSum, transaction) => transactionSum + Number(transaction.amount), 0), 0), numberLocale)}</td>
                     <td className="number text-red-600">{formatKWD(totalExpenses, numberLocale)}</td>
                     <td className="number text-green-600">{formatKWD(netRevenue, numberLocale)}</td>
                     <td colSpan={2}></td>

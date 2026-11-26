@@ -26,10 +26,12 @@ interface Attachment {
   entityType: string | null;
   entityId: string | null;
   attachmentType: string | null;
+  documentCategory: string | null;
   refModule: string;
   notes: string | null;
   createdAt: string;
   uploadedBy: { nameAr: string; nameEn: string | null };
+  employee?: { id: string; nameAr: string; employeeNumber: string | null } | null;
 }
 
 const ENTITY_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
@@ -42,8 +44,34 @@ const ENTITY_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
   VEHICLE: { ar: "مركبة", en: "Vehicle" },
   EXPENSE: { ar: "مصروف", en: "Expense" },
   LICENSE: { ar: "ترخيص", en: "License" },
+  CONSTRUCTION_PROJECT: { ar: "مشروع مقاولات", en: "Construction project" },
   OTHER: { ar: "أخرى", en: "Other" },
 };
+
+const MODULE_LABELS: Record<string, string> = {
+  HR: "الموظفون", LICENSE: "التراخيص", VEHICLES: "المركبات", ACCOUNTING: "المحاسبة", CONTRACTING: "المقاولات", COMPANY: "الشركة",
+  "EMPLOYEE:OTHER": "ملفات الموظفين الأخرى",
+  "EMPLOYEE:PASSPORT": "جوازات سفر الموظفين",
+  "EMPLOYEE:WORK_PERMIT": "تصاريح عمل الموظفين",
+  "EMPLOYEE:CIVIL_ID": "البطاقات المدنية للموظفين",
+  "EMPLOYEE:RESIDENCY": "إقامات الموظفين",
+  "EMPLOYEE:CONTRACT": "عقود الموظفين",
+  "VEHICLE:REGISTRATION": "دفاتر المركبات",
+  "VEHICLE:INSURANCE": "تأمين المركبات",
+  "LICENSE:COMMERCIAL": "التراخيص التجارية",
+  "LICENSE:HEALTH": "التراخيص الصحية",
+  "LICENSE:FIRE": "تراخيص الإطفاء",
+  "COMPANY:ESTABLISHMENT_CONTRACT": "عقود التأسيس",
+  "COMPANY:LEASE_RECEIPT": "إيصالات الإيجار",
+};
+
+function moduleLabel(module: string, locale: "ar" | "en") {
+  if (MODULE_LABELS[module]) return MODULE_LABELS[module];
+  const [entity, document] = module.split(":");
+  const entityLabel = ENTITY_TYPE_LABELS[entity]?.[locale] ?? entity;
+  if (!document) return entityLabel;
+  return `${entityLabel} — ${document.replaceAll("_", " ")}`;
+}
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -106,6 +134,13 @@ function AttachmentCard({
         {entityLabel && (
           <p className="text-xs text-muted-foreground">{entityLabel}</p>
         )}
+        {attachment.employee && (
+          <p className="text-xs font-medium text-foreground">
+            {attachment.employee.nameAr}
+            {attachment.employee.employeeNumber ? ` · ${attachment.employee.employeeNumber}` : ""}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">{moduleLabel(attachment.refModule, locale)}{attachment.attachmentType ? ` · ${attachment.attachmentType}` : ""}</p>
         <p className="text-xs text-muted-foreground">
           {formatDate(attachment.createdAt, locale)}
         </p>
@@ -133,6 +168,7 @@ export default function CompanyAttachmentsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [filterType, setFilterType] = useState("");
+  const [filterModule, setFilterModule] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -192,9 +228,8 @@ export default function CompanyAttachmentsPage() {
     new Set(attachments.map((a) => a.entityType).filter(Boolean) as string[])
   );
 
-  const filtered = filterType
-    ? attachments.filter((a) => a.entityType === filterType)
-    : attachments;
+  const modules = Array.from(new Set(attachments.map((a) => String(a.refModule ?? "").trim()).filter(Boolean))).sort();
+  const filtered = attachments.filter((a) => (!filterType || a.entityType === filterType) && (!filterModule || a.refModule === filterModule));
 
   return (
     <div>
@@ -228,6 +263,10 @@ export default function CompanyAttachmentsPage() {
               ))}
             </select>
           </div>
+          <select value={filterModule} onChange={(e) => setFilterModule(e.target.value)} className="input-field min-w-52 text-sm">
+            <option value="">{locale === "en" ? "All sections" : "كل الأقسام"}</option>
+            {modules.map((module) => <option key={module} value={module}>{moduleLabel(module, locale)}</option>)}
+          </select>
 
           <label
             className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ms-auto ${

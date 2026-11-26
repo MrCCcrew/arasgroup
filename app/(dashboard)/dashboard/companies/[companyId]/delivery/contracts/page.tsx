@@ -17,6 +17,9 @@ interface Contract {
   notes: string | null;
   isActive: boolean;
   usesLocationPricing?: boolean;
+  usesHourlyWork?: boolean;
+  defaultHourlyRate?: string | number | null;
+  _count?: { hourlyWorkEntries: number };
 }
 
 const KNOWN_PLATFORMS: Record<string, { ar: string; en: string; color: string }> = {
@@ -47,6 +50,8 @@ const EMPTY = {
   endDate: "",
   notes: "",
   usesLocationPricing: false,
+  usesHourlyWork: false,
+  defaultHourlyRate: "",
 };
 
 type Form = typeof EMPTY;
@@ -54,7 +59,7 @@ type Form = typeof EMPTY;
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X size={16} /></button>
@@ -163,6 +168,8 @@ export default function ContractsPage() {
       endDate: c.endDate?.slice(0, 10) ?? "",
       notes: c.notes ?? "",
       usesLocationPricing: c.usesLocationPricing ?? false,
+      usesHourlyWork: c.usesHourlyWork ?? false,
+      defaultHourlyRate: c.defaultHourlyRate == null ? "" : String(c.defaultHourlyRate),
     });
     setFormError("");
     setShowForm(true);
@@ -170,6 +177,9 @@ export default function ContractsPage() {
 
   async function save() {
     if (!form.nameAr.trim()) { setFormError(t.nameRequired); return; }
+    if (form.usesHourlyWork && (!Number.isFinite(Number(form.defaultHourlyRate)) || Number(form.defaultHourlyRate) <= 0)) {
+      setFormError(en ? "Enter a valid hourly rate" : "أدخل سعر ساعة صحيحًا"); return;
+    }
     if (form.platformSelect === "__custom__" && !form.platformCustom.trim()) {
       setFormError(t.platformRequired); return;
     }
@@ -182,6 +192,8 @@ export default function ContractsPage() {
       endDate: form.endDate || null,
       notes: form.notes || null,
       usesLocationPricing: form.usesLocationPricing,
+      usesHourlyWork: form.usesHourlyWork,
+      defaultHourlyRate: form.defaultHourlyRate ? Number(form.defaultHourlyRate) : null,
       ...(!editId ? { companyId } : {}),
     };
     const res = await fetch(
@@ -268,7 +280,7 @@ export default function ContractsPage() {
                 <tbody>
                   {contracts.map((c) => (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="font-medium">{c.nameAr}</td>
+                      <td className="font-medium">{c.nameAr}{c.usesHourlyWork && <span className="mt-1 block text-xs text-emerald-700">{en ? "Hourly work" : "عمل بالساعة"} · {Number(c.defaultHourlyRate).toFixed(3)} {en ? "KWD/hour" : "د.ك / ساعة"}</span>}</td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getPlatformColor(c.platform)}`}>
                           {getPlatformLabel(c.platform, en)}
@@ -285,6 +297,7 @@ export default function ContractsPage() {
                       </td>
                       <td className="max-w-xs truncate text-sm text-muted-foreground">{c.notes ?? "—"}</td>
                       <td className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {(c.usesHourlyWork || !!c._count?.hourlyWorkEntries) && <Link href={`/dashboard/companies/${companyId}/delivery/contracts/${c.id}/hourly`} className="rounded px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50">{en ? "Hours & work entities" : "الساعات وجهات العمل"}</Link>}
                         {c.usesLocationPricing && (
                           <Link
                             href={`/dashboard/companies/${companyId}/delivery/contracts/${c.id}/settings`}
@@ -365,6 +378,10 @@ export default function ContractsPage() {
                   ? "Different daily-orders entry: per-delivery restaurant + location pricing. Reference only — does not affect accounting."
                   : "تسجيل طلبات مختلف: كل توصيلة لها مطعم + مكان بسعر. مرجعي فقط — لا يؤثر على الحسابات."}
               </p>
+            </div>
+            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={form.usesHourlyWork} onChange={event => setForm(previous => ({ ...previous, usesHourlyWork: event.target.checked }))} />{en ? "Hourly work" : "نظام العمل بالساعة"}</label>
+              {form.usesHourlyWork && <><label className="form-label">{en ? "Default company hourly rate (KWD)" : "سعر الساعة الافتراضي المستحق للشركة (د.ك)"}<input type="number" min="0.001" max="100000" step="0.001" className="input-field mt-1 w-full" value={form.defaultHourlyRate} onChange={f("defaultHourlyRate")} /></label><p className="text-xs text-muted-foreground">{en ? "Add work entities such as eyed after saving. Each entity can have its own hourly rate. Orders are tracked separately." : "بعد الحفظ أضف جهات العمل مثل eyed وحدد سعرًا لكل جهة عند الحاجة. عدد الأوردرات للمتابعة فقط."}</p></>}
             </div>
             {formError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">

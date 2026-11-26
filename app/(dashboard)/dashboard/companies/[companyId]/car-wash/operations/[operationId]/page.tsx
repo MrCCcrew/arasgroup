@@ -4,7 +4,6 @@ import { redirect, notFound } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { DeleteOperationButton } from "../DeleteOperationButton";
 import { MovementImageViewer } from "@/components/car-wash/movement-image-viewer";
 
 interface Props {
@@ -37,15 +36,6 @@ export default async function CarWashOperationDetailPage({ params }: Props) {
         title={`عملية ${new Date(operation.date).toLocaleDateString("ar-KW")}`}
         subtitle={`${operation.vehicle.nameAr} - ${operation.location.nameAr}`}
         companyId={companyId}
-        actions={
-          session.isSuperAdmin ? (
-            <DeleteOperationButton
-              operationId={operation.id}
-              locale="ar"
-              redirectTo={`/dashboard/companies/${companyId}/car-wash/operations`}
-            />
-          ) : undefined
-        }
       />
 
       <div className="page-container max-w-4xl space-y-6">

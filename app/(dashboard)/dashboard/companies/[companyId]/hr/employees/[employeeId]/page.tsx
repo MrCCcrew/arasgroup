@@ -103,6 +103,7 @@ interface Employee {
   licenseNumber?: string;
   licenseExpiry?: string;
   phone?: string;
+  residentialAddress?: string | null;
   joinDate?: string;
   baseSalary?: number;
   bankAccountNumber?: string;
@@ -282,6 +283,7 @@ export default function EmployeeDetailPage() {
             {branchName && <Row label={locale === "en" ? "Branch / License" : "الفرع / الرخصة"} value={branchName} />}
             {employee.nationality && <Row label={locale === "en" ? "Nationality" : "الجنسية"} value={employee.nationality} />}
             {employee.phone && <Row label={locale === "en" ? "Phone" : "الهاتف"} value={employee.phone} />}
+            <Row label={locale === "en" ? "Residence location" : "مكان السكن"} value={employee.residentialAddress || "—"} />
             {employee.civilId && <Row label={locale === "en" ? "Civil ID" : "الرقم المدني"} value={employee.civilId} />}
             {employee.passportNumber && <Row label={locale === "en" ? "Passport No." : "رقم الجواز"} value={employee.passportNumber} />}
             {employee.residencyNumber && <Row label={locale === "en" ? "Residency No." : "رقم الإقامة"} value={employee.residencyNumber} />}

@@ -1,9 +1,12 @@
 "use client";
 
+import { useSalaryAdvances } from "@/hooks/use-salary-advances";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, RotateCcw, Save, Trash2, Truck, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { SalaryAdjustmentEditor } from "@/components/hr/salary-adjustment-editor";
+import { adjustmentTotal, restoreSalaryAdjustments, type SalaryAdjustment, type SalaryAdjustmentDetails, type SalaryAdjustmentField } from "@/lib/hr/salary-adjustments";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 
@@ -69,6 +72,9 @@ const arText = {
 interface DriverInfo {
   id: string;
   targetOrders: number;
+  payrollMode?: "TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE";
+  monthlyVehicleRent?: string | number;
+  monthlyHousingDeduction?: string | number;
 }
 
 interface Employee {
@@ -93,6 +99,7 @@ interface BatchPayment {
   incentives: string | number;
   additionalEarnings: string | number;
   deductions: string | number;
+  advanceDeduction?: string | number;
   attendanceDays?: string | number | null;
   evaluationScore?: string | number | null;
   targetOrders?: number | null;
@@ -106,6 +113,9 @@ interface BatchPayment {
 interface SalaryItem {
   employeeId: string | null;
   type: string;
+  category: string;
+  titleAr: string;
+  titleEn?: string | null;
   amount: string | number;
 }
 
@@ -121,6 +131,7 @@ interface BatchResponse {
 }
 
 interface PaymentLine {
+  adjustmentDetails?: SalaryAdjustmentDetails;
   employeeId: string;
   included: boolean;
   isDriver: boolean;
@@ -134,6 +145,8 @@ interface PaymentLine {
   fuelAddition: string;
   targetDeduction: string;
   companyDeduction: string;
+  vehicleRentDeduction: string;
+  housingDeduction: string;
   additionalEarnings: string;
   deductions: string;
   notes: string;
@@ -165,8 +178,7 @@ function round3(value: number) {
 }
 
 function itemAmount(items: SalaryItem[], employeeId: string, type: string) {
-  const item = items.find((entry) => entry.employeeId === employeeId && entry.type === type);
-  return item ? Number(item.amount) : 0;
+  return round3(items.filter(entry => entry.employeeId === employeeId && entry.type === type).reduce((total, item) => total + Number(item.amount), 0));
 }
 
 export default function EditSalaryBatchPage() {
@@ -179,6 +191,7 @@ export default function EditSalaryBatchPage() {
 
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
+  const advances = useSalaryAdvances(companyId, year, month, batchId);
   const [notes, setNotes] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [lines, setLines] = useState<PaymentLine[]>([]);
@@ -246,6 +259,8 @@ export default function EditSalaryBatchPage() {
                 fuelAddition: "0",
                 targetDeduction: "0",
                 companyDeduction: "0",
+                vehicleRentDeduction: "0",
+                housingDeduction: "0",
                 additionalEarnings: "0",
                 deductions: "0",
                 notes: "",
@@ -261,6 +276,7 @@ export default function EditSalaryBatchPage() {
               included: true,
               isDriver,
               driverId: employee.driver?.id ?? null,
+              adjustmentDetails: restoreSalaryAdjustments(loadedBatch.items, employee.id, isDriver),
               baseAmount: String(payment.baseAmount ?? ""),
               targetOrders: payment.targetOrders != null ? String(payment.targetOrders) : String(employee.driver?.targetOrders ?? 370),
               actualOrders: payment.actualOrders != null ? String(payment.actualOrders) : "",
@@ -270,6 +286,8 @@ export default function EditSalaryBatchPage() {
               fuelAddition: String(itemAmount(loadedBatch.items, employee.id, "FUEL_ADDITION")),
               targetDeduction: String(itemAmount(loadedBatch.items, employee.id, "TARGET_DEDUCTION")),
               companyDeduction: String(itemAmount(loadedBatch.items, employee.id, "COMPANY_DEDUCTION")),
+              vehicleRentDeduction: employee.driver?.payrollMode === "CALCULATED_ORDER_RATE" ? String(itemAmount(loadedBatch.items, employee.id, "VEHICLE_RENT_DEDUCTION") || Number(employee.driver?.monthlyVehicleRent ?? 130)) : "0",
+              housingDeduction: employee.driver?.payrollMode === "CALCULATED_ORDER_RATE" ? String(itemAmount(loadedBatch.items, employee.id, "HOUSING_DEDUCTION") || Number(employee.driver?.monthlyHousingDeduction ?? 30)) : "0",
               additionalEarnings: String(
                 isDriver
                   ? itemAmount(loadedBatch.items, employee.id, "ADDITIONAL_EARNING")
@@ -278,7 +296,7 @@ export default function EditSalaryBatchPage() {
               deductions: String(
                 isDriver
                   ? itemAmount(loadedBatch.items, employee.id, "DEDUCTION")
-                  : Number(payment.deductions ?? 0),
+                  : round3(Number(payment.deductions ?? 0) - Number(payment.advanceDeduction ?? 0)),
               ),
               notes: payment.notes ?? "",
               attendanceDays: payment.attendanceDays != null ? String(payment.attendanceDays) : "",
@@ -335,15 +353,23 @@ export default function EditSalaryBatchPage() {
     );
   }
 
+  function setLineAdjustments(employeeId: string, field: SalaryAdjustmentField, items: SalaryAdjustment[]) {
+    setLines(previous => previous.map(line => line.employeeId === employeeId ? {
+      ...line,
+      [field]: String(adjustmentTotal(items)),
+      adjustmentDetails: { ...line.adjustmentDetails, [field]: items },
+    } : line));
+  }
+
   function driverNet(line: PaymentLine) {
     return round3(
       n(line.baseAmount) + n(line.incentive) + n(line.foodAllowance) + n(line.companyAddition) +
-      n(line.fuelAddition) - n(line.targetDeduction) - n(line.companyDeduction),
+      n(line.fuelAddition) + n(line.additionalEarnings) - n(line.targetDeduction) - n(line.companyDeduction) - n(line.vehicleRentDeduction) - n(line.housingDeduction) - n(line.deductions) - (advances.amounts[line.employeeId] || 0),
     );
   }
 
   function otherNet(line: PaymentLine) {
-    return round3(n(line.baseAmount) + n(line.incentive) + n(line.additionalEarnings) - n(line.deductions));
+    return round3(n(line.baseAmount) + n(line.incentive) + n(line.additionalEarnings) - n(line.deductions) - (advances.amounts[line.employeeId] || 0));
   }
 
 function lineNet(line: PaymentLine) {
@@ -388,6 +414,7 @@ function lineNetWithoutIncentive(line: PaymentLine) {
             employeeId: line.employeeId,
             baseAmount: n(line.baseAmount),
             incentives: n(line.incentive),
+            adjustmentDetails: line.adjustmentDetails,
             deductions: n(line.deductions),
             additionalEarnings: n(line.additionalEarnings),
             foodAllowance: line.isDriver ? n(line.foodAllowance) : 0,
@@ -395,6 +422,8 @@ function lineNetWithoutIncentive(line: PaymentLine) {
             fuelAddition: line.isDriver ? n(line.fuelAddition) : 0,
             targetDeduction: line.isDriver ? n(line.targetDeduction) : 0,
             companyDeduction: line.isDriver ? n(line.companyDeduction) : 0,
+            vehicleRentDeduction: line.isDriver ? n(line.vehicleRentDeduction) : 0,
+            housingDeduction: line.isDriver ? n(line.housingDeduction) : 0,
             targetOrders: line.isDriver ? parseInt(line.targetOrders || "0", 10) || undefined : undefined,
             actualOrders: line.isDriver ? parseInt(line.actualOrders || "0", 10) || undefined : undefined,
             attendanceDays: line.attendanceDays ? n(line.attendanceDays) : undefined,
@@ -457,6 +486,7 @@ function lineNetWithoutIncentive(line: PaymentLine) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {advances.error && <p role="alert" className="text-red-700">{advances.error}</p>}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <div className="section-card space-y-4">
@@ -517,6 +547,7 @@ function lineNetWithoutIncentive(line: PaymentLine) {
                       <th className="w-24 px-2 py-2 text-right font-bold text-blue-700">{ar ? arText.fuel : "Fuel/tire"}</th>
                       <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? arText.targetDeduction : "Target ded."}</th>
                       <th className="w-24 px-2 py-2 text-right font-bold text-red-700">{ar ? arText.companyDeduction : "Company ded."}</th>
+                          <th className="px-2 py-2 text-red-700">{ar ? "قسط السلفة" : "Advance installment"}</th>
                       <th className="w-36 px-2 py-2 text-right font-bold text-muted-foreground">{ar ? arText.netWithoutIncentive : "Net without incentive"}</th>
                     </tr>
                   </thead>
@@ -543,10 +574,11 @@ function lineNetWithoutIncentive(line: PaymentLine) {
                           <td className="px-2 py-2"><input type="number" step="1" min="0" value={line.actualOrders} onChange={(e) => setLineField(line.employeeId, "actualOrders", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.incentive} onChange={(e) => setLineField(line.employeeId, "incentive", e.target.value)} className={`${numInput} text-green-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.foodAllowance} onChange={(e) => setLineField(line.employeeId, "foodAllowance", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.companyAddition} onChange={(e) => setLineField(line.employeeId, "companyAddition", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
+                          <td className="px-2 py-2"><SalaryAdjustmentEditor label={ar ? "إضافة الشركة" : "Company additions"} employeeName={employee.nameAr} locale={ar ? "ar" : "en"} total={line.companyAddition} items={line.adjustmentDetails?.companyAddition} onChange={items => setLineAdjustments(line.employeeId, "companyAddition", items)} disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.fuelAddition} onChange={(e) => setLineField(line.employeeId, "fuelAddition", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.targetDeduction} onChange={(e) => setLineField(line.employeeId, "targetDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-2 py-2"><input type="number" step="0.001" min="0" value={line.companyDeduction} onChange={(e) => setLineField(line.employeeId, "companyDeduction", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
+                          <td className="px-2 py-2"><SalaryAdjustmentEditor label={ar ? "خصم الشركة" : "Company deductions"} employeeName={employee.nameAr} locale={ar ? "ar" : "en"} deduction total={line.companyDeduction} items={line.adjustmentDetails?.companyDeduction} fixedItems={employee.driver?.payrollMode === "CALCULATED_ORDER_RATE" ? [{ titleAr: "إيجار السيارة", titleEn: "Vehicle rent", amount: n(line.vehicleRentDeduction) }, { titleAr: "بدل السكن", titleEn: "Housing deduction", amount: n(line.housingDeduction) }].filter(item => item.amount > 0) : []} onChange={items => setLineAdjustments(line.employeeId, "companyDeduction", items)} disabled={!canEdit} /></td>
+                          <td className="number px-2 py-2 text-red-700">{(advances.amounts[line.employeeId] || 0).toFixed(3)}</td>
                           <td className="px-2 py-2 text-left">
                             <div className="flex items-center justify-end gap-2">
                               <span className="number font-bold text-emerald-600">{lineNetWithoutIncentive(line).toFixed(3)}</span>
@@ -583,6 +615,7 @@ function lineNetWithoutIncentive(line: PaymentLine) {
                       <th className="w-28 px-3 py-2 text-right font-bold text-green-700">{ar ? arText.incentives : "Incentives"}</th>
                       <th className="w-28 px-3 py-2 text-right font-bold text-blue-700">{ar ? arText.additions : "Additions"}</th>
                       <th className="w-28 px-3 py-2 text-right font-bold text-red-700">{ar ? arText.deductions : "Deductions"}</th>
+                          <th className="px-2 py-2 text-red-700">{ar ? "قسط السلفة" : "Advance installment"}</th>
                       <th className="w-40 px-3 py-2 text-right font-bold text-muted-foreground">{ar ? arText.netWithoutIncentive : "Net without incentive"}</th>
                     </tr>
                   </thead>
@@ -608,8 +641,9 @@ function lineNetWithoutIncentive(line: PaymentLine) {
                           <td className="px-3 py-2 text-xs text-muted-foreground">{typeLabel}</td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.baseAmount} onChange={(e) => setLineField(line.employeeId, "baseAmount", e.target.value)} className={numInput} dir="ltr" disabled={!canEdit} /></td>
                           <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.incentive} onChange={(e) => setLineField(line.employeeId, "incentive", e.target.value)} className={`${numInput} text-green-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.additionalEarnings} onChange={(e) => setLineField(line.employeeId, "additionalEarnings", e.target.value)} className={`${numInput} text-blue-600`} dir="ltr" disabled={!canEdit} /></td>
-                          <td className="px-3 py-2"><input type="number" step="0.001" min="0" value={line.deductions} onChange={(e) => setLineField(line.employeeId, "deductions", e.target.value)} className={`${numInput} text-red-600`} dir="ltr" disabled={!canEdit} /></td>
+                          <td className="px-3 py-2"><SalaryAdjustmentEditor label={ar ? "الإضافات" : "Additions"} employeeName={employee.nameAr} locale={ar ? "ar" : "en"} total={line.additionalEarnings} items={line.adjustmentDetails?.additionalEarnings} onChange={items => setLineAdjustments(line.employeeId, "additionalEarnings", items)} disabled={!canEdit} /></td>
+                          <td className="px-3 py-2"><SalaryAdjustmentEditor label={ar ? "الخصومات" : "Deductions"} employeeName={employee.nameAr} locale={ar ? "ar" : "en"} deduction total={line.deductions} items={line.adjustmentDetails?.deductions} onChange={items => setLineAdjustments(line.employeeId, "deductions", items)} disabled={!canEdit} /></td>
+                          <td className="number px-2 py-2 text-red-700">{(advances.amounts[line.employeeId] || 0).toFixed(3)}</td>
                           <td className="px-3 py-2 text-left">
                             <div className="flex items-center justify-end gap-2">
                               <span className="number font-bold text-emerald-600">{lineNetWithoutIncentive(line).toFixed(3)}</span>
@@ -665,7 +699,7 @@ function lineNetWithoutIncentive(line: PaymentLine) {
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={loading || !canEdit}
+                disabled={loading || !canEdit || advances.loading || !!advances.error}
                 className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
                 <Save size={16} />

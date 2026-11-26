@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { assertCompanyAccess, assertPermission, requireRequestSession } from "@/lib/auth/access";
 import { getAccessibleBranchIds } from "@/lib/auth/permissions";
 import { allowsCrossCompanyLicenses, getAllowedEmployeeTypes } from "@/lib/hr/company-employee-rules";
+import { employeeCompanyScope } from "@/lib/hr/employee-list";
 
 const employeeSchema = z.object({
   companyId: z.string(),
@@ -45,7 +46,7 @@ const employeeSchema = z.object({
   licenseNumber: z.string().optional(),
   licenseExpiry: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
   jobTitle: z.string().optional(),
-  residentialAddress: z.string().optional(),
+  residentialAddress: z.string().trim().max(191).optional(),
   employmentStatus: z.enum(["ACTIVE", "ON_LEAVE", "SUSPENDED", "TERMINATED", "EXITED"]).default("ACTIVE"),
   phone: z.string().optional(),
   joinDate: z.string().optional().transform((value) => (value ? new Date(value) : undefined)),
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const expiringResidency = searchParams.get("expiringResidency");
     const investorOnly = searchParams.get("investorOnly") === "true";
+    const payrollScope = searchParams.get("payrollScope") === "residency";
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: "معرف الشركة مطلوب" }, { status: 400 });
@@ -100,10 +102,21 @@ export async function GET(request: NextRequest) {
 
     const employees = await prisma.employee.findMany({
       where: {
-        companyId,
         isActive: true,
         isDeleted: false,
-        ...(branchIds.length ? { branchId: { in: branchIds } } : {}),
+        AND: [
+          payrollScope
+            ? {
+                OR: [
+                  { residencyLicense: { companyId } },
+                  // Legacy employees without a residency license remain paid by
+                  // their directly assigned company until their sponsorship is entered.
+                  { companyId, residencyLicenseId: null },
+                ],
+              }
+            : employeeCompanyScope(companyId, branchIds),
+          ...(payrollScope && branchIds.length ? [{ OR: [{ branchId: { in: branchIds } }, { branchId: null }] }] : []),
+        ],
         ...(type ? { type: type as z.infer<typeof employeeSchema>["type"] } : {}),
         ...(search ? { nameAr: { contains: search } } : {}),
         ...(expiryThreshold ? { residencyExpiry: { lte: expiryThreshold, gte: now } } : {}),
@@ -116,7 +129,7 @@ export async function GET(request: NextRequest) {
         licenseAssignments: {
           select: { licenseId: true, license: { select: { commercialNameAr: true, licenseNumber: true } } },
         },
-        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, targetOrders: true } },
+        driver: { select: { id: true, isRegisteredTalabat: true, isRegisteredRoPops: true, targetOrders: true, payrollMode: true, calculatedOrderRate: true, monthlyVehicleRent: true, monthlyHousingDeduction: true } },
         carWashWorker: {
           select: {
             id: true,

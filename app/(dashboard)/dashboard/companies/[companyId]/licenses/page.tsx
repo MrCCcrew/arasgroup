@@ -64,6 +64,19 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-rose-100 text-rose-700",
 };
 
+function FilterMenu({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value) ?? options[0];
+  return <div className="relative min-w-40">
+    <button type="button" onClick={() => setOpen((current) => !current)} className="input-field flex w-full items-center justify-between gap-3 text-sm">
+      <span>{selected?.label}</span><ChevronDown size={15} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+    </button>
+    {open && <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
+      {options.map((option) => <button key={option.value || "all"} type="button" onClick={() => { onChange(option.value); setOpen(false); }} className={`w-full rounded-md px-3 py-2 text-right text-sm hover:bg-muted ${value === option.value ? "bg-muted font-medium" : ""}`}>{option.label}</button>)}
+    </div>}
+  </div>;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysLeft(d: string | null | undefined): number | null {
@@ -146,6 +159,7 @@ export default function LicensesPage() {
   // ── Filters ──────────────────────────────────────────────────────────────
   const [search,         setSearch]         = useState("");
   const [filterStatus,   setFilterStatus]   = useState("");
+    const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [filterType,     setFilterType]     = useState("");   // "" | "main" | "branch"
   const [filterInvestor, setFilterInvestor] = useState("");
   const [filterExpiry,   setFilterExpiry]   = useState("");   // "" | "expired" | "30" | "60" | "90"
@@ -377,37 +391,30 @@ export default function LicensesPage() {
             </div>
 
             {/* Status */}
-            <select className="input-field text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="">كل الحالات</option>
-              <option value="ACTIVE">فعال</option>
-              <option value="EXPIRED">منتهي</option>
-              <option value="SUSPENDED">موقوف</option>
-              <option value="CANCELLED">ملغاة</option>
-            </select>
+            <div className="relative min-w-40">
+              <button type="button" onClick={() => setStatusMenuOpen((open) => !open)} className="input-field flex items-center justify-between gap-3 text-sm">
+                <span>{filterStatus ? STATUS_LABELS[filterStatus] : "كل الحالات"}</span>
+                <ChevronDown size={15} className={statusMenuOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+              </button>
+              {statusMenuOpen && (
+                <div className="absolute z-30 mt-1 w-full rounded-lg border border-border bg-card p-1 shadow-lg">
+                  {[["", "كل الحالات"], ["ACTIVE", "فعال"], ["EXPIRED", "منتهي"], ["SUSPENDED", "موقوف"], ["CANCELLED", "ملغاة"]].map(([value, label]) => (
+                    <button key={value || "all"} type="button" onClick={() => { setFilterStatus(value); setStatusMenuOpen(false); }} className={`w-full rounded-md px-3 py-2 text-right text-sm hover:bg-muted ${filterStatus === value ? "bg-muted font-medium" : ""}`}>{label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Type */}
-            <select className="input-field text-sm" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="">كل الأنواع</option>
-              <option value="main">رئيسية فقط</option>
-              <option value="branch">فرعية فقط</option>
-            </select>
+            <FilterMenu value={filterType} onChange={setFilterType} options={[{ value: "", label: "كل الأنواع" }, { value: "main", label: "رئيسية فقط" }, { value: "branch", label: "فرعية فقط" }]} />
 
             {/* Investor */}
             {investors.length > 0 && (
-              <select className="input-field text-sm" value={filterInvestor} onChange={(e) => setFilterInvestor(e.target.value)}>
-                <option value="">كل المسئولين</option>
-                {investors.map((i) => <option key={i.id} value={i.id}>{i.nameAr}</option>)}
-              </select>
+              <FilterMenu value={filterInvestor} onChange={setFilterInvestor} options={[{ value: "", label: "كل المسؤولين" }, ...investors.map((i) => ({ value: i.id, label: i.nameAr }))]} />
             )}
 
             {/* Expiry */}
-            <select className="input-field text-sm" value={filterExpiry} onChange={(e) => setFilterExpiry(e.target.value)}>
-              <option value="">كل التواريخ</option>
-              <option value="expired">منتهية الصلاحية</option>
-              <option value="30">تنتهي خلال 30 يوم</option>
-              <option value="60">تنتهي خلال 60 يوم</option>
-              <option value="90">تنتهي خلال 90 يوم</option>
-            </select>
+            <FilterMenu value={filterExpiry} onChange={setFilterExpiry} options={[{ value: "", label: "كل التواريخ" }, { value: "expired", label: "منتهية الصلاحية" }, { value: "30", label: "تنتهي خلال 30 يوم" }, { value: "60", label: "تنتهي خلال 60 يوم" }, { value: "90", label: "تنتهي خلال 90 يوم" }]} />
 
             {/* Clear */}
             {hasFilters && (

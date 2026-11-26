@@ -32,7 +32,26 @@ export async function GET(request: NextRequest, { params }: Ctx) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: attachments });
+    const employeeIds = [...new Set(attachments
+      .filter((attachment) => attachment.entityType === "EMPLOYEE" && attachment.entityId)
+      .map((attachment) => attachment.entityId!))];
+    const employees = employeeIds.length
+      ? await prisma.employee.findMany({
+          where: { companyId, id: { in: employeeIds } },
+          select: { id: true, nameAr: true, employeeNumber: true },
+        })
+      : [];
+    const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
+
+    return NextResponse.json({
+      success: true,
+      data: attachments.map((attachment) => ({
+        ...attachment,
+        employee: attachment.entityType === "EMPLOYEE" && attachment.entityId
+          ? employeesById.get(attachment.entityId) ?? null
+          : null,
+      })),
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, error: "فشل في جلب المرفقات" }, { status: 500 });

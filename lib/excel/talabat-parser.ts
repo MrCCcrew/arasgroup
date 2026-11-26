@@ -354,6 +354,29 @@ export async function parseDeliveryReport(
 
     const sheetNames = workbook.SheetNames.map((n) => n.trim().toLowerCase());
 
+    // Talabat's current settlement export can arrive as either CSV or Excel.
+    // Detect it by its count/cancellation columns rather than by extension or
+    // sheet name, then route it through the 0.590 / 1.180 calculation.
+    const currentRateColumns = [
+      "Pickups Count",
+      "Pickup Cancellations",
+      "Dropoffs Count",
+      "Dropoff Cancellations",
+    ];
+    const isCurrentTalabatRateReport = workbook.SheetNames.some((sheetName) => {
+      const firstRow = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        workbook.Sheets[sheetName],
+        { defval: "", raw: true, range: 0 }
+      )[0];
+      const columns = firstRow ? Object.keys(firstRow) : [];
+      return currentRateColumns.every((column) => columns.includes(column));
+    });
+
+    if (isCurrentTalabatRateReport) {
+      const { parseCarriageCSV } = await import("./carriage-parser");
+      return parseCarriageCSV(buffer);
+    }
+
     // ── Strategy 2: Sheet name detection ──────────────────────────────────
     // Old Talabat format has a sheet named "Data"
     if (sheetNames.includes("data")) {

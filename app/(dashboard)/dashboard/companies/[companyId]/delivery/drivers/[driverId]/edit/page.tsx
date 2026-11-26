@@ -12,6 +12,10 @@ interface DriverData {
   isRegisteredTalabat: boolean;
   isRegisteredRoPops: boolean;
   targetOrders: number;
+  payrollMode: "TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE";
+  calculatedOrderRate: string | number;
+  monthlyVehicleRent: string | number;
+  monthlyHousingDeduction: string | number;
   fuelCardNumber: string | null;
   assignedVehicleId: string | null;
   assignedVehicle: {
@@ -86,6 +90,10 @@ export default function EditDriverPage() {
   const [isRegisteredTalabat, setIsRegisteredTalabat] = useState(false);
   const [isRegisteredRoPops, setIsRegisteredRoPops] = useState(false);
   const [targetOrders, setTargetOrders] = useState("370");
+  const [payrollMode, setPayrollMode] = useState<"TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE">("TARGET_INCENTIVE");
+  const [calculatedOrderRate, setCalculatedOrderRate] = useState("0.950");
+  const [monthlyVehicleRent, setMonthlyVehicleRent] = useState("130");
+  const [monthlyHousingDeduction, setMonthlyHousingDeduction] = useState("30");
   const [isOfficeStaff, setIsOfficeStaff] = useState(false);
   const [fuelCardNumber, setFuelCardNumber] = useState("");
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
@@ -122,6 +130,10 @@ export default function EditDriverPage() {
         setIsRegisteredTalabat(d.isRegisteredTalabat);
         setIsRegisteredRoPops(d.isRegisteredRoPops);
         setTargetOrders(String(d.targetOrders ?? 370));
+        setPayrollMode(d.payrollMode ?? "TARGET_INCENTIVE");
+        setCalculatedOrderRate(String(d.calculatedOrderRate ?? "0.950"));
+        setMonthlyVehicleRent(String(d.monthlyVehicleRent ?? "130"));
+        setMonthlyHousingDeduction(String(d.monthlyHousingDeduction ?? "30"));
         setIsOfficeStaff(!["DRIVER", "DELIVERY_DRIVER"].includes(d.employee.type));
         setFuelCardNumber(d.fuelCardNumber ?? "");
         setAssignedVehicleId(d.assignedVehicleId ?? "");
@@ -184,6 +196,10 @@ export default function EditDriverPage() {
       isRegisteredTalabat,
       isRegisteredRoPops,
       targetOrders: targetOrders ? Number(targetOrders) : undefined,
+      payrollMode,
+      calculatedOrderRate: calculatedOrderRate ? Number(calculatedOrderRate) : 0.95,
+      monthlyVehicleRent: monthlyVehicleRent ? Number(monthlyVehicleRent) : 130,
+      monthlyHousingDeduction: monthlyHousingDeduction ? Number(monthlyHousingDeduction) : 30,
       employeeType: isOfficeStaff ? "DELIVERY_ADMIN" : "DELIVERY_DRIVER",
       fuelCardNumber: fuelCardNumber || null,
       assignedVehicleId: assignedVehicleId || null,
@@ -290,6 +306,30 @@ export default function EditDriverPage() {
                 <label className="mb-1.5 block text-sm font-medium">تارجيت الطلبات</label>
                 <input type="number" step="1" min="0" value={targetOrders} onChange={(e) => setTargetOrders(e.target.value)} className="input-field w-full" dir="ltr" placeholder="370" disabled={isOfficeStaff} />
                 <p className="mt-1 text-xs text-muted-foreground">يُستخدم لحساب الحافز/الخصم تلقائياً في الرواتب.</p>
+              </div>
+              <div className="col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <label className="mb-1.5 block text-sm font-semibold">نظام محاسبة السائق في الرواتب</label>
+                <select value={payrollMode} onChange={(e) => setPayrollMode(e.target.value as "TARGET_INCENTIVE" | "CALCULATED_ORDER_RATE")} className="input-field w-full" disabled={isOfficeStaff}>
+                  <option value="TARGET_INCENTIVE">نظام الراتب والتارجيت والحافز المعتاد</option>
+                  <option value="CALCULATED_ORDER_RATE">قيمة للطلب المحسوب</option>
+                </select>
+                {payrollMode === "CALCULATED_ORDER_RATE" && !isOfficeStaff && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">قيمة الطلب المحسوب (د.ك)</label>
+                      <input type="number" step="0.001" min="0" value={calculatedOrderRate} onChange={(e) => setCalculatedOrderRate(e.target.value)} className="input-field w-full" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">خصم إيجار السيارة الشهري (د.ك)</label>
+                      <input type="number" step="0.001" min="0" value={monthlyVehicleRent} onChange={(e) => setMonthlyVehicleRent(e.target.value)} className="input-field w-full" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">خصم بدل السكن الشهري (د.ك)</label>
+                      <input type="number" step="0.001" min="0" value={monthlyHousingDeduction} onChange={(e) => setMonthlyHousingDeduction(e.target.value)} className="input-field w-full" dir="ltr" />
+                    </div>
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">في نظام قيمة الطلب يُلغى الحافز وخصم التارجيت، ويُحتسب الراتب من الطلبات المحسوبة فقط ثم تخصم إيجارات السيارة والسكن والخصومات الأخرى.</p>
               </div>
               <div className="col-span-2 flex items-center gap-3">
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">

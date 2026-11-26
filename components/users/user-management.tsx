@@ -133,6 +133,7 @@ const MODULE_GROUPS: Record<string, string[]> = {
   "فواتير السائقين": ["DRIVER_INVOICES"],
   "تتبع السائقين": ["DRIVER_TRACKING"],
   "غسيل السيارات":        ["CAR_WASH_HR", "CAR_WASH_OPERATIONS", "CAR_WASH_REPORTS", "CAR_WASH_EXPENSES"],
+  "المقاولات":             ["CONTRACTING", "CONTRACTING_SUBMISSIONS"],
   "الأصول والمركبات":     ["VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "LICENSES"],
   "تقارير ومهام":         ["REPORTS", "TASKS"],
 };
@@ -162,6 +163,8 @@ const moduleLabelMap: Record<string, { ar: string; en: string }> = {
   DELIVERY_EXPENSES: { ar: "مصروفات التوصيل", en: "Delivery Expenses" },
   CAR_WASH_HR: { ar: "موارد غسيل السيارات", en: "Car Wash HR" },
   CAR_WASH_OPERATIONS: { ar: "عمليات غسيل السيارات", en: "Car Wash Operations" },
+  CONTRACTING: { ar: "مشروعات المقاولات", en: "Contracting Projects" },
+  CONTRACTING_SUBMISSIONS: { ar: "رفع مستندات المقاولات", en: "Contracting uploads" },
   CAR_WASH_REPORTS: { ar: "تقارير غسيل السيارات", en: "Car Wash Reports" },
   CAR_WASH_EXPENSES: { ar: "مصروفات غسيل السيارات", en: "Car Wash Expenses" },
   VEHICLES: { ar: "المركبات", en: "Vehicles" },
@@ -1027,13 +1030,21 @@ export function UserManagement({
                                 <div>
                                   <div className="mb-1.5 flex items-center justify-between">
                                     <span className="text-sm font-medium">{text("الإجراءات", "Actions")}</span>
-                                    <button
-                                      type="button"
-                                      className="text-xs text-primary hover:underline"
-                                      onClick={() => setSelectedActions(selectedActions.length === availableActions.length ? [] : [...availableActions])}
-                                    >
-                                      {selectedActions.length === availableActions.length ? text("إلغاء الكل", "Deselect all") : text("تحديد الكل", "Select all")}
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                      <button type="button" className="text-xs text-emerald-700 hover:underline" onClick={() => { setSelectedActions([...availableActions]); setSelectedPermissionAllowed(true); }}>
+                                        {text("إظهار القسم بالكامل", "Show full section")}
+                                      </button>
+                                      <button type="button" className="text-xs text-red-700 hover:underline" onClick={() => { setSelectedActions([...availableActions]); setSelectedPermissionAllowed(false); }}>
+                                        {text("إخفاء القسم بالكامل", "Hide full section")}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="text-xs text-primary hover:underline"
+                                        onClick={() => setSelectedActions(selectedActions.length === availableActions.length ? [] : [...availableActions])}
+                                      >
+                                        {selectedActions.length === availableActions.length ? text("إلغاء الكل", "Deselect all") : text("تحديد الكل", "Select all")}
+                                      </button>
+                                    </div>
                                   </div>
                                   <div className="flex flex-wrap gap-3 rounded-lg border p-2">
                                     {availableActions.map((action) => (

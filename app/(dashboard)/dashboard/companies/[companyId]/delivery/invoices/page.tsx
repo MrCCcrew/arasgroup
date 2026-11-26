@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, FileBarChart, Image as ImageIcon, Pencil, Plus, Trash2, X } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
 import { parseInvoiceText } from "@/lib/delivery/invoice-parse";
@@ -88,7 +89,6 @@ export default function DeliveryInvoicesPage() {
   const [fType, setFType] = useState("");
   const [drivers, setDrivers] = useState<Person[]>([]);
   const [driverId, setDriverId] = useState("");
-  const [driverName, setDriverName] = useState("");
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("");
   const [uploadSource, setUploadSource] = useState("");
@@ -276,27 +276,14 @@ export default function DeliveryInvoicesPage() {
               <option value="EMPLOYEE">{en ? "Employee" : "موظف"}</option>
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">{en ? "Driver" : "السائق"}</label>
-            <input
-              list="invoice-driver-options"
-              value={driverName}
-              onChange={(event) => {
-                const value = event.target.value;
-                setDriverName(value);
-                const selectedDriver = drivers.find((driver) => (en ? driver.nameEn ?? driver.nameAr : driver.nameAr) === value);
-                setDriverId(selectedDriver?.id ?? "");
-              }}
-              placeholder={en ? "Type or select a driver" : "اكتب أو اختر اسم السائق"}
-              className="input-field w-48"
-            />
-            <datalist id="invoice-driver-options">
-              {drivers.map((driver) => {
-                const name = en ? driver.nameEn ?? driver.nameAr : driver.nameAr;
-                return <option key={driver.id} value={name} />;
-              })}
-            </datalist>
-          </div>
+          <SearchableSelect
+            className="w-60"
+            label={en ? "Driver" : "السائق"}
+            value={driverId}
+            onChange={setDriverId}
+            options={drivers.map(driver => ({ value: driver.id, label: en ? driver.nameEn || driver.nameAr : driver.nameAr }))}
+            placeholder={en ? "All drivers" : "كل السائقين"}
+          />
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Review" : "المراجعة"}</label>
             <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)} className="input-field w-40">
@@ -316,10 +303,10 @@ export default function DeliveryInvoicesPage() {
           </div>
           <div className="min-w-40 flex-1">
             <label className="mb-1 block text-xs text-muted-foreground">{en ? "Search" : "بحث"}</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
+            <input value={search} onFocus={(event) => event.currentTarget.select()} onChange={(e) => setSearch(e.target.value)} placeholder={en ? "Name / notes" : "اسم / ملاحظات"} className="input-field w-full" />
           </div>
-          {(from || to || month || year || fType || driverId || driverName || search || reviewStatus || uploadSource) && (
-            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setDriverId(""); setDriverName(""); setSearch(""); setReviewStatus(""); setUploadSource(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+          {(from || to || month || year || fType || driverId || search || reviewStatus || uploadSource) && (
+            <button onClick={() => { setFrom(""); setTo(""); setMonth(""); setYear(""); setFType(""); setDriverId(""); setSearch(""); setReviewStatus(""); setUploadSource(""); }} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
               {en ? "Clear" : "مسح"}
             </button>
           )}

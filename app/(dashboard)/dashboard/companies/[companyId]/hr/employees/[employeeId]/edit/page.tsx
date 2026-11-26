@@ -158,6 +158,7 @@ interface FormState {
   licenseNumber: string;
   licenseExpiry: string;
   phone: string;
+  residentialAddress: string;
   joinDate: string;
   baseSalary: string;
   bankAccountNumber: string;
@@ -210,6 +211,7 @@ export default function EditEmployeePage() {
     licenseNumber: "",
     licenseExpiry: "",
     phone: "",
+    residentialAddress: "",
     joinDate: "",
     baseSalary: "",
     bankAccountNumber: "",
@@ -302,6 +304,7 @@ export default function EditEmployeePage() {
           licenseNumber: e.licenseNumber ?? "",
           licenseExpiry: toInputDate(e.licenseExpiry),
           phone: e.phone ?? "",
+          residentialAddress: e.residentialAddress ?? "",
           joinDate: toInputDate(e.joinDate),
           baseSalary: e.baseSalary != null ? String(e.baseSalary) : "",
           bankAccountNumber: e.bankAccountNumber ?? "",
@@ -354,6 +357,7 @@ export default function EditEmployeePage() {
           licenseNumber: form.licenseNumber || undefined,
           licenseExpiry: form.licenseExpiry || undefined,
           phone: form.phone || undefined,
+          residentialAddress: form.residentialAddress.trim() || null,
           joinDate: form.joinDate || undefined,
           baseSalary: form.baseSalary ? parseFloat(form.baseSalary) : undefined,
           bankAccountNumber: form.bankAccountNumber || undefined,
@@ -637,6 +641,17 @@ export default function EditEmployeePage() {
                   className="input-field w-full"
                   placeholder="+965XXXXXXXX"
                   dir="ltr"
+                />
+              </div>
+              <div>
+                <label htmlFor="residentialAddress" className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Residence location" : "مكان السكن"}</label>
+                <input
+                  id="residentialAddress"
+                  value={form.residentialAddress}
+                  onChange={(event) => setField("residentialAddress", event.target.value)}
+                  maxLength={191}
+                  className="input-field w-full"
+                  placeholder={locale === "en" ? "Area / building or accommodation name" : "المنطقة / اسم المبنى أو السكن"}
                 />
               </div>
               <div>

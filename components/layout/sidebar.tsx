@@ -30,6 +30,7 @@ import {
   Shield,
   TrendingUp,
   Truck,
+  Upload,
   UserRoundPlus,
   Users,
   Wallet,
@@ -126,6 +127,7 @@ function buildCompanyNav(base: string): NavItem[] {
         { href: `${base}/accounting/guide`, labelKey: "nav.accountingGuide", icon: <BookOpen size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/receipts`, labelKey: "nav.receipts", icon: <ArrowDownToLine size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/payments`, labelKey: "nav.payments", icon: <ArrowUpFromLine size={14} />, iconColor: "emerald" },
+        { href: `${base}/accounting/employee-advances`, labelKey: "nav.employeeAdvances", icon: <Wallet size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/journal-entries`, labelKey: "nav.journalEntries", icon: <FileText size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/end-of-service`, labelKey: "nav.endOfService", icon: <Wallet size={14} />, iconColor: "emerald" },
         { href: `${base}/accounting/leave-pay`, labelKey: "nav.leavePay", icon: <Receipt size={14} />, iconColor: "emerald" },
@@ -181,6 +183,18 @@ function buildCompanyNav(base: string): NavItem[] {
       ],
     },
     {
+      href: `${base}/grocery`,
+      labelKey: "nav.groceryOperations",
+      icon: <Package size={16} />,
+      iconColor: "orange",
+      module: "GROCERY",
+      children: [
+        { href: `${base}/grocery/submissions`, labelKey: "nav.grocerySubmissions", icon: <Upload size={14} />, iconColor: "orange", module: "GROCERY_SUBMISSIONS" },
+        { href: `${base}/grocery/payables`, labelKey: "nav.groceryPayables", icon: <Wallet size={14} />, iconColor: "orange", module: "GROCERY_SUBMISSIONS" },
+        { href: `${base}/grocery/accounts`, labelKey: "nav.groceryAccounts", icon: <UserRoundPlus size={14} />, iconColor: "orange", module: "GROCERY" },
+      ],
+    },
+    {
       href: `${base}/investors`,
       labelKey: "nav.investorsList",
       icon: <Building2 size={16} />,
@@ -230,6 +244,7 @@ function filterGroupNav(user: SessionUser, items: NavItem[]) {
 function filterCompanyNav(user: SessionUser, company: CompanyNavContext, items: NavItem[]) {
   const visibleModules = new Set(getVisibleModules(user, company.type));
   return items.filter((item) => {
+    if (company.type === "GROCERY" && item.module === "INVESTORS") return false;
     if (!item.module) return true;
     if (!visibleModules.has(item.module)) return false;
 
@@ -247,7 +262,10 @@ function filterCompanyNav(user: SessionUser, company: CompanyNavContext, items: 
   }).map((item) => item.children
     ? {
         ...item,
-        children: item.children.filter((child) => !child.module || hasPermission(user, child.module, "VIEW", { companyId: company.id })),
+        children: item.children.filter((child) => {
+          if (company.type === "GROCERY" && child.href.endsWith("/managers")) return false;
+          return !child.module || hasPermission(user, child.module, "VIEW", { companyId: company.id });
+        }),
       }
     : item);
 }
@@ -283,7 +301,17 @@ export function Sidebar({ userName, session, companies }: SidebarProps) {
   const navItems = useMemo(() => {
     if (!mounted || !currentCompany) return filterGroupNav(session, GROUP_NAV);
     if (currentCompany.type === "OWNER_MANAGED") return buildOwnerManagedNav(`/dashboard/companies/${currentCompany.id}`);
-    return filterCompanyNav(session, currentCompany, buildCompanyNav(`/dashboard/companies/${currentCompany.id}`));
+    const items = filterCompanyNav(session, currentCompany, buildCompanyNav(`/dashboard/companies/${currentCompany.id}`));
+    if (currentCompany.type === "CONTRACTING" && (hasPermission(session, "CONTRACTING", "VIEW", { companyId: currentCompany.id }) || hasPermission(session, "ACCOUNTING", "VIEW", { companyId: currentCompany.id }) || hasPermission(session, "CONTRACTING_SUBMISSIONS", "VIEW", { companyId: currentCompany.id }))) {
+      items.splice(1, 0, {
+        href: `/dashboard/companies/${currentCompany.id}/contracting`, labelKey: "nav.contracting", icon: <Building2 size={16} />, iconColor: "orange",
+        children: [
+          ...(hasPermission(session, "CONTRACTING_SUBMISSIONS", "CREATE", { companyId: currentCompany.id }) ? [{ href: `/dashboard/companies/${currentCompany.id}/contracting/submissions`, labelKey: "nav.contractingSubmissions", icon: <ArrowUpFromLine size={14} />, iconColor: "orange" }] : []),
+          ...((hasPermission(session, "CONTRACTING", "UPDATE", { companyId: currentCompany.id }) || hasPermission(session, "ACCOUNTING", "UPDATE", { companyId: currentCompany.id })) ? [{ href: `/dashboard/companies/${currentCompany.id}/contracting/site-accounts`, labelKey: "nav.contractingSiteAccounts", icon: <UserRoundPlus size={14} />, iconColor: "orange" }] : []),
+        ],
+      });
+    }
+    return items;
   }, [mounted, currentCompany, session]);
 
   // Per-company/group persistence key.

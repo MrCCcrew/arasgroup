@@ -1,3 +1,5 @@
+import { employeeCompanyScope, employeeListParams, employeeListWhere, type EmployeeListFilters } from "@/lib/hr/employee-list";
+import { canAccessCompany, getAccessibleBranchIds, hasPermission } from "@/lib/auth/permissions";
 import Link from "next/link";
 import { AlertTriangle, Plus, Printer, Search, X } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -13,18 +15,7 @@ import { EmployeeQuickSearch } from "@/components/hr/employee-quick-search";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{
-    type?: string;
-    positionId?: string;
-    search?: string;
-    group?: string;
-    status?: string;
-    category?: string;
-    residencyLicenseId?: string;
-    workPermitLicenseId?: string;
-    mainLicenseId?: string;
-    subLicenseId?: string;
-  }>;
+  searchParams: Promise<EmployeeListFilters>;
 }
 
 const typeLabels = {
@@ -61,30 +52,9 @@ type EmployeeType = keyof typeof typeLabels.ar;
 
 function buildEmployeesHref(
   companyId: string,
-  params: {
-    group?: string;
-    type?: string;
-    positionId?: string;
-    status?: string;
-    category?: string;
-    search?: string;
-    residencyLicenseId?: string;
-    workPermitLicenseId?: string;
-    mainLicenseId?: string;
-    subLicenseId?: string;
-  } = {},
+  params: EmployeeListFilters = {},
 ) {
-  const searchParams = new URLSearchParams();
-  if (params.group) searchParams.set("group", params.group);
-  if (params.type) searchParams.set("type", params.type);
-  if (params.positionId) searchParams.set("positionId", params.positionId);
-  if (params.status) searchParams.set("status", params.status);
-  if (params.category) searchParams.set("category", params.category);
-  if (params.search) searchParams.set("search", params.search);
-  if (params.residencyLicenseId) searchParams.set("residencyLicenseId", params.residencyLicenseId);
-  if (params.workPermitLicenseId) searchParams.set("workPermitLicenseId", params.workPermitLicenseId);
-  if (params.mainLicenseId) searchParams.set("mainLicenseId", params.mainLicenseId);
-  if (params.subLicenseId) searchParams.set("subLicenseId", params.subLicenseId);
+  const searchParams = employeeListParams(params);
 
   const query = searchParams.toString();
   return `/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`;
@@ -95,6 +65,8 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+  if (!canAccessCompany(session, companyId) || !hasPermission(session, "HR", "VIEW", { companyId })) redirect("/dashboard");
+  const branchIds = getAccessibleBranchIds(session, companyId);
 
   const locale = await getLocale();
   const numberLocale = "en-US"; // Always use English numbers for salary
@@ -103,60 +75,19 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
   const showingDeleted = query.status === "deleted";
   const showingInactive = query.status === "inactive";
 
-  const activeWhere = { companyId, isActive: true, isDeleted: false };
-  const inactiveWhere = { companyId, isActive: false, isDeleted: false };
-  const deletedWhere = { companyId, isDeleted: true };
+  const scope = employeeCompanyScope(companyId, branchIds);
+  const activeWhere = { AND: [scope, { isActive: true, isDeleted: false }] };
+  const inactiveWhere = { AND: [scope, { isActive: false, isDeleted: false }] };
+  const deletedWhere = { AND: [scope, { isDeleted: true }] };
   const baseWhere = showingDeleted ? deletedWhere : showingInactive ? inactiveWhere : activeWhere;
 
-  const categoryFilter =
-    query.category === "drivers"
-      ? { type: { in: [...DRIVER_TYPES] } }
-      : query.category === "admins"
-        ? { investorId: null, type: { in: [...ADMIN_TYPES] } }
-        : {};
-
-  const groupFilter =
-    query.group === "investor"
-      ? { investorId: { not: null } }
-      : query.group === "company"
-        ? { investorId: null }
-        : {};
-
-  const typeFilter = query.type
-    ? {
-        type: query.type as EmployeeType,
-      }
-    : {};
-
-  const positionFilter = query.positionId
-    ? {
-        positionId: query.positionId,
-      }
-    : {};
-
-  const residencyLicenseFilter = query.residencyLicenseId
-    ? {
-        residencyLicenseId: query.residencyLicenseId,
-      }
-    : {};
-
-  const workPermitLicenseFilter = query.workPermitLicenseId
-    ? {
-        workPermitLicenseId: query.workPermitLicenseId,
-      }
-    : {};
-
-  const mainLicenseFilter = query.mainLicenseId
-    ? {
-        licenseId: query.mainLicenseId,
-      }
-    : {};
-
-  const subLicenseFilter = query.subLicenseId
-    ? {
-        licenseId: query.subLicenseId,
-      }
-    : {};
+  const residences = await prisma.employee.findMany({
+    where: { ...baseWhere, residentialAddress: { not: null } },
+    select: { residentialAddress: true },
+    distinct: ["residentialAddress"],
+    orderBy: { residentialAddress: "asc" },
+  });
+  const residenceOptions = residences.map(row => row.residentialAddress!).filter(value => value.trim());
 
   // Get only licenses that are actually used by employees (separated by type)
   const [usedResidencyLicenseIds, usedWorkPermitLicenseIds, usedMainLicenseIds, usedSubLicenseIds] = await Promise.all([
@@ -200,49 +131,30 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     }),
     // Residency licenses
     prisma.license.findMany({
-      where: { companyId, id: { in: usedResidencyLicenseIds } },
+      where: { id: { in: usedResidencyLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     // Work permit licenses
     prisma.license.findMany({
-      where: { companyId, id: { in: usedWorkPermitLicenseIds } },
+      where: { id: { in: usedWorkPermitLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     // Main licenses
     prisma.license.findMany({
-      where: { companyId, isMainLicense: true, id: { in: usedMainLicenseIds } },
+      where: { isMainLicense: true, id: { in: usedMainLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     // Sub licenses
     prisma.license.findMany({
-      where: { companyId, isMainLicense: false, id: { in: usedSubLicenseIds } },
+      where: { isMainLicense: false, id: { in: usedSubLicenseIds } },
       select: { id: true, commercialNameAr: true, commercialNameEn: true, civilEntityNumber: true, mainLicenseId: true },
       orderBy: { commercialNameAr: "asc" },
     }),
     prisma.employee.findMany({
-      where: {
-        ...baseWhere,
-        ...groupFilter,
-        ...categoryFilter,
-        ...typeFilter,
-        ...positionFilter,
-        ...residencyLicenseFilter,
-        ...workPermitLicenseFilter,
-        ...mainLicenseFilter,
-        ...subLicenseFilter,
-        ...(query.search
-          ? {
-              OR: [
-                { employeeNumber: { contains: query.search } },
-                { nameAr: { contains: query.search } },
-                { civilId: { contains: query.search } },
-              ],
-            }
-          : {}),
-      },
+      where: employeeListWhere(companyId, query, branchIds),
       include: {
         branch: { select: { nameAr: true, nameEn: true } },
         investor: { select: { nameAr: true, nameEn: true } },
@@ -278,15 +190,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
     ? `${deletedCount} ${locale === "en" ? "deleted employee(s)" : "موظف محذوف"}`
     : `${totalCount} ${locale === "en" ? "active employee(s)" : "موظف نشط"}`;
   const showInvestorColumn = (!query.group || query.group === "investor") && query.category !== "admins";
-  const tableColSpan = showInvestorColumn ? (showingDeleted ? 15 : 14) : showingDeleted ? 14 : 13;
+  const tableColSpan = showInvestorColumn ? (showingDeleted ? 16 : 15) : showingDeleted ? 15 : 14;
 
-  const printQuery = new URLSearchParams();
-  if (query.type) printQuery.set("type", query.type);
-  if (query.positionId) printQuery.set("positionId", query.positionId);
-  if (query.search) printQuery.set("search", query.search);
-  if (query.group) printQuery.set("group", query.group);
-  if (query.status) printQuery.set("status", query.status);
-  if (query.category) printQuery.set("category", query.category);
+  const printQuery = employeeListParams(query);
   const printHref = `/dashboard/companies/${companyId}/hr/employees/print${printQuery.toString() ? `?${printQuery.toString()}` : ""}`;
 
   return (
@@ -321,43 +227,43 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
       <div className="page-container space-y-4">
         <div className="flex flex-wrap gap-2">
           <Link
-            href={buildEmployeesHref(companyId)}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && !showingInactive && !query.group && !query.category ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "All active" : "كل النشطين"} ({totalCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { category: "drivers" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, category: "drivers" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.category === "drivers" ? "bg-sky-600 text-white" : "border-sky-300 text-sky-700 hover:bg-sky-50"}`}
           >
             {locale === "en" ? "Drivers" : "السائقون"} ({driverCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { category: "admins" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, category: "admins" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.category === "admins" ? "bg-blue-600 text-white" : "border-blue-300 text-blue-700 hover:bg-blue-50"}`}
           >
             {locale === "en" ? "Administrative" : "الإداريون"} ({adminCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { group: "investor" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, group: "investor" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.group === "investor" ? "bg-amber-600 text-white" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
           >
             {locale === "en" ? "Investor employees" : "موظفو المسئولين"} ({investorEmployeeCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { group: "company" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, group: "company" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${!showingDeleted && query.group === "company" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {locale === "en" ? "Company employees" : "موظفو الشركة"} ({companyEmployeeCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { status: "inactive" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, status: "inactive" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${showingInactive ? "bg-orange-600 text-white" : "border-orange-300 text-orange-700 hover:bg-orange-50"}`}
           >
             {locale === "en" ? "Inactive" : "غير النشطين"} ({inactiveCount})
           </Link>
           <Link
-            href={buildEmployeesHref(companyId, { status: "deleted" })}
+            href={buildEmployeesHref(companyId, { residentialAddress: query.residentialAddress, status: "deleted" })}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${showingDeleted ? "bg-red-600 text-white" : "border-red-300 text-red-700 hover:bg-red-50"}`}
           >
             {locale === "en" ? "Deleted" : "المحذوفون"} ({deletedCount})
@@ -367,6 +273,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         <div className="flex flex-wrap gap-2">
           <Link
             href={buildEmployeesHref(companyId, {
+              residentialAddress: query.residentialAddress,
               group: query.group,
               status: query.status,
               category: query.category,
@@ -384,6 +291,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
               <Link
                 key={type}
                 href={buildEmployeesHref(companyId, {
+              residentialAddress: query.residentialAddress,
                   group: query.group,
                   status: query.status,
                   category: query.category,
@@ -403,6 +311,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
           <div className="flex flex-wrap gap-2">
             <Link
               href={buildEmployeesHref(companyId, {
+              residentialAddress: query.residentialAddress,
                 group: query.group,
                 status: query.status,
                 category: query.category,
@@ -421,6 +330,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
               <Link
                 key={p.id}
                 href={buildEmployeesHref(companyId, {
+              residentialAddress: query.residentialAddress,
                   group: query.group,
                   status: query.status,
                   category: query.category,
@@ -443,7 +353,9 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
         <EmployeeQuickSearch
           companyId={companyId}
           printHref={printHref}
+          residences={residenceOptions}
           currentFilters={{
+            residentialAddress: query.residentialAddress,
             group: query.group,
             status: query.status,
             category: query.category,
@@ -477,6 +389,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                   {showInvestorColumn ? <th>{locale === "en" ? "Investor" : "المسئول"}</th> : null}
                   <th>{locale === "en" ? "Residency license" : "ترخيص الإقامة"}</th>
                   <th>{locale === "en" ? "Work permit license" : "ترخيص العمل"}</th>
+                  <th>{locale === "en" ? "Residence location" : "مكان السكن"}</th>
                   <th>{locale === "en" ? "Phone" : "التليفون"}</th>
                   <th>{locale === "en" ? "Main license" : "الترخيص الرئيسي"}</th>
                   <th>{locale === "en" ? "Sub license" : "الترخيص الفرعي"}</th>
@@ -587,6 +500,7 @@ export default async function EmployeesPage({ params, searchParams }: Props) {
                         </td>
 
                         {/* 10. التليفون */}
+                        <td className="max-w-64 whitespace-normal break-words">{employee.residentialAddress || "—"}</td>
                         <td className="number text-sm" dir="ltr">
                           {employee.phone ?? (locale === "en" ? "Not set" : "غير محدد")}
                         </td>

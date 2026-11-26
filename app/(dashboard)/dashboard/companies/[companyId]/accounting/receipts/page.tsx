@@ -108,12 +108,15 @@ export default async function ReceiptsPage({ params, searchParams }: Props) {
         subtitle={t.subtitle}
         companyId={companyId}
         actions={
+          <>
+          <Link href={`/dashboard/companies/${companyId}/accounting/print-settings`} className="btn-secondary">{en ? "Print settings" : "\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u0627\u0644\u0637\u0628\u0627\u0639\u0629"}</Link>
           <Link
             href={`/dashboard/companies/${companyId}/accounting/receipts/new`}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <Plus size={16} /> {t.new}
           </Link>
+          </>
         }
       />
 

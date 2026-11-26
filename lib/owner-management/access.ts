@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/lib/types";
 
+export function canManageOwnerEntries(session: SessionUser) {
+  return session.isSuperAdmin || session.accountType === "ADMIN";
+}
+
 export async function requireOwnerManagedCompany(session: SessionUser, companyId: string) {
   const company = await prisma.company.findFirst({ where: { id: companyId, type: "OWNER_MANAGED", isActive: true } });
   if (!company || (!session.isSuperAdmin && !session.companyAccess.includes(companyId))) return null;

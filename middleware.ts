@@ -62,7 +62,9 @@ export async function middleware(request: NextRequest) {
       if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/owner-management/partner/")) {
         return NextResponse.json({ success: false, error: "غير مصرح بالوصول إلى واجهات الإدارة" }, { status: 403 });
       }
-    } else if (pathname === "/partner" || pathname.startsWith("/partner/")) {
+    } else if (accountType === "GROCERY_EMPLOYEE") {
+      if (pathname.startsWith("/api/") && !pathname.startsWith("/api/grocery-portal/")) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+      if (!pathname.startsWith("/grocery-portal") && !pathname.startsWith("/api/grocery-portal/")) return NextResponse.redirect(new URL("/grocery-portal", request.url));    } else if (pathname === "/partner" || pathname.startsWith("/partner/")) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 

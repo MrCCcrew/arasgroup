@@ -38,6 +38,11 @@ interface Violation {
   paymentMode: string;
   installmentMonths: number | null;
   installmentsPaid: number;
+  installmentStartYear: number | null;
+  installmentStartMonth: number | null;
+  companyExpenseCategoryId: string | null;
+  trafficPaidAt: string | null;
+  trafficPaymentReference: string | null;
   status: string;
   notes: string | null;
   driver?: { employee: { nameAr: string; nameEn: string | null } };
@@ -87,6 +92,7 @@ const EMPTY_FORM = {
   driverSharePct: "50",
   paymentMode: "FULL",
   installmentMonths: "3",
+  installmentStart: new Date().toISOString().slice(0, 7),
   notes: "",
   expenseCategoryId: "",
 };
@@ -195,9 +201,13 @@ export default function ViolationsPage() {
   const [formError, setFormError] = useState("");
 
   const [actionId, setActionId] = useState<string | null>(null);
-  const [actionType, setActionType] = useState<"settle" | "cancel" | "delete" | null>(null);
+  const [actionType, setActionType] = useState<"cancel" | "delete" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [trafficPayment, setTrafficPayment] = useState<Violation | null>(null);
+  const [trafficForm, setTrafficForm] = useState({ paidAt: new Date().toISOString().slice(0, 10), categoryId: "", reference: "" });
+  const [trafficSaving, setTrafficSaving] = useState(false);
+  const [trafficError, setTrafficError] = useState("");
 
   // السيارة المقترحة تلقائياً للسائق في تاريخ المخالفة (من سجل تبديل السيارات)
   const [vehicleAutoFilled, setVehicleAutoFilled] = useState(false);
@@ -263,6 +273,8 @@ export default function ViolationsPage() {
       driverSharePct: form.responsibility === "SPLIT" ? Number(form.driverSharePct) : undefined,
       paymentMode: form.paymentMode,
       installmentMonths: form.paymentMode === "INSTALLMENT" ? Number(form.installmentMonths) : undefined,
+      installmentStartYear: form.responsibility !== "COMPANY" ? Number(form.installmentStart.slice(0, 4)) : undefined,
+      installmentStartMonth: form.responsibility !== "COMPANY" ? Number(form.installmentStart.slice(5, 7)) : undefined,
       notes: form.notes || undefined,
       expenseCategoryId: form.expenseCategoryId || undefined,
     };
@@ -300,6 +312,7 @@ export default function ViolationsPage() {
       driverSharePct: violation.driverSharePct?.toString() || "50",
       paymentMode: violation.paymentMode,
       installmentMonths: violation.installmentMonths?.toString() || "3",
+      installmentStart: violation.installmentStartYear && violation.installmentStartMonth ? `${violation.installmentStartYear}-${String(violation.installmentStartMonth).padStart(2, "0")}` : new Date(violation.date).toISOString().slice(0, 7),
       notes: violation.notes || "",
       expenseCategoryId: "",
     });
@@ -324,7 +337,7 @@ export default function ViolationsPage() {
       res = await fetch(`/api/delivery/violations/${actionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: actionType === "settle" ? "SETTLED" : "CANCELLED" }),
+        body: JSON.stringify({ status: "CANCELLED" }),
       });
     }
 
@@ -336,6 +349,28 @@ export default function ViolationsPage() {
     } else {
       setActionError(data.error ?? t.errorOccurred);
     }
+  }
+
+  function openTrafficPayment(violation: Violation) {
+    setTrafficPayment(violation);
+    setTrafficForm({ paidAt: new Date().toISOString().slice(0, 10), categoryId: violation.companyExpenseCategoryId ?? "", reference: "" });
+    setTrafficError("");
+  }
+
+  async function saveTrafficPayment() {
+    if (!trafficPayment) return;
+    const companyPortion = trafficPayment.responsibility === "COMPANY" || trafficPayment.responsibility === "SPLIT";
+    if (companyPortion && !trafficForm.categoryId) { setTrafficError(en ? "Select an expense category" : "اختر فئة المصروف"); return; }
+    setTrafficSaving(true); setTrafficError("");
+    const response = await fetch(`/api/delivery/violations/${trafficPayment.id}/traffic-payment`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(trafficForm),
+    });
+    const data = await response.json().catch(() => ({}));
+    setTrafficSaving(false);
+    if (!response.ok || data.success === false) { setTrafficError(data.error ?? t.errorOccurred); return; }
+    setTrafficPayment(null);
+    load();
   }
 
   const pending = violations.filter((v) => v.status === "PENDING").length;
@@ -415,6 +450,7 @@ export default function ViolationsPage() {
                     <th>{t.colResponsibility}</th>
                     <th>{t.colPayment}</th>
                     <th>{t.colStatus}</th>
+                    <th>سداد المرور</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -478,6 +514,15 @@ export default function ViolationsPage() {
                           </span>
                         </td>
                         <td>
+                          {v.trafficPaidAt ? (
+                            <span className="text-xs font-medium text-emerald-700">تم السداد لإدارة المرور</span>
+                          ) : (
+                            <button onClick={() => openTrafficPayment(v)} className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50">
+                              تسجيل سداد المرور
+                            </button>
+                          )}
+                        </td>
+                        <td>
                           <div className="flex items-center gap-1">
                             {v.status !== "SETTLED" && (
                               <button
@@ -490,12 +535,6 @@ export default function ViolationsPage() {
                             )}
                             {v.status === "PENDING" && (
                               <>
-                                <button
-                                  onClick={() => { setActionId(v.id); setActionType("settle"); setActionError(""); }}
-                                  className="rounded px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50"
-                                >
-                                  {t.settle}
-                                </button>
                                 <button
                                   onClick={() => { setActionId(v.id); setActionType("cancel"); setActionError(""); }}
                                   className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
@@ -640,7 +679,7 @@ export default function ViolationsPage() {
                       <option value="INSTALLMENT">{t.installmentFromSalary}</option>
                     </select>
                   </div>
-                  {form.paymentMode === "INSTALLMENT" && (
+                  {form.paymentMode === "INSTALLMENT" &&
                     <div>
                       <label className="form-label">{t.months}</label>
                       <input type="number" min="1" max="12" value={form.installmentMonths} onChange={f("installmentMonths")} className="input-field w-full" dir="ltr" />
@@ -653,8 +692,12 @@ export default function ViolationsPage() {
                           ).toFixed(3)} {kwd}
                         </p>
                       )}
-                    </div>
-                  )}
+                    </div>}
+                <div>
+                  <label className="form-label">شهر أول خصم من الراتب</label>
+                  <input type="month" value={form.installmentStart} onChange={f("installmentStart")} className="input-field w-full" dir="ltr" />
+                  <p className="mt-1 text-xs text-muted-foreground">يُخصم المبلغ أو القسط فقط من دفعة رواتب هذا الشهر.</p>
+                </div>
                 </div>
               )}
 
@@ -676,19 +719,32 @@ export default function ViolationsPage() {
         </div>
       )}
 
-      {/* Settle / Cancel / Delete confirm */}
+      {trafficPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl bg-card p-5 shadow-2xl">
+            <h2 className="font-semibold">تسجيل سداد المخالفة لإدارة المرور</h2>
+            <p className="mt-1 text-sm text-muted-foreground">لن يُنشأ المصروف إلا عند تأكيد هذا السداد.</p>
+            <div className="mt-4 space-y-3">
+              <div><label className="form-label">تاريخ السداد</label><input type="date" value={trafficForm.paidAt} onChange={(event) => setTrafficForm(current => ({ ...current, paidAt: event.target.value }))} className="input-field w-full" /></div>
+              {(trafficPayment.responsibility === "COMPANY" || trafficPayment.responsibility === "SPLIT") && <div><label className="form-label">فئة المصروف</label><select value={trafficForm.categoryId} onChange={(event) => setTrafficForm(current => ({ ...current, categoryId: event.target.value }))} className="input-field w-full"><option value="">اختر الفئة</option>{categories.map(category => <option key={category.id} value={category.id}>{category.nameAr}</option>)}</select></div>}
+              <div><label className="form-label">مرجع السداد</label><input value={trafficForm.reference} onChange={(event) => setTrafficForm(current => ({ ...current, reference: event.target.value }))} className="input-field w-full" /></div>
+              {trafficError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-600">{trafficError}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2"><button onClick={() => setTrafficPayment(null)} className="rounded-lg border px-4 py-2 text-sm">إلغاء</button><button onClick={saveTrafficPayment} disabled={trafficSaving} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{trafficSaving ? "جارٍ الحفظ..." : "تأكيد السداد"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel / Delete confirm */}
       {actionId && actionType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-xl bg-card p-5 shadow-2xl">
             <p className="font-medium">
-              {actionType === "settle" ? t.confirmSettle
-                : actionType === "cancel" ? t.confirmCancel
+              {actionType === "cancel" ? t.confirmCancel
                 : t.confirmDelete}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {actionType === "settle"
-                ? t.settleDesc
-                : actionType === "cancel"
+              {actionType === "cancel"
                   ? t.cancelDesc
                   : t.deleteDesc}
             </p>
@@ -698,10 +754,9 @@ export default function ViolationsPage() {
               <button
                 onClick={doAction}
                 disabled={actionLoading}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${actionType === "settle" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {actionLoading ? t.inProgress
-                  : actionType === "settle" ? t.settleBtn
                   : actionType === "cancel" ? t.cancelBtn
                   : t.deleteBtn}
               </button>

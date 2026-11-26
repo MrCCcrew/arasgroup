@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { useLocale } from "@/components/providers/locale-provider";
+import { HourlyOrderEntry } from "@/components/delivery/hourly-order-entry";
 import { LocationOrderEntry } from "@/components/delivery/location-order-entry";
 
 interface Contract {
@@ -14,6 +15,7 @@ interface Contract {
   nameEn?: string;
   platform: string;
   usesLocationPricing?: boolean;
+  usesHourlyWork?: boolean;
 }
 
 interface Driver {
@@ -160,6 +162,7 @@ export default function NewDailyOrdersPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [contractId, setContractId] = useState("");
+  const [workMode, setWorkMode] = useState<"hourly" | "orders">("hourly");
   const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
   const [date, setDate] = useState(today);
   const [lines, setLines] = useState<EntryLine[]>([]);
@@ -253,6 +256,7 @@ export default function NewDailyOrdersPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isHourlyWork) return;
     setError("");
 
     if (dateMode === "single") {
@@ -336,7 +340,8 @@ export default function NewDailyOrdersPage() {
   }
 
   const selectedContract = contracts.find((contract) => contract.id === contractId);
-  const isLocationPricing = !!selectedContract?.usesLocationPricing;
+  const isHourlyWork = !!selectedContract?.usesHourlyWork && workMode === "hourly";
+  const isLocationPricing = !isHourlyWork && !!selectedContract?.usesLocationPricing;
 
   return (
     <div>
@@ -367,7 +372,7 @@ export default function NewDailyOrdersPage() {
               <label className="mb-1.5 block text-sm font-medium">
                 {locale === "en" ? "Contract" : AR.contract} <span className="text-red-500">*</span>
               </label>
-              <select required value={contractId} onChange={(event) => setContractId(event.target.value)} className="input-field w-full">
+              <select required value={contractId} onChange={(event) => { setContractId(event.target.value); setWorkMode("hourly"); setError(""); }} className="input-field w-full">
                 <option value="">{locale === "en" ? "Select contract..." : AR.selectContract}</option>
                 {contracts.map((contract) => (
                   <option key={contract.id} value={contract.id}>
@@ -379,7 +384,16 @@ export default function NewDailyOrdersPage() {
               </select>
             </div>
 
-            {!isLocationPricing && (
+            {selectedContract?.usesHourlyWork ? (
+              <label className="block text-sm font-medium">{locale === "en" ? "Work recording system" : "نظام تسجيل الشغل"}
+                <select className="input-field mt-2 w-full" value={workMode} onChange={event => setWorkMode(event.target.value as "hourly" | "orders")}>
+                  <option value="hourly">{locale === "en" ? "Hourly work" : "العمل بالساعة"}</option>
+                  <option value="orders">{selectedContract.usesLocationPricing ? (locale === "en" ? "Restaurants & locations" : "المطاعم والأماكن") : (locale === "en" ? "Daily orders" : "الطلبات اليومية")}</option>
+                </select>
+              </label>
+            ) : selectedContract && <p className="text-sm text-muted-foreground">{locale === "en" ? "For hourly work, enable it in" : "لتسجيل العمل بالساعة، فعّل النظام من"} <Link className="text-primary underline" href={`/dashboard/companies/${companyId}/delivery/contracts`}>{locale === "en" ? "contract settings" : "إعدادات العقد"}</Link>.</p>}
+
+            {!isHourlyWork && !isLocationPricing && (
             <div>
               <label className="mb-2 block text-sm font-medium">{locale === "en" ? "Date mode" : AR.dateMode}</label>
               <div className="flex gap-2">
@@ -405,7 +419,7 @@ export default function NewDailyOrdersPage() {
             </div>
             )}
 
-            {(isLocationPricing || dateMode === "single") ? (
+            {(isHourlyWork || isLocationPricing || dateMode === "single") ? (
               <div>
                 <label className="mb-1.5 block text-sm font-medium">{locale === "en" ? "Date" : AR.date}</label>
                 <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="input-field w-full" dir="ltr" />
@@ -448,11 +462,13 @@ export default function NewDailyOrdersPage() {
             )}
           </div>
 
+          {isHourlyWork && <HourlyOrderEntry key={contractId} companyId={companyId} contractId={contractId} date={date} drivers={drivers.filter(driver => driver.employee.isActive).map(driver => ({ id: driver.id, name: getDriverName(driver) }))} />}
+
           {isLocationPricing && (
             <LocationOrderEntry companyId={companyId} contractId={contractId} date={date} drivers={aliasDriverOptions} />
           )}
 
-          {!isLocationPricing && (dateMode === "single" ? (
+          {!isHourlyWork && !isLocationPricing && (dateMode === "single" ? (
             <div className="section-card">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
                 {locale === "en" ? "Driver orders" : AR.driverOrders}
@@ -610,7 +626,7 @@ export default function NewDailyOrdersPage() {
             </>
           ))}
 
-          {!isLocationPricing && (
+          {!isHourlyWork && !isLocationPricing && (
           <div className="flex items-center gap-3">
             <button
               type="submit"

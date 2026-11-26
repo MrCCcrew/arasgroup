@@ -30,7 +30,7 @@ export default function LoginForm({ logoUrl, groupNameAr, groupNameEn, portal, e
     setError("");
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, locale }) });
       const data = await response.json();
       if (!response.ok || !data.success) {
         setError(data.error ?? t("\u062E\u0637\u0623 \u0641\u064A \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644", "Incorrect email or password"));

@@ -15,15 +15,24 @@ export function buildSalaryWhatsAppMessage(input: {
   netWithoutIncentive: number;
   deductions: number;
   netAmount: number;
+  additionalEarnings?: number;
+  items?: Array<{ type: string; category: string; titleAr: string; titleEn?: string | null; amount: number }>;
   pdfUrl?: string;
 }) {
+  const numberLocale = input.locale === "en" ? "en-US" : "ar-KW";
+  const detailLines = (category: string) => (input.items ?? [])
+    .filter(item => item.category === category && !["BASE_SALARY", "INCENTIVE"].includes(item.type))
+    .map(item => `- ${input.locale === "en" ? item.titleEn || item.titleAr : item.titleAr}: ${formatKWD(item.amount, numberLocale)}`);
   if (input.locale === "en") {
     const lines = [
       `Salary details for ${input.employeeName}`,
       `Period: ${input.month}/${input.year}`,
       `Base salary: ${formatKWD(input.baseAmount, "en-US")}`,
       `Incentive: ${formatKWD(input.incentives, "en-US")}`,
+      ...(input.additionalEarnings !== undefined ? [`Additions: ${formatKWD(input.additionalEarnings, "en-US")}`] : []),
+      ...detailLines("EARNING"),
       `Deductions: ${formatKWD(input.deductions, "en-US")}`,
+      ...detailLines("DEDUCTION"),
       `Net salary: ${formatKWD(input.netWithoutIncentive, "en-US")} + Incentive: ${formatKWD(input.incentives, "en-US")}`,
       `Final payable: ${formatKWD(input.netAmount, "en-US")}`,
     ];
@@ -40,7 +49,10 @@ export function buildSalaryWhatsAppMessage(input: {
     `\u0627\u0644\u0641\u062a\u0631\u0629: ${input.month}/${input.year}`,
     `\u0627\u0644\u0631\u0627\u062a\u0628 \u0627\u0644\u0623\u0633\u0627\u0633\u064a: ${formatKWD(input.baseAmount, "ar-KW")}`,
     `\u0627\u0644\u062d\u0627\u0641\u0632: ${formatKWD(input.incentives, "ar-KW")}`,
+    ...(input.additionalEarnings !== undefined ? [`الإضافات: ${formatKWD(input.additionalEarnings, "ar-KW")}`] : []),
+    ...detailLines("EARNING"),
     `\u0627\u0644\u062e\u0635\u0648\u0645\u0627\u062a: ${formatKWD(input.deductions, "ar-KW")}`,
+    ...detailLines("DEDUCTION"),
     `\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0627\u062a\u0628: ${formatKWD(input.netWithoutIncentive, "ar-KW")} + \u0627\u0644\u062d\u0627\u0641\u0632: ${formatKWD(input.incentives, "ar-KW")}`,
     `\u0627\u0644\u0635\u0627\u0641\u064a \u0627\u0644\u0646\u0647\u0627\u0626\u064a: ${formatKWD(input.netAmount, "ar-KW")}`,
   ];

@@ -8,11 +8,13 @@ import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n";
 import { formatDate, formatKWD } from "@/lib/utils";
 import { JournalEntriesTable } from "@/components/accounting/journal-entries-table";
+import { JournalPagination } from "@/components/accounting/journal-pagination";
+import { journalListHref, journalMonthRange, journalPage } from "@/lib/accounting/journal-list";
 import type { JournalStatus } from "@prisma/client";
 
 interface Props {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ page?: string; status?: string; search?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; search?: string; month?: string }>;
 }
 
 const statusLabels = {
@@ -77,16 +79,18 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
   const numberLocale = locale === "en" ? "en-US" : "ar-KW";
   const dateLocale = locale === "en" ? "en-US" : "ar-KW";
 
-  const page = parseInt(query.page ?? "1", 10);
   const pageSize = 20;
   const allowedStatuses = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED"] as const satisfies readonly JournalStatus[];
   const filters = ["", ...allowedStatuses] as const;
   const statusFilter = allowedStatuses.find((status) => status === query.status);
   const searchTerm = query.search?.trim();
+  const monthRange = journalMonthRange(query.month);
+  const month = monthRange ? query.month : undefined;
 
   const where = {
     companyId,
     isDeleted: false,
+    ...(monthRange ? { date: monthRange } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(searchTerm ? {
       OR: [
@@ -97,8 +101,9 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
     } : {}),
   };
 
-  const [total, rawEntries, unpostedCount] = await Promise.all([
-    prisma.journalEntry.count({ where }),
+  const total = await prisma.journalEntry.count({ where });
+  const page = journalPage(query.page, total, pageSize);
+  const [rawEntries, unpostedCount] = await Promise.all([
     prisma.journalEntry.findMany({
       where,
       select: {
@@ -114,7 +119,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
         createdBy: { select: { nameAr: true, nameEn: true } },
         _count: { select: { lines: true } },
       },
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -129,7 +134,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
 
   const entries = rawEntries.map((e) => ({ ...e, entryNumber: e.number }));
 
-  const totalPages = Math.ceil(total / pageSize);
+  const pagination = <JournalPagination companyId={companyId} page={page} total={total} status={statusFilter} search={searchTerm} month={month} en={locale === "en"} />;
 
   const canDelete = hasPermission(session, "ACCOUNTING", "DELETE", { companyId });
 
@@ -175,19 +180,23 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
         )}
 
         {/* Search box */}
-        <form method="GET" className="flex gap-2">
+        <form key={`${statusFilter ?? ""}:${searchTerm ?? ""}:${month ?? ""}`} method="GET" className="flex flex-wrap items-end gap-2">
           <input
             type="text"
             name="search"
             defaultValue={searchTerm}
             placeholder={locale === "en" ? "Search by number, date, or description..." : "بحث برقم القيد، التاريخ، أو البيان..."}
-            className="input-field flex-1"
+            className="input-field min-w-0 flex-1 basis-64"
           />
+          <div>
+            <label htmlFor="journal-month" className="form-label">{locale === "en" ? "Month" : "الشهر"}</label>
+            <input id="journal-month" type="month" name="month" defaultValue={month} className="input-field" />
+          </div>
           {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
           <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             {locale === "en" ? "Search" : "بحث"}
           </button>
-          {searchTerm && (
+          {(searchTerm || month) && (
             <Link
               href={`/dashboard/companies/${companyId}/accounting/journal-entries${statusFilter ? `?status=${statusFilter}` : ""}`}
               className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
@@ -200,7 +209,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
         <div className="flex flex-wrap gap-3">
           {filters.map((status) => {
             const active = statusFilter === status || (!statusFilter && !status);
-            const href = `/dashboard/companies/${companyId}/accounting/journal-entries${status ? `?status=${status}` : ""}${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""}`;
+            const href = journalListHref(companyId, { status, search: searchTerm, month });
             const label = status ? statusLabels[locale][status] : locale === "en" ? "All" : "الكل";
             return (
               <Link
@@ -216,6 +225,8 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           })}
         </div>
 
+        {pagination}
+
         <JournalEntriesTable
           entries={entries}
           companyId={companyId}
@@ -228,21 +239,7 @@ export default async function JournalEntriesPage({ params, searchParams }: Props
           isSuperAdmin={session.isSuperAdmin}
         />
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            {Array.from({ length: totalPages }, (_: unknown, index: number) => index + 1).map((currentPage: number) => (
-              <Link
-                key={currentPage}
-                href={`/dashboard/companies/${companyId}/accounting/journal-entries?page=${currentPage}${statusFilter ? `&status=${statusFilter}` : ""}`}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors ${
-                  currentPage === page ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                }`}
-              >
-                {currentPage}
-              </Link>
-            ))}
-          </div>
-        )}
+        {pagination}
       </div>
     </div>
   );

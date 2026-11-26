@@ -4,6 +4,12 @@ import { hash } from "bcryptjs";
 const prisma = new PrismaClient();
 
 const permissionSeeds = [
+  ["CONTRACTING", "VIEW", "COMPANY"],
+  ["CONTRACTING", "CREATE", "COMPANY"],
+  ["CONTRACTING", "UPDATE", "COMPANY"],
+  ["CONTRACTING", "DELETE", "COMPANY"],
+  ["CONTRACTING_SUBMISSIONS", "VIEW", "COMPANY"],
+  ["CONTRACTING_SUBMISSIONS", "CREATE", "COMPANY"],
   ["DASHBOARD", "VIEW", "GROUP"],
   ["COMPANIES", "VIEW", "GROUP"],
   ["COMPANIES", "CREATE", "GROUP"],
@@ -114,6 +120,9 @@ const rolePermissionMap: Record<string, ReadonlyArray<readonly [string, string, 
   ),
   CAR_WASH_SUPERVISOR: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "CAR_WASH_HR", "CAR_WASH_OPERATIONS", "CAR_WASH_REPORTS", "VEHICLES", "ASSETS_CUSTODY", "ATTACHMENTS", "EXPENSES"].includes(module)
+  ),
+  CONTRACTING_SITE_EMPLOYEE: rolePermissionSeeds.filter(([module, action]) =>
+    module === "DASHBOARD" || module === "CONTRACTING_SUBMISSIONS" || (module === "ATTACHMENTS" && ["VIEW", "UPLOAD"].includes(action))
   ),
   HR_MANDOB: rolePermissionSeeds.filter(([module]) =>
     ["DASHBOARD", "HR", "INVESTORS", "ATTACHMENTS"].includes(module)
@@ -397,6 +406,7 @@ async function main() {
     { id: "role-delivery-hr", name: "DELIVERY_HR", nameAr: "موارد بشرية التوصيل" },
     { id: "role-delivery-operations", name: "DELIVERY_OPERATIONS", nameAr: "عمليات التوصيل" },
     { id: "role-carwash", name: "CAR_WASH_SUPERVISOR", nameAr: "مشرف غسيل السيارات" },
+    { id: "role-contracting-site", name: "CONTRACTING_SITE_EMPLOYEE", nameAr: "موظف موقع مقاولات - رفع مستندات" },
     { id: "role-hr", name: "HR_MANDOB", nameAr: "مسؤول الموارد البشرية / المندوب" },
     { id: "role-investor", name: "INVESTOR_VIEWER", nameAr: "مشاهد المستثمر" },
     { id: "role-read-only", name: "READ_ONLY", nameAr: "قراءة فقط" },

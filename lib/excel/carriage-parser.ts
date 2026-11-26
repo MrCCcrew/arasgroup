@@ -18,6 +18,8 @@ export interface CarriageRiderRow {
   pickupCancellations: number;
   dropoffsCount: number;
   dropoffCancellations: number;
+  // Payroll-equivalent completed orders calculated from the current Talabat rate.
+  calculatedOrders: number;
 
   // ── Rider Settlement (Driver Productivity) ───────────────────
   pickupPayment: number;
@@ -48,6 +50,23 @@ export interface CarriageRiderRow {
   contractFees: number;
 
   netPayment: number; // = Final payment after all fleet deductions
+}
+
+/**
+ * The current Talabat fleet settlement charges KWD 0.590 for each eligible
+ * pickup and KWD 0.590 for each eligible dropoff (KWD 1.180 for a complete
+ * pickup/dropoff pair).  Cancellations in the exported file may be negative
+ * numbers, so this helper safely supports both negative and positive formats.
+ */
+export const TALABAT_PICKUP_OR_DROPOFF_RATE = 0.59;
+export const TALABAT_COMPLETE_ORDER_RATE = 1.18;
+
+function netOfCancellations(count: number, cancellations: number): number {
+  return Math.max(0, count - Math.abs(cancellations));
+}
+
+function money(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
 export interface CarriageFleetRow {
@@ -110,9 +129,10 @@ export interface CarriageParseResult {
 const REQUIRED_COLUMNS = [
   "Month",
   "Year",
-  "Total Completed Deliveries",
-  "Pickup Payment",
-  "Dropoff Payment",
+  "Pickups Count",
+  "Pickup Cancellations",
+  "Dropoffs Count",
+  "Dropoff Cancellations",
   "Net Cost",
   "Net Payment",
 ];
@@ -191,7 +211,17 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
     };
   }
 
-  const sheetName = workbook.SheetNames[0];
+  // CSV has one sheet.  For the equivalent Excel export, use the sheet that
+  // actually contains the current Talabat count/cancellation columns.
+  const sheetName = workbook.SheetNames.find((name) => {
+    const firstDataRow = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      workbook.Sheets[name],
+      { defval: "", raw: true, range: 0 }
+    )[0];
+    if (!firstDataRow) return false;
+    const columns = Object.keys(firstDataRow);
+    return REQUIRED_COLUMNS.every((column) => columns.includes(column));
+  }) ?? workbook.SheetNames[0];
   if (!sheetName) {
     errors.push("الملف فارغ / File is empty");
     return {
@@ -404,11 +434,21 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
     }
 
     // ── Case 3: Both Rider ID and Rider Name exist → Valid rider row ──
-    const pickupPayment = parseNumber(row["Pickup Payment"]);
-    const dropoffPayment = parseNumber(row["Dropoff Payment"]);
+    const pickupsCount = parseNumber(row["Pickups Count"]);
+    const pickupCancellations = parseNumber(row["Pickup Cancellations"]);
+    const dropoffsCount = parseNumber(row["Dropoffs Count"]);
+    const dropoffCancellations = parseNumber(row["Dropoff Cancellations"]);
 
-    // Calculate orders: (Pickup Payment + Dropoff Payment) / 1.050 to remove 5% VAT
-    const calculatedOrders = (pickupPayment + dropoffPayment) / 1.050;
+    // Current Talabat logic: each eligible pickup and dropoff is worth 0.590.
+    // Payroll uses the equivalent completed orders: total earned at the two
+    // components divided by the full-order rate of 1.180.
+    const billablePickups = netOfCancellations(pickupsCount, pickupCancellations);
+    const billableDropoffs = netOfCancellations(dropoffsCount, dropoffCancellations);
+    const pickupPayment = money(billablePickups * TALABAT_PICKUP_OR_DROPOFF_RATE);
+    const dropoffPayment = money(billableDropoffs * TALABAT_PICKUP_OR_DROPOFF_RATE);
+    const calculatedOrders = money(
+      (pickupPayment + dropoffPayment) / TALABAT_COMPLETE_ORDER_RATE
+    );
 
     const rider: CarriageRiderRow = {
       riderId,
@@ -418,11 +458,13 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
 
       // Productivity
       evaluatedHours: parseNumber(row["Evaluated Hours"]),
-      totalCompletedDeliveries: calculatedOrders, // Use calculated orders instead of CSV value
-      pickupsCount: parseNumber(row["Pickups Count"]),
-      pickupCancellations: parseNumber(row["Pickup Cancellations"]),
-      dropoffsCount: parseNumber(row["Dropoffs Count"]),
-      dropoffCancellations: parseNumber(row["Dropoff Cancellations"]),
+      // Physical completed delivery count, kept separately for reporting.
+      totalCompletedDeliveries: billableDropoffs,
+      pickupsCount,
+      pickupCancellations,
+      dropoffsCount,
+      dropoffCancellations,
+      calculatedOrders,
 
       // Rider settlement
       pickupPayment,
@@ -493,7 +535,7 @@ export function parseCarriageCSV(buffer: Buffer): CarriageParseResult {
 
   // Riders totals
   for (const rider of riders) {
-    totals.completedDeliveries += rider.totalCompletedDeliveries;
+    totals.completedDeliveries += rider.calculatedOrders;
     totals.evaluatedHours += rider.evaluatedHours;
     totals.pickupPayment += rider.pickupPayment;
     totals.dropoffPayment += rider.dropoffPayment;

@@ -26,11 +26,6 @@ export type ExtractedPdf = { pages: string[]; pageCount: number; visualRows: Nbk
 
 GlobalWorkerOptions.workerSrc = `file://${path.join(process.cwd(), "node_modules", "pdfjs-dist", "legacy", "build", "pdf.worker.mjs").replace(/\\/g, "/")}`;
 
-async function createPdfCanvas(width: number, height: number) {
-  const canvas = await import(/* webpackIgnore: true */ "@napi-rs/canvas") as { createCanvas: (width: number, height: number) => any };
-  return canvas.createCanvas(width, height);
-}
-
 async function createOcrWorker(): Promise<OcrWorker> {
   const tesseract = await import(/* webpackIgnore: true */ "tesseract.js") as { createWorker: (languages: string) => Promise<OcrWorker> };
   return tesseract.createWorker("eng");
@@ -158,11 +153,19 @@ function addOcrDetails(rows: NbkVisualRow[], ocr: OcrMidLine[]) {
   for (const entry of ocr) {
     const row = rows.reduce<NbkVisualRow | undefined>((closest, candidate) => !closest || Math.abs(candidate.y - entry.y) < Math.abs(closest.y - entry.y) ? candidate : closest, undefined);
     if (!row || Math.abs(row.y - entry.y) > 18) continue;
+    if (/\bMID\s*[:.-]?\s*\d{8,12}\b/i.test(row.description)) continue;
     row.mid = entry.mid;
     row.transactionReference = entry.transactionReference;
     row.description = [row.description, entry.text].filter(Boolean).join(" ").trim();
     row.rawRowText = [row.rawRowText, entry.text].filter(Boolean).join(" ").trim();
   }
+}
+
+export function needsNbkOcr(rows: NbkVisualRow[]) {
+  // Hybrid PDFs can have hundreds of extractable dates/amounts while the
+  // description column is drawn as glyph paths. Total text count says nothing
+  // about whether those descriptions (and their merchant IDs) are readable.
+  return rows.some(row => !row.description.trim());
 }
 
 function verifyBalances(rows: NbkVisualRow[]) {
@@ -194,21 +197,27 @@ export async function extractPdfText(bytes: Uint8Array): Promise<ExtractedPdf> {
       // column. Avoid rendering and OCRing every page, which can time out on
       // long statements. OCR remains only as a fallback for legacy rows that
       // truly lack extractable MID text.
-      if (rows.length > 0 && items.length < 20 && rows.some((row) => !/\bMID\s*[:.-]?\s*\d{8,12}\b/i.test(row.rawRowText))) {
+      if (needsNbkOcr(rows)) {
         const viewport = page.getViewport({ scale: 3 });
-        const canvas = await createPdfCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-        const context = canvas.getContext("2d") as any;
-        await page.render({ canvasContext: context, viewport }).promise;
-        worker ??= await createOcrWorker();
-        const result = await worker.recognize(Buffer.from(await canvas.encode("png")), {}, { tsv: true });
-        addOcrDetails(rows, ocrMidLines(result.data.tsv ?? "", page.getViewport({ scale: 1 }).height, 3));
+        // Use PDF.js's own canvas factory: a separately resolved native canvas
+        // version may not accept the Path2D objects created by PDF.js.
+        const factory = document.canvasFactory as { create(width: number, height: number): { canvas: { encode(format: string): Promise<Uint8Array> }; context: any }; destroy(target: unknown): void };
+        const target = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        try {
+          await page.render({ canvasContext: target.context, viewport }).promise;
+          worker ??= await createOcrWorker();
+          const result = await worker.recognize(Buffer.from(await target.canvas.encode("png")), {}, { tsv: true });
+          addOcrDetails(rows, ocrMidLines(result.data.tsv ?? "", page.getViewport({ scale: 1 }).height, 3));
+        } finally {
+          factory.destroy(target);
+        }
       }
       verifyBalances(rows);
       allRows.push(...rows);
       pages.push(rows.map((row) => row.rawRowText).join("\n"));
     }
   } finally {
-    await worker?.terminate();
+    try { await worker?.terminate(); } finally { await document.destroy(); }
   }
   return { pages, pageCount: document.numPages, visualRows: allRows };
 }

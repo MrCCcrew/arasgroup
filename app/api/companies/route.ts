@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRequestSession } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { initializeCompanyChart } from "@/lib/accounting/company-chart";
 
 const createCompanySchema = z.object({
   groupId: z.string(),
   nameAr: z.string().min(2, "الاسم مطلوب"),
   nameEn: z.string().optional(),
-  type: z.enum(["DELIVERY", "CAR_WASH", "TRADING", "HOLDING", "OTHER", "OWNER_MANAGED"]),
+  type: z.enum(["DELIVERY", "CAR_WASH", "GENERAL_TRADING", "TRADING", "HOLDING", "OTHER", "OWNER_MANAGED", "CONTRACTING", "GROCERY", "CLOTHING_RETAIL", "TAILORING", "FABRIC_RETAIL", "TAILORING_FABRIC_RETAIL", "TOBACCO_SHISHA", "MOBILE_REPAIR_ACCESSORIES"]),
   commercialReg: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
@@ -53,7 +54,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const company = await prisma.company.create({ data: parsed.data });
+    const company = await prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({ data: parsed.data });
+      await initializeCompanyChart(tx, created.id, created.type);
+      return created;
+    }, { timeout: 30000 });
     return NextResponse.json({ success: true, data: company }, { status: 201 });
   } catch (error) {
     console.error(error);

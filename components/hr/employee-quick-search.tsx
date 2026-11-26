@@ -4,24 +4,15 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X, Printer } from "lucide-react";
 import Link from "next/link";
+import { employeeListParams, type EmployeeListFilters } from "@/lib/hr/employee-list";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Props {
   companyId: string;
   printHref: string;
-  currentFilters: {
-    group?: string;
-    status?: string;
-    category?: string;
-    type?: string;
-    positionId?: string;
-    residencyLicenseId?: string;
-    workPermitLicenseId?: string;
-    mainLicenseId?: string;
-    subLicenseId?: string;
-    search?: string;
-  };
+  currentFilters: EmployeeListFilters;
+  residences: string[];
   initialSearch: string;
   locale: "ar" | "en";
   residencyLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
@@ -30,7 +21,7 @@ interface Props {
   subLicenses: { id: string; commercialNameAr: string; commercialNameEn: string | null; civilEntityNumber: string | null; mainLicenseId: string | null }[];
 }
 
-export function EmployeeQuickSearch({ companyId, printHref, currentFilters, initialSearch, locale, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses }: Props) {
+export function EmployeeQuickSearch({ companyId, printHref, currentFilters, residences, initialSearch, locale, residencyLicenses, workPermitLicenses, mainLicenses, subLicenses }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 300);
@@ -100,43 +91,16 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
     allLicenses: en ? "All" : "الكل",
   };
 
-  const handleLicenseFilter = useCallback(
-    (type: 'residency' | 'workPermit' | 'main' | 'sub', value: string) => {
-      const params = new URLSearchParams();
-      if (currentFilters.group) params.set("group", currentFilters.group);
-      if (currentFilters.status) params.set("status", currentFilters.status);
-      if (currentFilters.category) params.set("category", currentFilters.category);
-      if (currentFilters.type) params.set("type", currentFilters.type);
-      if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
-      if (currentFilters.search) params.set("search", currentFilters.search);
+  const updateFilter = useCallback((key: keyof EmployeeListFilters, value: string) => {
+    const params = employeeListParams({ ...currentFilters, search: search.trim(), [key]: value });
+    const query = params.toString();
+    router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
+  }, [companyId, currentFilters, router, search]);
 
-      if (type === 'residency') {
-        if (value) params.set("residencyLicenseId", value);
-        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
-        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
-        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
-      } else if (type === 'workPermit') {
-        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
-        if (value) params.set("workPermitLicenseId", value);
-        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
-        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
-      } else if (type === 'main') {
-        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
-        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
-        if (value) params.set("mainLicenseId", value);
-        if (currentFilters.subLicenseId) params.set("subLicenseId", currentFilters.subLicenseId);
-      } else {
-        if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
-        if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
-        if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
-        if (value) params.set("subLicenseId", value);
-      }
-
-      const query = params.toString();
-      router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
-    },
-    [companyId, currentFilters, router]
-  );
+  const handleLicenseFilter = (type: "residency" | "workPermit" | "main" | "sub", value: string) => {
+    const keys = { residency: "residencyLicenseId", workPermit: "workPermitLicenseId", main: "mainLicenseId", sub: "subLicenseId" } as const;
+    updateFilter(keys[type], value);
+  };
 
   useEffect(() => {
     setSearch(initialSearch);
@@ -144,16 +108,7 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
 
   const handleSearch = useCallback(
     (value: string) => {
-      const params = new URLSearchParams();
-      if (currentFilters.group) params.set("group", currentFilters.group);
-      if (currentFilters.status) params.set("status", currentFilters.status);
-      if (currentFilters.category) params.set("category", currentFilters.category);
-      if (currentFilters.type) params.set("type", currentFilters.type);
-      if (currentFilters.positionId) params.set("positionId", currentFilters.positionId);
-      if (currentFilters.residencyLicenseId) params.set("residencyLicenseId", currentFilters.residencyLicenseId);
-      if (currentFilters.workPermitLicenseId) params.set("workPermitLicenseId", currentFilters.workPermitLicenseId);
-      if (currentFilters.mainLicenseId) params.set("mainLicenseId", currentFilters.mainLicenseId);
-      if (value.trim()) params.set("search", value.trim());
+      const params = employeeListParams({ ...currentFilters, search: value.trim() });
 
       const query = params.toString();
       router.push(`/dashboard/companies/${companyId}/hr/employees${query ? `?${query}` : ""}`);
@@ -192,6 +147,14 @@ export function EmployeeQuickSearch({ companyId, printHref, currentFilters, init
             </button>
           )}
         </div>
+
+        <SearchableSelect
+          label={en ? "Residence location" : "مكان السكن"}
+          value={currentFilters.residentialAddress || ""}
+          onChange={(value) => updateFilter("residentialAddress", value)}
+          options={[...new Set([...residences, ...(currentFilters.residentialAddress ? [currentFilters.residentialAddress] : [])])].map(value => ({ value, label: value }))}
+          placeholder={en ? "All residence locations" : "كل أماكن السكن"}
+        />
 
         {(residencyLicenses.length > 0 || workPermitLicenses.length > 0 || mainLicenses.length > 0 || subLicenses.length > 0) && (
           <div className="grid grid-cols-2 gap-3">
