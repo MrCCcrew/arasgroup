@@ -34,7 +34,9 @@ html[data-ui="modern"] {
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-border: 217.2 32.6% 17.5%;
   --sidebar-ring: 229.7 93.5% 81.8%;  --radius: 1rem;
-  --m-line: #EEF0F4;
+  --m-line: #E3E7EE;
+  --m-field: #C5CEDB;
+  --m-field-hover: #A8B3C4;
   --m-subtle: #F8FAFC;
   --m-crit-fg: #B42318; --m-crit-bg: #FEF1EC; --m-crit-bd: #F4C7B8; --m-crit-solid: #C4320A;
   --m-warn-fg: #8A5A00; --m-warn-bg: #FFF6E0; --m-warn-bd: #F5D78A; --m-warn-strong: #6B4600;
@@ -179,14 +181,25 @@ html[data-ui="modern"] :is(.input-field, .ui-input):not(textarea) { min-height: 
 html[data-ui="modern"] :is(.input-field, .ui-input) {
   border-radius: 14px;
   background: hsl(var(--card));
-  border-color: hsl(var(--border));
   font-size: 14px;
 }
-html[data-ui="modern"] :is(.input-field, .ui-input):focus {
-  border-color: hsl(var(--ring));
+/* حدود حقول الإدخال واضحة في كل الصفحات (حتى مع تكبير شاشة ويندوز 125%) */
+html[data-ui="modern"] :is(.input-field, .ui-input),
+html[data-ui="modern"] main :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]), select, textarea):not(.border-0) {
+  border: 1px solid var(--m-field) !important;
+  background-color: #fff;
+}
+html[data-ui="modern"] :is(.input-field, .ui-input):hover,
+html[data-ui="modern"] main :is(input, select, textarea):not(:focus):not(:disabled):hover { border-color: var(--m-field-hover) !important; }
+html[data-ui="modern"] :is(.input-field, .ui-input):focus,
+html[data-ui="modern"] main :is(input, select, textarea):focus {
+  border-color: hsl(var(--ring)) !important;
   box-shadow: 0 0 0 3px hsl(var(--ring) / .2);
   outline: none;
 }
+html[data-ui="modern"] main :is(input, select, textarea):disabled { background-color: var(--m-subtle); }
+/* الحقول الصغيرة جوه الجداول: زوايا أصغر علشان الحدود متتاكلش */
+html[data-ui="modern"] main table :is(input, select, .input-field) { border-radius: 10px; }
 html[data-ui="modern"] .form-label { font-weight: 700; font-size: 13px; }
 html[data-ui="modern"] main :is(input[type="checkbox"], input[type="radio"]) {
   accent-color: hsl(var(--primary));
